@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { z } from 'zod';
 import { createContract } from '@ts-kizuna/core';
-import { createApi, createExpressEndpoints, type KizunaRequest } from './server.js';
+import { createApi, createExpressEndpoints } from './server.js';
 
 interface User {
     id: string;
@@ -241,7 +241,7 @@ describe('Express integration — globalMiddleware', () => {
         createExpressEndpoints(api, app, {
             globalMiddleware: [
                 (req, _res, next) => {
-                    routesSeen.push((req as KizunaRequest).kizunaRoute.path);
+                    routesSeen.push(req.kizunaRoute.path);
                     next();
                 },
             ],
