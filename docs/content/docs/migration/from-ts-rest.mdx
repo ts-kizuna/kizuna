@@ -51,6 +51,45 @@ export const contract = createContract({
 
 The optional string argument to `createContract` sets the OpenAPI tag for all routes in that sub-contract.
 
+### `c.noBody()` → `z.void()`
+
+ts-rest uses `c.noBody()` to mark a route as having no request body or to mark a response as having no body. In ts-kizuna, use `z.void()` instead. Routes don't require a `body` field, so for request bodies you can simply remove it.
+
+```ts
+// ts-rest
+import { initContract } from '@ts-rest/core';
+const c = initContract();
+
+export const contract = c.router({
+    deleteUser: {
+        method: 'DELETE',
+        path: '/users/:id',
+        body: c.noBody(),
+        responses: {
+            204: c.noBody(),
+        },
+    },
+});
+```
+
+```ts
+// ts-kizuna — remove `body`, use z.void() for empty responses
+import { createContract } from '@ts-kizuna/core';
+import { z } from 'zod';
+
+export const contract = createContract({
+    deleteUser: {
+        method: 'DELETE',
+        path: '/users/:id',
+        responses: {
+            204: z.void(),
+        },
+    },
+});
+```
+
+For request bodies, just remove the `body` field. Use `z.void()` for responses that return no body (like `204`).
+
 ## Client
 
 The ts-rest client lives in `@ts-rest/core`. In ts-kizuna, the client is a separate package.
@@ -166,11 +205,12 @@ ts-kizuna targets **Zod 4 only**. ts-rest supports Zod 3 and 4.
 
 If you are upgrading from ts-rest and Zod 3, migrate to Zod 4 alongside this change:
 
-| Zod 3 / ts-rest                   | Zod 4 / ts-kizuna  |
-| --------------------------------- | ------------------ |
-| `z.ZodTypeAny`                    | `z.ZodType`        |
-| `ZodIssue` (from `'zod'`)         | `z.core.$ZodIssue` |
-| `.openapi({ ... })` (zod-openapi) | `.meta({ ... })`   |
+| Zod 3 / ts-rest                   | Zod 4 / ts-kizuna                  |
+| --------------------------------- | ---------------------------------- |
+| `c.noBody()`                      | `z.void()` or omit `body` entirely |
+| `z.ZodTypeAny`                    | `z.ZodType`                        |
+| `ZodIssue` (from `'zod'`)         | `z.core.$ZodIssue`                 |
+| `.openapi({ ... })` (zod-openapi) | `.meta({ ... })`                   |
 
 ## Deprecation
 
