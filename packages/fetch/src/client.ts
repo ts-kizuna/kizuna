@@ -35,7 +35,11 @@ type ClientPayload<T extends z.ZodType> = SubstituteUnknown<z.input<T>, z.output
 
 type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends true ? { params: ExtractPathParams<R['path']> } : {}) &
     (R extends { body: z.ZodType } ? (ClientPayload<R['body']> extends void ? {} : { body: ClientPayload<R['body']> }) : {}) &
-    (R extends { query: z.ZodType } ? { query: ClientPayload<R['query']> } : {}) &
+    (R extends { query: z.ZodType }
+        ? {} extends ClientPayload<R['query']>
+            ? { query?: ClientPayload<R['query']> }
+            : { query: ClientPayload<R['query']> }
+        : {}) &
     (R extends { headers: z.ZodType } ? { headers: ClientPayload<R['headers']> } : { headers?: Record<string, string> }) & {
         fetchOptions?: RequestInit;
     };

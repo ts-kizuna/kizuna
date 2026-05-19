@@ -263,10 +263,15 @@ test('createUser requires body with the right shape', async () => {
     }
 });
 
-test('listUsers query is required (the key itself), even if its inner fields are optional', async () => {
-    const result = await client.listUsers({
-        query: {},
-    });
+test('listUsers can be called without args when all query fields are optional', async () => {
+    const result = await client.listUsers();
+    if (result.status === 200) {
+        expectTypeOf(result.body).toEqualTypeOf<{ users: string[] }>();
+    }
+});
+
+test('listUsers also accepts explicit query', async () => {
+    const result = await client.listUsers({ query: { page: 1 } });
     if (result.status === 200) {
         expectTypeOf(result.body).toEqualTypeOf<{ users: string[] }>();
     }
