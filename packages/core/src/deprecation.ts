@@ -376,25 +376,7 @@ const findAllRouteObjectLiterals = (sourceFile: ts.SourceFile, resolve: Identifi
 };
 
 /**
- * Read JSDoc `@deprecated` tags from a contract source file and return a `DeprecationMap`
- * for use in `generateOpenApi` / `generateSwiftClient`. Pass the absolute path of the
- * contract `.ts` file.
- *
- * ```ts
- * import * as path from 'node:path';
- * import { createDeprecationMap } from '@ts-kizuna/core';
- * import { generateOpenApi } from '@ts-kizuna/open-api';
- * import { contract } from './contract';
- *
- * const deprecation = createDeprecationMap(
- *     path.resolve(import.meta.dirname, './contract.ts')
- * );
- *
- * export const spec = generateOpenApi(contract, {
- *     info: { title: 'My API', version: '1.0.0' },
- *     deprecation,
- * });
- * ```
+ * Read JSDoc `@deprecated` tags from a contract source file and return a `DeprecationMap`.
  */
 export const createDeprecationMap = (contractPath: string): DeprecationMap => {
     const source = fs.readFileSync(contractPath, 'utf8');
