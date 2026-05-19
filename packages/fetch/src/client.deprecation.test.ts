@@ -70,9 +70,13 @@ describe('@deprecated propagation through Client<T>', () => {
 
     test('field-level @deprecated on a query field propagates into client args', () => {
         const args = callArgsType(clientType, 'newRoute');
-        const query = args.getProperty('query');
-        if (!query) throw new Error('query missing');
-        const queryType = checker.getTypeOfSymbol(query);
+        const querySymbol = args.getProperty('query');
+        if (!querySymbol) throw new Error('query missing');
+        let queryType = checker.getTypeOfSymbol(querySymbol);
+        if (queryType.isUnion()) {
+            const nonUndefined = queryType.types.find((t) => !(t.getFlags() & ts.TypeFlags.Undefined));
+            if (nonUndefined) queryType = nonUndefined;
+        }
         expect(hasDeprecated(propertyTags(queryType, 'page'))).toBe(true);
     });
 });
