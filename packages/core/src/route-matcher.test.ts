@@ -167,4 +167,21 @@ describe('matchRoute', () => {
             id: 'a b',
         });
     });
+
+    it('prefers static segments over parameterized ones regardless of declaration order', () => {
+        const c = createContract({
+            addItem: {
+                method: 'POST',
+                path: '/cart/:itemId',
+                responses: { 200: z.object({ ok: z.boolean() }) },
+            },
+            checkout: {
+                method: 'POST',
+                path: '/cart/checkout',
+                responses: { 200: z.object({ ok: z.boolean() }) },
+            },
+        });
+        const match = matched(matchRoute('POST', '/cart/checkout', c));
+        expect(match.routeKey).toBe('checkout');
+    });
 });

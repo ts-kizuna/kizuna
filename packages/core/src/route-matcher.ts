@@ -43,6 +43,7 @@ const getCompiled = (contract: Contract): CompiledRoute[] => {
     const existing = cache.get(contract);
     if (existing) return existing;
     const fresh = flattenContract(contract).map(({ routeKey, route }) => compileRoute(routeKey, route));
+    fresh.sort((a, b) => a.paramNames.length - b.paramNames.length);
     cache.set(contract, fresh);
     return fresh;
 };
