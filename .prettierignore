@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+.turbo
+pnpm-lock.yaml
+
+# Don't touch package manifests or TS configs — leave those to the user / pnpm.
+package.json
+**/package.json
+tsconfig.json
+**/tsconfig*.json

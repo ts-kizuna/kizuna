@@ -1,0 +1,39 @@
+{
+  "name": "@ts-kizuna/next",
+  "version": "0.3.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@ts-kizuna/core": "workspace:*",
+    "next": ">=16.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@ts-kizuna/core": "workspace:*",
+    "next": "^16.0.0",
+    "tsdown": "^0.21.0",
+    "typescript": "^5.6.3",
+    "zod": "^4.0.0"
+  }
+}

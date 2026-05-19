@@ -1,0 +1,22 @@
+{
+  "name": "@ts-kizuna-demo/swift",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "generate": "ts-kizuna-swift generate --contract ../shared/src/contract.ts --out swift/Sources/APIClient/APIClient.swift --namespace-name API",
+    "pretest": "pnpm generate",
+    "test": "tsx scripts/test.ts",
+    "build": "cd swift && swift build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ts-kizuna-demo/shared": "workspace:*",
+    "@ts-kizuna/swift": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

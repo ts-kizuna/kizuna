@@ -1,0 +1,159 @@
+---
+title: Express
+description: Mount a ts-kizuna contract on an Express 5 application.
+---
+
+`@ts-kizuna/express` connects a ts-kizuna contract to an Express 5 application. It handles routing, request validation, body parsing, and error formatting — all driven by your contract schema.
+
+**Requires Express ≥ 5.**
+
+<InstallTabs packageName="@ts-kizuna/express express" />
+
+## Setup
+
+The standard setup uses three functions:
+
+- `createRouter` — bind typed implementations to a contract
+- `createApi` — combine a contract and its handlers into an API object
+- `createExpressEndpoints` — mount the API on an Express app
+
+```ts
+// src/lib/router.ts
+import { createRouter } from '@ts-kizuna/express';
+import { contract } from '@shared/contract';
+
+export const router = createRouter(contract, {
+    listUsers: async ({ query }) => {
+        const users = await db.users.findMany({
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+        });
+        return {
+            status: 200,
+            body: {
+                users,
+                total: await db.users.count(),
+            },
+        };
+    },
+    createUser: async ({ body }) => {
+        const user = await db.users.create(body);
+        return {
+            status: 201,
+            body: user,
+        };
+    },
+    getUser: async ({ params }) => {
+        const user = await db.users.findById(params.id);
+        if (!user) {
+            return {
+                status: 404,
+                body: {
+                    message: 'Not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: user,
+        };
+    },
+});
+```
+
+```ts
+// src/lib/server.ts
+import { createApi } from '@ts-kizuna/express';
+import { contract } from '@shared/contract';
+import { router } from './router';
+
+export const api = createApi({
+    contract,
+    router,
+});
+```
+
+```ts
+// src/index.ts
+import express from 'express';
+import { createExpressEndpoints } from '@ts-kizuna/express';
+import { api } from './lib/server';
+
+const app = express();
+app.use(express.json());
+
+createExpressEndpoints(api, app);
+
+app.listen(3000);
+```
+
+## Handler context
+
+Each handler receives `{ params, query, body, headers, req, res }`. The `req` and `res` are the native Express objects — useful when you need to access cookies, set custom headers, or stream a response.
+
+```ts
+getUser: async ({ params, req, res }) => {
+    console.log(req.ip);
+    res.setHeader('x-custom', 'value');
+    const user = await db.users.findById(params.id);
+    return {
+        status: 200,
+        body: user,
+    };
+},
+```
+
+## Options
+
+```ts
+createExpressEndpoints(api, app, {
+    problemDetailsEnabled: true,
+    responseValidation: false,
+    globalMiddleware: [],
+    requestValidationErrorHandler: undefined,
+});
+```
+
+| Option                          | Default             | Description                                                                                                                              |
+| ------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `problemDetailsEnabled`         | `true`              | Emit RFC 9457 `application/problem+json` error responses                                                                                 |
+| `responseValidation`            | `false`             | Validate handler return values against response schemas — surfaces as 500 on mismatch. Enable in development.                            |
+| `globalMiddleware`              | `[]`                | Middleware inserted after route matching, before the handler runs. Use `(req as TsZestRequest).tsZestRoute` to branch on route metadata. |
+| `requestValidationErrorHandler` | default 400 handler | Custom handler for validation failures. Not called when `problemDetailsEnabled` is `true`.                                               |
+
+## RFC 9457 Problem Details
+
+By default, all non-2xx error responses use the [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) format with `Content-Type: application/problem+json`:
+
+```json
+{
+    "type": "about:blank",
+    "title": "Unprocessable Entity",
+    "status": 422,
+    "detail": "Request validation failed"
+}
+```
+
+Set `problemDetailsEnabled: false` to revert to the legacy `{ message, issues }` shape.
+
+## Method mismatches
+
+If a path is matched but the method is not defined in the contract, the adapter returns 405 with an `Allow` header listing the supported methods. This follows [RFC 9110 §15.5.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.6).
+
+## Multipart / file uploads
+
+For routes with `contentType: 'multipart/form-data'`, add a multipart middleware such as `multer` or `busboy` before the ts-kizuna handler. The adapter reads `req.body` as-is and does not parse multipart itself.
+
+```ts
+import multer from 'multer';
+
+const upload = multer({
+    storage: multer.memoryStorage(),
+});
+
+app.post('/avatar', upload.single('file'), (req, res, next) => {
+    next();
+});
+
+createExpressEndpoints(api, app);
+```

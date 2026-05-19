@@ -1,0 +1,16 @@
+{
+  "name": "@ts-kizuna-demo/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/contract.ts",
+      "default": "./src/contract.ts"
+    }
+  },
+  "dependencies": {
+    "@ts-kizuna/core": "workspace:*",
+    "zod": "^4.0.0"
+  }
+}

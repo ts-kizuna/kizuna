@@ -1,0 +1,133 @@
+---
+title: Router
+description: Implement route handlers with full type inference from the contract.
+---
+
+A router implements each route in your contract.
+
+## `createRouter`
+
+```ts
+import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/next
+import { contract } from './contract';
+
+export const router = createRouter(contract, {
+    listUsers: async ({ query }) => {
+        const users = await db.users.findMany({
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+        });
+        return {
+            status: 200,
+            body: {
+                users,
+                total: await db.users.count(),
+            },
+        };
+    },
+
+    createUser: async ({ body }) => {
+        const user = await db.users.create(body);
+        return {
+            status: 201,
+            body: user,
+        };
+    },
+
+    getUser: async ({ params }) => {
+        const user = await db.users.findById(params.id);
+        if (!user) {
+            return {
+                status: 404,
+                body: {
+                    message: 'Not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: user,
+        };
+    },
+});
+```
+
+## Handler arguments
+
+Each handler receives an object with the validated inputs for that route:
+
+| Property     | Available when                       |
+| ------------ | ------------------------------------ |
+| `params`     | Route path has `:param` placeholders |
+| `query`      | Route has a `query` schema           |
+| `body`       | Route has a `body` schema            |
+| `headers`    | Route has a `headers` schema         |
+| `req`, `res` | Express adapter                      |
+| `request`    | Next.js adapter                      |
+
+## Return type
+
+Return `{ status, body }` matching one of the route's declared responses. TypeScript enforces that the status and body match.
+
+```ts
+// Route: responses: { 200: UserSchema, 404: z.object({ message: z.string() }) }
+return {
+    status: 200,
+    body: user,
+};
+
+return {
+    status: 404,
+    body: {
+        message: 'User not found',
+    },
+};
+```
+
+For routes with typed response headers, include `headers` too:
+
+```ts
+return {
+    status: 200,
+    body: user,
+    headers: {
+        'x-request-id': req.headers['x-request-id'] ?? '',
+    },
+};
+```
+
+## `RouteHandler` and `Router` types
+
+Annotate handlers individually or as a group:
+
+```ts
+import type { RouteHandler, Router } from '@ts-kizuna/express';
+import { contract } from './contract';
+
+// Single route
+const getUser: RouteHandler<typeof contract.getUser> = async ({ params }) => {
+    const user = await db.users.findById(params.id);
+    if (!user) {
+        return {
+            status: 404,
+            body: {
+                message: 'Not found',
+            },
+        };
+    }
+    return {
+        status: 200,
+        body: user,
+    };
+};
+
+// All routes
+const router: Router<typeof contract> = { ... };
+```
+
+## Next steps
+
+Mount your router with an adapter:
+
+- [Express](/docs/adapters/express)
+- [Next.js](/docs/adapters/next)

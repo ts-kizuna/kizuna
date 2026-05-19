@@ -1,0 +1,111 @@
+---
+title: Breaking Changes
+description: Detect breaking API changes between versions using oasdiff.
+---
+
+We recommend using [oasdiff](https://github.com/oasdiff/oasdiff) to detect breaking changes in your API. oasdiff compares OpenAPI specs and reports breaking changes, changelogs, and diffs. Since ts-kizuna generates OpenAPI 3.1.0 specs from your contract, you can wire up oasdiff to catch breaking changes before they ship.
+
+## Print your spec to stdout
+
+Create a script that prints your OpenAPI spec as YAML to stdout — this is the interface oasdiff and CI workflows consume.
+
+```ts
+// scripts/print-openapi.ts
+import path from 'path';
+import { generateOpenApi } from '@ts-kizuna/open-api';
+import { contract } from '../src/contract';
+
+const spec = generateOpenApi(contract, {
+    info: {
+        title: 'My API',
+        version: '1.0.0',
+    },
+    deprecationWarnings: {
+        contractPath: path.resolve(import.meta.dirname, '../src/contract.ts'),
+    },
+});
+
+console.log(spec('yaml'));
+```
+
+Add a script to your `package.json`:
+
+```json
+{
+    "scripts": {
+        "print:openapi": "tsx scripts/print-openapi.ts"
+    }
+}
+```
+
+## GitHub Actions
+
+Add a workflow that runs oasdiff on every pull request. This generates the OpenAPI spec from both the base branch and the PR branch, then checks for breaking changes.
+
+```yaml
+# .github/workflows/breaking-changes.yml
+name: Breaking Changes
+
+on:
+    pull_request:
+        branches: [main]
+
+jobs:
+    breaking-changes:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout PR branch
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.head_ref }}
+
+            - name: Setup
+              uses: pnpm/action-setup@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+
+            - name: Install and build (PR)
+              run: |
+                  pnpm install --frozen-lockfile
+                  pnpm build
+            - name: Generate PR spec
+              run: pnpm print:openapi > pr-api.yaml
+
+            - name: Checkout base branch
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.base_ref }}
+                  clean: false
+                  path: base
+
+            - name: Install and build (base)
+              working-directory: base
+              run: |
+                  pnpm install --frozen-lockfile
+                  pnpm build
+            - name: Generate base spec
+              working-directory: base
+              run: pnpm print:openapi > ../base-api.yaml
+
+            - name: Check for breaking changes
+              id: oasdiff
+              uses: oasdiff/oasdiff-action/breaking@main
+              with:
+                  base: base-api.yaml
+                  revision: pr-api.yaml
+                  fail-on: ERR
+
+            - name: Require label for breaking changes
+              if: steps.oasdiff.outcome == 'failure'
+              run: |
+                  if [[ "${{ contains(github.event.pull_request.labels.*.name, 'breaking changes') }}" == "true" ]]; then
+                      echo "Breaking changes acknowledged via label."
+                  else
+                      echo "::error::Breaking changes detected. Add the 'breaking changes' label to acknowledge."
+                      exit 1
+                  fi
+```
+
+If oasdiff detects breaking changes, the PR is blocked until someone adds the `breaking changes` label — forcing explicit acknowledgment from the team.

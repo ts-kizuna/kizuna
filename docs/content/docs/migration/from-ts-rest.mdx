@@ -1,0 +1,226 @@
+---
+title: Migrating from ts-rest
+description: Side-by-side comparison of ts-rest and ts-kizuna APIs, with notes on deliberate differences.
+---
+
+ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered. ts-rest proved that contract-first TypeScript APIs could work beautifully, and a lot of people built real things with it — we did too. We truly appreciate what the team behind ts-rest built. ts-kizuna borrows several of its core concepts and keeps the public API deliberately familiar, but takes a different approach under the hood. This page maps every changed API to its ts-kizuna equivalent.
+
+## Package mapping
+
+| ts-rest             | ts-kizuna                              | Notes                              |
+| ------------------- | -------------------------------------- | ---------------------------------- |
+| `@ts-rest/core`     | `@ts-kizuna/core` + `@ts-kizuna/fetch` | Client lives in a separate package |
+| `@ts-rest/express`  | `@ts-kizuna/express`                   |                                    |
+| `@ts-rest/next`     | `@ts-kizuna/next`                      |                                    |
+| `@ts-rest/open-api` | `@ts-kizuna/open-api`                  |                                    |
+
+## Contract
+
+### `initContract` → `createContract`
+
+`initContract` does not exist in ts-kizuna. Use `createContract` directly.
+
+```ts
+// ts-rest
+import { initContract } from '@ts-rest/core';
+const c = initContract();
+export const contract = c.router({ ... });
+```
+
+```ts
+// ts-kizuna
+import { createContract } from '@ts-kizuna/core';
+export const contract = createContract({ ... });
+```
+
+### Nested contracts
+
+```ts
+// ts-rest
+export const contract = c.router({
+    users: c.router({ ... }),
+});
+```
+
+```ts
+// ts-kizuna
+export const contract = createContract({
+    users: createContract('Users', { ... }),
+});
+```
+
+The optional string argument to `createContract` sets the OpenAPI tag for all routes in that sub-contract.
+
+## Client
+
+The ts-rest client lives in `@ts-rest/core`. In ts-kizuna, the client is a separate package.
+
+```ts
+// ts-rest
+import { initClient } from '@ts-rest/core';
+const client = initClient(contract, {
+    baseUrl: '...',
+});
+```
+
+```ts
+// ts-kizuna
+import { createClient } from '@ts-kizuna/fetch';
+const client = createClient(contract, {
+    baseUrl: '...',
+});
+```
+
+## Server
+
+### `initServer` → `createRouter` + `createApi`
+
+`initServer` does not exist in ts-kizuna. Use `createRouter` to bind handler implementations to a contract, and `createApi` to produce a mountable API object.
+
+```ts
+// ts-rest
+import { initServer } from '@ts-rest/express';
+const s = initServer();
+const router = s.router(contract, { ... });
+```
+
+```ts
+// ts-kizuna
+import { createRouter, createApi } from '@ts-kizuna/express';
+
+const router = createRouter(contract, { ... });
+
+export const api = createApi({
+    contract,
+    router,
+});
+```
+
+### `RouterImpl` → `Router`, `Handler` → `RouteHandler`
+
+```ts
+// ts-rest
+import type { RouterImpl } from '@ts-rest/express';
+const router: RouterImpl<typeof contract> = { ... };
+```
+
+```ts
+// ts-kizuna
+import type { Router, RouteHandler } from '@ts-kizuna/express';
+
+// All routes
+const router: Router<typeof contract> = { ... };
+
+// Single route
+const getUser: RouteHandler<typeof contract.getUser> = async ({ params }) => { ... };
+```
+
+## Express adapter
+
+### `createExpressEndpoints`
+
+```ts
+// ts-rest
+import { createExpressEndpoints } from '@ts-rest/express';
+createExpressEndpoints(contract, router, app);
+```
+
+```ts
+// ts-kizuna
+import { createExpressEndpoints } from '@ts-kizuna/express';
+createExpressEndpoints(api, app);
+```
+
+In ts-kizuna, `createExpressEndpoints` takes the `api` object (produced by `createApi`) rather than separate contract and handler arguments.
+
+## Next.js adapter
+
+### Route file setup
+
+```ts
+// ts-rest — App Router via @ts-rest/serverless/next
+import { createNextHandler } from '@ts-rest/serverless/next';
+import { contract } from '@shared/contract';
+import { router } from './router';
+
+const handler = createNextHandler(contract, router, {
+    basePath: '/api',
+});
+
+export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE, handler as OPTIONS };
+```
+
+```ts
+// ts-kizuna — App Router catch-all
+import { createNextEndpoints } from '@ts-kizuna/next';
+import { api } from '../../lib/server';
+
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
+    basePath: '/api',
+});
+```
+
+## Zod version
+
+ts-kizuna targets **Zod 4 only**. ts-rest supports Zod 3 and 4.
+
+If you are upgrading from ts-rest and Zod 3, migrate to Zod 4 alongside this change:
+
+| Zod 3 / ts-rest                   | Zod 4 / ts-kizuna  |
+| --------------------------------- | ------------------ |
+| `z.ZodTypeAny`                    | `z.ZodType`        |
+| `ZodIssue` (from `'zod'`)         | `z.core.$ZodIssue` |
+| `.openapi({ ... })` (zod-openapi) | `.meta({ ... })`   |
+
+## Deprecation
+
+ts-rest supports `deprecated: true` on route definitions and `.meta({ deprecated: true })` on Zod schemas. Both are intentionally removed in ts-kizuna.
+
+```ts
+// ts-rest
+deleteUser: {
+    method: 'DELETE',
+    path: '/users/:id',
+    deprecated: true,
+    responses: {
+        200: z.object({
+            success: z.boolean(),
+        }),
+    },
+},
+```
+
+```ts
+// ts-kizuna — JSDoc only
+/**
+ * @deprecated
+ */
+deleteUser: {
+    method: 'DELETE',
+    path: '/users/:id',
+    responses: {
+        200: z.object({
+            success: z.boolean(),
+        }),
+    },
+},
+```
+
+The `/** @deprecated */` JSDoc tag drives IDE strikethrough, the OpenAPI `deprecated` flag, and the Swift `@available(*, deprecated)` attribute — all from a single annotation.
+
+## Error responses
+
+ts-kizuna returns [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) (`application/problem+json`) by default for all non-2xx adapter errors. ts-rest returns `{ message, issues }`.
+
+To opt out per-adapter:
+
+```ts
+// Express
+createExpressEndpoints(api, app, {
+    problemDetailsEnabled: false,
+});
+```
+
+## Method mismatch behaviour
+
+ts-rest returns 404 for requests to a known path with an unsupported method. ts-kizuna returns **405 with an `Allow` header** per [RFC 9110 §15.5.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.6).

@@ -1,0 +1,128 @@
+---
+title: Fetch
+description: A fully typed HTTP client for consuming ts-kizuna contracts in the browser or on the server.
+---
+
+`@ts-kizuna/fetch` provides `createClient` — a typed wrapper around the native `fetch` API.
+
+<InstallTabs packageName="@ts-kizuna/fetch" />
+
+## `createClient`
+
+```ts
+import { createClient } from '@ts-kizuna/fetch';
+import { contract } from '@shared/contract';
+
+export const apiClient = createClient(contract, {
+    baseUrl: 'http://localhost:3000',
+});
+```
+
+The returned client mirrors the shape of the contract. Each route becomes a function that accepts the route's typed arguments and returns a Promise resolving to the typed response.
+
+## Calling routes
+
+```ts
+// GET /users?page=1&limit=10
+const { status, body } = await apiClient.listUsers({
+    query: {
+        page: 1,
+        limit: 10,
+    },
+});
+
+// body is { users: User[]; total: number }
+```
+
+```ts
+// POST /users
+const result = await apiClient.createUser({
+    body: {
+        name: 'Alice',
+        email: 'alice@example.com',
+    },
+});
+
+if (result.status === 201) {
+    console.log(result.body.id);
+} else {
+    // result.status === 400
+    console.error(result.body.message);
+}
+```
+
+```ts
+// GET /users/:id
+const { status, body } = await apiClient.getUser({
+    params: {
+        id: 'usr_abc123',
+    },
+});
+```
+
+The `params` field is only required when the route path contains `:param` placeholders. TypeScript enforces this — routes with no path parameters do not accept `params`.
+
+## `ClientConfig`
+
+```ts
+export interface ClientConfig {
+    baseUrl: string;
+    baseHeaders?: Record<string, string>;
+    credentials?: RequestCredentials;
+    fetch?: typeof fetch;
+}
+```
+
+| Option        | Description                                                  |
+| ------------- | ------------------------------------------------------------ |
+| `baseUrl`     | Base URL prepended to every route path                       |
+| `baseHeaders` | Headers merged into every request                            |
+| `credentials` | Passed as `credentials` to every `fetch` call                |
+| `fetch`       | Custom fetch implementation (e.g. for testing or a polyfill) |
+
+## Per-request headers
+
+If a route declares a `headers` schema, the client requires those headers:
+
+```ts
+// contract declares: headers: z.object({ 'x-request-id': z.string() })
+const { body } = await apiClient.getUser({
+    params: { id: 'usr_abc123' },
+    headers: { 'x-request-id': crypto.randomUUID() },
+});
+```
+
+Routes without a `headers` schema accept an optional `headers?: Record<string, string>` for arbitrary request headers.
+
+## Per-request fetch options
+
+Pass any `RequestInit` option via `fetchOptions`:
+
+```ts
+const { body } = await apiClient.listUsers({
+    query: { page: 1 },
+    fetchOptions: {
+        signal: AbortSignal.timeout(5000),
+    },
+});
+```
+
+## Response type
+
+Each call returns a discriminated union over the route's defined status codes:
+
+```ts
+type ListUsersResponse = { status: 200; body: { users: User[]; total: number }; headers: Record<string, string> };
+```
+
+Narrow on `status` to access the correctly typed `body`:
+
+```ts
+const result = await apiClient.createUser({ body: { name: 'Alice', email: 'alice@example.com' } });
+
+if (result.status === 201) {
+    // result.body is User
+} else {
+    // result.status === 400, result.body is { message: string }
+}
+```

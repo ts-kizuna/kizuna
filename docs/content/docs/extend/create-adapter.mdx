@@ -1,0 +1,164 @@
+---
+title: Create an Adapter
+description: Build a ts-kizuna adapter for any HTTP runtime using createAdapter from @ts-kizuna/core/adapter.
+---
+
+`@ts-kizuna/core/adapter` exposes `createAdapter` so third parties can build and ship their own adapters independently. ts-kizuna ships Express and Next.js — everything else is up to the community.
+
+New first-party adapter PRs will be declined — we can't maintain what we don't know well. The adapter API is public so you can build your own and own it.
+
+## Overview
+
+An adapter translates between a native HTTP runtime (Bun, Hono, Cloudflare Workers, Fastify, etc.) and ts-kizuna's handler pipeline. You provide three things:
+
+- `buildHandlerContext` — builds the context object your handlers receive alongside validated inputs
+- `respond` — translates an `AdapterResult` to a native response
+- `onError` (optional) — intercepts unhandled handler errors
+
+## `createAdapter`
+
+```ts
+import { createAdapter, renderJsonResult, parseFetchBody, headersToObject, type AdapterRequest } from '@ts-kizuna/core/adapter';
+```
+
+## Minimal example (fetch-based runtime)
+
+This example targets any runtime that uses the standard `Request`/`Response` APIs — Bun, Cloudflare Workers, Deno, etc.
+
+```ts
+// adapter.ts
+import {
+    createAdapter,
+    renderJsonResult,
+    parseFetchBody,
+    headersToObject,
+    type AdapterRequest,
+    type Contract,
+    type Handlers,
+} from '@ts-kizuna/core/adapter';
+
+export interface HandlerContext {
+    request: Request;
+}
+
+const adapter = createAdapter<Request, Response, HandlerContext>({
+    buildHandlerContext: (adapterRequest) => ({
+        request: adapterRequest.request,
+    }),
+
+    respond: (result) => {
+        if (result.kind === 'raw-response') return result.response as Response;
+        const rendered = renderJsonResult(result);
+        return new Response(rendered.body === null || rendered.body === undefined ? null : JSON.stringify(rendered.body), {
+            status: rendered.status,
+            headers: rendered.headers,
+        });
+    },
+});
+
+export const handleRequest = <T extends Contract>(
+    request: Request,
+    contract: T,
+    router: Router<T, HandlerContext>,
+    options?: { basePath?: string }
+): Promise<Response> => {
+    const url = new URL(request.url);
+
+    const adapterRequest: AdapterRequest<Request> = {
+        request,
+        method: request.method,
+        resolution: {
+            kind: 'core-match',
+            path: url.pathname,
+        },
+        query: Object.fromEntries(url.searchParams),
+        headers: headersToObject(request.headers),
+        readBody: (route) => parseFetchBody(request, route),
+    };
+
+    return adapter.handle({
+        contract,
+        router,
+        request: adapterRequest,
+        responseContext: {},
+        basePath: options?.basePath,
+    });
+};
+```
+
+## `AdapterDefinition`
+
+```ts
+interface AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, ResponseContext = Record<string, never>> {
+    buildHandlerContext: (request: AdapterRequest<NativeRequest>, context: ResponseContext) => HandlerContext | Promise<HandlerContext>;
+    respond: (result: AdapterResult, context: ResponseContext) => NativeResponse | Promise<NativeResponse>;
+    onError?: (error: unknown, request: AdapterRequest<NativeRequest>) => AdapterResult | void | Promise<AdapterResult | void>;
+    matcher?: RouteMatcher;
+}
+```
+
+| Field                 | Description                                                                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `buildHandlerContext` | Returns the context object each handler receives alongside `params`, `query`, `body`, `headers`.                                                        |
+| `respond`             | Translates an `AdapterResult` to a native response. Always handle `kind: 'raw-response'` first — it carries a pre-built native response from `onError`. |
+| `onError`             | Called on unhandled handler errors. Return an `AdapterResult` to override the default 500, or return `void` to let it pass through.                     |
+| `matcher`             | Custom route matcher. Defaults to ts-kizuna's built-in path matcher.                                                                                    |
+
+## `AdapterRequest`
+
+```ts
+interface AdapterRequest<NativeRequest> {
+    request: NativeRequest;
+    method: string;
+    resolution:
+        | { kind: 'core-match'; path: string } // Next-style: core matches the path
+        | { kind: 'pre-resolved'; routeKey: string; route: Route; params: Record<string, string> }; // Express-style: adapter already routed
+    query: unknown;
+    headers: unknown;
+    readBody: (route: Route) => Promise<unknown> | unknown;
+}
+```
+
+Use `kind: 'core-match'` for catch-all routing (one handler handles all paths). Use `kind: 'pre-resolved'` for per-route registration (Express-style, where the framework has already matched the route).
+
+## `AdapterResult`
+
+`respond` receives one of these from the pipeline:
+
+| `kind`               | When                                                                             |
+| -------------------- | -------------------------------------------------------------------------------- |
+| `success`            | Handler returned a valid response                                                |
+| `not-found`          | No route matched the path                                                        |
+| `method-not-allowed` | Path matched but method is not in the contract                                   |
+| `validation-failed`  | params, query, headers, or body failed schema validation                         |
+| `handler-error`      | Handler threw an unhandled error                                                 |
+| `raw-response`       | `onError` returned an override — cast `result.response` back to `NativeResponse` |
+
+## Helpers
+
+### `renderJsonResult`
+
+Translates any `AdapterResult` (except `raw-response`) to `{ status, headers, body }` using ts-kizuna's defaults — 405 with `Allow` header, RFC 9457 Problem Details, etc. Pass `{ problemDetailsEnabled: false }` to use the legacy `{ message, issues }` shape.
+
+```ts
+const rendered = renderJsonResult(result, {
+    problemDetailsEnabled: true,
+});
+// rendered.status, rendered.headers, rendered.body
+```
+
+### `parseFetchBody`
+
+Content-type-aware body parsing for fetch-based runtimes (`Request` / `Response` API). Handles `application/json`, `multipart/form-data`, and `application/x-www-form-urlencoded`.
+
+```ts
+readBody: (route) => parseFetchBody(request, route),
+```
+
+### `headersToObject`
+
+Converts a `Headers` instance to `Record<string, string>`.
+
+```ts
+headers: headersToObject(request.headers),
+```

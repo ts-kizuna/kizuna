@@ -1,0 +1,15 @@
+{
+    "pages": [
+        "index",
+        "quickstart",
+        "---Documentation---",
+        "building",
+        "adapters",
+        "clients",
+        "open-api",
+        "breaking-changes",
+        "---Extras---",
+        "extend",
+        "migration"
+    ]
+}

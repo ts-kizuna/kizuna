@@ -1,0 +1,4 @@
+{
+    "title": "Extend",
+    "pages": ["create-adapter", "create-generator", "create-ts-client"]
+}

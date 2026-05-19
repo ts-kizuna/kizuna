@@ -1,0 +1,55 @@
+---
+title: Mounting
+description: Combine a contract and a router into an API object.
+---
+
+`createApi` wraps a contract and a router into an API object that an adapter can mount.
+
+## `createApi`
+
+```ts
+// src/lib/server.ts
+import { createApi } from '@ts-kizuna/express'; // or @ts-kizuna/next
+import { contract } from './contract';
+import { router } from './router';
+
+export const api = createApi({
+    contract,
+    router,
+});
+```
+
+## Mounting
+
+Once you have an `api` object, pass it to the adapter's endpoint function:
+
+**Express:**
+
+```ts
+// src/index.ts
+import express from 'express';
+import { createExpressEndpoints } from '@ts-kizuna/express';
+import { api } from './lib/server';
+
+const app = express();
+app.use(express.json());
+createExpressEndpoints(api, app);
+app.listen(3000);
+```
+
+**Next.js:**
+
+```ts
+// src/app/api/[...ts-kizuna]/route.ts
+import { createNextEndpoints } from '@ts-kizuna/next';
+import { api } from '../../../lib/server';
+
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
+    basePath: '/api',
+});
+```
+
+For adapter-specific options (error handling, middleware, `onError`, etc.) see the adapter pages:
+
+- [Express](/docs/adapters/express)
+- [Next.js](/docs/adapters/next)

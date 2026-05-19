@@ -1,0 +1,167 @@
+---
+title: Next.js
+description: Mount a ts-kizuna contract on a Next.js App Router catch-all route.
+---
+
+`@ts-kizuna/next` connects a ts-kizuna contract to a Next.js App Router application via a single catch-all route file.
+
+**Requires Next.js ≥ 16** (App Router).
+
+<InstallTabs packageName="@ts-kizuna/next" />
+
+## Setup
+
+Create a catch-all route at `src/app/api/[...ts-kizuna]/route.ts`. The adapter exports handlers for every HTTP method, which Next.js dispatches automatically.
+
+```ts
+// src/lib/router.ts
+import { createRouter } from '@ts-kizuna/next';
+import { contract } from '@shared/contract';
+
+export const router = createRouter(contract, {
+    listUsers: async ({ query }) => {
+        const users = await db.users.findMany({
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+        });
+        return {
+            status: 200,
+            body: {
+                users,
+                total: await db.users.count(),
+            },
+        };
+    },
+    createUser: async ({ body }) => {
+        const user = await db.users.create(body);
+        return {
+            status: 201,
+            body: user,
+        };
+    },
+    getUser: async ({ params }) => {
+        const user = await db.users.findById(params.id);
+        if (!user) {
+            return {
+                status: 404,
+                body: {
+                    message: 'Not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: user,
+        };
+    },
+});
+```
+
+```ts
+// src/lib/server.ts
+import { createApi } from '@ts-kizuna/next';
+import { contract } from '@shared/contract';
+import { router } from './router';
+
+export const api = createApi({
+    contract,
+    router,
+});
+```
+
+```ts
+// src/app/api/[...ts-kizuna]/route.ts
+import { createNextEndpoints } from '@ts-kizuna/next';
+import { api } from '../../../lib/server';
+
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
+    basePath: '/api',
+});
+```
+
+The `basePath` option tells the adapter to strip the prefix when matching routes against the contract paths.
+
+## Handler context
+
+Each handler receives `{ params, query, body, headers, request }`. The `request` is the native `NextRequest` — useful when you need to read cookies or access other request properties.
+
+```ts
+getUser: async ({ params, request }) => {
+    const token = request.cookies.get('session')?.value;
+    const user = await db.users.findById(params.id);
+    return {
+        status: 200,
+        body: user,
+    };
+},
+```
+
+## Options
+
+```ts
+createNextEndpoints(api, {
+    basePath: '/api',
+    responseValidation: false,
+    onError: undefined,
+});
+```
+
+| Option               | Default | Description                                                                                          |
+| -------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `basePath`           | `''`    | Path prefix to strip when matching contract routes                                                   |
+| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                      |
+| `onError`            | —       | Custom handler for unhandled errors. Return an `AdapterResult` to override the default 500 response. |
+
+## `onError`
+
+Return an `AdapterResult` from `onError` to send a custom response instead of the default 500:
+
+```ts
+// src/lib/server.ts
+import { createApi } from '@ts-kizuna/next';
+import { contract } from '@shared/contract';
+import { router } from './router';
+
+export const api = createApi({
+    contract,
+    router,
+    onError: (error) => {
+        if (error instanceof AuthError) {
+            return {
+                kind: 'raw-response',
+                response: new Response(
+                    JSON.stringify({
+                        message: 'Unauthorized',
+                    }),
+                    {
+                        status: 401,
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    }
+                ),
+            };
+        }
+    },
+});
+```
+
+Returning `undefined` lets the default 500 flow run.
+
+## Multipart / file uploads
+
+Routes with `contentType: 'multipart/form-data'` work natively. The adapter calls `request.formData()` internally — no additional middleware needed.
+
+```ts
+uploadAvatar: async ({ body }) => {
+    // body.file is a File, body.userId is a string
+    await storage.upload(body.userId, body.file);
+    return {
+        status: 200,
+        body: {
+            size: body.file.size,
+            userId: body.userId,
+        },
+    };
+},
+```

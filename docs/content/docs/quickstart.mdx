@@ -1,0 +1,230 @@
+---
+title: Quickstart
+description: Define a contract, implement a server, and call it from a typed client in five minutes.
+---
+
+This guide walks through the three steps of a ts-kizuna project: defining the contract, implementing the server, and calling it from a typed client.
+
+<Steps>
+<Step>
+
+Create a contract with `@ts-kizuna/core`
+
+</Step>
+<Step>
+
+Create a server implementation with one of our supported frameworks
+
+</Step>
+<Step>
+
+Create a client implementation with one of our supported libraries
+
+</Step>
+</Steps>
+
+## Installation
+
+Install the `@ts-kizuna/core` package — the core package that provides the type-safe contract and shared types.
+
+<InstallTabs packageName="@ts-kizuna/core zod" />
+
+Enable `strict` in your `tsconfig.json` — this is required for ts-kizuna's type inference to work correctly.
+
+```json title="tsconfig.json"
+{
+    "compilerOptions": {
+        "strict": true
+    }
+}
+```
+
+## 1. Define the contract
+
+The contract is the shared source of truth. It lives in a package (or file) that both your server and client import.
+
+```ts
+// packages/shared/src/contract.ts
+import { createContract } from '@ts-kizuna/core';
+import { z } from 'zod';
+
+export const UserSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.email(),
+});
+
+export const contract = createContract({
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        query: z.object({
+            page: z.coerce.number().int().min(1).default(1),
+            limit: z.coerce.number().int().min(1).max(100).default(10),
+        }),
+        responses: {
+            200: z.object({
+                users: z.array(UserSchema),
+                total: z.number(),
+            }),
+        },
+    },
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        body: z.object({
+            name: z.string().min(1),
+            email: z.email(),
+        }),
+        responses: {
+            201: UserSchema,
+            400: z.object({
+                message: z.string(),
+            }),
+        },
+    },
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
+            404: z.object({
+                message: z.string(),
+            }),
+        },
+    },
+});
+```
+
+## 2. Implement the server (Express)
+
+<InstallTabs packageName="@ts-kizuna/express" />
+
+```ts
+// src/lib/router.ts
+import { createRouter } from '@ts-kizuna/express';
+import { contract } from '@shared/contract';
+
+export const router = createRouter(contract, {
+    listUsers: async ({ query }) => {
+        const users = await db.users.findMany({
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+        });
+        return {
+            status: 200,
+            body: {
+                users,
+                total: await db.users.count(),
+            },
+        };
+    },
+
+    createUser: async ({ body }) => {
+        const existing = await db.users.findByEmail(body.email);
+        if (existing) {
+            return {
+                status: 400,
+                body: {
+                    message: 'Email already in use',
+                },
+            };
+        }
+        const user = await db.users.create(body);
+        return {
+            status: 201,
+            body: user,
+        };
+    },
+
+    getUser: async ({ params }) => {
+        const user = await db.users.findById(params.id);
+        if (!user) {
+            return {
+                status: 404,
+                body: {
+                    message: 'User not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: user,
+        };
+    },
+});
+```
+
+```ts
+// src/lib/server.ts
+import { createApi } from '@ts-kizuna/express';
+import { contract } from '@shared/contract';
+import { router } from './router';
+
+export const api = createApi({
+    contract,
+    router,
+});
+```
+
+```ts
+// src/index.ts
+import express from 'express';
+import { createExpressEndpoints } from '@ts-kizuna/express';
+import { api } from './lib/server';
+
+const app = express();
+app.use(express.json());
+
+createExpressEndpoints(api, app);
+
+app.listen(3000);
+```
+
+## 3. Call it from the typed client
+
+<InstallTabs packageName="@ts-kizuna/fetch" />
+
+```ts
+// src/lib/api-client.ts
+import { createClient } from '@ts-kizuna/fetch';
+import { contract } from '@shared/contract';
+
+export const apiClient = createClient(contract, {
+    baseUrl: 'http://localhost:3000',
+});
+```
+
+```ts
+const { body } = await apiClient.listUsers({
+    query: {
+        page: 1,
+        limit: 10,
+    },
+});
+
+// body is { users: User[]; total: number }
+console.log(body.users);
+
+const result = await apiClient.createUser({
+    body: {
+        name: 'Alice',
+        email: 'alice@example.com',
+    },
+});
+
+// status is 201 | 400 — TypeScript narrows from there
+if (result.status === 201) {
+    console.log(result.body.id);
+}
+```
+
+Every field — `query.page`, `body.name`, the response shape — is fully typed from the contract with no extra work.
+
+## Next steps
+
+- [Contract](/docs/building/contract) — route shapes, nested contracts, supported methods
+- [Express adapter](/docs/adapters/express) — options, error handling, middleware
+- [Next.js adapter](/docs/adapters/next) — App Router catch-all route setup
+- [Fetch client](/docs/adapters/fetch) — `ClientConfig`, headers, custom fetch
+- [OpenAPI generation](/docs/open-api/generate) — serve a spec alongside your API

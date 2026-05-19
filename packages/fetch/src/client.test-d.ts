@@ -1,0 +1,452 @@
+import { expectTypeOf, test } from 'vitest';
+import { z } from 'zod';
+import { createContract } from '@ts-kizuna/core';
+import { createClient } from './client.js';
+
+const contract = createContract({
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: {
+                body: z.object({
+                    id: z.string(),
+                    name: z.string(),
+                }),
+                headers: z.object({
+                    'x-request-id': z.string().optional(),
+                }),
+            },
+            404: z.object({
+                message: z.string(),
+            }),
+        },
+    },
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        body: z.object({
+            name: z.string(),
+            email: z.string(),
+        }),
+        responses: {
+            201: z.object({
+                id: z.string(),
+                name: z.string(),
+                email: z.string(),
+            }),
+        },
+    },
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        query: z.object({
+            page: z.number().optional(),
+        }),
+        responses: {
+            200: z.object({
+                users: z.array(z.string()),
+            }),
+        },
+    },
+    coercedQuery: {
+        method: 'GET',
+        path: '/coerced',
+        query: z.object({
+            page: z.coerce.number().int().min(1).default(1),
+            search: z.string(),
+            transformed: z.string().transform((value) => value.length),
+        }),
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+    nestedCoerced: {
+        method: 'POST',
+        path: '/nested',
+        body: z.object({
+            filters: z.object({
+                price: z.coerce.number(),
+                tags: z.array(
+                    z.object({
+                        weight: z.coerce.number(),
+                        name: z.string(),
+                    })
+                ),
+            }),
+            scores: z.array(z.coerce.number()),
+            pair: z.tuple([z.coerce.number(), z.string()]),
+        }),
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+    discriminatedCoerced: {
+        method: 'POST',
+        path: '/discriminated',
+        body: z.discriminatedUnion('kind', [
+            z.object({
+                kind: z.literal('count'),
+                count: z.coerce.number(),
+            }),
+            z.object({
+                kind: z.literal('name'),
+                name: z.string(),
+            }),
+        ]),
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+    arrayOfDiscriminatedCoerced: {
+        method: 'POST',
+        path: '/array-of-discriminated',
+        body: z.object({
+            events: z.array(
+                z.discriminatedUnion('kind', [
+                    z.object({
+                        kind: z.literal('view'),
+                        viewedAt: z.coerce.number(),
+                    }),
+                    z.object({
+                        kind: z.literal('purchase'),
+                        amount: z.coerce.number(),
+                        currency: z.string(),
+                    }),
+                ])
+            ),
+        }),
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+    nestedDiscriminatedCoerced: {
+        method: 'POST',
+        path: '/nested-discriminated',
+        body: z.object({
+            wrapper: z.object({
+                strategy: z.discriminatedUnion('kind', [
+                    z.object({
+                        kind: z.literal('linear'),
+                        slope: z.coerce.number(),
+                    }),
+                    z.object({
+                        kind: z.literal('exponential'),
+                        base: z.coerce.number(),
+                    }),
+                ]),
+            }),
+        }),
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+
+const nestedContract = createContract({
+    users: createContract({
+        getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                    name: z.string(),
+                }),
+                404: z.object({
+                    message: z.string(),
+                }),
+            },
+        },
+        createUser: {
+            method: 'POST',
+            path: '/users',
+            body: z.object({
+                name: z.string(),
+            }),
+            responses: {
+                201: z.object({
+                    id: z.string(),
+                }),
+            },
+        },
+    }),
+    posts: createContract({
+        listPosts: {
+            method: 'GET',
+            path: '/posts',
+            responses: {
+                200: z.object({
+                    posts: z.array(z.string()),
+                }),
+            },
+        },
+    }),
+});
+
+const nestedClient = createClient(nestedContract, {
+    baseUrl: 'http://localhost:3000',
+});
+
+const client = createClient(contract, {
+    baseUrl: 'http://localhost:3000',
+});
+
+test('client exposes one function per route', () => {
+    expectTypeOf(client).toHaveProperty('getUser');
+    expectTypeOf(client).toHaveProperty('createUser');
+    expectTypeOf(client).toHaveProperty('listUsers');
+});
+
+test('getUser requires params with the right shape', async () => {
+    const result = await client.getUser({
+        params: {
+            id: '1',
+        },
+    });
+    if (result.status === 200) {
+        expectTypeOf(result.body).toEqualTypeOf<{ id: string; name: string }>();
+        expectTypeOf(result.headers).toEqualTypeOf<{ 'x-request-id'?: string | undefined }>();
+    } else if (result.status === 404) {
+        expectTypeOf(result.body).toEqualTypeOf<{ message: string }>();
+        expectTypeOf(result.headers).toEqualTypeOf<Record<string, string>>();
+    }
+});
+
+test('createUser requires body with the right shape', async () => {
+    const result = await client.createUser({
+        body: {
+            name: 'Alice',
+            email: 'alice@test.com',
+        },
+    });
+    if (result.status === 201) {
+        expectTypeOf(result.body).toEqualTypeOf<{ id: string; name: string; email: string }>();
+    }
+});
+
+test('listUsers query is required (the key itself), even if its inner fields are optional', async () => {
+    const result = await client.listUsers({
+        query: {},
+    });
+    if (result.status === 200) {
+        expectTypeOf(result.body).toEqualTypeOf<{ users: string[] }>();
+    }
+});
+
+test('rejects wrong param shape', () => {
+    // @ts-expect-error wrong param key
+    client.getUser({ params: { userId: '1' } });
+});
+
+test('rejects wrong body shape', () => {
+    // @ts-expect-error missing email
+    client.createUser({ body: { name: 'Alice' } });
+});
+
+test('rejects extra body field', () => {
+    // @ts-expect-error extra `extra` key
+    client.createUser({ body: { name: 'A', email: 'a@b.com', extra: true } });
+});
+
+test('rejects body on a route that does not accept one', () => {
+    // @ts-expect-error getUser has no body schema
+    client.getUser({ params: { id: '1' }, body: { foo: 'bar' } });
+});
+
+test('z.coerce fields surface as their output type, not unknown', async () => {
+    await client.coercedQuery({
+        query: {
+            search: 'hello',
+            transformed: 'world',
+            page: 1,
+        },
+    });
+    type Query = Parameters<typeof client.coercedQuery>[0]['query'];
+    expectTypeOf<Query['page']>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<Query['search']>().toEqualTypeOf<string>();
+    expectTypeOf<Query['transformed']>().toEqualTypeOf<string>();
+});
+
+test('z.coerce inside nested objects and arrays surfaces as the output type', async () => {
+    await client.nestedCoerced({
+        body: {
+            filters: {
+                price: 99,
+                tags: [
+                    {
+                        weight: 1,
+                        name: 'a',
+                    },
+                ],
+            },
+            scores: [1, 2, 3],
+            pair: [1, 'two'],
+        },
+    });
+    type Body = Parameters<typeof client.nestedCoerced>[0]['body'];
+    expectTypeOf<Body['filters']['price']>().toEqualTypeOf<number>();
+    expectTypeOf<Body['filters']['tags'][number]['weight']>().toEqualTypeOf<number>();
+    expectTypeOf<Body['filters']['tags'][number]['name']>().toEqualTypeOf<string>();
+    expectTypeOf<Body['scores']>().toEqualTypeOf<number[]>();
+    expectTypeOf<Body['pair']>().toEqualTypeOf<[number, string]>();
+});
+
+test('nested z.coerce field rejects wrong-typed values', () => {
+    client.nestedCoerced({
+        body: {
+            filters: {
+                // @ts-expect-error price must be a number
+                price: '99',
+                tags: [],
+            },
+            scores: [],
+            pair: [1, 'x'],
+        },
+    });
+});
+
+test('z.coerce inside a discriminated union inside an array resolves per branch per element', async () => {
+    await client.arrayOfDiscriminatedCoerced({
+        body: {
+            events: [
+                {
+                    kind: 'view',
+                    viewedAt: 1700000000000,
+                },
+                {
+                    kind: 'purchase',
+                    amount: 99,
+                    currency: 'USD',
+                },
+            ],
+        },
+    });
+    type Body = Parameters<typeof client.arrayOfDiscriminatedCoerced>[0]['body'];
+    type Event = Body['events'][number];
+    type ViewEvent = Extract<Event, { kind: 'view' }>;
+    type PurchaseEvent = Extract<Event, { kind: 'purchase' }>;
+    expectTypeOf<ViewEvent['viewedAt']>().toEqualTypeOf<number>();
+    expectTypeOf<PurchaseEvent['amount']>().toEqualTypeOf<number>();
+    expectTypeOf<PurchaseEvent['currency']>().toEqualTypeOf<string>();
+});
+
+test('z.coerce inside a discriminated union inside an array rejects wrong-typed branch values', () => {
+    client.arrayOfDiscriminatedCoerced({
+        body: {
+            events: [
+                {
+                    kind: 'purchase',
+                    // @ts-expect-error amount must be a number
+                    amount: '99',
+                    currency: 'USD',
+                },
+            ],
+        },
+    });
+});
+
+test('z.coerce inside a discriminated union nested in an object resolves per branch', async () => {
+    await client.nestedDiscriminatedCoerced({
+        body: {
+            wrapper: {
+                strategy: {
+                    kind: 'linear',
+                    slope: 0.5,
+                },
+            },
+        },
+    });
+    type Body = Parameters<typeof client.nestedDiscriminatedCoerced>[0]['body'];
+    type Strategy = Body['wrapper']['strategy'];
+    type LinearBranch = Extract<Strategy, { kind: 'linear' }>;
+    type ExponentialBranch = Extract<Strategy, { kind: 'exponential' }>;
+    expectTypeOf<LinearBranch['slope']>().toEqualTypeOf<number>();
+    expectTypeOf<ExponentialBranch['base']>().toEqualTypeOf<number>();
+});
+
+test('z.coerce inside a discriminated union resolves per branch', async () => {
+    await client.discriminatedCoerced({
+        body: {
+            kind: 'count',
+            count: 7,
+        },
+    });
+    await client.discriminatedCoerced({
+        body: {
+            kind: 'name',
+            name: 'alice',
+        },
+    });
+    type Body = Parameters<typeof client.discriminatedCoerced>[0]['body'];
+    type CountBranch = Extract<Body, { kind: 'count' }>;
+    type NameBranch = Extract<Body, { kind: 'name' }>;
+    expectTypeOf<CountBranch['count']>().toEqualTypeOf<number>();
+    expectTypeOf<NameBranch['name']>().toEqualTypeOf<string>();
+});
+
+test('z.coerce field rejects values that the output type does not accept', () => {
+    client.coercedQuery({
+        query: {
+            search: 'hello',
+            transformed: 'world',
+            // @ts-expect-error page must be a number, not a string
+            page: '1',
+        },
+    });
+});
+
+test('nested client exposes sub-router namespaces', () => {
+    expectTypeOf(nestedClient).toHaveProperty('users');
+    expectTypeOf(nestedClient).toHaveProperty('posts');
+});
+
+test('nested client sub-router exposes its own route functions', () => {
+    expectTypeOf(nestedClient.users).toHaveProperty('getUser');
+    expectTypeOf(nestedClient.users).toHaveProperty('createUser');
+    expectTypeOf(nestedClient.posts).toHaveProperty('listPosts');
+});
+
+test('nested route response type narrows correctly by status', async () => {
+    const result = await nestedClient.users.getUser({
+        params: {
+            id: '1',
+        },
+    });
+    if (result.status === 200) {
+        expectTypeOf(result.body).toEqualTypeOf<{ id: string; name: string }>();
+    } else if (result.status === 404) {
+        expectTypeOf(result.body).toEqualTypeOf<{ message: string }>();
+    }
+});
+
+test('nested route body arg has the correct shape', async () => {
+    const result = await nestedClient.users.createUser({
+        body: {
+            name: 'Alice',
+        },
+    });
+    if (result.status === 201) {
+        expectTypeOf(result.body).toEqualTypeOf<{ id: string }>();
+    }
+});
+
+test('nested route rejects wrong param key', () => {
+    // @ts-expect-error wrong param key
+    nestedClient.users.getUser({ params: { userId: '1' } });
+});
+
+test('nested route rejects body on a route that has none', () => {
+    // @ts-expect-error listPosts has no body schema
+    nestedClient.posts.listPosts({ body: { foo: 'bar' } });
+});

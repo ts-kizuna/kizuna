@@ -1,0 +1,225 @@
+---
+title: Contract
+description: Define the routes shared between your server and client.
+---
+
+The contract is a plain TypeScript object that describes every route in your API — methods, paths, Zod schemas for inputs and outputs. Both your server and client import it.
+
+## `createContract`
+
+```ts
+import { createContract } from '@ts-kizuna/core';
+import { z } from 'zod';
+
+export const UserSchema = z
+    .object({
+        id: z.string(),
+        name: z.string(),
+        email: z.email(),
+    })
+    .meta({
+        id: 'User',
+    });
+
+export const contract = createContract({
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        query: z.object({
+            page: z.coerce.number().int().min(1).default(1),
+            limit: z.coerce.number().int().min(1).max(100).default(10),
+        }),
+        responses: {
+            200: z.object({
+                users: z.array(UserSchema),
+                total: z.number(),
+            }),
+        },
+    },
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        body: z.object({
+            name: z.string().min(1),
+            email: z.email(),
+        }),
+        responses: {
+            201: UserSchema,
+            400: z.object({
+                message: z.string(),
+            }),
+        },
+    },
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
+            404: z.object({
+                message: z.string(),
+            }),
+        },
+    },
+});
+```
+
+## Route fields
+
+| Field         | Required | Description                                                                                    |
+| ------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `method`      | Yes      | `GET` `POST` `PUT` `PATCH` `DELETE` `HEAD` `OPTIONS`                                           |
+| `path`        | Yes      | URL path — use `:name` for path parameters                                                     |
+| `body`        | —        | Request body schema                                                                            |
+| `query`       | —        | Query string schema                                                                            |
+| `headers`     | —        | Request headers schema                                                                         |
+| `responses`   | Yes      | Response schemas keyed by status code                                                          |
+| `contentType` | —        | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
+| `summary`     | —        | Short description shown in OpenAPI                                                             |
+| `tags`        | —        | OpenAPI tags                                                                                   |
+
+## Response schemas
+
+Simple form — a Zod schema per status code:
+
+```ts
+responses: {
+    200: UserSchema,
+    404: z.object({
+        message: z.string(),
+    }),
+},
+```
+
+With typed response headers:
+
+```ts
+responses: {
+    200: {
+        body: UserSchema,
+        headers: z.object({
+            'x-request-id': z.string().optional(),
+        }),
+    },
+    404: z.object({
+        message: z.string(),
+    }),
+},
+```
+
+No-content responses — use `z.void()` when a status code carries no body:
+
+```ts
+responses: {
+    204: z.void(),
+    404: z.object({
+        message: z.string(),
+    }),
+},
+```
+
+## Models
+
+To create a model, add `.meta({ id })` to a Zod schema. This gives it a name that the OpenAPI and Swift generators pick up.
+
+```ts
+export const UserSchema = z
+    .object({
+        id: z.string(),
+        name: z.string(),
+        email: z.email(),
+    })
+    .meta({
+        id: 'User',
+    });
+```
+
+Without `id`, the generators inline the schema everywhere it appears. With `id`:
+
+- **OpenAPI** — the schema is extracted into `components.schemas.User` and every usage becomes a `$ref: '#/components/schemas/User'` reference
+- **Swift** — the schema becomes a named `public struct User` in the generated client, shared across all routes that reference it
+- **TypeScript** — export a type alongside the schema with `export type User = z.infer<typeof UserSchema>` (see [Exporting types from schemas](#exporting-types-from-schemas))
+
+## Nested contracts
+
+Split your contract across files using sub-contracts:
+
+```ts
+// contracts/users.ts
+export const usersContract = createContract('Users', {
+    listUsers: { ... },
+    createUser: { ... },
+});
+
+// contract.ts
+export const contract = createContract({
+    users: usersContract,
+    health: healthContract,
+});
+```
+
+The optional string argument sets the OpenAPI tag for all routes in that sub-contract.
+
+## Deprecating routes and fields
+
+To deprecate a route or a response field, add a `/** @deprecated */` JSDoc tag directly above it. You can optionally include a migration message: `/** @deprecated use createUser instead */`.
+
+**Route:**
+
+```ts
+/**
+ * @deprecated
+ */
+deleteUser: {
+    method: 'DELETE',
+    path: '/users/:id',
+    responses: {
+        200: z.object({
+            success: z.boolean(),
+        }),
+    },
+},
+```
+
+**Field:**
+
+```ts
+getUser: {
+    method: 'GET',
+    path: '/users/:id',
+    responses: {
+        200: z.object({
+            id: z.string(),
+            name: z.string(),
+            /**
+             * @deprecated
+             */
+            legacyUsername: z.string().optional(),
+        }),
+    },
+},
+```
+
+That single tag is enough — IDEs show a strikethrough on deprecated routes and fields, and the generators pick it up automatically for the OpenAPI spec and Swift client.
+
+## Exporting types from schemas
+
+Create a separate `types.ts` file that imports your schemas and exports inferred types. This keeps schemas and types cleanly separated:
+
+```ts
+// packages/contract/src/types.ts
+import type { z } from 'zod';
+import { UserSchema, CreateUserSchema } from './contract';
+
+export type User = z.infer<typeof UserSchema>;
+export type CreateUserInput = z.infer<typeof CreateUserSchema>;
+```
+
+Consumers import the types directly:
+
+```ts
+import type { User } from '@shared/contract/types';
+
+function UserCard({ user }: { user: User }) {
+    return <div>{user.name}</div>;
+}
+```

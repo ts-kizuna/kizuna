@@ -1,0 +1,16 @@
+node_modules
+dist
+.source
+*.log
+.DS_Store
+.turbo
+.next
+next-env.d.ts
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Swift / SwiftPM build artifacts
+.build/
+.swiftpm/
+Package.resolved
+DerivedData/

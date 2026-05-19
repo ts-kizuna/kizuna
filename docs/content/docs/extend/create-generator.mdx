@@ -1,0 +1,76 @@
+---
+title: Create a Generator
+description: Build a custom code generator or client from your ts-kizuna contract using createGenerator.
+---
+
+`createGenerator` from `@ts-kizuna/core/generator` lets you walk a contract and produce any output — a typed client for another language, documentation, a route manifest, whatever you need. The OpenAPI and Swift generators are both built on it.
+
+## How it works
+
+You provide a factory function that receives your options and returns two methods:
+
+- `processRoute` — called once for every route in the contract
+- `finalize` — called after all routes are processed, returns your output
+
+`createGenerator` handles contract walking, flattening nested contracts, and resolving `/** @deprecated */` annotations automatically.
+
+## `createGenerator`
+
+```ts
+import { createGenerator, type GeneratorOptions, type GeneratorRouteContext } from '@ts-kizuna/core/generator';
+
+interface MyOptions extends GeneratorOptions {
+    prefix?: string;
+}
+
+const generateRouteList = createGenerator((options: MyOptions) => {
+    const lines: string[] = [];
+
+    return {
+        processRoute({ routeKey, route, deprecated }: GeneratorRouteContext) {
+            const prefix = options.prefix ?? '';
+            const tag = deprecated ? ' (deprecated)' : '';
+            lines.push(`${prefix}${route.method} ${route.path}${tag}`);
+        },
+        finalize() {
+            return lines;
+        },
+    };
+});
+
+const list = generateRouteList(contract, {
+    prefix: '> ',
+    deprecationWarnings: {
+        contractPath: path.resolve(import.meta.dirname, './contract.ts'),
+    },
+});
+```
+
+## `GeneratorRouteContext`
+
+Each `processRoute` call receives:
+
+| Property             | Type                               | Description                                                             |
+| -------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
+| `routeKey`           | `string`                           | Dot-separated key path, e.g. `users.getUser`                            |
+| `route`              | `Route`                            | The full route definition                                               |
+| `contractTags`       | `string[]`                         | OpenAPI tags inherited from the sub-contract                            |
+| `deprecated`         | `boolean`                          | `true` if the route is marked `/** @deprecated */`                      |
+| `deprecationMessage` | `string \| undefined`              | The text after `@deprecated`, if any                                    |
+| `fieldDeprecations`  | `Map<string, string> \| undefined` | Field-path → deprecation message for body/query/headers/response fields |
+
+## Deprecation
+
+Pass `deprecationWarnings.contractPath` to resolve `@deprecated` annotations. Without it, `deprecated` is always `false` and `fieldDeprecations` is always `undefined`.
+
+```ts
+generateRouteList(contract, {
+    deprecationWarnings: {
+        contractPath: path.resolve(import.meta.dirname, './contract.ts'),
+    },
+});
+```
+
+## Publishing
+
+ts-kizuna does not maintain third-party generators. Build yours, publish it as its own package, and own it.
