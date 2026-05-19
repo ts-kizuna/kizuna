@@ -153,6 +153,34 @@ const contract = createContract({
     },
 });
 
+const voidBodyContract = createContract({
+    deleteItem: {
+        method: 'DELETE',
+        path: '/items/:id',
+        body: z.void(),
+        responses: {
+            200: z.object({
+                success: z.boolean(),
+            }),
+        },
+    },
+});
+
+const voidBodyClient = createClient(voidBodyContract, {
+    baseUrl: 'http://localhost:3000',
+});
+
+test('route with body: z.void() does not require a body argument', async () => {
+    await voidBodyClient.deleteItem({
+        params: { id: '1' },
+    });
+});
+
+test('route with body: z.void() rejects a non-void body', () => {
+    // @ts-expect-error body should not accept an object
+    voidBodyClient.deleteItem({ params: { id: '1' }, body: { foo: 'bar' } });
+});
+
 const nestedContract = createContract({
     users: createContract({
         getUser: {
