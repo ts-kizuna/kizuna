@@ -10,7 +10,7 @@
     "test:ts": "vitest run",
     "test:watch": "vitest",
     "test:types": "vitest --typecheck.only",
-    "generate:swift": "node packages/swift/dist/cli.mjs generate --contract apps/shared/src/contract.ts --out apps/swift-demo/swift/Sources/APIClient/APIClient.swift --namespace-name API",
+    "generate:swift": "pnpm --filter @ts-kizuna-demo/swift generate",
     "test:swift": "pnpm --filter @ts-kizuna-demo/swift test",
     "swift:build": "pnpm --filter @ts-kizuna-demo/swift build",
     "format": "prettier --write .",
