@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "generate": "ts-kizuna-swift generate --contract ../shared/src/contract.ts --out swift/Sources/APIClient/APIClient.swift --namespace-name API",
+    "generate": "node ../../packages/swift/dist/cli.mjs generate --contract ../shared/src/contract.ts --out swift/Sources/APIClient/APIClient.swift --namespace-name API",
     "pretest": "pnpm generate",
     "test": "tsx scripts/test.ts",
     "build": "cd swift && swift build",

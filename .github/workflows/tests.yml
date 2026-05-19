@@ -15,11 +15,11 @@ jobs:
         name: Lint, Build & Test
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
 
-            - uses: pnpm/action-setup@v4
+            - uses: pnpm/action-setup@v6
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
                   node-version: 24
                   cache: pnpm
@@ -32,11 +32,8 @@ jobs:
             - name: Lint
               run: pnpm lint
 
-            - name: Build packages
-              run: pnpm -r --filter "./packages/*" build
-
-            - name: Typecheck
-              run: pnpm typecheck
+            - name: Build
+              run: pnpm build
 
             - name: Test
               run: pnpm test:ts
@@ -45,25 +42,19 @@ jobs:
         name: Swift E2E
         runs-on: macos-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
 
-            - uses: pnpm/action-setup@v4
+            - uses: pnpm/action-setup@v6
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
                   node-version: 24
                   cache: pnpm
 
             - run: pnpm install --frozen-lockfile
 
-            - name: Build packages
-              run: pnpm -r --filter "./packages/*" build
-
-            - name: Typecheck
-              run: pnpm typecheck
-
-            - name: Generate Swift
-              run: node packages/swift/dist/cli.mjs generate --contract apps/shared/src/contract.ts --out apps/swift-demo/swift/Sources/APIClient/APIClient.swift --namespace-name API
+            - name: Build
+              run: pnpm build
 
             - name: Swift E2E tests
-              run: pnpm --filter @ts-kizuna-demo/swift exec tsx scripts/test.ts
+              run: pnpm test:swift
