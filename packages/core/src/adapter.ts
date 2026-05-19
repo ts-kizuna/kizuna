@@ -298,7 +298,8 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     }
 
     const validation = validateRequest(route, raw);
-    if (!validation.ok) {
+
+    if (!validation.ok && validation.error.stage !== 'body') {
         const formatted = formatValidationError(validation.error);
         return {
             kind: 'validation-failed',
@@ -316,17 +317,32 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         };
     }
 
+    const bodyFailed = !validation.ok;
+    const validationError = bodyFailed
+        ? { message: formatValidationError(validation.error).message, issues: validation.error.issues }
+        : undefined;
+
     try {
         const handlerContext = await definition.buildHandlerContext(request, responseContext);
         const handlerResult = await (
             handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: Record<string, string> }>
         )({
-            params: validation.parsed.params,
-            query: validation.parsed.query,
-            body: validation.parsed.body,
-            headers: validation.parsed.headers,
+            params: bodyFailed ? raw.params : validation.parsed.params,
+            query: bodyFailed ? raw.query : validation.parsed.query,
+            body: bodyFailed ? raw.body : validation.parsed.body,
+            headers: bodyFailed ? raw.headers : validation.parsed.headers,
+            validationError,
             ...handlerContext,
         });
+        if (bodyFailed && handlerResult.status < 400) {
+            const formatted = formatValidationError(validation.error);
+            return {
+                kind: 'validation-failed',
+                stage: validation.error.stage,
+                message: formatted.message,
+                issues: formatted.issues,
+            };
+        }
         if (responseValidation) {
             const responseSpec = route.responses[handlerResult.status];
             if (responseSpec !== undefined) {
