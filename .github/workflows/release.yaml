@@ -28,11 +28,8 @@ jobs:
 
             - run: pnpm install --frozen-lockfile
 
-            - name: Build packages
-              run: pnpm -r --filter "./packages/*" build
-
-            - name: Typecheck
-              run: pnpm typecheck
+            - name: Build
+              run: pnpm build
 
             - name: Configure git
               run: |
