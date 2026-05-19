@@ -19,6 +19,24 @@ const contract = createContract({
     },
 });
 
+const contractWithBody = createContract({
+    createItem: {
+        method: 'POST',
+        path: '/items',
+        body: z.object({
+            name: z.string().min(1),
+        }),
+        responses: {
+            201: z.object({
+                id: z.string(),
+            }),
+            400: z.object({
+                errors: z.record(z.string(), z.string()),
+            }),
+        },
+    },
+});
+
 const makeRequest = (path: string): AdapterRequest<null> => ({
     request: null,
     method: 'GET',
@@ -120,6 +138,87 @@ describe('responseValidation', () => {
             responseContext: {},
         });
         expect(results[0]?.kind).toBe('success');
+    });
+
+    it('passes validationError to handler on body validation failure', async () => {
+        const { adapter, results } = makeAdapter();
+        await adapter.handle({
+            contract: contractWithBody,
+            router: {
+                createItem: ({ validationError }: { validationError?: { issues: Array<{ path: PropertyKey[]; message: string }> } }) => {
+                    if (validationError) {
+                        const errors: Record<string, string> = {};
+                        for (const issue of validationError.issues) {
+                            errors[String(issue.path[0])] = issue.message;
+                        }
+                        return {
+                            status: 400,
+                            body: {
+                                errors,
+                            },
+                        };
+                    }
+                    return {
+                        status: 201,
+                        body: {
+                            id: '1',
+                        },
+                    };
+                },
+            },
+            request: {
+                request: null,
+                method: 'POST',
+                resolution: {
+                    kind: 'core-match' as const,
+                    path: '/items',
+                },
+                query: {},
+                headers: {
+                    'content-type': 'application/json',
+                },
+                readBody: () => ({ name: '' }),
+            },
+            responseContext: {},
+        });
+        expect(results[0]?.kind).toBe('success');
+        const result = results[0] as Extract<AdapterResult, { kind: 'success' }>;
+        expect(result.status).toBe(400);
+        expect(result.body).toEqual({
+            errors: {
+                name: expect.any(String),
+            },
+        });
+    });
+
+    it('falls back to default validation error when handler ignores validationError', async () => {
+        const { adapter, results } = makeAdapter();
+        await adapter.handle({
+            contract: contractWithBody,
+            router: {
+                createItem: () => ({
+                    status: 201,
+                    body: {
+                        id: '1',
+                    },
+                }),
+            },
+            request: {
+                request: null,
+                method: 'POST',
+                resolution: {
+                    kind: 'core-match' as const,
+                    path: '/items',
+                },
+                query: {},
+                headers: {
+                    'content-type': 'application/json',
+                },
+                readBody: () => ({ name: '' }),
+            },
+            responseContext: {},
+        });
+        expect(results[0]?.kind).toBe('validation-failed');
     });
 
     it('passes through a valid 404 response', async () => {

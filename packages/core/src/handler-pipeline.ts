@@ -14,11 +14,17 @@ export type HandlerReturn<R extends RouteDefinition> = {
     };
 }[keyof R['responses']];
 
+export interface ValidationError {
+    message: string;
+    issues: z.core.$ZodIssue[];
+}
+
 export type HandlerArgs<R extends RouteDefinition> = {
     params: R extends { pathParams: z.ZodType } ? z.output<R['pathParams']> : ExtractPathParams<R['path']>;
     query: R extends { query: z.ZodType } ? z.output<R['query']> : undefined;
     body: R extends { body: z.ZodType } ? z.output<R['body']> : undefined;
     headers: R extends { headers: z.ZodType } ? z.output<R['headers']> : Record<string, string | string[] | undefined>;
+    validationError?: ValidationError;
 };
 
 export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = (
