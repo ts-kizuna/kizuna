@@ -1,0 +1,159 @@
+---
+title: MCP
+description: Mount an MCP endpoint on your Express or Next.js app so AI assistants can call your API.
+---
+
+`@ts-kizuna/mcp` adds a [Model Context Protocol](https://modelcontextprotocol.io) endpoint to your existing app. Each route in your contract becomes an MCP tool that AI assistants can discover and call.
+
+<InstallTabs packageName="@ts-kizuna/mcp" />
+
+## Express
+
+```ts
+// src/index.ts
+import express from 'express';
+import { createExpressEndpoints } from '@ts-kizuna/express';
+import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
+import { api } from './lib/api';
+
+const app = express();
+app.use(express.json());
+
+createExpressEndpoints(api, app);
+createMcpEndpoint(api, app, {
+    baseUrl: 'http://localhost:3000',
+});
+
+app.listen(3000);
+```
+
+`createMcpEndpoint` mounts the MCP protocol handler at `/mcp` by default. Change it with the `path` option.
+
+## Next.js
+
+```ts
+// app/mcp/route.ts
+import { createMcpEndpoint } from '@ts-kizuna/mcp/next';
+import { api } from '../../lib/api';
+
+export const { GET, POST, DELETE } = createMcpEndpoint(api, {
+    baseUrl: 'http://localhost:3000',
+});
+```
+
+Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HTTP transport requires.
+
+## How it works
+
+Each route in your contract becomes an MCP tool:
+
+- **Tool name** — the dotted route key from the contract (e.g. `users.getUser`)
+- **Tool description** — from the route's `summary` and `description`, falling back to `METHOD /path`
+- **Tool input** — structured as `{ params, query, body }` matching the route's schemas
+- **Tool execution** — sends an HTTP request to `baseUrl` and returns `{ status, body }`
+
+Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-urlencoded'` are excluded by default since MCP tools receive JSON.
+
+## Options
+
+| Option         | Default                                | Description                                      |
+| -------------- | -------------------------------------- | ------------------------------------------------ |
+| `baseUrl`      | required                               | Full URL of the API the tools will call           |
+| `name`         | `'MCP Server'`                         | Human-readable name shown to AI assistants        |
+| `version`      | `'1.0.0'`                              | Semantic version string                           |
+| `baseHeaders`  | —                                      | Headers sent with every request (auth, API keys)  |
+| `fetch`        | global `fetch`                         | Custom fetch implementation                       |
+| `routeFilter`  | excludes multipart and form-urlencoded | Predicate to filter which routes become tools     |
+| `path`         | `'/mcp'`                               | Mount path (Express only)                         |
+
+## Connecting clients
+
+After mounting the endpoint, connect your AI tools to it.
+
+### Claude Code
+
+```sh
+claude mcp add --transport http my-api http://localhost:3000/mcp
+```
+
+### VS Code
+
+```json
+{
+    "mcp.servers": {
+        "my-api": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "mcp-remote",
+                "http://localhost:3000/mcp"
+            ]
+        }
+    }
+}
+```
+
+### Cursor
+
+```json
+{
+    "mcpServers": {
+        "my-api": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "mcp-remote",
+                "http://localhost:3000/mcp"
+            ]
+        }
+    }
+}
+```
+
+## Tool input structure
+
+Tool inputs use structured keys that mirror the kizuna handler args:
+
+```json
+{
+    "params": { "id": "42" },
+    "query": { "page": 1, "limit": 25 },
+    "body": { "name": "Alice", "email": "alice@example.com" }
+}
+```
+
+Only the keys relevant to the route are present. A `GET /users/:id` route has `params` only. A `POST /users` with a body has `body` only.
+
+## Tool responses
+
+Every tool returns a JSON text block with the HTTP status and parsed response body:
+
+```json
+{
+    "status": 200,
+    "body": {
+        "id": "42",
+        "name": "Alice"
+    }
+}
+```
+
+Responses with status >= 400 set `isError: true` on the MCP result so the AI knows the call failed.
+
+## Standalone server
+
+If you don't want to mount on an existing app, `createMcpServer` returns a raw `McpServer` you can connect to any transport (stdio, SSE, etc.).
+
+```ts
+import { createMcpServer } from '@ts-kizuna/mcp';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { contract } from '@shared/contract';
+
+const server = createMcpServer(contract, {
+    name: 'My API',
+    version: '1.0.0',
+    baseUrl: 'https://api.example.com',
+});
+
+await server.connect(new StdioServerTransport());
+```
