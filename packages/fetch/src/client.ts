@@ -47,11 +47,19 @@ export type Client<T extends Contract> = {
     [K in keyof T]: T[K] extends RouteDefinition ? ClientFn<T[K]> : T[K] extends Contract ? Client<T[K]> : never;
 };
 
+export interface RequestContext {
+    url: URL;
+    method: string;
+    headers: Headers;
+    route: RouteDefinition;
+}
+
 export interface ClientConfig {
     baseUrl: string;
     baseHeaders?: Record<string, string>;
     credentials?: RequestCredentials;
     fetch?: typeof fetch;
+    onRequest?: (context: RequestContext) => void | Promise<void>;
 }
 
 const buildFormData = (body: Record<string, unknown>): FormData => {
@@ -110,10 +118,14 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
                     body = JSON.stringify(args.body);
             }
         }
+        const requestHeaders = new Headers(headers);
+        if (config.onRequest) {
+            await config.onRequest({ url, method: route.method, headers: requestHeaders, route });
+        }
         const fetchFn = config.fetch ?? fetch;
         const res = await fetchFn(url.toString(), {
             method: route.method,
-            headers,
+            headers: requestHeaders,
             body,
             credentials: config.credentials,
             ...args.fetchOptions,
