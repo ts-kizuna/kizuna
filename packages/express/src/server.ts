@@ -30,20 +30,20 @@ export interface ExpressHandlerContext {
 export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, ExpressHandlerContext>;
 export type Router<T extends Contract> = CoreRouter<T, ExpressHandlerContext>;
 
-/**
- * Augments the Express Request with the matched ts-kizuna route schema.
- * Available inside globalMiddleware and route handlers after the route is matched.
- */
-export type KizunaRequest = Request & {
-    kizunaRoute: RouteDefinition;
-};
+declare global {
+    // eslint-disable-next-line @typescript-eslint/no-namespace
+    namespace Express {
+        interface Request {
+            kizunaRoute?: RouteDefinition;
+        }
+    }
+}
 
 export interface ExpressOptions {
     /**
      * Middleware inserted after `req.kizunaRoute` is set, before the route handler runs.
-     * Use `(req as KizunaRequest).kizunaRoute` to branch on route metadata.
      */
-    globalMiddleware?: Array<(req: Request, res: Response, next: NextFunction) => void>;
+    globalMiddleware?: Array<(req: Request & { kizunaRoute: RouteDefinition }, res: Response, next: NextFunction) => void>;
     /**
      * Custom handler for request validation failures (400 responses).
      * Receives the validation error and can send a custom response shape.
@@ -210,10 +210,10 @@ export function createExpressEndpoints(api: ApiWithRouter, app: AppLike, options
         expressRouter[method](
             route.path,
             (req: Request, _res: Response, next: NextFunction) => {
-                (req as KizunaRequest).kizunaRoute = route;
+                req.kizunaRoute = route;
                 next();
             },
-            ...(resolvedOptions?.globalMiddleware ?? []),
+            ...((resolvedOptions?.globalMiddleware ?? []) as Array<(req: Request, res: Response, next: NextFunction) => void>),
             async (req: Request, res: Response, next: NextFunction) => {
                 const adapterRequest: AdapterRequest<Request> = {
                     request: req,

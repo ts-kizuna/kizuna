@@ -1,4 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
+import type { Request } from 'express';
+import type { RouteDefinition } from '@ts-kizuna/core';
 import { z } from 'zod';
 import { createContract } from '@ts-kizuna/core';
 import { createRouter } from './server.js';
@@ -58,4 +60,8 @@ test('handler receives typed path params', () => {
             };
         },
     });
+});
+
+test('Express Request is augmented with kizunaRoute', () => {
+    expectTypeOf<Request['kizunaRoute']>().toEqualTypeOf<RouteDefinition | undefined>();
 });
