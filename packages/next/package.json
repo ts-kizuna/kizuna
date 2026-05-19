@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/next",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -20,6 +20,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "scripts": {
     "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod",
     "typecheck": "tsc --noEmit"

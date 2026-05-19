@@ -22,6 +22,7 @@ module.exports = {
     },
     hooks: {
         'after:bump': 'node tools/sync-versions.cjs && git add package.json packages/*/package.json',
+        'after:release': 'pnpm -r publish --no-git-checks',
     },
     plugins: {
         '@release-it/conventional-changelog': {
