@@ -140,4 +140,53 @@ describe('responseValidation', () => {
         });
         expect(results[0]?.kind).toBe('success');
     });
+
+    it('error() helper throws and adapter returns it as a response', async () => {
+        const { adapter, results } = makeAdapter();
+        await adapter.handle({
+            contract,
+            router: {
+                getItem: ({ error }) => {
+                    return error({
+                        status: 404,
+                        body: {
+                            message: 'Not found',
+                        },
+                    });
+                },
+            },
+            request: makeRequest('/items/1'),
+            responseContext: {},
+        });
+        expect(results[0]?.kind).toBe('success');
+        const result = results[0] as Extract<AdapterResult, { kind: 'success' }>;
+        expect(result.status).toBe(404);
+        expect(result.body).toEqual({
+            message: 'Not found',
+        });
+    });
+
+    it('passes non-ResponseError to onError as before', async () => {
+        const errors: unknown[] = [];
+        const adapter = createAdapter<null, void, Record<string, never>>({
+            buildHandlerContext: () => ({}),
+            respond: () => {},
+            onError: async (error) => {
+                errors.push(error);
+            },
+        });
+        await adapter.handle({
+            contract,
+            router: {
+                getItem: () => {
+                    throw new Error('something broke');
+                },
+            },
+            request: makeRequest('/items/1'),
+            responseContext: {},
+        });
+        expect(errors.length).toBe(1);
+        expect(errors[0]).toBeInstanceOf(Error);
+        expect((errors[0] as Error).message).toBe('something broke');
+    });
 });
