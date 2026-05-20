@@ -388,4 +388,15 @@ export const contract = createContract({
         summary: 'Validate config — exercises generator bug coverage',
     },
     health: healthContract,
+    webhook: {
+        method: 'POST',
+        path: '/webhook',
+        body: z.any(),
+        responses: {
+            200: z.object({
+                received: z.boolean(),
+            }),
+        },
+        summary: 'Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen',
+    },
 });
