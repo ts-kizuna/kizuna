@@ -128,14 +128,6 @@ describe('createClient', () => {
         vi.restoreAllMocks();
     });
 
-    it('throws when baseUrl is not a full URL', () => {
-        expect(() =>
-            createClient(contract, {
-                baseUrl: '/api',
-            })
-        ).toThrow(/baseUrl must be a full URL/);
-    });
-
     it('builds correct URL for GET with path params', async () => {
         const fetchMock = stubFetch(200, {
             id: '123',
@@ -494,5 +486,113 @@ describe('createClient — nested routers', () => {
         expect(result.body).toEqual({
             posts: ['hello', 'world'],
         });
+    });
+});
+
+describe('createClient — relative baseUrl', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('builds a relative URL with path params', async () => {
+        const fetchMock = stubFetch(200, {
+            id: '123',
+            name: 'Alice',
+        });
+        const client = createClient(contract, {
+            baseUrl: '/api',
+            fetch: fetchMock,
+        });
+
+        await client.getUser({
+            params: {
+                id: '123',
+            },
+        });
+
+        const [url] = fetchMock.mock.calls[0]! as [string];
+        expect(url).toBe('/api/users/123');
+    });
+
+    it('appends query params to a relative URL', async () => {
+        const fetchMock = stubFetch(200, {
+            users: [],
+        });
+        const client = createClient(contract, {
+            baseUrl: '/api',
+            fetch: fetchMock,
+        });
+
+        await client.listUsers({
+            query: {
+                page: 2,
+            },
+        });
+
+        const [url] = fetchMock.mock.calls[0]! as [string];
+        expect(url).toBe('/api/users?page=2');
+    });
+
+    it('works with an empty baseUrl', async () => {
+        const fetchMock = stubFetch(200, {
+            id: '1',
+            name: 'Alice',
+        });
+        const client = createClient(contract, {
+            baseUrl: '',
+            fetch: fetchMock,
+        });
+
+        await client.getUser({
+            params: {
+                id: '1',
+            },
+        });
+
+        const [url] = fetchMock.mock.calls[0]! as [string];
+        expect(url).toBe('/users/1');
+    });
+
+    it('preserves a relative baseUrl path prefix with path params', async () => {
+        const fetchMock = stubFetch(200, {
+            id: '42',
+            name: 'Bob',
+        });
+        const client = createClient(contract, {
+            baseUrl: '/api/v1',
+            fetch: fetchMock,
+        });
+
+        await client.getUser({
+            params: {
+                id: '42',
+            },
+        });
+
+        const [url] = fetchMock.mock.calls[0]! as [string];
+        expect(url).toBe('/api/v1/users/42');
+    });
+
+    it('provides the correct url string in onRequest', async () => {
+        const fetchMock = stubFetch(200, {
+            id: '1',
+            name: 'Alice',
+        });
+        let receivedUrl = '';
+        const client = createClient(contract, {
+            baseUrl: '/api',
+            fetch: fetchMock,
+            onRequest: ({ url }) => {
+                receivedUrl = url;
+            },
+        });
+
+        await client.getUser({
+            params: {
+                id: '1',
+            },
+        });
+
+        expect(receivedUrl).toBe('/api/users/1');
     });
 });
