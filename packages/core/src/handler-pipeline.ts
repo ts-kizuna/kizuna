@@ -19,6 +19,12 @@ export type HandlerArgs<R extends RouteDefinition> = {
     query: R extends { query: z.ZodType } ? z.output<R['query']> : undefined;
     body: R extends { body: z.ZodType } ? z.output<R['body']> : undefined;
     headers: R extends { headers: z.ZodType } ? z.output<R['headers']> : Record<string, string | string[] | undefined>;
+    /**
+     * Throws a typed error response. Takes the same `{ status, body }` shape as a handler return.
+     *
+     * This function throws internally and never returns.
+     */
+    error: (response: HandlerReturn<R>) => never;
 };
 
 export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = (

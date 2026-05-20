@@ -12,6 +12,7 @@ import {
 } from './handler-pipeline.js';
 import { type MatchResult, matchRoute as defaultMatchRoute } from './route-matcher.js';
 import { parsePath } from './path-params.js';
+import { ResponseError } from './response-error.js';
 
 export type { RouteDefinition, Contract, Method } from './types.js';
 
@@ -318,6 +319,9 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
 
     try {
         const handlerContext = await definition.buildHandlerContext(request, responseContext);
+        const error = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
+            throw new ResponseError(response);
+        };
         const handlerResult = await (
             handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: Record<string, string> }>
         )({
@@ -325,6 +329,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             query: validation.parsed.query,
             body: validation.parsed.body,
             headers: validation.parsed.headers,
+            error,
             ...handlerContext,
         });
         if (responseValidation) {
@@ -353,6 +358,16 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             headers: successHeaders,
         };
     } catch (error) {
+        if (error instanceof ResponseError) {
+            return {
+                kind: 'success',
+                routeKey,
+                route,
+                status: error.status,
+                body: error.body,
+                headers: error.headers ?? {},
+            };
+        }
         if (definition.onError) {
             try {
                 const override = await definition.onError(error, request);
