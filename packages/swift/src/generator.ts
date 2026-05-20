@@ -621,7 +621,8 @@ const resolveType = (
     }
 
     if (base === 'AnyCodable') {
-        return optional ? 'Kizuna.AnyCodable?' : 'Kizuna.AnyCodable';
+        const qualified = `${clientName}.AnyCodable`;
+        return optional ? `${qualified}?` : qualified;
     }
 
     if (fileLevelTypeNames.has(base)) {
@@ -724,7 +725,7 @@ const emitSuccessSumEnum = (writer: SwiftWriter, method: RouteMethod, context: E
     });
 };
 
-const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean; anyCodable: boolean; clientName: string }): void => {
+const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean; clientName: string }): void => {
     writer.blank();
     writer.block('private enum Kizuna', () => {
         writer.line('nonisolated(unsafe) static let iso8601Formatter: ISO8601DateFormatter = {');
@@ -825,63 +826,6 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
                 writer.blank();
                 writer.block('var contentType: String', () => {
                     writer.line('"multipart/form-data; boundary=\\(boundary)"');
-                });
-            });
-        }
-        if (options.anyCodable) {
-            writer.blank();
-            writer.block('struct AnyCodable: Codable, Sendable, Equatable', () => {
-                writer.line('let value: Foundation.Data?');
-                writer.line('init(value: Foundation.Data? = nil) { self.value = value }');
-                writer.block('init(from decoder: Decoder) throws', () => {
-                    writer.line('let container = try decoder.singleValueContainer()');
-                    writer.line('if container.decodeNil() { self.value = nil; return }');
-                    writer.line(
-                        'let raw = try JSONSerialization.data(withJSONObject: try container.decode(JSONValue.self).rawValue, options: [])'
-                    );
-                    writer.line('self.value = raw');
-                });
-                writer.block('func encode(to encoder: Encoder) throws', () => {
-                    writer.line('var container = encoder.singleValueContainer()');
-                    writer.line('if let value = value, let object = try? JSONSerialization.jsonObject(with: value) {');
-                    writer.line('    try container.encode(JSONValue(rawValue: object))');
-                    writer.line('} else {');
-                    writer.line('    try container.encodeNil()');
-                    writer.line('}');
-                });
-                writer.line('static func == (lhs: AnyCodable, rhs: AnyCodable) -> Bool { lhs.value == rhs.value }');
-            });
-            writer.blank();
-            writer.block('private struct JSONValue: Codable', () => {
-                writer.line('let rawValue: Any');
-                writer.line('init(rawValue: Any) { self.rawValue = rawValue }');
-                writer.block('init(from decoder: Decoder) throws', () => {
-                    writer.line('let container = try decoder.singleValueContainer()');
-                    writer.line('if container.decodeNil() { self.rawValue = NSNull(); return }');
-                    writer.line('if let value = try? container.decode(Bool.self) { self.rawValue = value; return }');
-                    writer.line('if let value = try? container.decode(Int.self) { self.rawValue = value; return }');
-                    writer.line('if let value = try? container.decode(Double.self) { self.rawValue = value; return }');
-                    writer.line('if let value = try? container.decode(String.self) { self.rawValue = value; return }');
-                    writer.line(
-                        'if let value = try? container.decode([JSONValue].self) { self.rawValue = value.map(\\.rawValue); return }'
-                    );
-                    writer.line(
-                        'if let value = try? container.decode([String: JSONValue].self) { self.rawValue = value.mapValues(\\.rawValue); return }'
-                    );
-                    writer.line('self.rawValue = NSNull()');
-                });
-                writer.block('func encode(to encoder: Encoder) throws', () => {
-                    writer.line('var container = encoder.singleValueContainer()');
-                    writer.line('switch rawValue {');
-                    writer.line('case is NSNull: try container.encodeNil()');
-                    writer.line('case let value as Bool: try container.encode(value)');
-                    writer.line('case let value as Int: try container.encode(value)');
-                    writer.line('case let value as Double: try container.encode(value)');
-                    writer.line('case let value as String: try container.encode(value)');
-                    writer.line('case let value as [Any]: try container.encode(value.map(JSONValue.init(rawValue:)))');
-                    writer.line('case let value as [String: Any]: try container.encode(value.mapValues(JSONValue.init(rawValue:)))');
-                    writer.line('default: try container.encodeNil()');
-                    writer.line('}');
                 });
             });
         }
@@ -1194,7 +1138,7 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
 
 const emitClient = (
     writer: SwiftWriter,
-    config: { clientName: string },
+    config: { clientName: string; anyCodable: boolean },
     partition: ContractPartition,
     context: EmitContext,
     typesByOperation: Map<string, SwiftType[]>
@@ -1218,6 +1162,63 @@ const emitClient = (
                     writer.line('self.data = data');
                     writer.line('self.filename = filename');
                     writer.line('self.mimeType = mimeType');
+                });
+            });
+        }
+        if (config.anyCodable) {
+            writer.blank();
+            writer.block('public struct AnyCodable: Codable, Sendable, Equatable', () => {
+                writer.line('public let value: Foundation.Data?');
+                writer.line('public init(value: Foundation.Data? = nil) { self.value = value }');
+                writer.block('public init(from decoder: Decoder) throws', () => {
+                    writer.line('let container = try decoder.singleValueContainer()');
+                    writer.line('if container.decodeNil() { self.value = nil; return }');
+                    writer.line(
+                        'let raw = try JSONSerialization.data(withJSONObject: try container.decode(CodableValue.self).rawValue, options: [])'
+                    );
+                    writer.line('self.value = raw');
+                });
+                writer.block('public func encode(to encoder: Encoder) throws', () => {
+                    writer.line('var container = encoder.singleValueContainer()');
+                    writer.line('if let value = value, let object = try? JSONSerialization.jsonObject(with: value) {');
+                    writer.line('    try container.encode(CodableValue(rawValue: object))');
+                    writer.line('} else {');
+                    writer.line('    try container.encodeNil()');
+                    writer.line('}');
+                });
+                writer.line('public static func == (lhs: AnyCodable, rhs: AnyCodable) -> Bool { lhs.value == rhs.value }');
+                writer.blank();
+                writer.block('private struct CodableValue: Codable', () => {
+                    writer.line('let rawValue: Any');
+                    writer.line('init(rawValue: Any) { self.rawValue = rawValue }');
+                    writer.block('init(from decoder: Decoder) throws', () => {
+                        writer.line('let container = try decoder.singleValueContainer()');
+                        writer.line('if container.decodeNil() { self.rawValue = NSNull(); return }');
+                        writer.line('if let value = try? container.decode(Bool.self) { self.rawValue = value; return }');
+                        writer.line('if let value = try? container.decode(Int.self) { self.rawValue = value; return }');
+                        writer.line('if let value = try? container.decode(Double.self) { self.rawValue = value; return }');
+                        writer.line('if let value = try? container.decode(String.self) { self.rawValue = value; return }');
+                        writer.line(
+                            'if let value = try? container.decode([CodableValue].self) { self.rawValue = value.map(\\.rawValue); return }'
+                        );
+                        writer.line(
+                            'if let value = try? container.decode([String: CodableValue].self) { self.rawValue = value.mapValues(\\.rawValue); return }'
+                        );
+                        writer.line('self.rawValue = NSNull()');
+                    });
+                    writer.block('func encode(to encoder: Encoder) throws', () => {
+                        writer.line('var container = encoder.singleValueContainer()');
+                        writer.line('switch rawValue {');
+                        writer.line('case is NSNull: try container.encodeNil()');
+                        writer.line('case let value as Bool: try container.encode(value)');
+                        writer.line('case let value as Int: try container.encode(value)');
+                        writer.line('case let value as Double: try container.encode(value)');
+                        writer.line('case let value as String: try container.encode(value)');
+                        writer.line('case let value as [Any]: try container.encode(value.map(CodableValue.init(rawValue:)))');
+                        writer.line('case let value as [String: Any]: try container.encode(value.mapValues(CodableValue.init(rawValue:)))');
+                        writer.line('default: try container.encodeNil()');
+                        writer.line('}');
+                    });
                 });
             });
         }
@@ -1362,7 +1363,7 @@ export const generateSwiftClient = (contract: Contract, config: SwiftConfig): st
         emitTypes(writer, topLevelSharedTypes, ownedEnumMap, sharedEnumLookup);
     });
 
-    emitClient(writer, { clientName }, partition, context, typesByOperation);
+    emitClient(writer, { clientName, anyCodable: registry.usesAnyCodable }, partition, context, typesByOperation);
 
     for (const group of partition.groups) {
         emitSubClientStruct(writer, group, clientName, context);
@@ -1370,7 +1371,6 @@ export const generateSwiftClient = (contract: Contract, config: SwiftConfig): st
 
     emitKizunaNamespace(writer, {
         multipart: usesMultipart,
-        anyCodable: registry.usesAnyCodable,
         clientName,
     });
 
