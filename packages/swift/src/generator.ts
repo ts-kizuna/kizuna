@@ -491,20 +491,24 @@ const emitStruct = (
     const hasFile = type.fields.some((field) => field.isFile);
     const conformances = hasFile ? 'Sendable, Equatable' : 'Codable, Sendable, Equatable';
 
+    const resolveOwnedType = (raw: string): string => {
+        const optional = raw.endsWith('?');
+        const stripped = optional ? raw.slice(0, -1) : raw;
+        const isArray = stripped.startsWith('[') && stripped.endsWith(']');
+        const inner = isArray ? stripped.slice(1, -1) : stripped;
+        if (ownedTypeMap.get(inner) !== lookupName) return raw;
+        const short = shortTypeName(inner, lookupName);
+        const resolved = isArray ? `[${short}]` : short;
+        return optional ? `${resolved}?` : resolved;
+    };
+
     const resolveFieldType = (fieldType: string, fieldOptional: boolean): string => {
-        const base = fieldType.endsWith('?') ? fieldType.slice(0, -1) : fieldType;
-        if (ownedTypeMap.get(base) === lookupName) {
-            return optionalize(shortTypeName(base, lookupName), fieldOptional);
-        }
-        return optionalize(fieldType, fieldOptional);
+        return optionalize(resolveOwnedType(fieldType), fieldOptional);
     };
 
     const adjustedFields = type.fields.map((field) => ({
         ...field,
-        type:
-            ownedTypeMap.get(field.type.replace('?', '')) === lookupName
-                ? shortTypeName(field.type.replace('?', ''), lookupName)
-                : field.type,
+        type: resolveOwnedType(field.type),
     }));
 
     const needsCodingKeys = !hasFile && type.fields.some((field) => field.name !== field.wireName || SWIFT_KEYWORDS.has(field.name));
