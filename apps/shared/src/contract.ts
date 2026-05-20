@@ -211,7 +211,6 @@ const usersContract = createContract('Users', {
     archiveUser: {
         method: 'POST',
         path: '/users/:id/archive',
-        body: z.object({}),
         responses: {
             200: z.object({
                 alreadyArchived: z.literal(true),
