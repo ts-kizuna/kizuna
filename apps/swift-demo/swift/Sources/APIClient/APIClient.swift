@@ -167,6 +167,55 @@ public actor APIClient {
             self.mimeType = mimeType
         }
     }
+
+    public struct AnyCodable: Codable, Sendable, Equatable {
+        public let value: Foundation.Data?
+        public init(value: Foundation.Data? = nil) { self.value = value }
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            if container.decodeNil() { self.value = nil; return }
+            let raw = try JSONSerialization.data(withJSONObject: try container.decode(CodableValue.self).rawValue, options: [])
+            self.value = raw
+        }
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            if let value = value, let object = try? JSONSerialization.jsonObject(with: value) {
+                try container.encode(CodableValue(rawValue: object))
+            } else {
+                try container.encodeNil()
+            }
+        }
+        public static func == (lhs: AnyCodable, rhs: AnyCodable) -> Bool { lhs.value == rhs.value }
+
+        private struct CodableValue: Codable {
+            let rawValue: Any
+            init(rawValue: Any) { self.rawValue = rawValue }
+            init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                if container.decodeNil() { self.rawValue = NSNull(); return }
+                if let value = try? container.decode(Bool.self) { self.rawValue = value; return }
+                if let value = try? container.decode(Int.self) { self.rawValue = value; return }
+                if let value = try? container.decode(Double.self) { self.rawValue = value; return }
+                if let value = try? container.decode(String.self) { self.rawValue = value; return }
+                if let value = try? container.decode([CodableValue].self) { self.rawValue = value.map(\.rawValue); return }
+                if let value = try? container.decode([String: CodableValue].self) { self.rawValue = value.mapValues(\.rawValue); return }
+                self.rawValue = NSNull()
+            }
+            func encode(to encoder: Encoder) throws {
+                var container = encoder.singleValueContainer()
+                switch rawValue {
+                case is NSNull: try container.encodeNil()
+                case let value as Bool: try container.encode(value)
+                case let value as Int: try container.encode(value)
+                case let value as Double: try container.encode(value)
+                case let value as String: try container.encode(value)
+                case let value as [Any]: try container.encode(value.map(CodableValue.init(rawValue:)))
+                case let value as [String: Any]: try container.encode(value.mapValues(CodableValue.init(rawValue:)))
+                default: try container.encodeNil()
+                }
+            }
+        }
+    }
     public let baseURL: URL
     public let session: URLSession
     public nonisolated let timeout: TimeInterval
@@ -320,6 +369,28 @@ public actor APIClient {
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(API.Error)
             case unauthorized
+        }
+    }
+
+    public enum Webhook {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let received: Bool
+
+            public init(received: Bool) {
+                self.received = received
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
         }
     }
 
@@ -819,6 +890,47 @@ public actor APIClient {
             throw APIClient.ValidateConfig.Failure.unauthorized
         default:
             throw APIClient.ValidateConfig.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen
+    public func webhook(_ input: APIClient.AnyCodable) async throws(APIClient.Webhook.Failure) -> APIClient.Webhook.Result {
+        let path = "/webhook"
+        guard let components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
+            throw APIClient.Webhook.Failure.unexpectedStatus(-1, Data())
+        }
+        guard let url = components.url else { throw APIClient.Webhook.Failure.unexpectedStatus(-1, Data()) }
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        do {
+            request.httpBody = try encoder.encode(input)
+        } catch { throw APIClient.Webhook.Failure.requestFailed(error) }
+        if let middleware = requestMiddleware {
+            do { try await middleware(&request) }
+            catch is CancellationError { throw APIClient.Webhook.Failure.cancelled }
+            catch { throw APIClient.Webhook.Failure.requestFailed(error) }
+        }
+        let data: Foundation.Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch is CancellationError { throw APIClient.Webhook.Failure.cancelled }
+        catch { throw APIClient.Webhook.Failure.requestFailed(error) }
+        if let middleware = responseMiddleware {
+            await middleware(request, data, response)
+        }
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+        switch statusCode {
+        case 200:
+            do {
+                let body = try decoder.decode(APIClient.Webhook.Response.self, from: data)
+                return APIClient.Webhook.Result(body: body)
+            } catch {
+                throw APIClient.Webhook.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
+        default:
+            throw APIClient.Webhook.Failure.unexpectedStatus(statusCode, data)
         }
     }
 }
