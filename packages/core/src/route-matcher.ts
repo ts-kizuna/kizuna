@@ -1,10 +1,12 @@
 import type { RouteDefinition, Contract, Method } from './types.js';
 import { flattenContract } from './handler-pipeline.js';
+import type { PathSegment } from './path-params.js';
 import { parsePath } from './path-params.js';
 
 interface CompiledRoute {
     routeKey: string;
     route: RouteDefinition;
+    segments: PathSegment[];
     paramNames: string[];
     pattern: RegExp;
 }
@@ -32,6 +34,7 @@ const compileRoute = (routeKey: string, route: RouteDefinition): CompiledRoute =
     return {
         routeKey,
         route,
+        segments,
         paramNames,
         pattern: new RegExp(`^${body}$`),
     };
@@ -43,7 +46,17 @@ const getCompiled = (contract: Contract): CompiledRoute[] => {
     const existing = cache.get(contract);
     if (existing) return existing;
     const fresh = flattenContract(contract).map(({ routeKey, route }) => compileRoute(routeKey, route));
-    fresh.sort((a, b) => a.paramNames.length - b.paramNames.length);
+    fresh.sort((a, b) => {
+        const limit = Math.min(a.segments.length, b.segments.length);
+        for (let index = 0; index < limit; index++) {
+            const segmentA = a.segments[index]!;
+            const segmentB = b.segments[index]!;
+            if (segmentA.kind !== segmentB.kind) {
+                return segmentA.kind === 'literal' ? -1 : 1;
+            }
+        }
+        return a.paramNames.length - b.paramNames.length;
+    });
     cache.set(contract, fresh);
     return fresh;
 };

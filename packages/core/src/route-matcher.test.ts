@@ -184,4 +184,55 @@ describe('matchRoute', () => {
         const match = matched(matchRoute('POST', '/cart/checkout', c));
         expect(match.routeKey).toBe('checkout');
     });
+
+    it('prefers static over dynamic at the same segment position with equal param counts', () => {
+        const c = createContract({
+            getByUserId: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: { 200: z.object({ id: z.string() }) },
+            },
+            getMe: {
+                method: 'GET',
+                path: '/users/me',
+                responses: { 200: z.object({ id: z.string() }) },
+            },
+        });
+        const match = matched(matchRoute('GET', '/users/me', c));
+        expect(match.routeKey).toBe('getMe');
+    });
+
+    it('prefers static over dynamic in deeper paths with equal param counts', () => {
+        const c = createContract({
+            getUserPosts: {
+                method: 'GET',
+                path: '/users/:id/posts',
+                responses: { 200: z.object({ id: z.string() }) },
+            },
+            getMyPosts: {
+                method: 'GET',
+                path: '/users/me/posts',
+                responses: { 200: z.object({ id: z.string() }) },
+            },
+        });
+        const match = matched(matchRoute('GET', '/users/me/posts', c));
+        expect(match.routeKey).toBe('getMyPosts');
+    });
+
+    it('matches distinct routes with identical structure but different static segments', () => {
+        const c = createContract({
+            getUserPosts: {
+                method: 'GET',
+                path: '/users/:id/posts',
+                responses: { 200: z.object({ id: z.string() }) },
+            },
+            getUserThings: {
+                method: 'GET',
+                path: '/users/:id/things',
+                responses: { 200: z.object({ id: z.string() }) },
+            },
+        });
+        expect(matched(matchRoute('GET', '/users/42/posts', c)).routeKey).toBe('getUserPosts');
+        expect(matched(matchRoute('GET', '/users/42/things', c)).routeKey).toBe('getUserThings');
+    });
 });
