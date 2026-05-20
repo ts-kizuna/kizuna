@@ -507,8 +507,7 @@ const emitStruct = (
                 : field.type,
     }));
 
-    const needsCodingKeys =
-        !hasFile && type.fields.some((field) => field.name !== field.wireName || SWIFT_KEYWORDS.has(field.name));
+    const needsCodingKeys = !hasFile && type.fields.some((field) => field.name !== field.wireName || SWIFT_KEYWORDS.has(field.name));
     writer.block(`public struct ${type.name}: ${conformances}`, () => {
         for (const [ownedName, owningStruct] of ownedTypeMap) {
             if (owningStruct !== lookupName) continue;
@@ -1361,9 +1360,7 @@ export const generateSwiftClient = (contract: Contract, config: SwiftConfig): st
         }
         if (bestMatch !== undefined) ownedTypeMap.set(type.name, bestMatch);
     }
-    const ownedTypeLookup = new Map(
-        sharedTypes.filter((type) => ownedTypeMap.has(type.name)).map((type) => [type.name, type])
-    );
+    const ownedTypeLookup = new Map(sharedTypes.filter((type) => ownedTypeMap.has(type.name)).map((type) => [type.name, type]));
     const topLevelSharedTypes = sharedTypes.filter((type) => !ownedTypeMap.has(type.name));
 
     const context: EmitContext = {
