@@ -188,6 +188,12 @@ export const router = createRouter(contract, {
             status: 'ok',
         },
     }),
+    webhook: () => ({
+        status: 200,
+        body: {
+            received: true,
+        },
+    }),
     health: {
         check: () => ({
             status: 200,
