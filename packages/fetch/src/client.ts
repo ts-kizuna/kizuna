@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { RouteDefinition, Contract } from '@ts-kizuna/core';
+import type { RouteDefinition, Contract, ValidationError } from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
 import { buildPath, isRouteDefinition } from '@ts-kizuna/core';
 
@@ -44,8 +44,19 @@ type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends t
         fetchOptions?: RequestInit;
     };
 
+type ValidationErrorResponse = {
+    status: 400;
+    body: ValidationError;
+    headers: Record<string, string>;
+};
+
+type HasValidation<R extends RouteDefinition> = R extends { body: z.ZodType } ? true : R extends { query: z.ZodType } ? true : false;
+
+type ClientResponse<R extends RouteDefinition> =
+    HasValidation<R> extends true ? ResponseUnion<R> | ValidationErrorResponse : ResponseUnion<R>;
+
 type ClientFn<R extends RouteDefinition> =
-    {} extends ClientArgs<R> ? (args?: ClientArgs<R>) => Promise<ResponseUnion<R>> : (args: ClientArgs<R>) => Promise<ResponseUnion<R>>;
+    {} extends ClientArgs<R> ? (args?: ClientArgs<R>) => Promise<ClientResponse<R>> : (args: ClientArgs<R>) => Promise<ClientResponse<R>>;
 
 export type Client<T extends Contract> = {
     [K in keyof T]: T[K] extends RouteDefinition ? ClientFn<T[K]> : T[K] extends Contract ? Client<T[K]> : never;

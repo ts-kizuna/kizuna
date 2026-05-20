@@ -84,8 +84,7 @@ describe('Zod validation', () => {
             email: 'bad',
         });
         expect(response.status).toBe(400);
-        expect(response.body.title).toBe('Validation Failed');
-        expect(response.body.status).toBe(400);
+        expect(response.body.message).toBe('Invalid request body');
         expect(Array.isArray(response.body.issues)).toBe(true);
     });
 

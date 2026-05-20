@@ -107,34 +107,15 @@ getUser: async ({ params, req, res }) => {
 
 ```ts
 createExpressEndpoints(api, app, {
-    problemDetailsEnabled: true,
     responseValidation: false,
     globalMiddleware: [],
-    requestValidationErrorHandler: undefined,
 });
 ```
 
-| Option                          | Default             | Description                                                                                                                              |
-| ------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `problemDetailsEnabled`         | `true`              | Emit RFC 9457 `application/problem+json` error responses                                                                                 |
-| `responseValidation`            | `false`             | Validate handler return values against response schemas — surfaces as 500 on mismatch. Enable in development.                            |
-| `globalMiddleware`              | `[]`                | Middleware inserted after route matching, before the handler runs. Use `(req as TsZestRequest).tsZestRoute` to branch on route metadata. |
-| `requestValidationErrorHandler` | default 400 handler | Custom handler for validation failures. Not called when `problemDetailsEnabled` is `true`.                                               |
-
-## RFC 9457 Problem Details
-
-By default, all non-2xx error responses use the [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) format with `Content-Type: application/problem+json`:
-
-```json
-{
-    "type": "about:blank",
-    "title": "Unprocessable Entity",
-    "status": 422,
-    "detail": "Request validation failed"
-}
-```
-
-Set `problemDetailsEnabled: false` to revert to the legacy `{ message, issues }` shape.
+| Option               | Default | Description                                                                                                           |
+| -------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
+| `responseValidation` | `false` | Validate handler return values against response schemas — surfaces as 500 on mismatch. Enable in development.         |
+| `globalMiddleware`   | `[]`    | Middleware inserted after route matching, before the handler runs. Use `req.kizunaRoute` to branch on route metadata. |
 
 ## Method mismatches
 

@@ -23,18 +23,6 @@ export interface NextHandlerOptions {
     basePath?: string;
     onError?: (error: unknown, request: NextRequest) => NextResponse | Promise<NextResponse> | void | Promise<void>;
     /**
-     * Emit error responses as RFC 9457 Problem Details (`application/problem+json`).
-     *
-     * When `true`, all non-2xx ts-kizuna error responses use the standard
-     * `{ type, title, status, detail }` shape. Set to `false` to revert to the
-     * legacy `{ message, issues }` format.
-     *
-     * See https://www.rfc-editor.org/rfc/rfc9457
-     *
-     * @default true
-     */
-    problemDetailsEnabled?: boolean;
-    /**
      * Validate handler return values against the contract's response schemas.
      * Mismatches surface as 500 errors. Intended for development; disable in production.
      *
@@ -63,9 +51,7 @@ export const handleNextRequest = async <T extends Contract>(
         }),
         respond: (result) => {
             if (result.kind === 'raw-response') return result.response as NextResponse;
-            const rendered = renderJsonResult(result, {
-                problemDetailsEnabled: options?.problemDetailsEnabled,
-            });
+            const rendered = renderJsonResult(result);
             return jsonResponse(rendered.status, rendered.body, rendered.headers);
         },
         onError: async (error): Promise<AdapterResult | void> => {

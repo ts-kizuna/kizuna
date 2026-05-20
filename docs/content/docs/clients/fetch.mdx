@@ -126,3 +126,41 @@ if (result.status === 201) {
     // result.status === 400, result.body is { message: string }
 }
 ```
+
+## Validation errors
+
+Routes with a `body` or `query` schema can receive a `400` validation error when the request data fails schema validation. This is automatically included in the response type — you don't need to declare it in your contract.
+
+```ts
+const result = await apiClient.createUser({
+    body: { name: '', email: 'not-an-email' },
+});
+
+if (result.status === 400) {
+    // result.body is typed as ValidationError
+    for (const issue of result.body.issues) {
+        console.log(issue.path, issue.message);
+        // ['email'], 'Invalid email'
+    }
+}
+```
+
+Routes without `body` or `query` cannot trigger validation, so the `400` is not included in their response type.
+
+### `isValidationError`
+
+If your contract also declares a `400` response on the same route, the body becomes a union of your type and `ValidationError`. Use the `isValidationError` type guard to distinguish them:
+
+```ts
+import { isValidationError } from '@ts-kizuna/fetch';
+
+if (result.status === 400) {
+    if (isValidationError(result.body)) {
+        // kizuna validation error
+    } else {
+        // your contract's 400 response
+    }
+}
+```
+
+If your contract does not declare a `400`, you don't need this — `result.status === 400` narrows the body to `ValidationError` directly.

@@ -293,7 +293,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         } catch {
             return {
                 kind: 'invalid-body',
-                message: 'Invalid request body',
+                message: 'Bad Request',
             };
         }
     }
@@ -423,12 +423,8 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
  * the adapter must return directly, so handle that case before calling this.
  */
 export const renderJsonResult = (
-    result: Exclude<AdapterResult, { kind: 'raw-response' }>,
-    options?: { problemDetailsEnabled?: boolean }
+    result: Exclude<AdapterResult, { kind: 'raw-response' }>
 ): { status: number; headers: Record<string, string>; body: unknown } => {
-    const problemDetailsEnabled = options?.problemDetailsEnabled ?? true;
-    const errorContentType = problemDetailsEnabled ? 'application/problem+json' : 'application/json';
-
     switch (result.kind) {
         case 'success':
             return {
@@ -443,96 +439,84 @@ export const renderJsonResult = (
             return {
                 status: 404,
                 headers: {
-                    'content-type': errorContentType,
+                    'content-type': 'application/json',
                 },
-                body: problemDetailsEnabled ? { type: 'about:blank', title: 'Not Found', status: 404 } : { message: 'Route not found' },
+                body: {
+                    message: 'Not Found',
+                },
             };
         case 'method-not-allowed':
             return {
                 status: 405,
                 headers: {
-                    'content-type': errorContentType,
+                    'content-type': 'application/json',
                     Allow: result.allowed.join(', '),
                 },
-                body: problemDetailsEnabled
-                    ? { type: 'about:blank', title: 'Method Not Allowed', status: 405, allowed: result.allowed }
-                    : { message: 'Method not allowed', allowed: result.allowed },
+                body: {
+                    message: 'Method Not Allowed',
+                    allowed: result.allowed,
+                },
             };
         case 'invalid-body':
             return {
                 status: 400,
                 headers: {
-                    'content-type': errorContentType,
+                    'content-type': 'application/json',
                 },
-                body: problemDetailsEnabled
-                    ? { type: 'about:blank', title: 'Bad Request', status: 400, detail: result.message }
-                    : { message: result.message },
+                body: {
+                    message: result.message,
+                },
             };
         case 'validation-failed':
             return {
                 status: 400,
                 headers: {
-                    'content-type': errorContentType,
+                    'content-type': 'application/json',
                 },
-                body: problemDetailsEnabled
-                    ? { type: 'about:blank', title: 'Validation Failed', status: 400, detail: result.message, issues: result.issues }
-                    : { message: result.message, issues: result.issues },
+                body: {
+                    message: result.message,
+                    issues: result.issues,
+                },
             };
         case 'no-handler':
             return {
                 status: 500,
                 headers: {
-                    'content-type': errorContentType,
+                    'content-type': 'application/json',
                 },
-                body: problemDetailsEnabled
-                    ? {
-                          type: 'about:blank',
-                          title: 'Internal Server Error',
-                          status: 500,
-                          detail: `Handler not implemented: ${result.routeKey}`,
-                      }
-                    : { message: `Handler not implemented: ${result.routeKey}` },
+                body: {
+                    message: `Handler not implemented: ${result.routeKey}`,
+                },
             };
         case 'unsupported-media-type':
             return {
                 status: 415,
                 headers: {
-                    'content-type': errorContentType,
+                    'content-type': 'application/json',
                 },
-                body: problemDetailsEnabled
-                    ? {
-                          type: 'about:blank',
-                          title: 'Unsupported Media Type',
-                          status: 415,
-                          detail: `Expected ${result.expected}, received ${result.received}`,
-                      }
-                    : { message: `Unsupported Media Type: expected ${result.expected}, received ${result.received}` },
+                body: {
+                    message: `Unsupported Media Type: expected ${result.expected}, received ${result.received}`,
+                },
             };
         case 'not-acceptable':
             return {
                 status: 406,
                 headers: {
-                    'content-type': errorContentType,
+                    'content-type': 'application/json',
                 },
-                body: problemDetailsEnabled
-                    ? {
-                          type: 'about:blank',
-                          title: 'Not Acceptable',
-                          status: 406,
-                      }
-                    : {
-                          message: 'Not Acceptable',
-                      },
+                body: {
+                    message: 'Not Acceptable',
+                },
             };
         case 'handler-error':
             return {
                 status: 500,
                 headers: {
-                    'content-type': errorContentType,
+                    'content-type': 'application/json',
                 },
-                body: problemDetailsEnabled
-                    ? { type: 'about:blank', title: 'Internal Server Error', status: 500 }
-                    : { message: 'Internal server error' },
+                body: {
+                    message: 'Internal Server Error',
+                },
             };
     }
 };

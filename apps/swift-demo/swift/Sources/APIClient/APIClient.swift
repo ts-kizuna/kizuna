@@ -167,6 +167,26 @@ public actor APIClient {
             self.mimeType = mimeType
         }
     }
+
+    public struct ValidationError: Codable, Sendable, Equatable {
+        public let message: String
+        public let issues: [ValidationIssue]
+
+        public init(message: String, issues: [ValidationIssue]) {
+            self.message = message
+            self.issues = issues
+        }
+    }
+
+    public struct ValidationIssue: Codable, Sendable, Equatable {
+        public let path: [String]
+        public let message: String
+
+        public init(path: [String], message: String) {
+            self.path = path
+            self.message = message
+        }
+    }
     public let baseURL: URL
     public let session: URLSession
     public nonisolated let timeout: TimeInterval
@@ -216,6 +236,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
         }
     }
 
@@ -277,6 +298,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
         }
     }
 
@@ -320,6 +342,7 @@ public actor APIClient {
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(API.Error)
             case unauthorized
+            case validationError(APIClient.ValidationError)
         }
     }
 
@@ -347,6 +370,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
         }
     }
 
@@ -374,6 +398,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
         }
     }
 
@@ -425,6 +450,7 @@ public actor APIClient {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(Response400)
+            case validationError(APIClient.ValidationError)
         }
     }
 
@@ -501,6 +527,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
         }
     }
 
@@ -541,6 +568,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
         }
     }
 
@@ -549,7 +577,9 @@ public actor APIClient {
         public enum Failure: Swift.Error, Sendable {
             case requestFailed(Swift.Error)
             case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
         }
     }
 
@@ -700,6 +730,15 @@ public actor APIClient {
             } catch {
                 throw APIClient.SendNotification.Failure.decoding(error, statusCode: statusCode, data: data)
             }
+        case 400:
+            do {
+                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
+                throw APIClient.SendNotification.Failure.badRequest(payload)
+            } catch let error as APIClient.SendNotification.Failure {
+                throw error
+            } catch {
+                throw APIClient.SendNotification.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
         default:
             throw APIClient.SendNotification.Failure.unexpectedStatus(statusCode, data)
         }
@@ -764,6 +803,15 @@ public actor APIClient {
             } catch {
                 throw APIClient.ListEvents.Failure.decoding(error, statusCode: statusCode, data: data)
             }
+        case 400:
+            do {
+                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
+                throw APIClient.ListEvents.Failure.badRequest(payload)
+            } catch let error as APIClient.ListEvents.Failure {
+                throw error
+            } catch {
+                throw APIClient.ListEvents.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
         default:
             throw APIClient.ListEvents.Failure.unexpectedStatus(statusCode, data)
         }
@@ -812,9 +860,14 @@ public actor APIClient {
                 throw APIClient.ValidateConfig.Failure.badRequest(payload)
             } catch let error as APIClient.ValidateConfig.Failure {
                 throw error
-            } catch {
-                throw APIClient.ValidateConfig.Failure.decoding(error, statusCode: statusCode, data: data)
-            }
+            } catch {}
+            do {
+                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
+                throw APIClient.ValidateConfig.Failure.validationError(payload)
+            } catch let error as APIClient.ValidateConfig.Failure {
+                throw error
+            } catch {}
+            throw APIClient.ValidateConfig.Failure.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status 400")), statusCode: statusCode, data: data)
         case 401:
             throw APIClient.ValidateConfig.Failure.unauthorized
         default:
@@ -876,6 +929,15 @@ public struct APIUsersClient: Sendable {
             } catch {
                 throw APIClient.UsersListUsers.Failure.decoding(error, statusCode: statusCode, data: data)
             }
+        case 400:
+            do {
+                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
+                throw APIClient.UsersListUsers.Failure.badRequest(payload)
+            } catch let error as APIClient.UsersListUsers.Failure {
+                throw error
+            } catch {
+                throw APIClient.UsersListUsers.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
         default:
             throw APIClient.UsersListUsers.Failure.unexpectedStatus(statusCode, data)
         }
@@ -923,6 +985,15 @@ public struct APIUsersClient: Sendable {
             do {
                 let body = try decoder.decode(APIClient.UsersSearchUsers.Response.self, from: data)
                 return APIClient.UsersSearchUsers.Result(body: body)
+            } catch {
+                throw APIClient.UsersSearchUsers.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
+        case 400:
+            do {
+                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
+                throw APIClient.UsersSearchUsers.Failure.badRequest(payload)
+            } catch let error as APIClient.UsersSearchUsers.Failure {
+                throw error
             } catch {
                 throw APIClient.UsersSearchUsers.Failure.decoding(error, statusCode: statusCode, data: data)
             }
@@ -1028,9 +1099,14 @@ public struct APIUsersClient: Sendable {
                 throw APIClient.UsersCreateUser.Failure.badRequest(payload)
             } catch let error as APIClient.UsersCreateUser.Failure {
                 throw error
-            } catch {
-                throw APIClient.UsersCreateUser.Failure.decoding(error, statusCode: statusCode, data: data)
-            }
+            } catch {}
+            do {
+                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
+                throw APIClient.UsersCreateUser.Failure.validationError(payload)
+            } catch let error as APIClient.UsersCreateUser.Failure {
+                throw error
+            } catch {}
+            throw APIClient.UsersCreateUser.Failure.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status 400")), statusCode: statusCode, data: data)
         default:
             throw APIClient.UsersCreateUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -1130,6 +1206,15 @@ public struct APIUsersClient: Sendable {
             } catch {
                 throw APIClient.UsersArchiveUser.Failure.decoding(error, statusCode: statusCode, data: data)
             }
+        case 400:
+            do {
+                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
+                throw APIClient.UsersArchiveUser.Failure.badRequest(payload)
+            } catch let error as APIClient.UsersArchiveUser.Failure {
+                throw error
+            } catch {
+                throw APIClient.UsersArchiveUser.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
         default:
             throw APIClient.UsersArchiveUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -1174,6 +1259,15 @@ public struct APIUsersClient: Sendable {
             } catch {
                 throw APIClient.UsersUploadAvatar.Failure.decoding(error, statusCode: statusCode, data: data)
             }
+        case 400:
+            do {
+                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
+                throw APIClient.UsersUploadAvatar.Failure.badRequest(payload)
+            } catch let error as APIClient.UsersUploadAvatar.Failure {
+                throw error
+            } catch {
+                throw APIClient.UsersUploadAvatar.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
         default:
             throw APIClient.UsersUploadAvatar.Failure.unexpectedStatus(statusCode, data)
         }
@@ -1181,7 +1275,7 @@ public struct APIUsersClient: Sendable {
 
     /// Ping a user — exercises z.void() body and response
     public func pingUser(id: String) async throws(APIClient.UsersPingUser.Failure) {
-        let (baseURL, session, _, _, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
         var path = "/users/:id/ping"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(id))
@@ -1209,6 +1303,15 @@ public struct APIUsersClient: Sendable {
         switch statusCode {
         case 204:
             return
+        case 400:
+            do {
+                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
+                throw APIClient.UsersPingUser.Failure.badRequest(payload)
+            } catch let error as APIClient.UsersPingUser.Failure {
+                throw error
+            } catch {
+                throw APIClient.UsersPingUser.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
         default:
             throw APIClient.UsersPingUser.Failure.unexpectedStatus(statusCode, data)
         }

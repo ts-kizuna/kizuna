@@ -656,3 +656,111 @@ describe('Swift generator — HEAD method', () => {
         expect(output).toContain('decoder.decode(');
     });
 });
+
+describe('Swift generator — automatic validation error', () => {
+    it('adds badRequest case for route with body', () => {
+        const contract = createContract({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('case badRequest(TestAPIClient.ValidationError)');
+        expect(output).toContain('struct ValidationError');
+        expect(output).toContain('struct ValidationIssue');
+    });
+
+    it('does not add validation case for route without body or query', () => {
+        const contract = createContract({
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).not.toContain('ValidationError');
+        expect(output).not.toContain('ValidationIssue');
+    });
+
+    it('uses validationError case when route also declares 400', () => {
+        const contract = createContract({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                    }),
+                    400: z.object({
+                        message: z.string(),
+                    }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('case badRequest(Response400)');
+        expect(output).toContain('case validationError(TestAPIClient.ValidationError)');
+    });
+
+    it('groups duplicate status codes into a single switch case', () => {
+        const contract = createContract({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                    }),
+                    400: z.object({
+                        message: z.string(),
+                    }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        const matches = output.match(/case 400:/g);
+        expect(matches).toHaveLength(1);
+    });
+
+    it('re-throws Failure in grouped case to prevent swallowing decoded errors', () => {
+        const contract = createContract({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                    }),
+                    400: z.object({
+                        message: z.string(),
+                    }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('catch let error as TestAPIClient.CreateUser.Failure');
+    });
+});

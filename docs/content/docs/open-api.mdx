@@ -172,6 +172,12 @@ writeFileSync('openapi.yaml', spec('yaml'));
 tsx scripts/generate-openapi.ts
 ```
 
+## Validation errors
+
+Routes with a `body` or `query` schema automatically include a `400` validation error response in the generated spec. This matches the error kizuna returns when request data fails schema validation.
+
+If your contract already declares a `400` response for a route, the automatic validation error is not added — your declaration takes precedence.
+
 ## Breaking changes
 
 Use [oasdiff](https://github.com/oasdiff/oasdiff) to compare your generated spec against a previous version and catch breaking changes before they ship. See the [Breaking Changes](/docs/breaking-changes) guide for setup and CI integration.

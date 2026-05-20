@@ -276,12 +276,12 @@ final class APIClientTests: XCTestCase {
             XCTFail("expected .unexpectedStatus to be thrown")
         } catch let failure {
             switch failure {
-            case .unexpectedStatus(let status, _):
-                XCTAssertEqual(status, 400, "expected the stub to reject with 400; got \(status)")
+            case .badRequest:
+                break
             case .requestFailed(let underlying):
                 XCTFail("multipart request should reach the server, got request failure: \(underlying)")
             default:
-                XCTFail("expected .unexpectedStatus, got \(failure)")
+                XCTFail("expected .badRequest, got \(failure)")
             }
         }
     }
