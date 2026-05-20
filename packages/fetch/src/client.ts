@@ -52,7 +52,7 @@ export type Client<T extends Contract> = {
 };
 
 export interface RequestContext {
-    url: URL;
+    url: string;
     method: string;
     headers: Headers;
     route: RouteDefinition;
@@ -81,6 +81,20 @@ const buildFormData = (body: Record<string, unknown>): FormData => {
     return formData;
 };
 
+const buildQueryString = (query: Record<string, unknown>): string => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+        if (value === undefined || value === null) continue;
+        if (Array.isArray(value)) {
+            for (const item of value) params.append(key, String(item));
+        } else {
+            params.append(key, String(value));
+        }
+    }
+    const result = params.toString();
+    return result.length > 0 ? `?${result}` : '';
+};
+
 const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
     return async (
         args: {
@@ -91,17 +105,7 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
             fetchOptions?: RequestInit;
         } = {}
     ) => {
-        const url = new URL(config.baseUrl + buildPath(route.path, args.params));
-        if (args.query) {
-            for (const [key, value] of Object.entries(args.query)) {
-                if (value === undefined || value === null) continue;
-                if (Array.isArray(value)) {
-                    for (const item of value) url.searchParams.append(key, String(item));
-                } else {
-                    url.searchParams.append(key, String(value));
-                }
-            }
-        }
+        const url = config.baseUrl + buildPath(route.path, args.params) + (args.query ? buildQueryString(args.query) : '');
         const headers: Record<string, string> = {
             ...(config.baseHeaders ?? {}),
             ...(args.headers ?? {}),
@@ -127,7 +131,7 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
             await config.onRequest({ url, method: route.method, headers: requestHeaders, route });
         }
         const fetchFn = config.fetch ?? fetch;
-        const res = await fetchFn(url.toString(), {
+        const res = await fetchFn(url, {
             method: route.method,
             headers: requestHeaders,
             body,
@@ -187,12 +191,5 @@ const buildClientTree = (router: Contract, config: ClientConfig): Record<string,
  * ```
  */
 export const createClient = <T extends Contract>(contract: T, config: ClientConfig): Client<T> => {
-    try {
-        new URL(config.baseUrl);
-    } catch {
-        throw new Error(
-            `[ts-kizuna] baseUrl must be a full URL (e.g. "https://api.example.com" or "http://localhost:3000"), got: ${JSON.stringify(config.baseUrl)}`
-        );
-    }
     return buildClientTree(contract, config) as Client<T>;
 };
