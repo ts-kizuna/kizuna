@@ -15,24 +15,21 @@ jobs:
             packages: write
             id-token: write
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
-            - uses: pnpm/action-setup@v4
+            - uses: pnpm/action-setup@v6
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
                   node-version: 24
                   cache: pnpm
 
             - run: pnpm install --frozen-lockfile
 
-            - name: Build packages
-              run: pnpm -r --filter "./packages/*" build
-
-            - name: Typecheck
-              run: pnpm typecheck
+            - name: Build
+              run: pnpm build
 
             - name: Configure git
               run: |

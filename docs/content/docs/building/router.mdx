@@ -96,6 +96,74 @@ return {
 };
 ```
 
+## Error responses
+
+Use the `error` helper to return typed error responses. It accepts the same `{ status, body }` as a normal return but throws internally — useful in branching logic where you want to bail out early.
+
+```ts
+getUser: async ({ params, error }) => {
+    const user = await db.users.findById(params.id);
+    if (!user) {
+        return error({
+            status: 404,
+            body: {
+                message: 'Not found',
+            },
+        });
+    }
+    return {
+        status: 200,
+        body: user,
+    };
+},
+```
+
+TypeScript enforces that the status and body match the contract — same as a return value.
+
+## Validation errors
+
+When a request body or query fails schema validation, kizuna automatically returns a `400` response before the handler runs:
+
+```json
+{
+    "message": "Invalid request body",
+    "issues": [
+        {
+            "code": "invalid_type",
+            "path": ["email"],
+            "message": "Expected string, received number"
+        },
+        {
+            "code": "custom",
+            "path": ["phone"],
+            "message": "Must include country code"
+        }
+    ]
+}
+```
+
+Each issue includes a `code` that tells you _why_ the field failed — not just _that_ it failed. Codes come from Zod's built-in validation:
+
+| Code                    | When it fires                             |
+| ----------------------- | ----------------------------------------- |
+| `invalid_type`          | Wrong type or missing required field      |
+| `too_small`             | Below `min()` / `minLength()`             |
+| `too_big`               | Above `max()` / `maxLength()`             |
+| `invalid_string_format` | Failed `email()`, `url()`, `uuid()`, etc. |
+| `unrecognized_keys`     | Extra keys when using `strict()`          |
+| `not_multiple_of`       | Failed `multipleOf()`                     |
+| `custom`                | `.refine()` or `.superRefine()` check     |
+
+The `custom` code covers all user-defined checks. If you need finer control, `.superRefine()` lets you emit any code string via `ctx.addIssue()`.
+
+The `message` and `path` fields come directly from your Zod schemas. If you use custom messages (e.g. `z.string().min(1, "Name is required")`), those are what the client receives.
+
+You don't need to handle this yourself — kizuna validates against the contract and rejects invalid requests automatically.
+
+This `400` response is reflected in the [fetch client](/docs/clients/fetch#validation-errors) return type and the [OpenAPI spec](/docs/open-api) for any route that declares a `body` or `query` schema.
+
+If you declare your own `400` response in the contract, the client will see a union of both your type and kizuna's `ValidationError`. Use [`isValidationError`](/docs/clients/fetch#isvalidationerror) on the client to distinguish them.
+
 ## `RouteHandler` and `Router` types
 
 Annotate handlers individually or as a group:

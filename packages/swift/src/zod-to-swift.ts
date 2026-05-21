@@ -72,6 +72,7 @@ export interface MapResult {
 export class TypeRegistry {
     private readonly types = new Map<string, SwiftType>();
     private readonly warningSet = new Set<string>();
+    private readonly explicitIds = new Set<string>();
     public usesAnyCodable = false;
 
     has(name: string): boolean {
@@ -89,6 +90,14 @@ export class TypeRegistry {
 
     all(): SwiftType[] {
         return Array.from(this.types.values());
+    }
+
+    markExplicitId(name: string): void {
+        this.explicitIds.add(name);
+    }
+
+    isExplicitId(name: string): boolean {
+        return this.explicitIds.has(name);
     }
 
     warnAnyCodable(hint: string, reason: string): void {
@@ -246,6 +255,7 @@ export const mapType = (
     const discriminated = readDiscriminatedUnion(schema);
     if (discriminated) {
         const enumName = id ?? sanitizeIdentifier(pascalCase(hint));
+        if (id) registry.markExplicitId(enumName);
         if (!registry.has(enumName)) {
             // placeholder to prevent recursion
             registry.add({
@@ -284,6 +294,7 @@ export const mapType = (
     }
 
     if (id && def.type === 'object') {
+        registry.markExplicitId(id);
         if (!registry.has(id)) {
             registry.add({
                 kind: 'struct',

@@ -1020,3 +1020,49 @@ describe('OpenAPI generator — HEAD method', () => {
         expect(optionsOp?.responses?.['200']?.content).toBeDefined();
     });
 });
+
+describe('automatic validation error response', () => {
+    const spec = generateJson(contract, baseConfig);
+
+    it('adds 400 validation error to routes with body', () => {
+        const response = spec.paths['/users']?.post?.responses?.['400'];
+        expect(response).toBeDefined();
+        expect(response?.description).toBe('Validation Error');
+        const schema = response?.content?.['application/json']?.schema as Record<string, unknown> | undefined;
+        expect(schema?.required).toContain('message');
+        expect(schema?.required).toContain('issues');
+        const properties = schema?.properties as Record<string, Record<string, unknown>> | undefined;
+        expect(properties?.issues?.type).toBe('array');
+    });
+
+    it('adds 400 validation error to routes with query', () => {
+        const response = spec.paths['/users']?.get?.responses?.['400'];
+        expect(response).toBeDefined();
+        expect(response?.description).toBe('Validation Error');
+    });
+
+    it('does not add 400 to routes without body or query', () => {
+        const response = spec.paths['/users/{id}']?.get?.responses?.['400'];
+        expect(response).toBeUndefined();
+    });
+
+    it('merges with a user-declared 400 using oneOf', () => {
+        const contractWith400 = createContract({
+            createItem: {
+                method: 'POST',
+                path: '/items',
+                body: z.object({ name: z.string() }),
+                responses: {
+                    201: z.object({ id: z.string() }),
+                    400: z.object({ error: z.string() }),
+                },
+            },
+        });
+        const spec = generateJson(contractWith400, baseConfig);
+        const response = spec.paths['/items']?.post?.responses?.['400'];
+        const schema = response?.content?.['application/json']?.schema as Record<string, unknown> | undefined;
+        const oneOf = schema?.oneOf as Array<Record<string, unknown>> | undefined;
+        expect(oneOf).toHaveLength(2);
+        expect(oneOf?.[1]?.required).toContain('issues');
+    });
+});

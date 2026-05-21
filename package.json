@@ -1,10 +1,10 @@
 {
   "name": "kizuna",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.6.0",
   "scripts": {
     "dev": "pnpm build && concurrently -n express,next -c cyan,magenta \"pnpm --filter @ts-kizuna-demo/express dev\" \"pnpm --filter @ts-kizuna-demo/next dev\"",
-    "build": "pnpm typecheck && pnpm -r --filter \"./packages/*\" build && pnpm generate:swift",
+    "build": "pnpm -r --filter \"./packages/*\" build && pnpm typecheck && pnpm generate:swift",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run && pnpm test:swift",
     "test:ts": "vitest run",
@@ -37,5 +37,5 @@
     "typescript-eslint": "^8.33.1",
     "vitest": "3.2.4"
   },
-  "packageManager": "pnpm@10.32.1"
+  "packageManager": "pnpm@10.33.4+sha512.1c67b3b359b2d408119ba1ed289f34b8fc3c6873412bec6fd264fbdc82489e510fcbecb9ce9d22dae7f3b76269d8441046014bdca53b9979cd7a561ad631b800"
 }

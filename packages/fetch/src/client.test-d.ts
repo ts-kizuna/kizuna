@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { createContract, type ValidationError } from '@ts-kizuna/core';
 import { createClient } from './client.js';
 
 const contract = createContract({
@@ -153,6 +153,34 @@ const contract = createContract({
     },
 });
 
+const voidBodyContract = createContract({
+    deleteItem: {
+        method: 'DELETE',
+        path: '/items/:id',
+        body: z.void(),
+        responses: {
+            200: z.object({
+                success: z.boolean(),
+            }),
+        },
+    },
+});
+
+const voidBodyClient = createClient(voidBodyContract, {
+    baseUrl: 'http://localhost:3000',
+});
+
+test('route with body: z.void() does not require a body argument', async () => {
+    await voidBodyClient.deleteItem({
+        params: { id: '1' },
+    });
+});
+
+test('route with body: z.void() rejects a non-void body', () => {
+    // @ts-expect-error body should not accept an object
+    voidBodyClient.deleteItem({ params: { id: '1' }, body: { foo: 'bar' } });
+});
+
 const nestedContract = createContract({
     users: createContract({
         getUser: {
@@ -235,10 +263,15 @@ test('createUser requires body with the right shape', async () => {
     }
 });
 
-test('listUsers query is required (the key itself), even if its inner fields are optional', async () => {
-    const result = await client.listUsers({
-        query: {},
-    });
+test('listUsers can be called without args when all query fields are optional', async () => {
+    const result = await client.listUsers();
+    if (result.status === 200) {
+        expectTypeOf(result.body).toEqualTypeOf<{ users: string[] }>();
+    }
+});
+
+test('listUsers also accepts explicit query', async () => {
+    const result = await client.listUsers({ query: { page: 1 } });
     if (result.status === 200) {
         expectTypeOf(result.body).toEqualTypeOf<{ users: string[] }>();
     }
@@ -449,4 +482,27 @@ test('nested route rejects wrong param key', () => {
 test('nested route rejects body on a route that has none', () => {
     // @ts-expect-error listPosts has no body schema
     nestedClient.posts.listPosts({ body: { foo: 'bar' } });
+});
+
+test('route with body includes ValidationError as a possible 400 response', async () => {
+    const result = await client.createUser({
+        body: { name: 'Alice', email: 'alice@test.com' },
+    });
+    if (result.status === 400) {
+        expectTypeOf(result.body).toEqualTypeOf<ValidationError>();
+    }
+});
+
+test('route with query includes ValidationError as a possible 400 response', async () => {
+    const result = await client.listUsers();
+    if (result.status === 400) {
+        expectTypeOf(result.body).toEqualTypeOf<ValidationError>();
+    }
+});
+
+test('route without body or query does not include ValidationError', async () => {
+    const result = await client.getUser({ params: { id: '1' } });
+    // getUser has no body/query, so 400 is not a possible status
+    // (it only has 200 and 404)
+    expectTypeOf(result.status).toEqualTypeOf<200 | 404>();
 });

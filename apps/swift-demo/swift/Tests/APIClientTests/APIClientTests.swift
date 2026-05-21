@@ -265,6 +265,13 @@ final class APIClientTests: XCTestCase {
         XCTAssertFalse(result.body.allow.isEmpty)
     }
 
+    func testWebhookAnyCodableBody() async throws {
+        let json = try JSONSerialization.data(withJSONObject: ["event": "test", "count": 42])
+        let payload = APIClient.AnyCodable(value: json)
+        let result = try await client.webhook(payload)
+        XCTAssertTrue(result.body.received)
+    }
+
     func testUploadAvatarMultipartEncoding() async throws {
         // The express demo ships a stub for multipart (see CLAUDE.md). The contract validator
         // rejects with 400 because parsed form fields don't satisfy `z.instanceof(File)`. We
@@ -276,12 +283,12 @@ final class APIClientTests: XCTestCase {
             XCTFail("expected .unexpectedStatus to be thrown")
         } catch let failure {
             switch failure {
-            case .unexpectedStatus(let status, _):
-                XCTAssertEqual(status, 400, "expected the stub to reject with 400; got \(status)")
+            case .badRequest:
+                break
             case .requestFailed(let underlying):
                 XCTFail("multipart request should reach the server, got request failure: \(underlying)")
             default:
-                XCTFail("expected .unexpectedStatus, got \(failure)")
+                XCTFail("expected .badRequest, got \(failure)")
             }
         }
     }

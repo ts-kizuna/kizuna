@@ -138,12 +138,10 @@ Use `kind: 'core-match'` for catch-all routing (one handler handles all paths). 
 
 ### `renderJsonResult`
 
-Translates any `AdapterResult` (except `raw-response`) to `{ status, headers, body }` using ts-kizuna's defaults — 405 with `Allow` header, RFC 9457 Problem Details, etc. Pass `{ problemDetailsEnabled: false }` to use the legacy `{ message, issues }` shape.
+Translates any `AdapterResult` (except `raw-response`) to `{ status, headers, body }` using ts-kizuna's defaults — 405 with `Allow` header, validation errors with `{ message, issues }`, etc.
 
 ```ts
-const rendered = renderJsonResult(result, {
-    problemDetailsEnabled: true,
-});
+const rendered = renderJsonResult(result);
 // rendered.status, rendered.headers, rendered.body
 ```
 

@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { RouteDefinition, Contract } from '@ts-kizuna/core';
+import type { RouteDefinition, Contract, ValidationError } from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
 import { buildPath, isRouteDefinition } from '@ts-kizuna/core';
 
@@ -34,24 +34,47 @@ type SubstituteUnknown<In, Out> = In extends unknown
 type ClientPayload<T extends z.ZodType> = SubstituteUnknown<z.input<T>, z.output<T>>;
 
 type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends true ? { params: ExtractPathParams<R['path']> } : {}) &
-    (R extends { body: z.ZodType } ? { body: ClientPayload<R['body']> } : {}) &
-    (R extends { query: z.ZodType } ? { query: ClientPayload<R['query']> } : {}) &
+    (R extends { body: z.ZodType } ? (ClientPayload<R['body']> extends void ? {} : { body: ClientPayload<R['body']> }) : {}) &
+    (R extends { query: z.ZodType }
+        ? {} extends ClientPayload<R['query']>
+            ? { query?: ClientPayload<R['query']> }
+            : { query: ClientPayload<R['query']> }
+        : {}) &
     (R extends { headers: z.ZodType } ? { headers: ClientPayload<R['headers']> } : { headers?: Record<string, string> }) & {
         fetchOptions?: RequestInit;
     };
 
+type ValidationErrorResponse = {
+    status: 400;
+    body: ValidationError;
+    headers: Record<string, string>;
+};
+
+type HasValidation<R extends RouteDefinition> = R extends { body: z.ZodType } ? true : R extends { query: z.ZodType } ? true : false;
+
+type ClientResponse<R extends RouteDefinition> =
+    HasValidation<R> extends true ? ResponseUnion<R> | ValidationErrorResponse : ResponseUnion<R>;
+
 type ClientFn<R extends RouteDefinition> =
-    {} extends ClientArgs<R> ? (args?: ClientArgs<R>) => Promise<ResponseUnion<R>> : (args: ClientArgs<R>) => Promise<ResponseUnion<R>>;
+    {} extends ClientArgs<R> ? (args?: ClientArgs<R>) => Promise<ClientResponse<R>> : (args: ClientArgs<R>) => Promise<ClientResponse<R>>;
 
 export type Client<T extends Contract> = {
     [K in keyof T]: T[K] extends RouteDefinition ? ClientFn<T[K]> : T[K] extends Contract ? Client<T[K]> : never;
 };
+
+export interface RequestContext {
+    url: string;
+    method: string;
+    headers: Headers;
+    route: RouteDefinition;
+}
 
 export interface ClientConfig {
     baseUrl: string;
     baseHeaders?: Record<string, string>;
     credentials?: RequestCredentials;
     fetch?: typeof fetch;
+    onRequest?: (context: RequestContext) => void | Promise<void>;
 }
 
 const buildFormData = (body: Record<string, unknown>): FormData => {
@@ -69,6 +92,20 @@ const buildFormData = (body: Record<string, unknown>): FormData => {
     return formData;
 };
 
+const buildQueryString = (query: Record<string, unknown>): string => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+        if (value === undefined || value === null) continue;
+        if (Array.isArray(value)) {
+            for (const item of value) params.append(key, String(item));
+        } else {
+            params.append(key, String(value));
+        }
+    }
+    const result = params.toString();
+    return result.length > 0 ? `?${result}` : '';
+};
+
 const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
     return async (
         args: {
@@ -79,17 +116,7 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
             fetchOptions?: RequestInit;
         } = {}
     ) => {
-        const url = new URL(config.baseUrl + buildPath(route.path, args.params));
-        if (args.query) {
-            for (const [key, value] of Object.entries(args.query)) {
-                if (value === undefined || value === null) continue;
-                if (Array.isArray(value)) {
-                    for (const item of value) url.searchParams.append(key, String(item));
-                } else {
-                    url.searchParams.append(key, String(value));
-                }
-            }
-        }
+        const url = config.baseUrl + buildPath(route.path, args.params) + (args.query ? buildQueryString(args.query) : '');
         const headers: Record<string, string> = {
             ...(config.baseHeaders ?? {}),
             ...(args.headers ?? {}),
@@ -110,10 +137,14 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
                     body = JSON.stringify(args.body);
             }
         }
+        const requestHeaders = new Headers(headers);
+        if (config.onRequest) {
+            await config.onRequest({ url, method: route.method, headers: requestHeaders, route });
+        }
         const fetchFn = config.fetch ?? fetch;
-        const res = await fetchFn(url.toString(), {
+        const res = await fetchFn(url, {
             method: route.method,
-            headers,
+            headers: requestHeaders,
             body,
             credentials: config.credentials,
             ...args.fetchOptions,
@@ -171,12 +202,5 @@ const buildClientTree = (router: Contract, config: ClientConfig): Record<string,
  * ```
  */
 export const createClient = <T extends Contract>(contract: T, config: ClientConfig): Client<T> => {
-    try {
-        new URL(config.baseUrl);
-    } catch {
-        throw new Error(
-            `[ts-kizuna] baseUrl must be a full URL (e.g. "https://api.example.com" or "http://localhost:3000"), got: ${JSON.stringify(config.baseUrl)}`
-        );
-    }
     return buildClientTree(contract, config) as Client<T>;
 };

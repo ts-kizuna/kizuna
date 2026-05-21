@@ -553,8 +553,8 @@ describe('Swift generator — responseHeaders', () => {
     });
 });
 
-describe('Swift generator — owned enum nesting', () => {
-    it('nests a string enum inside its owning struct and removes it from API. top level', () => {
+describe('Swift generator — owned type nesting', () => {
+    it('nests a string enum inside its owning struct and removes it from top level', () => {
         const contract = createContract({
             getVideo: {
                 method: 'GET',
@@ -570,12 +570,92 @@ describe('Swift generator — owned enum nesting', () => {
             },
         });
         const output = generateSwiftClient(contract, baseConfig);
-        // Enum nested inside the struct with short name
         expect(output).toContain('public struct Video');
         expect(output).toContain('public enum Status: String, Codable, Sendable');
         expect(output).toContain('let status: Status');
-        // Not emitted as a top-level API. peer
         expect(output).not.toContain('public enum VideoStatus');
+    });
+
+    it('nests an inline object inside its parent struct', () => {
+        const contract = createContract({
+            getPage: {
+                method: 'GET',
+                path: '/pages/:id',
+                responses: {
+                    200: z
+                        .object({
+                            id: z.string(),
+                            images: z.object({
+                                portrait: z.string(),
+                                landscape: z.string().optional(),
+                            }),
+                        })
+                        .meta({ id: 'Page' }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public struct Page');
+        expect(output).toContain('public struct Images');
+        expect(output).toContain('let images: Images');
+        expect(output).not.toContain('public struct PageImages');
+    });
+
+    it('does not nest an inline object that has its own meta.id', () => {
+        const Image = z
+            .object({
+                url: z.string(),
+                width: z.number().int(),
+            })
+            .meta({ id: 'Image' });
+        const contract = createContract({
+            getPage: {
+                method: 'GET',
+                path: '/pages/:id',
+                responses: {
+                    200: z
+                        .object({
+                            id: z.string(),
+                            image: Image,
+                        })
+                        .meta({ id: 'Page' }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public struct Page');
+        expect(output).toContain('public struct Image');
+        expect(output).toContain('let image: Image');
+        // Image is top-level, not nested inside Page
+        const pageBlock = output.slice(output.indexOf('public struct Page'));
+        const imageStructInPage = pageBlock.indexOf('public struct Image');
+        const pageBlockEnd = pageBlock.indexOf('\n    }');
+        expect(imageStructInPage === -1 || imageStructInPage > pageBlockEnd).toBe(true);
+    });
+
+    it('handles deeply nested inline objects', () => {
+        const contract = createContract({
+            getPage: {
+                method: 'GET',
+                path: '/pages/:id',
+                responses: {
+                    200: z
+                        .object({
+                            settings: z.object({
+                                theme: z.object({
+                                    color: z.string(),
+                                }),
+                            }),
+                        })
+                        .meta({ id: 'Page' }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).not.toContain('public struct PageSettings');
+        expect(output).not.toContain('public struct PageSettingsTheme');
+        expect(output).toContain('public struct Settings');
+        expect(output).toContain('public struct Theme');
     });
 });
 
@@ -654,5 +734,113 @@ describe('Swift generator — HEAD method', () => {
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('func describeUsers() async throws(TestAPIClient.DescribeUsers.Failure)');
         expect(output).toContain('decoder.decode(');
+    });
+});
+
+describe('Swift generator — automatic validation error', () => {
+    it('adds badRequest case for route with body', () => {
+        const contract = createContract({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('case badRequest(TestAPIClient.ValidationError)');
+        expect(output).toContain('struct ValidationError');
+        expect(output).toContain('struct ValidationIssue');
+    });
+
+    it('does not add validation case for route without body or query', () => {
+        const contract = createContract({
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).not.toContain('ValidationError');
+        expect(output).not.toContain('ValidationIssue');
+    });
+
+    it('uses validationError case when route also declares 400', () => {
+        const contract = createContract({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                    }),
+                    400: z.object({
+                        message: z.string(),
+                    }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('case badRequest(Response400)');
+        expect(output).toContain('case validationError(TestAPIClient.ValidationError)');
+    });
+
+    it('groups duplicate status codes into a single switch case', () => {
+        const contract = createContract({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                    }),
+                    400: z.object({
+                        message: z.string(),
+                    }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        const matches = output.match(/case 400:/g);
+        expect(matches).toHaveLength(1);
+    });
+
+    it('re-throws Failure in grouped case to prevent swallowing decoded errors', () => {
+        const contract = createContract({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                    }),
+                    400: z.object({
+                        message: z.string(),
+                    }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('catch let error as TestAPIClient.CreateUser.Failure');
     });
 });

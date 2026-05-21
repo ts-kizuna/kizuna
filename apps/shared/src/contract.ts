@@ -211,7 +211,6 @@ const usersContract = createContract('Users', {
     archiveUser: {
         method: 'POST',
         path: '/users/:id/archive',
-        body: z.object({}),
         responses: {
             200: z.object({
                 alreadyArchived: z.literal(true),
@@ -388,4 +387,15 @@ export const contract = createContract({
         summary: 'Validate config — exercises generator bug coverage',
     },
     health: healthContract,
+    webhook: {
+        method: 'POST',
+        path: '/webhook',
+        body: z.any(),
+        responses: {
+            200: z.object({
+                received: z.boolean(),
+            }),
+        },
+        summary: 'Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen',
+    },
 });
