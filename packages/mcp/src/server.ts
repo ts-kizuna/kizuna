@@ -26,6 +26,15 @@ export interface McpServerOptions {
      * By default, multipart/form-data and application/x-www-form-urlencoded routes are excluded.
      */
     routeFilter?: (route: RouteDefinition, routeKey: string) => boolean;
+
+    /**
+     * Extra context spread into every handler call.
+     *
+     * Adapter-specific endpoints populate this automatically with the
+     * framework's request object (e.g. `{ req, res }` for Express,
+     * `{ request }` for Next.js).
+     */
+    handlerContext?: Record<string, unknown>;
 }
 
 const defaultRouteFilter = (route: RouteDefinition): boolean => {
@@ -115,7 +124,8 @@ const executeToolCall = async (
     route: RouteDefinition,
     routeKey: string,
     args: Record<string, unknown>,
-    router: Record<string, unknown>
+    router: Record<string, unknown>,
+    handlerContext?: Record<string, unknown>
 ): Promise<ToolCallResult> => {
     const params = (args.params ?? {}) as Record<string, string>;
     const query = (args.query ?? {}) as Record<string, unknown>;
@@ -183,6 +193,7 @@ const executeToolCall = async (
             body: validation.parsed.body,
             headers: validation.parsed.headers,
             error,
+            ...handlerContext,
         });
 
         const isError = result.status >= 400;
@@ -275,7 +286,8 @@ export const createMcpServer = (api: Contract & ApiWithRouter, options?: McpServ
                 inputSchema: definition.inputSchema.shape,
                 annotations: buildToolAnnotations(definition.route),
             },
-            async (args: Record<string, unknown>) => executeToolCall(definition.route, definition.routeKey, args ?? {}, router)
+            async (args: Record<string, unknown>) =>
+                executeToolCall(definition.route, definition.routeKey, args ?? {}, router, options?.handlerContext)
         );
     }
 

@@ -50,6 +50,15 @@ Each route in your contract becomes an MCP tool:
 
 Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-urlencoded'` are excluded by default since MCP tools receive JSON.
 
+## Framework context
+
+Handlers called via MCP receive the same framework context as handlers called via normal HTTP requests. The MCP endpoint passes the incoming request through automatically:
+
+- **Express** — handlers receive `req` and `res` from the MCP endpoint's request
+- **Next.js** — handlers receive `request` from the MCP endpoint's request
+
+This means auth middleware, cookies, headers, and anything else attached to the request (like `req.user`) works out of the box.
+
 ## Options
 
 | Option        | Default                                | Description                                   |

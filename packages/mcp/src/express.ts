@@ -64,7 +64,13 @@ export const createMcpEndpoint = (api: Contract & ApiWithRouter, app: AppLike, o
     const mountPath = options?.path ?? '/mcp';
 
     app.post(mountPath, async (request: Request, response: Response) => {
-        const server = createMcpServer(api, options);
+        const server = createMcpServer(api, {
+            ...options,
+            handlerContext: {
+                req: request,
+                res: response,
+            },
+        });
         const transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: undefined,
         });

@@ -69,7 +69,12 @@ const methodNotAllowed = (message: string): Response =>
  */
 export const createMcpEndpoint = (api: Contract & ApiWithRouter, options?: McpEndpointOptions): McpEndpoints => {
     const POST: HttpHandler = async (request: Request) => {
-        const server = createMcpServer(api, options);
+        const server = createMcpServer(api, {
+            ...options,
+            handlerContext: {
+                request,
+            },
+        });
         const transport = new WebStandardStreamableHTTPServerTransport({
             sessionIdGenerator: undefined,
         });

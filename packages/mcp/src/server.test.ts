@@ -591,4 +591,41 @@ describe('MCP server e2e', () => {
 
         await close();
     });
+
+    it('passes handlerContext to handlers', async () => {
+        let receivedUser: unknown;
+        const contextRouter = {
+            ...router,
+            health: ({ user }: { user: unknown }) => {
+                receivedUser = user;
+                return {
+                    status: 200,
+                    body: {
+                        ok: true,
+                    },
+                };
+            },
+        };
+
+        const { client, close } = await connectMcpClient(buildApi(contextRouter), {
+            handlerContext: {
+                user: {
+                    id: '1',
+                    role: 'admin',
+                },
+            },
+        });
+
+        await client.callTool({
+            name: 'health',
+            arguments: {},
+        });
+
+        expect(receivedUser).toEqual({
+            id: '1',
+            role: 'admin',
+        });
+
+        await close();
+    });
 });
