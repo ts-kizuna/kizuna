@@ -56,15 +56,15 @@ Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-url
 
 ## Options
 
-| Option         | Default                                | Description                                      |
-| -------------- | -------------------------------------- | ------------------------------------------------ |
-| `baseUrl`      | required                               | Full URL of the API the tools will call           |
-| `name`         | `'MCP Server'`                         | Human-readable name shown to AI assistants        |
-| `version`      | `'1.0.0'`                              | Semantic version string                           |
-| `baseHeaders`  | —                                      | Headers sent with every request (auth, API keys)  |
-| `fetch`        | global `fetch`                         | Custom fetch implementation                       |
-| `routeFilter`  | excludes multipart and form-urlencoded | Predicate to filter which routes become tools     |
-| `path`         | `'/mcp'`                               | Mount path (Express only)                         |
+| Option        | Default                                | Description                                      |
+| ------------- | -------------------------------------- | ------------------------------------------------ |
+| `baseUrl`     | required                               | Full URL of the API the tools will call          |
+| `name`        | `'MCP Server'`                         | Human-readable name shown to AI assistants       |
+| `version`     | `'1.0.0'`                              | Semantic version string                          |
+| `baseHeaders` | —                                      | Headers sent with every request (auth, API keys) |
+| `fetch`       | global `fetch`                         | Custom fetch implementation                      |
+| `routeFilter` | excludes multipart and form-urlencoded | Predicate to filter which routes become tools    |
+| `path`        | `'/mcp'`                               | Mount path (Express only)                        |
 
 ## Connecting clients
 
@@ -83,11 +83,7 @@ claude mcp add --transport http my-api http://localhost:3000/mcp
     "mcp.servers": {
         "my-api": {
             "command": "npx",
-            "args": [
-                "-y",
-                "mcp-remote",
-                "http://localhost:3000/mcp"
-            ]
+            "args": ["-y", "mcp-remote", "http://localhost:3000/mcp"]
         }
     }
 }
@@ -100,11 +96,7 @@ claude mcp add --transport http my-api http://localhost:3000/mcp
     "mcpServers": {
         "my-api": {
             "command": "npx",
-            "args": [
-                "-y",
-                "mcp-remote",
-                "http://localhost:3000/mcp"
-            ]
+            "args": ["-y", "mcp-remote", "http://localhost:3000/mcp"]
         }
     }
 }
