@@ -100,7 +100,11 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
         for (const [key, value] of Object.entries(rendered.headers)) {
             res.setHeader(key, value);
         }
-        res.status(rendered.status).send(JSON.stringify(rendered.body));
+        if (rendered.body === undefined) {
+            res.status(rendered.status).end();
+        } else {
+            res.status(rendered.status).json(rendered.body);
+        }
     },
 });
 

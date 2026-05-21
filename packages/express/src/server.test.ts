@@ -496,6 +496,72 @@ describe('Express integration — requestValidationErrorHandler', () => {
     });
 });
 
+describe('Express integration — void / noBody responses', () => {
+    const voidContract = createContract({
+        deleteItem: {
+            method: 'DELETE',
+            path: '/items/:id',
+            responses: {
+                204: z.void(),
+            },
+        },
+        sendNotification: {
+            method: 'POST',
+            path: '/notifications',
+            body: z.object({
+                message: z.string(),
+            }),
+            responses: {
+                201: z.void(),
+            },
+        },
+    });
+
+    const createVoidApp = () => {
+        const app = express();
+        app.use(express.json());
+
+        const api = createApi({
+            contract: voidContract,
+            router: {
+                deleteItem: () => ({
+                    status: 204 as const,
+                    body: undefined,
+                }),
+                sendNotification: () => ({
+                    status: 201 as const,
+                    body: undefined,
+                }),
+            },
+        });
+
+        createExpressEndpoints(api, app);
+        return app;
+    };
+
+    it('returns no content-type header for void responses', async () => {
+        const app = createVoidApp();
+        const response = await request(app).delete('/items/1');
+        expect(response.status).toBe(204);
+        expect(response.headers['content-type']).toBeUndefined();
+    });
+
+    it('returns an empty body for void responses', async () => {
+        const app = createVoidApp();
+        const response = await request(app).delete('/items/1');
+        expect(response.status).toBe(204);
+        expect(response.text).toBe('');
+    });
+
+    it('void response body is parseable by JSON-based clients (no JSON.parse crash)', async () => {
+        const app = createVoidApp();
+        const response = await request(app).post('/notifications').send({ message: 'hello' });
+        expect(response.status).toBe(201);
+        expect(response.headers['content-type']).toBeUndefined();
+        expect(response.text).toBe('');
+    });
+});
+
 describe('Express handler — responseValidation', () => {
     it('returns 500 when responseValidation is enabled and the handler returns a mismatched body', async () => {
         const app = express();
