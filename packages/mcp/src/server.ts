@@ -1,16 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { flattenContract, buildPath } from '@ts-kizuna/core';
+import { flattenContract, validateRequest } from '@ts-kizuna/core';
+import { ResponseError } from '@ts-kizuna/core/adapter';
 import type { Contract, RouteDefinition } from '@ts-kizuna/core';
 import { deriveToolNames } from './tool-name.js';
 import { buildToolInputSchema, type ToolInputSchema } from './schema.js';
 
 export interface McpServerOptions {
-    /**
-     * Base URL of the API the tools will call.
-     * Must be a full URL (e.g. "https://api.example.com").
-     */
-    baseUrl: string;
-
     /**
      * Human-readable name for the MCP server.
      *
@@ -24,18 +19,6 @@ export interface McpServerOptions {
      * @default '1.0.0'
      */
     version?: string;
-
-    /**
-     * Headers sent with every request.
-     * Use for API keys, bearer tokens, etc.
-     */
-    baseHeaders?: Record<string, string>;
-
-    /**
-     * Custom fetch implementation.
-     * Defaults to the global fetch.
-     */
-    fetch?: typeof fetch;
 
     /**
      * Predicate to filter which routes become MCP tools.
@@ -94,9 +77,14 @@ export interface ToolDefinition {
     routeKey: string;
 }
 
-export const buildToolDefinitions = (contract: Contract, options: McpServerOptions): ToolDefinition[] => {
-    const filter = options.routeFilter ?? defaultRouteFilter;
-    const routes = flattenContract(contract).filter(({ route, routeKey }) => filter(route, routeKey));
+export const buildToolDefinitions = (
+    contract: Contract,
+    options?: McpServerOptions
+): ToolDefinition[] => {
+    const filter = options?.routeFilter ?? defaultRouteFilter;
+    const routes = flattenContract(contract).filter(({ route, routeKey }: { route: RouteDefinition; routeKey: string }) =>
+        filter(route, routeKey)
+    );
     const names = deriveToolNames(routes);
     const definitions: ToolDefinition[] = [];
 
@@ -114,89 +102,174 @@ export const buildToolDefinitions = (contract: Contract, options: McpServerOptio
     return definitions;
 };
 
+const resolveHandler = (router: Record<string, unknown>, routeKey: string): unknown => {
+    const segments = routeKey.split('.');
+    let current: unknown = router;
+    for (const segment of segments) {
+        if (!current || typeof current !== 'object') return undefined;
+        current = (current as Record<string, unknown>)[segment];
+    }
+    return current;
+};
+
+type ToolCallResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
+
 const executeToolCall = async (
     route: RouteDefinition,
+    routeKey: string,
     args: Record<string, unknown>,
-    options: McpServerOptions
-): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> => {
+    router: Record<string, unknown>
+): Promise<ToolCallResult> => {
     const params = (args.params ?? {}) as Record<string, string>;
     const query = (args.query ?? {}) as Record<string, unknown>;
     const body = args.body;
 
-    const url = new URL(options.baseUrl + buildPath(route.path, params));
-    for (const [key, value] of Object.entries(query)) {
-        if (value === undefined || value === null) continue;
-        if (Array.isArray(value)) {
-            for (const item of value) {
-                url.searchParams.append(key, String(item));
-            }
-        } else {
-            url.searchParams.append(key, String(value));
-        }
-    }
-
-    const headers: Record<string, string> = { ...(options.baseHeaders ?? {}) };
-    let fetchBody: string | undefined;
-    if (body !== undefined) {
-        headers['Content-Type'] = 'application/json';
-        fetchBody = JSON.stringify(body);
-    }
-
-    const fetchFunction = options.fetch ?? fetch;
-    const response = await fetchFunction(url.toString(), {
-        method: route.method,
-        headers,
-        body: fetchBody,
+    const validation = validateRequest(route, {
+        params,
+        query,
+        body,
+        headers: {},
     });
 
-    const text = await response.text();
-    let parsed: unknown;
-    try {
-        parsed = text.length > 0 ? JSON.parse(text) : undefined;
-    } catch {
-        parsed = text;
+    if (!validation.ok) {
+        return {
+            content: [
+                {
+                    type: 'text' as const,
+                    text: JSON.stringify(
+                        {
+                            status: 400,
+                            body: {
+                                message: `Validation failed: ${validation.error.stage}`,
+                                issues: validation.error.issues,
+                            },
+                        },
+                        null,
+                        2
+                    ),
+                },
+            ],
+            isError: true,
+        };
     }
 
-    const isError = response.status >= 400;
+    const handler = resolveHandler(router, routeKey);
+    if (typeof handler !== 'function') {
+        return {
+            content: [
+                {
+                    type: 'text' as const,
+                    text: JSON.stringify(
+                        {
+                            status: 500,
+                            body: {
+                                message: `Handler not implemented: ${routeKey}`,
+                            },
+                        },
+                        null,
+                        2
+                    ),
+                },
+            ],
+            isError: true,
+        };
+    }
 
-    return {
-        content: [
-            {
-                type: 'text' as const,
-                text: JSON.stringify(
+    try {
+        const error = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
+            throw new ResponseError(response);
+        };
+
+        const result = await (handler as (args: unknown) => Promise<{ status: number; body: unknown }>)({
+            params: validation.parsed.params,
+            query: validation.parsed.query,
+            body: validation.parsed.body,
+            headers: validation.parsed.headers,
+            error,
+        });
+
+        const isError = result.status >= 400;
+
+        return {
+            content: [
+                {
+                    type: 'text' as const,
+                    text: JSON.stringify(
+                        {
+                            status: result.status,
+                            body: result.body,
+                        },
+                        null,
+                        2
+                    ),
+                },
+            ],
+            isError,
+        };
+    } catch (error) {
+        if (error instanceof ResponseError) {
+            return {
+                content: [
                     {
-                        status: response.status,
-                        body: parsed,
+                        type: 'text' as const,
+                        text: JSON.stringify(
+                            {
+                                status: error.status,
+                                body: error.body,
+                            },
+                            null,
+                            2
+                        ),
                     },
-                    null,
-                    2
-                ),
-            },
-        ],
-        isError,
-    };
+                ],
+                isError: error.status >= 400,
+            };
+        }
+
+        return {
+            content: [
+                {
+                    type: 'text' as const,
+                    text: JSON.stringify(
+                        {
+                            status: 500,
+                            body: {
+                                message: error instanceof Error ? error.message : 'Internal Server Error',
+                            },
+                        },
+                        null,
+                        2
+                    ),
+                },
+            ],
+            isError: true,
+        };
+    }
 };
 
 /**
- * Create an MCP server from a kizuna contract.
+ * Create an MCP server from a kizuna contract and router.
  *
- * Each route in the contract becomes an MCP tool that proxies HTTP requests
- * to the API at `baseUrl`. Connect the returned server to any MCP transport
- * (stdio, SSE, etc.).
+ * Each route in the contract becomes an MCP tool. When an AI assistant calls
+ * a tool, the corresponding handler in `router` is invoked directly — no HTTP
+ * round-trip.
  *
  * ```ts
  * import { createMcpServer } from '@ts-kizuna/mcp';
  * import { contract } from './contract';
+ * import { router } from './router';
  *
- * const server = createMcpServer(contract, {
- *     baseUrl: 'https://api.example.com',
- * });
+ * const server = createMcpServer(contract, router);
  * ```
  */
-export const createMcpServer = (contract: Contract, options: McpServerOptions): McpServer => {
+export const createMcpServer = (
+    contract: Contract,
+    router: Record<string, unknown>,
+    options?: McpServerOptions
+): McpServer => {
     const server = new McpServer({
-        name: options.name ?? 'MCP Server',
-        version: options.version ?? '1.0.0',
+        name: options?.name ?? 'MCP Server',
+        version: options?.version ?? '1.0.0',
     });
 
     const definitions = buildToolDefinitions(contract, options);
@@ -209,7 +282,8 @@ export const createMcpServer = (contract: Contract, options: McpServerOptions): 
                 inputSchema: definition.inputSchema.shape,
                 annotations: buildToolAnnotations(definition.route),
             },
-            async (args: Record<string, unknown>) => executeToolCall(definition.route, args ?? {}, options)
+            async (args: Record<string, unknown>) =>
+                executeToolCall(definition.route, definition.routeKey, args ?? {}, router)
         );
     }
 

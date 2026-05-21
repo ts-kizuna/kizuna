@@ -58,6 +58,7 @@ export const createApi = <const R extends Contract>(contract: R): R & ApiDefinit
 };
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
 export { allowedMethodsForPath, flattenContract, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
+export { ResponseError } from './response-error.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';
 export { matchRoute } from './route-matcher.js';
 

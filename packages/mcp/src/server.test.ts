@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createContract } from '@ts-kizuna/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -111,14 +111,89 @@ const contract = createContract({
     },
 });
 
+const router = {
+    users: {
+        listUsers: ({ query }: { query: { page?: number; limit?: number } }) => ({
+            status: 200,
+            body: {
+                users: [
+                    {
+                        id: '1',
+                        name: 'Alice',
+                    },
+                ],
+            },
+        }),
+        getUser: ({ params, error }: { params: { id: string }; error: (response: { status: number; body: unknown }) => never }) => {
+            if (params.id === '999') {
+                error({
+                    status: 404,
+                    body: {
+                        message: 'User not found',
+                    },
+                });
+            }
+            return {
+                status: 200,
+                body: {
+                    id: params.id,
+                    name: 'Alice',
+                },
+            };
+        },
+        createUser: ({ body }: { body: { name: string; email: string } }) => ({
+            status: 201,
+            body: {
+                id: '1',
+                name: body.name,
+                email: body.email,
+            },
+        }),
+    },
+    health: () => ({
+        status: 200,
+        body: {
+            ok: true,
+        },
+    }),
+    uploadAvatar: () => ({
+        status: 200,
+        body: {
+            size: 1024,
+        },
+    }),
+    pingUser: () => ({
+        status: 204,
+        body: undefined,
+    }),
+    deleteUser: ({ params }: { params: { id: string } }) => ({
+        status: 200,
+        body: {
+            success: true,
+        },
+    }),
+    updateUser: ({ params, body }: { params: { id: string }; body: { name: string } }) => ({
+        status: 200,
+        body: {
+            id: params.id,
+            name: body.name,
+        },
+    }),
+};
+
 const baseOptions = {
     name: 'Test API',
     version: '1.0.0',
-    baseUrl: 'https://api.example.com',
 };
 
-const connectMcpClient = async (options: Parameters<typeof createMcpServer>[1]) => {
-    const server = createMcpServer(contract, options);
+const connectMcpClient = async (
+    testRouter: Record<string, unknown> = router,
+    options?: Parameters<typeof createMcpServer>[2]
+) => {
+    const server = createMcpServer(contract, testRouter, {
+        ...baseOptions,
+        ...options,
+    });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({
         name: 'test-client',
@@ -158,7 +233,6 @@ describe('buildToolDefinitions', () => {
 
     it('includes multipart routes when routeFilter allows them', () => {
         const definitions = buildToolDefinitions(contract, {
-            ...baseOptions,
             routeFilter: () => true,
         });
         const names = definitions.map((definition) => definition.name);
@@ -252,7 +326,7 @@ describe('buildToolDefinitions — input schema', () => {
             },
         });
 
-        const definitions = buildToolDefinitions(unionContract, baseOptions);
+        const definitions = buildToolDefinitions(unionContract);
         const send = definitions.find((definition) => definition.name === 'sendNotification')!;
 
         expect(send.inputSchema.hasBody).toBe(true);
@@ -278,7 +352,7 @@ describe('buildToolDefinitions — input schema', () => {
             },
         });
 
-        const definitions = buildToolDefinitions(complexContract, baseOptions);
+        const definitions = buildToolDefinitions(complexContract);
         const update = definitions.find((definition) => definition.name === 'updateItem')!;
 
         expect(update.inputSchema.hasParams).toBe(true);
@@ -292,11 +366,7 @@ describe('buildToolDefinitions — input schema', () => {
 
 describe('tool annotations', () => {
     it('marks GET routes as readOnly', async () => {
-        const mockFetch = vi.fn();
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
+        const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
         const getUser = tools.find((tool) => tool.name === 'users.getUser')!;
@@ -308,11 +378,7 @@ describe('tool annotations', () => {
     });
 
     it('marks DELETE routes as destructive', async () => {
-        const mockFetch = vi.fn();
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
+        const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
         const deleteUser = tools.find((tool) => tool.name === 'deleteUser')!;
@@ -324,11 +390,7 @@ describe('tool annotations', () => {
     });
 
     it('marks PUT routes as idempotent', async () => {
-        const mockFetch = vi.fn();
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
+        const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
         const updateUser = tools.find((tool) => tool.name === 'updateUser')!;
@@ -341,11 +403,7 @@ describe('tool annotations', () => {
     });
 
     it('POST routes have no special annotations', async () => {
-        const mockFetch = vi.fn();
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
+        const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
         const createUser = tools.find((tool) => tool.name === 'users.createUser')!;
@@ -360,11 +418,7 @@ describe('tool annotations', () => {
 
 describe('MCP server e2e', () => {
     it('lists all registered tools via MCP protocol', async () => {
-        const mockFetch = vi.fn();
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
+        const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
         const names = tools.map((tool) => tool.name);
@@ -380,11 +434,7 @@ describe('MCP server e2e', () => {
     });
 
     it('tools carry descriptions from the contract', async () => {
-        const mockFetch = vi.fn();
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
+        const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
         const listUsers = tools.find((tool) => tool.name === 'users.listUsers')!;
@@ -396,11 +446,7 @@ describe('MCP server e2e', () => {
     });
 
     it('tools have correct input schemas', async () => {
-        const mockFetch = vi.fn();
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
+        const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
         const getUser = tools.find((tool) => tool.name === 'users.getUser')!;
@@ -413,20 +459,8 @@ describe('MCP server e2e', () => {
         await close();
     });
 
-    it('calls fetch with correct URL and method for a GET with path params', async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-            status: 200,
-            text: async () =>
-                JSON.stringify({
-                    id: '42',
-                    name: 'Alice',
-                }),
-        });
-
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
+    it('invokes handler for a GET with path params', async () => {
+        const { client, close } = await connectMcpClient();
 
         const result = await client.callTool({
             name: 'users.getUser',
@@ -437,36 +471,19 @@ describe('MCP server e2e', () => {
             },
         });
 
-        expect(mockFetch).toHaveBeenCalledOnce();
-        const [url, options] = mockFetch.mock.calls[0]!;
-        expect(url).toBe('https://api.example.com/users/42');
-        expect(options.method).toBe('GET');
-
         const content = result.content as Array<{ type: string; text: string }>;
         const parsed = JSON.parse(content[0]!.text);
         expect(parsed.status).toBe(200);
+        expect(parsed.body.id).toBe('42');
         expect(parsed.body.name).toBe('Alice');
 
         await close();
     });
 
-    it('calls fetch with correct body for a POST', async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-            status: 201,
-            text: async () =>
-                JSON.stringify({
-                    id: '1',
-                    name: 'Bob',
-                    email: 'bob@example.com',
-                }),
-        });
+    it('invokes handler for a POST with body', async () => {
+        const { client, close } = await connectMcpClient();
 
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
-
-        await client.callTool({
+        const result = await client.callTool({
             name: 'users.createUser',
             arguments: {
                 body: {
@@ -476,34 +493,19 @@ describe('MCP server e2e', () => {
             },
         });
 
-        expect(mockFetch).toHaveBeenCalledOnce();
-        const [url, options] = mockFetch.mock.calls[0]!;
-        expect(url).toBe('https://api.example.com/users');
-        expect(options.method).toBe('POST');
-        expect(options.headers['Content-Type']).toBe('application/json');
-        expect(JSON.parse(options.body)).toEqual({
-            name: 'Bob',
-            email: 'bob@example.com',
-        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(parsed.status).toBe(201);
+        expect(parsed.body.name).toBe('Bob');
+        expect(parsed.body.email).toBe('bob@example.com');
 
         await close();
     });
 
-    it('appends query params to URL', async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-            status: 200,
-            text: async () =>
-                JSON.stringify({
-                    users: [],
-                }),
-        });
+    it('passes query params to handler', async () => {
+        const { client, close } = await connectMcpClient();
 
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
-
-        await client.callTool({
+        const result = await client.callTool({
             name: 'users.listUsers',
             arguments: {
                 query: {
@@ -513,57 +515,16 @@ describe('MCP server e2e', () => {
             },
         });
 
-        expect(mockFetch).toHaveBeenCalledOnce();
-        const [url] = mockFetch.mock.calls[0]!;
-        const parsed = new URL(url);
-        expect(parsed.searchParams.get('page')).toBe('2');
-        expect(parsed.searchParams.get('limit')).toBe('25');
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(parsed.status).toBe(200);
+        expect(parsed.body.users).toHaveLength(1);
 
         await close();
     });
 
-    it('sends baseHeaders with every request', async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-            status: 200,
-            text: async () =>
-                JSON.stringify({
-                    ok: true,
-                }),
-        });
-
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            baseHeaders: {
-                Authorization: 'Bearer test-token',
-            },
-            fetch: mockFetch,
-        });
-
-        await client.callTool({
-            name: 'health',
-            arguments: {},
-        });
-
-        expect(mockFetch).toHaveBeenCalledOnce();
-        const [, options] = mockFetch.mock.calls[0]!;
-        expect(options.headers['Authorization']).toBe('Bearer test-token');
-
-        await close();
-    });
-
-    it('returns isError for 4xx responses', async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-            status: 404,
-            text: async () =>
-                JSON.stringify({
-                    message: 'User not found',
-                }),
-        });
-
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
+    it('returns isError when handler calls error()', async () => {
+        const { client, close } = await connectMcpClient();
 
         const result = await client.callTool({
             name: 'users.getUser',
@@ -583,18 +544,10 @@ describe('MCP server e2e', () => {
         await close();
     });
 
-    it('handles void body route (no body sent)', async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-            status: 204,
-            text: async () => '',
-        });
+    it('handles void body route', async () => {
+        const { client, close } = await connectMcpClient();
 
-        const { client, close } = await connectMcpClient({
-            ...baseOptions,
-            fetch: mockFetch,
-        });
-
-        await client.callTool({
+        const result = await client.callTool({
             name: 'pingUser',
             arguments: {
                 params: {
@@ -603,11 +556,33 @@ describe('MCP server e2e', () => {
             },
         });
 
-        expect(mockFetch).toHaveBeenCalledOnce();
-        const [url, options] = mockFetch.mock.calls[0]!;
-        expect(url).toBe('https://api.example.com/users/42/ping');
-        expect(options.method).toBe('POST');
-        expect(options.body).toBeUndefined();
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(parsed.status).toBe(204);
+
+        await close();
+    });
+
+    it('returns isError when handler throws', async () => {
+        const throwingRouter = {
+            ...router,
+            health: () => {
+                throw new Error('database connection failed');
+            },
+        };
+
+        const { client, close } = await connectMcpClient(throwingRouter);
+
+        const result = await client.callTool({
+            name: 'health',
+            arguments: {},
+        });
+
+        expect(result.isError).toBe(true);
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(parsed.status).toBe(500);
+        expect(parsed.body.message).toBe('database connection failed');
 
         await close();
     });

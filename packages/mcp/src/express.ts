@@ -10,42 +10,66 @@ interface AppLike {
     delete(path: string, ...handlers: Array<(req: Request, res: Response) => void>): void;
 }
 
-export interface McpEndpointOptions extends McpServerOptions {
+export interface McpEndpointOptions {
     /**
      * Path where the MCP endpoint is mounted.
      *
      * @default '/mcp'
      */
     path?: string;
+
+    /**
+     * Human-readable name for the MCP server.
+     *
+     * @default 'MCP Server'
+     */
+    name?: string;
+
+    /**
+     * Semantic version string (e.g. "1.0.0").
+     *
+     * @default '1.0.0'
+     */
+    version?: string;
+
+    /**
+     * Predicate to filter which routes become MCP tools.
+     * Return false to exclude a route.
+     * By default, multipart/form-data and application/x-www-form-urlencoded routes are excluded.
+     */
+    routeFilter?: McpServerOptions['routeFilter'];
 }
 
 /**
  * Mount an MCP endpoint on an Express app.
  *
- * Each route in the contract becomes an MCP tool. AI assistants connect
- * to the endpoint and call tools that proxy HTTP requests to `baseUrl`.
+ * Each route in the contract becomes an MCP tool. When an AI assistant calls
+ * a tool, the corresponding handler in `router` is invoked directly.
  *
  * ```ts
  * import { createExpressEndpoints } from '@ts-kizuna/express';
  * import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
- * import { api } from './lib/api';
+ * import { api, router } from './lib/api';
  *
  * const app = express();
  * app.use(express.json());
  *
  * createExpressEndpoints(api, app);
- * createMcpEndpoint(api, app, {
- *     baseUrl: 'http://localhost:3000',
- * });
+ * createMcpEndpoint(api, app, router);
  *
  * app.listen(3000);
  * ```
  */
-export const createMcpEndpoint = (api: Contract & ApiDefinition, app: AppLike, options: McpEndpointOptions): void => {
-    const mountPath = options.path ?? '/mcp';
+export const createMcpEndpoint = (
+    api: Contract & ApiDefinition,
+    app: AppLike,
+    router: Record<string, unknown>,
+    options?: McpEndpointOptions
+): void => {
+    const mountPath = options?.path ?? '/mcp';
 
     app.post(mountPath, async (request: Request, response: Response) => {
-        const server = createMcpServer(api, options);
+        const server = createMcpServer(api, router, options);
         const transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: undefined,
         });

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { describe, expect, it, afterEach } from 'vitest';
 import { z } from 'zod';
 import express from 'express';
 import type { Server } from 'node:http';
@@ -72,14 +72,48 @@ const contract = createContract({
 
 const api = coreCreateApi(contract);
 
-const startServer = async (mockFetch: typeof fetch): Promise<{ port: number; server: Server }> => {
+const router = {
+    users: {
+        listUsers: () => ({
+            status: 200,
+            body: {
+                users: [
+                    {
+                        id: '1',
+                        name: 'Alice',
+                    },
+                ],
+            },
+        }),
+        getUser: ({ params }: { params: { id: string } }) => ({
+            status: 200,
+            body: {
+                id: params.id,
+                name: 'Alice',
+            },
+        }),
+        createUser: ({ body }: { body: { name: string; email: string } }) => ({
+            status: 201,
+            body: {
+                id: '1',
+                name: body.name,
+                email: body.email,
+            },
+        }),
+    },
+    health: () => ({
+        status: 200,
+        body: {
+            ok: true,
+        },
+    }),
+};
+
+const startServer = async (): Promise<{ port: number; server: Server }> => {
     const app = express();
     app.use(express.json());
 
-    createMcpEndpoint(api, app, {
-        baseUrl: 'http://placeholder',
-        fetch: mockFetch,
-    });
+    createMcpEndpoint(api, app, router);
 
     return new Promise((resolve) => {
         const server = app.listen(0, () => {
@@ -122,8 +156,7 @@ describe('createMcpEndpoint — Express e2e', () => {
     });
 
     it('lists tools over HTTP', async () => {
-        const mockFetch = vi.fn();
-        const result = await startServer(mockFetch);
+        const result = await startServer();
         server = result.server;
         client = await connectClient(result.port);
 
@@ -136,17 +169,8 @@ describe('createMcpEndpoint — Express e2e', () => {
         expect(names).toContain('health');
     });
 
-    it('calls a tool and proxies to baseUrl', async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-            status: 200,
-            text: async () =>
-                JSON.stringify({
-                    id: '42',
-                    name: 'Alice',
-                }),
-        });
-
-        const result = await startServer(mockFetch);
+    it('calls a tool and invokes the handler directly', async () => {
+        const result = await startServer();
         server = result.server;
         client = await connectClient(result.port);
 
@@ -159,26 +183,19 @@ describe('createMcpEndpoint — Express e2e', () => {
             },
         });
 
-        expect(mockFetch).toHaveBeenCalledOnce();
-        const [url, options] = mockFetch.mock.calls[0]!;
-        expect(url).toBe('http://placeholder/users/42');
-        expect(options.method).toBe('GET');
-
         const content = toolResult.content as Array<{ type: string; text: string }>;
         const parsed = JSON.parse(content[0]!.text);
         expect(parsed.status).toBe(200);
+        expect(parsed.body.id).toBe('42');
         expect(parsed.body.name).toBe('Alice');
     });
 
     it('mounts at custom path', async () => {
-        const mockFetch = vi.fn();
         const app = express();
         app.use(express.json());
 
-        createMcpEndpoint(api, app, {
-            baseUrl: 'http://placeholder',
+        createMcpEndpoint(api, app, router, {
             path: '/api/mcp',
-            fetch: mockFetch,
         });
 
         const started = await new Promise<{ port: number; server: Server }>((resolve) => {
