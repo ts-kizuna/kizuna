@@ -375,10 +375,27 @@ const findAllRouteObjectLiterals = (sourceFile: ts.SourceFile, resolve: Identifi
     return lit ? [lit] : [];
 };
 
-/**
- * Read JSDoc `@deprecated` tags from a contract source file and return a `DeprecationMap`.
- */
-export const createDeprecationMap = (contractPath: string): DeprecationMap => {
+type SerializedDeprecationMap = {
+    routes: Record<string, string>;
+    fields: Record<string, Record<string, string>>;
+    schemas?: Record<string, Record<string, string>>;
+};
+
+const cachePath = (contractPath: string): string => contractPath.replace(/\.ts$/, '.deprecations.json');
+
+const serialize = (map: DeprecationMap): SerializedDeprecationMap => ({
+    routes: Object.fromEntries(map.routes),
+    fields: Object.fromEntries(Array.from(map.fields, ([key, value]) => [key, Object.fromEntries(value)])),
+    schemas: map.schemas ? Object.fromEntries(Array.from(map.schemas, ([key, value]) => [key, Object.fromEntries(value)])) : undefined,
+});
+
+const deserialize = (data: SerializedDeprecationMap): DeprecationMap => ({
+    routes: new Map(Object.entries(data.routes)),
+    fields: new Map(Object.entries(data.fields).map(([key, value]) => [key, new Map(Object.entries(value))])),
+    schemas: data.schemas ? new Map(Object.entries(data.schemas).map(([key, value]) => [key, new Map(Object.entries(value))])) : undefined,
+});
+
+const parseFromSource = (contractPath: string): DeprecationMap => {
     const source = fs.readFileSync(contractPath, 'utf8');
     const sourceFile = ts.createSourceFile(contractPath, source, ts.ScriptTarget.Latest, true);
     const { resolve, cache } = makeResolverWithCache(contractPath);
@@ -390,7 +407,6 @@ export const createDeprecationMap = (contractPath: string): DeprecationMap => {
         for (const [key, value] of partial.routes) routes.set(key, value);
         for (const [key, value] of partial.fields) fields.set(key, value);
     }
-    const routeMap = { routes, fields };
 
     const schemas = new Map<string, Map<string, string>>();
     for (const fileScope of cache.values()) {
@@ -403,5 +419,26 @@ export const createDeprecationMap = (contractPath: string): DeprecationMap => {
         }
     }
 
-    return { ...routeMap, schemas };
+    return { routes, fields, schemas };
+};
+
+/**
+ * Read JSDoc `@deprecated` tags from a contract source file and return a `DeprecationMap`.
+ *
+ * Writes a `.deprecations.json` next to the contract for runtime use.
+ */
+export const createDeprecationMap = (contractPath: string): DeprecationMap => {
+    if (fs.existsSync(contractPath)) {
+        const map = parseFromSource(contractPath);
+        fs.writeFileSync(cachePath(contractPath), JSON.stringify(serialize(map)), 'utf8');
+        return map;
+    }
+    const jsonPath = cachePath(contractPath);
+    if (fs.existsSync(jsonPath)) {
+        return deserialize(JSON.parse(fs.readFileSync(jsonPath, 'utf8')) as SerializedDeprecationMap);
+    }
+    throw new Error(
+        `Deprecation contract not found: "${contractPath}" does not exist and no cached .deprecations.json was found beside it. ` +
+            `Either fix the contractPath in your deprecationWarnings config or remove the deprecationWarnings option.`
+    );
 };

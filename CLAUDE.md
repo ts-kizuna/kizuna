@@ -67,6 +67,10 @@ Never add `Co-Authored-By` to commit messages.
 
 Examples in comments and JSDoc use names from this repo's own contract (`UserSchema`, `createUser`, `listEvents`, etc.), not from consumer projects.
 
+# Documentation
+
+When changing public API surface (types, function signatures, options), check if README.md or JSDoc examples reference the old API. If so, update them in the same change.
+
 # Running tests
 
 - `pnpm test` — runs Vitest + Swift end-to-end. Always use this.
