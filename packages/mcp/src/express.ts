@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Contract } from '@ts-kizuna/core';
-import { type ApiDefinition } from '@ts-kizuna/core/adapter';
+import { type ApiWithRouter, ROUTER_META } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
 interface AppLike {
@@ -44,29 +44,25 @@ export interface McpEndpointOptions {
  * Mount an MCP endpoint on an Express app.
  *
  * Each route in the contract becomes an MCP tool. When an AI assistant calls
- * a tool, the corresponding handler in `router` is invoked directly.
+ * a tool, the corresponding handler from the api's router is invoked directly.
  *
  * ```ts
  * import { createExpressEndpoints } from '@ts-kizuna/express';
  * import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
- * import { api, router } from './lib/api';
+ * import { api } from './lib/api';
  *
  * const app = express();
  * app.use(express.json());
  *
  * createExpressEndpoints(api, app);
- * createMcpEndpoint(api, app, router);
+ * createMcpEndpoint(api, app);
  *
  * app.listen(3000);
  * ```
  */
-export const createMcpEndpoint = (
-    api: Contract & ApiDefinition,
-    app: AppLike,
-    router: Record<string, unknown>,
-    options?: McpEndpointOptions
-): void => {
+export const createMcpEndpoint = (api: Contract & ApiWithRouter, app: AppLike, options?: McpEndpointOptions): void => {
     const mountPath = options?.path ?? '/mcp';
+    const router = api[ROUTER_META];
 
     app.post(mountPath, async (request: Request, response: Response) => {
         const server = createMcpServer(api, router, options);

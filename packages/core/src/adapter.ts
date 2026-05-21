@@ -31,8 +31,10 @@ export class ResponseValidationError extends Error {
 }
 
 export const API_META: unique symbol = Symbol('ts-kizuna.api.meta');
+export const ROUTER_META: unique symbol = Symbol('ts-kizuna.router');
 
 export type ApiDefinition = { readonly [API_META]: true };
+export type ApiWithRouter = ApiDefinition & { readonly [ROUTER_META]: Record<string, unknown> };
 
 const assertNoDuplicateRoutes = (contract: Contract): void => {
     const seen = new Map<string, { routeKey: string; path: string }>();

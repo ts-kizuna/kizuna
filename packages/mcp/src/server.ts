@@ -77,10 +77,7 @@ export interface ToolDefinition {
     routeKey: string;
 }
 
-export const buildToolDefinitions = (
-    contract: Contract,
-    options?: McpServerOptions
-): ToolDefinition[] => {
+export const buildToolDefinitions = (contract: Contract, options?: McpServerOptions): ToolDefinition[] => {
     const filter = options?.routeFilter ?? defaultRouteFilter;
     const routes = flattenContract(contract).filter(({ route, routeKey }: { route: RouteDefinition; routeKey: string }) =>
         filter(route, routeKey)
@@ -262,11 +259,7 @@ const executeToolCall = async (
  * const server = createMcpServer(contract, router);
  * ```
  */
-export const createMcpServer = (
-    contract: Contract,
-    router: Record<string, unknown>,
-    options?: McpServerOptions
-): McpServer => {
+export const createMcpServer = (contract: Contract, router: Record<string, unknown>, options?: McpServerOptions): McpServer => {
     const server = new McpServer({
         name: options?.name ?? 'MCP Server',
         version: options?.version ?? '1.0.0',
@@ -282,8 +275,7 @@ export const createMcpServer = (
                 inputSchema: definition.inputSchema.shape,
                 annotations: buildToolAnnotations(definition.route),
             },
-            async (args: Record<string, unknown>) =>
-                executeToolCall(definition.route, definition.routeKey, args ?? {}, router)
+            async (args: Record<string, unknown>) => executeToolCall(definition.route, definition.routeKey, args ?? {}, router)
         );
     }
 

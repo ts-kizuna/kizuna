@@ -186,10 +186,7 @@ const baseOptions = {
     version: '1.0.0',
 };
 
-const connectMcpClient = async (
-    testRouter: Record<string, unknown> = router,
-    options?: Parameters<typeof createMcpServer>[2]
-) => {
+const connectMcpClient = async (testRouter: Record<string, unknown> = router, options?: Parameters<typeof createMcpServer>[2]) => {
     const server = createMcpServer(contract, testRouter, {
         ...baseOptions,
         ...options,

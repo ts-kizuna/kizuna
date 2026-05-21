@@ -3,7 +3,7 @@ import { z } from 'zod';
 import express from 'express';
 import type { Server } from 'node:http';
 import { createContract } from '@ts-kizuna/core';
-import { createApi as coreCreateApi } from '@ts-kizuna/core/adapter';
+import { createApi as coreCreateApi, ROUTER_META } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createMcpEndpoint } from './express.js';
@@ -70,8 +70,6 @@ const contract = createContract({
     },
 });
 
-const api = coreCreateApi(contract);
-
 const router = {
     users: {
         listUsers: () => ({
@@ -109,11 +107,15 @@ const router = {
     }),
 };
 
+const api = Object.assign(coreCreateApi(contract), {
+    [ROUTER_META]: router,
+});
+
 const startServer = async (): Promise<{ port: number; server: Server }> => {
     const app = express();
     app.use(express.json());
 
-    createMcpEndpoint(api, app, router);
+    createMcpEndpoint(api, app);
 
     return new Promise((resolve) => {
         const server = app.listen(0, () => {
@@ -194,7 +196,7 @@ describe('createMcpEndpoint — Express e2e', () => {
         const app = express();
         app.use(express.json());
 
-        createMcpEndpoint(api, app, router, {
+        createMcpEndpoint(api, app, {
             path: '/api/mcp',
         });
 

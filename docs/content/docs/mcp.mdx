@@ -14,13 +14,13 @@ description: Mount an MCP endpoint on your Express or Next.js app so AI assistan
 import express from 'express';
 import { createExpressEndpoints } from '@ts-kizuna/express';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
-import { api, router } from './lib/api';
+import { api } from './lib/api';
 
 const app = express();
 app.use(express.json());
 
 createExpressEndpoints(api, app);
-createMcpEndpoint(api, app, router);
+createMcpEndpoint(api, app);
 
 app.listen(3000);
 ```
@@ -32,9 +32,9 @@ app.listen(3000);
 ```ts
 // app/mcp/route.ts
 import { createMcpEndpoint } from '@ts-kizuna/mcp/next';
-import { api, router } from '../../lib/api';
+import { api } from '../../lib/api';
 
-export const { GET, POST, DELETE } = createMcpEndpoint(api, router);
+export const { GET, POST, DELETE } = createMcpEndpoint(api);
 ```
 
 Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HTTP transport requires.
@@ -52,12 +52,12 @@ Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-url
 
 ## Options
 
-| Option        | Default                                | Description                                    |
-| ------------- | -------------------------------------- | ---------------------------------------------- |
-| `name`        | `'MCP Server'`                         | Human-readable name shown to AI assistants     |
-| `version`     | `'1.0.0'`                              | Semantic version string                        |
-| `routeFilter` | excludes multipart and form-urlencoded | Predicate to filter which routes become tools  |
-| `path`        | `'/mcp'`                               | Mount path (Express only)                      |
+| Option        | Default                                | Description                                   |
+| ------------- | -------------------------------------- | --------------------------------------------- |
+| `name`        | `'MCP Server'`                         | Human-readable name shown to AI assistants    |
+| `version`     | `'1.0.0'`                              | Semantic version string                       |
+| `routeFilter` | excludes multipart and form-urlencoded | Predicate to filter which routes become tools |
+| `path`        | `'/mcp'`                               | Mount path (Express only)                     |
 
 ## Connecting clients
 
@@ -133,7 +133,7 @@ If you don't want to mount on an existing app, `createMcpServer` returns a raw `
 import { createMcpServer } from '@ts-kizuna/mcp';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { contract } from '@shared/contract';
-import { router } from './router';
+import { router } from '@shared/router';
 
 const server = createMcpServer(contract, router, {
     name: 'My API',

@@ -1,6 +1,6 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import type { Contract } from '@ts-kizuna/core';
-import { type ApiDefinition } from '@ts-kizuna/core/adapter';
+import { type ApiWithRouter, ROUTER_META } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
 type HttpHandler = (request: Request) => Promise<Response>;
@@ -62,16 +62,14 @@ const methodNotAllowed = (message: string): Response =>
  * ```ts
  * // app/mcp/route.ts
  * import { createMcpEndpoint } from '@ts-kizuna/mcp/next';
- * import { api, router } from '../../lib/api';
+ * import { api } from '../../lib/api';
  *
- * export const { GET, POST, DELETE } = createMcpEndpoint(api, router);
+ * export const { GET, POST, DELETE } = createMcpEndpoint(api);
  * ```
  */
-export const createMcpEndpoint = (
-    api: Contract & ApiDefinition,
-    router: Record<string, unknown>,
-    options?: McpEndpointOptions
-): McpEndpoints => {
+export const createMcpEndpoint = (api: Contract & ApiWithRouter, options?: McpEndpointOptions): McpEndpoints => {
+    const router = api[ROUTER_META];
+
     const POST: HttpHandler = async (request: Request) => {
         const server = createMcpServer(api, router, options);
         const transport = new WebStandardStreamableHTTPServerTransport({
