@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Contract } from '@ts-kizuna/core';
-import { type ApiWithRouter, ROUTER_META } from '@ts-kizuna/core/adapter';
+import { type ApiWithRouter } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
 interface AppLike {
@@ -62,10 +62,9 @@ export interface McpEndpointOptions {
  */
 export const createMcpEndpoint = (api: Contract & ApiWithRouter, app: AppLike, options?: McpEndpointOptions): void => {
     const mountPath = options?.path ?? '/mcp';
-    const router = api[ROUTER_META];
 
     app.post(mountPath, async (request: Request, response: Response) => {
-        const server = createMcpServer(api, router, options);
+        const server = createMcpServer(api, options);
         const transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: undefined,
         });

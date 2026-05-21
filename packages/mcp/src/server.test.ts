@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createContract } from '@ts-kizuna/core';
+import { createApi as coreCreateApi, ROUTER_META } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildToolDefinitions, createMcpServer } from './server.js';
@@ -181,13 +182,20 @@ const router = {
     }),
 };
 
+const buildApi = (testRouter: Record<string, unknown> = router) =>
+    Object.assign(coreCreateApi(contract), {
+        [ROUTER_META]: testRouter,
+    });
+
+const api = buildApi();
+
 const baseOptions = {
     name: 'Test API',
     version: '1.0.0',
 };
 
-const connectMcpClient = async (testRouter: Record<string, unknown> = router, options?: Parameters<typeof createMcpServer>[2]) => {
-    const server = createMcpServer(contract, testRouter, {
+const connectMcpClient = async (testApi = api, options?: Parameters<typeof createMcpServer>[1]) => {
+    const server = createMcpServer(testApi, {
         ...baseOptions,
         ...options,
     });
@@ -568,7 +576,7 @@ describe('MCP server e2e', () => {
             },
         };
 
-        const { client, close } = await connectMcpClient(throwingRouter);
+        const { client, close } = await connectMcpClient(buildApi(throwingRouter));
 
         const result = await client.callTool({
             name: 'health',

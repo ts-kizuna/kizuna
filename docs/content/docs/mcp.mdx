@@ -132,10 +132,9 @@ If you don't want to mount on an existing app, `createMcpServer` returns a raw `
 ```ts
 import { createMcpServer } from '@ts-kizuna/mcp';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { contract } from '@shared/contract';
-import { router } from '@shared/router';
+import { api } from './api';
 
-const server = createMcpServer(contract, router, {
+const server = createMcpServer(api, {
     name: 'My API',
     version: '1.0.0',
 });

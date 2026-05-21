@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { flattenContract, validateRequest } from '@ts-kizuna/core';
-import { ResponseError } from '@ts-kizuna/core/adapter';
+import { ResponseError, type ApiWithRouter, ROUTER_META } from '@ts-kizuna/core/adapter';
 import type { Contract, RouteDefinition } from '@ts-kizuna/core';
 import { deriveToolNames } from './tool-name.js';
 import { buildToolInputSchema, type ToolInputSchema } from './schema.js';
@@ -245,27 +245,27 @@ const executeToolCall = async (
 };
 
 /**
- * Create an MCP server from a kizuna contract and router.
+ * Create an MCP server from a kizuna API.
  *
  * Each route in the contract becomes an MCP tool. When an AI assistant calls
- * a tool, the corresponding handler in `router` is invoked directly — no HTTP
- * round-trip.
+ * a tool, the corresponding handler is invoked directly.
  *
  * ```ts
  * import { createMcpServer } from '@ts-kizuna/mcp';
- * import { contract } from './contract';
- * import { router } from './router';
+ * import { api } from './api';
  *
- * const server = createMcpServer(contract, router);
+ * const server = createMcpServer(api);
  * ```
  */
-export const createMcpServer = (contract: Contract, router: Record<string, unknown>, options?: McpServerOptions): McpServer => {
+export const createMcpServer = (api: Contract & ApiWithRouter, options?: McpServerOptions): McpServer => {
+    const router = api[ROUTER_META];
+
     const server = new McpServer({
         name: options?.name ?? 'MCP Server',
         version: options?.version ?? '1.0.0',
     });
 
-    const definitions = buildToolDefinitions(contract, options);
+    const definitions = buildToolDefinitions(api, options);
 
     for (const definition of definitions) {
         server.registerTool(
