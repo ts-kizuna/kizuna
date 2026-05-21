@@ -1210,8 +1210,6 @@ public struct APIUsersClient: Sendable {
         guard let url = components.url else { throw APIClient.UsersArchiveUser.Failure.unexpectedStatus(-1, Data()) }
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = Data("{}".utf8)
         if let middleware = requestMiddleware {
             do { try await middleware(&request) }
             catch is CancellationError { throw APIClient.UsersArchiveUser.Failure.cancelled }
