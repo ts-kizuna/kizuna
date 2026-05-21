@@ -430,7 +430,7 @@ export const renderJsonResult = (
             return {
                 status: result.status,
                 headers: {
-                    'content-type': 'application/json',
+                    ...(result.body !== undefined ? { 'content-type': 'application/json' } : {}),
                     ...(result.headers ?? {}),
                 },
                 body: result.body,
