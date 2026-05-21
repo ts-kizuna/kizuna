@@ -52,12 +52,12 @@ Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-url
 
 ## Framework context
 
-Handlers called via MCP receive the same framework context as handlers called via normal HTTP requests. The MCP endpoint passes the incoming request through automatically:
+Handlers called via MCP receive the same framework context as regular HTTP handlers. The MCP endpoint passes its incoming request through automatically:
 
-- **Express** — handlers receive `req` and `res` from the MCP endpoint's request
-- **Next.js** — handlers receive `request` from the MCP endpoint's request
+- **Express** — handlers receive `req` and `res`
+- **Next.js** — handlers receive `request`
 
-This means auth middleware, cookies, headers, and anything else attached to the request (like `req.user`) works out of the box.
+Auth middleware that reads headers and sets `req.user` works out of the box — MCP clients can send authorization headers when connecting to the endpoint.
 
 ## Options
 
