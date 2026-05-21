@@ -179,10 +179,12 @@ public actor APIClient {
     }
 
     public struct ValidationIssue: Codable, Sendable, Equatable {
+        public let code: String
         public let path: [String]
         public let message: String
 
-        public init(path: [String], message: String) {
+        public init(code: String, path: [String], message: String) {
+            self.code = code
             self.path = path
             self.message = message
         }
@@ -414,6 +416,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
         }
     }
 
@@ -979,6 +982,15 @@ public actor APIClient {
             do {
                 let body = try decoder.decode(APIClient.Webhook.Response.self, from: data)
                 return APIClient.Webhook.Result(body: body)
+            } catch {
+                throw APIClient.Webhook.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
+        case 400:
+            do {
+                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
+                throw APIClient.Webhook.Failure.badRequest(payload)
+            } catch let error as APIClient.Webhook.Failure {
+                throw error
             } catch {
                 throw APIClient.Webhook.Failure.decoding(error, statusCode: statusCode, data: data)
             }

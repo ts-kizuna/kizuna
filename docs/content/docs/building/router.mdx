@@ -126,15 +126,37 @@ When a request body or query fails schema validation, kizuna automatically retur
 
 ```json
 {
-    "message": "Validation failed",
+    "message": "Invalid request body",
     "issues": [
-        { "path": ["email"], "message": "Invalid email" },
-        { "path": ["phoneNumber"], "message": "Invalid phone number" }
+        {
+            "code": "invalid_type",
+            "path": ["email"],
+            "message": "Expected string, received number"
+        },
+        {
+            "code": "custom",
+            "path": ["phone"],
+            "message": "Must include country code"
+        }
     ]
 }
 ```
 
-The error messages in `issues` come directly from your Zod schemas in the contract. If you use custom messages in your schemas (e.g. `z.string().min(1, "Name is required")`), those messages are what the client receives.
+Each issue includes a `code` that tells you _why_ the field failed — not just _that_ it failed. Codes come from Zod's built-in validation:
+
+| Code                    | When it fires                             |
+| ----------------------- | ----------------------------------------- |
+| `invalid_type`          | Wrong type or missing required field      |
+| `too_small`             | Below `min()` / `minLength()`             |
+| `too_big`               | Above `max()` / `maxLength()`             |
+| `invalid_string_format` | Failed `email()`, `url()`, `uuid()`, etc. |
+| `unrecognized_keys`     | Extra keys when using `strict()`          |
+| `not_multiple_of`       | Failed `multipleOf()`                     |
+| `custom`                | `.refine()` or `.superRefine()` check     |
+
+The `custom` code covers all user-defined checks. If you need finer control, `.superRefine()` lets you emit any code string via `ctx.addIssue()`.
+
+The `message` and `path` fields come directly from your Zod schemas. If you use custom messages (e.g. `z.string().min(1, "Name is required")`), those are what the client receives.
 
 You don't need to handle this yourself — kizuna validates against the contract and rejects invalid requests automatically.
 

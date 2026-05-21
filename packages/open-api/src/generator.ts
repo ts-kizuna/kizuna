@@ -458,8 +458,9 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                             type: 'array',
                             items: {
                                 type: 'object',
-                                required: ['path', 'message'],
+                                required: ['code', 'path', 'message'],
                                 properties: {
+                                    code: { type: 'string' },
                                     path: {
                                         type: 'array',
                                         items: { type: 'string' },

@@ -1239,10 +1239,12 @@ const emitClient = (
             });
             writer.blank();
             writer.block('public struct ValidationIssue: Codable, Sendable, Equatable', () => {
+                writer.line('public let code: String');
                 writer.line('public let path: [String]');
                 writer.line('public let message: String');
                 writer.blank();
-                writer.block('public init(path: [String], message: String)', () => {
+                writer.block('public init(code: String, path: [String], message: String)', () => {
+                    writer.line('self.code = code');
                     writer.line('self.path = path');
                     writer.line('self.message = message');
                 });

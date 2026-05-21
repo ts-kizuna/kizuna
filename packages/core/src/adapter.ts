@@ -475,7 +475,11 @@ export const renderJsonResult = (
                 },
                 body: {
                     message: result.message,
-                    issues: result.issues,
+                    issues: result.issues.map((issue) => ({
+                        code: issue.code ?? 'custom',
+                        path: issue.path,
+                        message: issue.message,
+                    })),
                 },
             };
         case 'no-handler':
