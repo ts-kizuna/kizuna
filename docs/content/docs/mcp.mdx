@@ -14,15 +14,13 @@ description: Mount an MCP endpoint on your Express or Next.js app so AI assistan
 import express from 'express';
 import { createExpressEndpoints } from '@ts-kizuna/express';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
-import { api } from './lib/api';
+import { api, router } from './lib/api';
 
 const app = express();
 app.use(express.json());
 
 createExpressEndpoints(api, app);
-createMcpEndpoint(api, app, {
-    baseUrl: 'http://localhost:3000',
-});
+createMcpEndpoint(api, app, router);
 
 app.listen(3000);
 ```
@@ -34,11 +32,9 @@ app.listen(3000);
 ```ts
 // app/mcp/route.ts
 import { createMcpEndpoint } from '@ts-kizuna/mcp/next';
-import { api } from '../../lib/api';
+import { api, router } from '../../lib/api';
 
-export const { GET, POST, DELETE } = createMcpEndpoint(api, {
-    baseUrl: 'http://localhost:3000',
-});
+export const { GET, POST, DELETE } = createMcpEndpoint(api, router);
 ```
 
 Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HTTP transport requires.
@@ -50,21 +46,18 @@ Each route in your contract becomes an MCP tool:
 - **Tool name** — the dotted route key from the contract (e.g. `users.getUser`)
 - **Tool description** — from the route's `summary` and `description`, falling back to `METHOD /path`
 - **Tool input** — structured as `{ params, query, body }` matching the route's schemas
-- **Tool execution** — sends an HTTP request to `baseUrl` and returns `{ status, body }`
+- **Tool execution** — invokes the corresponding handler directly and returns `{ status, body }`
 
 Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-urlencoded'` are excluded by default since MCP tools receive JSON.
 
 ## Options
 
-| Option        | Default                                | Description                                      |
-| ------------- | -------------------------------------- | ------------------------------------------------ |
-| `baseUrl`     | required                               | Full URL of the API the tools will call          |
-| `name`        | `'MCP Server'`                         | Human-readable name shown to AI assistants       |
-| `version`     | `'1.0.0'`                              | Semantic version string                          |
-| `baseHeaders` | —                                      | Headers sent with every request (auth, API keys) |
-| `fetch`       | global `fetch`                         | Custom fetch implementation                      |
-| `routeFilter` | excludes multipart and form-urlencoded | Predicate to filter which routes become tools    |
-| `path`        | `'/mcp'`                               | Mount path (Express only)                        |
+| Option        | Default                                | Description                                    |
+| ------------- | -------------------------------------- | ---------------------------------------------- |
+| `name`        | `'MCP Server'`                         | Human-readable name shown to AI assistants     |
+| `version`     | `'1.0.0'`                              | Semantic version string                        |
+| `routeFilter` | excludes multipart and form-urlencoded | Predicate to filter which routes become tools  |
+| `path`        | `'/mcp'`                               | Mount path (Express only)                      |
 
 ## Connecting clients
 
@@ -140,11 +133,11 @@ If you don't want to mount on an existing app, `createMcpServer` returns a raw `
 import { createMcpServer } from '@ts-kizuna/mcp';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { contract } from '@shared/contract';
+import { router } from './router';
 
-const server = createMcpServer(contract, {
+const server = createMcpServer(contract, router, {
     name: 'My API',
     version: '1.0.0',
-    baseUrl: 'https://api.example.com',
 });
 
 await server.connect(new StdioServerTransport());
