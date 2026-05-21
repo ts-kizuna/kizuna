@@ -119,21 +119,23 @@ responses: {
 
 ## Models
 
-To create a model, add `.meta({ id })` to a Zod schema. This gives it a name that the OpenAPI and Swift generators pick up.
+Use `createModel` to give a Zod schema a name that the OpenAPI and Swift generators pick up.
 
 ```ts
-export const UserSchema = z
-    .object({
+import { createModel } from '@ts-kizuna/core';
+
+export const UserSchema = createModel({
+    title: 'User',
+    description: 'A user in the system',
+    schema: z.object({
         id: z.string(),
         name: z.string(),
         email: z.email(),
-    })
-    .meta({
-        id: 'User',
-    });
+    }),
+});
 ```
 
-Without `id`, the generators inline the schema everywhere it appears. With `id`:
+Without a title, the generators inline the schema everywhere it appears. With `createModel`:
 
 - **OpenAPI** — the schema is extracted into `components.schemas.User` and every usage becomes a `$ref: '#/components/schemas/User'` reference
 - **Swift** — the schema becomes a named `public struct User` in the generated client, shared across all routes that reference it
