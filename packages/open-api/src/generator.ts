@@ -447,6 +447,55 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                 };
             }
 
+            const hasValidation = route.body || route.query;
+            if (hasValidation) {
+                const validationSchema = {
+                    type: 'object',
+                    required: ['message', 'issues'],
+                    properties: {
+                        message: { type: 'string' },
+                        issues: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                required: ['code', 'path', 'message'],
+                                properties: {
+                                    code: { type: 'string' },
+                                    path: {
+                                        type: 'array',
+                                        items: { type: 'string' },
+                                    },
+                                    message: { type: 'string' },
+                                },
+                            },
+                        },
+                    },
+                };
+                const existing = operation.responses['400'];
+                if (existing) {
+                    const existingSchema = existing.content?.['application/json']?.schema;
+                    operation.responses['400'] = {
+                        description: existing.description ?? 'Bad Request',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    oneOf: [existingSchema, validationSchema].filter(Boolean),
+                                },
+                            },
+                        },
+                    };
+                } else {
+                    operation.responses['400'] = {
+                        description: 'Validation Error',
+                        content: {
+                            'application/json': {
+                                schema: validationSchema,
+                            },
+                        },
+                    };
+                }
+            }
+
             if (options.operationMapper) {
                 operation = options.operationMapper(operation, route, routeKey);
             }

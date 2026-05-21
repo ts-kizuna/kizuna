@@ -6,7 +6,6 @@ ts-kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RF
 
 - **RFC 9110** (HTTP Semantics, June 2022) — methods, status codes, headers, content negotiation
 - **RFC 5789** (PATCH Method, April 2010) — PATCH semantics
-- **RFC 9457** (Problem Details for HTTP APIs, October 2023) — error response format, opt-out via `problemDetailsEnabled: false` on each adapter
 - **OpenAPI 3.1.0** — spec generation
 
 ### Deliberate omissions

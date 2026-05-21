@@ -466,12 +466,11 @@ describe('Express integration — requestValidationErrorHandler', () => {
             name: '',
         });
         expect(response.status).toBe(400);
-        expect(response.body.title).toBe('Validation Failed');
-        expect(response.body.status).toBe(400);
+        expect(response.body.message).toBeDefined();
         expect(Array.isArray(response.body.issues)).toBe(true);
     });
 
-    it('calls the custom requestValidationErrorHandler with the validation error', async () => {
+    it('returns application/json content type for validation errors', async () => {
         const app = express();
         app.use(express.json());
 
@@ -487,20 +486,13 @@ describe('Express integration — requestValidationErrorHandler', () => {
             },
         });
 
-        createExpressEndpoints(api, app, {
-            problemDetailsEnabled: false,
-            requestValidationErrorHandler: (_err, _req, res, _next) => {
-                res.status(422).json({
-                    error: 'invalid input',
-                });
-            },
-        });
+        createExpressEndpoints(api, app);
 
         const response = await request(app).post('/items').send({
             name: '',
         });
-        expect(response.status).toBe(422);
-        expect(response.body.error).toBe('invalid input');
+        expect(response.status).toBe(400);
+        expect(response.headers['content-type']).toContain('application/json');
     });
 });
 

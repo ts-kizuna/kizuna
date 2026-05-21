@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { createContract, type ValidationError } from '@ts-kizuna/core';
 import { createClient } from './client.js';
 
 const contract = createContract({
@@ -482,4 +482,27 @@ test('nested route rejects wrong param key', () => {
 test('nested route rejects body on a route that has none', () => {
     // @ts-expect-error listPosts has no body schema
     nestedClient.posts.listPosts({ body: { foo: 'bar' } });
+});
+
+test('route with body includes ValidationError as a possible 400 response', async () => {
+    const result = await client.createUser({
+        body: { name: 'Alice', email: 'alice@test.com' },
+    });
+    if (result.status === 400) {
+        expectTypeOf(result.body).toEqualTypeOf<ValidationError>();
+    }
+});
+
+test('route with query includes ValidationError as a possible 400 response', async () => {
+    const result = await client.listUsers();
+    if (result.status === 400) {
+        expectTypeOf(result.body).toEqualTypeOf<ValidationError>();
+    }
+});
+
+test('route without body or query does not include ValidationError', async () => {
+    const result = await client.getUser({ params: { id: '1' } });
+    // getUser has no body/query, so 400 is not a possible status
+    // (it only has 200 and 404)
+    expectTypeOf(result.status).toEqualTypeOf<200 | 404>();
 });

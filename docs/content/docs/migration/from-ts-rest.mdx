@@ -250,16 +250,7 @@ The `/** @deprecated */` JSDoc tag drives IDE strikethrough, the OpenAPI `deprec
 
 ## Error responses
 
-ts-kizuna returns [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) (`application/problem+json`) by default for all non-2xx adapter errors. ts-rest returns `{ message, issues }`.
-
-To opt out per-adapter:
-
-```ts
-// Express
-createExpressEndpoints(api, app, {
-    problemDetailsEnabled: false,
-});
-```
+ts-kizuna returns `application/json` for all error responses. Validation errors use `{ message, issues }` — the same shape as ts-rest.
 
 ## Method mismatch behaviour
 

@@ -253,6 +253,16 @@ const buildRouteMethod = (
             });
         }
     }
+    const hasValidation = route.body || route.query;
+    if (hasValidation) {
+        const has400 = errorCases.some((c) => c.status === 400);
+        errorCases.push({
+            caseName: has400 ? 'validationError' : statusName(400),
+            status: 400,
+            type: 'ValidationError',
+        });
+    }
+
     successResponses.sort((left, right) => left.status - right.status);
 
     const resultHeaderFields: SwiftField[] = mergeHeaderFields(successResponses.map((entry) => entry.responseHeaders));
@@ -635,8 +645,8 @@ const resolveType = (
         return optional ? `[${resolved}]?` : `[${resolved}]`;
     }
 
-    if (base === 'MultipartFile') {
-        const qualified = `${clientName}.MultipartFile`;
+    if (base === 'MultipartFile' || base === 'ValidationError' || base === 'ValidationIssue') {
+        const qualified = `${clientName}.${base}`;
         return optional ? `${qualified}?` : qualified;
     }
 
@@ -1030,20 +1040,49 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
             writer.line('    return');
         }
     }
+    const grouped = new Map<number, typeof method.errorCases>();
     for (const errorCase of method.errorCases) {
-        writer.line(`case ${errorCase.status}:`);
-        if (errorCase.type === 'Void') {
-            writer.line(`    throw ${failure}.${escapeKeyword(errorCase.caseName)}`);
+        const existing = grouped.get(errorCase.status);
+        if (existing) {
+            existing.push(errorCase);
         } else {
-            const resolved = resolveType(errorCase.type, method.operationName, context);
-            writer.line('    do {');
-            writer.line(`        let payload = try decoder.decode(${resolved}.self, from: data)`);
-            writer.line(`        throw ${failure}.${escapeKeyword(errorCase.caseName)}(payload)`);
-            writer.line(`    } catch let error as ${failure} {`);
-            writer.line('        throw error');
-            writer.line('    } catch {');
-            writer.line(`        throw ${failure}.decoding(error, statusCode: statusCode, data: data)`);
-            writer.line('    }');
+            grouped.set(errorCase.status, [errorCase]);
+        }
+    }
+    for (const [status, cases] of grouped) {
+        writer.line(`case ${status}:`);
+        const firstCase = cases[0];
+        if (cases.length === 1 && firstCase) {
+            if (firstCase.type === 'Void') {
+                writer.line(`    throw ${failure}.${escapeKeyword(firstCase.caseName)}`);
+            } else {
+                const resolved = resolveType(firstCase.type, method.operationName, context);
+                writer.line('    do {');
+                writer.line(`        let payload = try decoder.decode(${resolved}.self, from: data)`);
+                writer.line(`        throw ${failure}.${escapeKeyword(firstCase.caseName)}(payload)`);
+                writer.line(`    } catch let error as ${failure} {`);
+                writer.line('        throw error');
+                writer.line('    } catch {');
+                writer.line(`        throw ${failure}.decoding(error, statusCode: statusCode, data: data)`);
+                writer.line('    }');
+            }
+        } else {
+            for (const errorCase of cases) {
+                if (errorCase.type === 'Void') {
+                    writer.line(`    throw ${failure}.${escapeKeyword(errorCase.caseName)}`);
+                } else {
+                    const resolved = resolveType(errorCase.type, method.operationName, context);
+                    writer.line('    do {');
+                    writer.line(`        let payload = try decoder.decode(${resolved}.self, from: data)`);
+                    writer.line(`        throw ${failure}.${escapeKeyword(errorCase.caseName)}(payload)`);
+                    writer.line(`    } catch let error as ${failure} {`);
+                    writer.line('        throw error');
+                    writer.line('    } catch {}');
+                }
+            }
+            writer.line(
+                `    throw ${failure}.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status ${status}")), statusCode: statusCode, data: data)`
+            );
         }
     }
     writer.line('default:');
@@ -1183,6 +1222,31 @@ const emitClient = (
                     writer.line('self.data = data');
                     writer.line('self.filename = filename');
                     writer.line('self.mimeType = mimeType');
+                });
+            });
+        }
+        const hasValidation = allMethods.some((method) => method.errorCases.some((c) => c.type === 'ValidationError'));
+        if (hasValidation) {
+            writer.blank();
+            writer.block('public struct ValidationError: Codable, Sendable, Equatable', () => {
+                writer.line('public let message: String');
+                writer.line('public let issues: [ValidationIssue]');
+                writer.blank();
+                writer.block('public init(message: String, issues: [ValidationIssue])', () => {
+                    writer.line('self.message = message');
+                    writer.line('self.issues = issues');
+                });
+            });
+            writer.blank();
+            writer.block('public struct ValidationIssue: Codable, Sendable, Equatable', () => {
+                writer.line('public let code: String');
+                writer.line('public let path: [String]');
+                writer.line('public let message: String');
+                writer.blank();
+                writer.block('public init(code: String, path: [String], message: String)', () => {
+                    writer.line('self.code = code');
+                    writer.line('self.path = path');
+                    writer.line('self.message = message');
                 });
             });
         }
