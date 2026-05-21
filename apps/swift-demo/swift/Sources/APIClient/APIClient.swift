@@ -601,7 +601,6 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
-            case badRequest(APIClient.ValidationError)
         }
     }
 
@@ -1325,15 +1324,6 @@ public struct APIUsersClient: Sendable {
             do {
                 let payload = try decoder.decode(APIClient.UsersArchiveUser.Response201.self, from: data)
                 return APIClient.UsersArchiveUser.Result(body: .status201(payload))
-            } catch {
-                throw APIClient.UsersArchiveUser.Failure.decoding(error, statusCode: statusCode, data: data)
-            }
-        case 400:
-            do {
-                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
-                throw APIClient.UsersArchiveUser.Failure.badRequest(payload)
-            } catch let error as APIClient.UsersArchiveUser.Failure {
-                throw error
             } catch {
                 throw APIClient.UsersArchiveUser.Failure.decoding(error, statusCode: statusCode, data: data)
             }
