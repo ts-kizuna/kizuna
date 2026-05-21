@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createContract } from './contract.js';
+import { createTag } from './tag.js';
 import { createApi } from './adapter.js';
 import { createClient } from '../../fetch/src/client.js';
 
@@ -36,7 +37,15 @@ const ExtendedUserSchema = UserSchema.extend({
 // Sub-contract defined with a tag *before* the main export — this used to confuse the
 // deprecation walker into treating the tag string as the routes argument and returning an
 // empty map.
-const healthContract = createContract('Health', {
+const Health = createTag({
+    title: 'Health',
+});
+
+const Users = createTag({
+    title: 'Users',
+});
+
+const healthContract = createContract(Health, {
     check: {
         method: 'GET' as const,
         path: '/health',
@@ -48,7 +57,7 @@ const healthContract = createContract('Health', {
     },
 });
 
-const usersContract = createContract('Users', {
+const usersContract = createContract(Users, {
     listUsers: {
         method: 'GET' as const,
         path: '/users',
@@ -165,7 +174,7 @@ export const contract = createContract({
     getUserById: {
         method: 'GET',
         path: '/users/by-id/:id',
-        tags: ['Users'],
+        tags: [Users],
         security: [
             {
                 bearerAuth: [],

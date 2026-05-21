@@ -1,5 +1,6 @@
 export * from './types.js';
 export * from './path-params.js';
+export * from './tag.js';
 export * from './contract.js';
 export * from './handler-pipeline.js';
 export * from './route-matcher.js';

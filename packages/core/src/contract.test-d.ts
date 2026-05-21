@@ -1,6 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { createContract } from './contract.js';
+import { createTag } from './tag.js';
 
 const contract = createContract({
     getUser: {
@@ -45,4 +46,26 @@ test('createUser has body, getUser does not', () => {
 test('path must start with /', () => {
     // @ts-expect-error path must start with /
     createContract({ bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } } });
+});
+
+const Users = createTag({
+    title: 'Users',
+    description: 'User management endpoints',
+});
+
+const tagged = createContract(Users, {
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: z.object({
+                id: z.string(),
+            }),
+        },
+    },
+});
+
+test('tagged contract preserves literal types', () => {
+    expectTypeOf(tagged.getUser.method).toEqualTypeOf<'GET'>();
+    expectTypeOf(tagged.getUser.path).toEqualTypeOf<'/users/:id'>();
 });

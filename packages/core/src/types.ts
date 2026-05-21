@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { Tag } from './tag.js';
 
 export type Method = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS';
 
@@ -12,7 +13,7 @@ export interface RouteDefinition {
     path: `/${string}`;
     summary?: string;
     description?: string;
-    tags?: string[];
+    tags?: readonly Tag[];
     security?: Array<Record<string, string[]>>;
     externalDocs?: {
         url: string;
@@ -29,8 +30,10 @@ export interface RouteDefinition {
 }
 
 export const CONTRACT_TAG: unique symbol = Symbol('ts-kizuna.contract.tag');
+export const CONTRACT_DESCRIPTION: unique symbol = Symbol('ts-kizuna.contract.description');
 
 export interface Contract {
     [CONTRACT_TAG]?: string;
+    [CONTRACT_DESCRIPTION]?: string;
     [key: string]: RouteDefinition | Contract;
 }
