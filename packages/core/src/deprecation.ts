@@ -96,17 +96,29 @@ const makeResolverWithCache = (contractPath: string): { resolve: IdentifierResol
     return { resolve, cache };
 };
 
-// Find createModel({title: '...'}) and return the title string.
-const readAstMetaId = (expr: ts.Expression): string | undefined => {
-    if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
-    if (expr.expression.text !== 'createModel') return undefined;
-    const firstArg = expr.arguments[0];
-    if (!firstArg || !ts.isObjectLiteralExpression(firstArg)) return undefined;
-    for (const prop of firstArg.properties) {
-        if (!ts.isPropertyAssignment(prop)) continue;
-        if (!ts.isIdentifier(prop.name) || prop.name.text !== 'title') continue;
-        if (ts.isStringLiteral(prop.initializer)) return prop.initializer.text;
+const readObjectStringProperty = (object: ts.ObjectLiteralExpression, name: string): string | undefined => {
+    for (const property of object.properties) {
+        if (!ts.isPropertyAssignment(property)) continue;
+        if (!ts.isIdentifier(property.name) || property.name.text !== name) continue;
+        if (ts.isStringLiteral(property.initializer)) return property.initializer.text;
     }
+    return undefined;
+};
+
+const readAstMetaId = (expr: ts.Expression): string | undefined => {
+    if (!ts.isCallExpression(expr)) return undefined;
+    const firstArg = expr.arguments[0];
+
+    if (ts.isIdentifier(expr.expression) && expr.expression.text === 'createModel') {
+        if (!firstArg || !ts.isObjectLiteralExpression(firstArg)) return undefined;
+        return readObjectStringProperty(firstArg, 'title');
+    }
+
+    if (ts.isPropertyAccessExpression(expr.expression) && expr.expression.name.text === 'meta') {
+        if (!firstArg || !ts.isObjectLiteralExpression(firstArg)) return undefined;
+        return readObjectStringProperty(firstArg, 'id') ?? readAstMetaId(expr.expression.expression as ts.Expression);
+    }
+
     return undefined;
 };
 
