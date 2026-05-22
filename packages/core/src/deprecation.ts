@@ -466,3 +466,21 @@ const parseFromSource = (contractPath: string): DeprecationMap => {
 export const createDeprecationMap = (contractPath: string): DeprecationMap => {
     return parseFromSource(contractPath);
 };
+
+/**
+ * Resolve a `DeprecationWarnings` value into a concrete `DeprecationMap`.
+ *
+ * Accepts all three forms:
+ * - `undefined` → `undefined` (no deprecation tracking)
+ * - `{ contractPath }` → parse from `.ts` source
+ * - `DeprecationMap` → returned as-is (routes/fields are Maps)
+ * - `SerializedDeprecationMap` → deserialized from plain objects (JSON import)
+ */
+export const resolveDeprecationMap = (
+    warnings: { contractPath: string } | DeprecationMap | SerializedDeprecationMap | undefined
+): DeprecationMap | undefined => {
+    if (warnings === undefined) return undefined;
+    if ('contractPath' in warnings) return createDeprecationMap(warnings.contractPath);
+    if (warnings.routes instanceof Map) return warnings as DeprecationMap;
+    return deserializeDeprecationMap(warnings as SerializedDeprecationMap);
+};

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import * as path from 'node:path';
 import * as url from 'node:url';
-import { createDeprecationMap, serializeDeprecationMap, deserializeDeprecationMap, type DeprecationMap } from './deprecation.js';
+import { createDeprecationMap, resolveDeprecationMap, serializeDeprecationMap, deserializeDeprecationMap, type DeprecationMap } from './deprecation.js';
 
 const fixtureDir = path.dirname(url.fileURLToPath(import.meta.url));
 const fixturePath = path.join(fixtureDir, 'deprecation.fixture.ts');
@@ -123,5 +123,40 @@ describe('serializeDeprecationMap / deserializeDeprecationMap', () => {
                 }
             }
         }
+    });
+});
+
+describe('resolveDeprecationMap', () => {
+    test('returns undefined when given undefined', () => {
+        expect(resolveDeprecationMap(undefined)).toBeUndefined();
+    });
+
+    test('parses from source when given a contractPath', () => {
+        const result = resolveDeprecationMap({
+            contractPath: fixturePath,
+        });
+        expect(result).toBeDefined();
+        expect(result!.routes.has('oldRoute')).toBe(true);
+    });
+
+    test('returns a DeprecationMap as-is', () => {
+        const map: DeprecationMap = {
+            routes: new Map([['oldRoute', 'use newRoute instead']]),
+            fields: new Map([['getUser', new Map([['responses.200.email', '']])]]),
+        };
+        const result = resolveDeprecationMap(map);
+        expect(result).toBe(map);
+    });
+
+    test('deserializes a SerializedDeprecationMap from a JSON import', () => {
+        const original = createDeprecationMap(fixturePath);
+        const serialized = serializeDeprecationMap(original);
+        const json = JSON.parse(JSON.stringify(serialized));
+
+        const result = resolveDeprecationMap(json);
+        expect(result).toBeDefined();
+        expect(result!.routes).toBeInstanceOf(Map);
+        expect(result!.routes.get('oldRoute')).toBe('use newRoute instead');
+        expect(result!.fields.get('getUser')?.get('responses.200.email')).toBe('');
     });
 });
