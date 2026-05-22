@@ -35,6 +35,16 @@
         "types": "./dist/generator.d.cts",
         "default": "./dist/generator.cjs"
       }
+    },
+    "./tsdown": {
+      "import": {
+        "types": "./dist/tsdown.d.mts",
+        "default": "./dist/tsdown.mjs"
+      },
+      "require": {
+        "types": "./dist/tsdown.d.cts",
+        "default": "./dist/tsdown.cjs"
+      }
     }
   },
   "files": [
@@ -44,14 +54,20 @@
     "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/adapter.ts src/generator.ts --format esm,cjs --dts --clean",
+    "build": "tsdown src/index.ts src/adapter.ts src/generator.ts src/tsdown.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "typescript": "^5.6.3"
   },
   "peerDependencies": {
+    "tsdown": ">=0.20.0",
     "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "tsdown": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^22.19.17",
