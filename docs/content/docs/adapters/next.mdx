@@ -174,7 +174,7 @@ export const { GET, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(ap
                     }
                 );
             }
-            (request as any).session = session;
+            request.session = session;
         },
     ],
 });
@@ -198,6 +198,46 @@ requestMiddleware: [
 ```
 
 Middleware only runs for matched routes. Requests that don't match any contract route skip middleware and receive the standard 404 or 405 response.
+
+## Type-safe request properties
+
+If your middleware sets custom properties on the request, use module augmentation to extend `NextRequest` so handlers can access them without casts:
+
+```ts
+// types/next.d.ts
+import 'next/server';
+
+declare module 'next/server' {
+    interface NextRequest {
+        userId: string;
+        sessionId?: string | null;
+    }
+}
+```
+
+With the augmentation in place, both middleware and handlers are fully typed:
+
+```ts
+requestMiddleware: [
+    async (request) => {
+        const session = await getSession(request);
+        if (!session) {
+            return new Response(null, {
+                status: 401,
+            });
+        }
+        request.userId = session.userId;
+        request.sessionId = session.id;
+    },
+],
+```
+
+```ts
+getUser: async ({ params, request }) => {
+    console.log(request.userId);
+    // ...
+},
+```
 
 ## Multipart / file uploads
 
