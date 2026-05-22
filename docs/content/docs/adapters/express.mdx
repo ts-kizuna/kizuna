@@ -117,6 +117,50 @@ createExpressEndpoints(api, app, {
 | `responseValidation` | `false` | Validate handler return values against response schemas — surfaces as 500 on mismatch. Enable in development.         |
 | `globalMiddleware`   | `[]`    | Middleware inserted after route matching, before the handler runs. Use `req.kizunaRoute` to branch on route metadata. |
 
+## Type-safe request properties
+
+If your `globalMiddleware` sets custom properties on `req`, use declaration merging to extend the Express `Request` interface:
+
+```ts
+// types/express.d.ts
+declare global {
+    namespace Express {
+        interface Request {
+            userId: string;
+            sessionId?: string | null;
+        }
+    }
+}
+```
+
+With the augmentation in place, both middleware and handlers are fully typed:
+
+```ts
+createExpressEndpoints(api, app, {
+    globalMiddleware: [
+        (req, res, next) => {
+            const session = getSession(req);
+            if (!session) {
+                res.status(401).json({
+                    message: 'Unauthorized',
+                });
+                return;
+            }
+            req.userId = session.userId;
+            req.sessionId = session.id;
+            next();
+        },
+    ],
+});
+```
+
+```ts
+getUser: async ({ params, req }) => {
+    console.log(req.userId);
+    // ...
+},
+```
+
 ## Method mismatches
 
 If a path is matched but the method is not defined in the contract, the adapter returns 405 with an `Allow` header listing the supported methods. This follows [RFC 9110 §15.5.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.6).
