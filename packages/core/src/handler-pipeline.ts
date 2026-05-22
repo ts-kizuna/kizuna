@@ -2,6 +2,93 @@ import type { z } from 'zod';
 import { CONTRACT_TAG, type RouteDefinition, type Contract, type Method } from './types.js';
 import type { ExtractPathParams } from './path-params.js';
 
+interface SchemaInternals {
+    _zod: {
+        def: {
+            type: string;
+            innerType?: { _zod: SchemaInternals['_zod'] };
+            element?: { _zod: SchemaInternals['_zod'] };
+            in?: { _zod: SchemaInternals['_zod'] };
+            shape?: Record<string, { _zod: SchemaInternals['_zod'] }>;
+        };
+    };
+}
+
+const WRAPPER_TYPES = new Set(['optional', 'nullable', 'default', 'prefault', 'catch', 'nonoptional', 'success', 'readonly']);
+
+const resolveBaseType = (internals: SchemaInternals['_zod']): string => {
+    const def = internals.def;
+    if (WRAPPER_TYPES.has(def.type) && def.innerType) {
+        return resolveBaseType(def.innerType._zod);
+    }
+    if (def.type === 'pipe' && def.in) {
+        return resolveBaseType(def.in._zod);
+    }
+    return def.type;
+};
+
+const resolveArrayElement = (internals: SchemaInternals['_zod']): SchemaInternals['_zod'] | undefined => {
+    const def = internals.def;
+    if (def.type === 'array' && def.element) {
+        return def.element._zod;
+    }
+    if (WRAPPER_TYPES.has(def.type) && def.innerType) {
+        return resolveArrayElement(def.innerType._zod);
+    }
+    if (def.type === 'pipe' && def.in) {
+        return resolveArrayElement(def.in._zod);
+    }
+    return undefined;
+};
+
+const coerceValue = (value: unknown, baseType: string): unknown => {
+    if (typeof value !== 'string') return value;
+    if (baseType === 'number' || baseType === 'int') {
+        const coerced = Number(value);
+        return Number.isNaN(coerced) ? value : coerced;
+    }
+    if (baseType === 'boolean') {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+    }
+    return value;
+};
+
+const coerceStringValues = (input: unknown, schema: z.ZodType): unknown => {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+    const internals = schema as unknown as SchemaInternals;
+    const def = internals._zod?.def;
+    if (!def?.shape) return input;
+    const record = input as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
+    let changed = false;
+    for (const key of Object.keys(record)) {
+        const fieldSchema = def.shape[key];
+        if (!fieldSchema) {
+            result[key] = record[key];
+            continue;
+        }
+        const fieldInternals = fieldSchema._zod;
+        const baseType = resolveBaseType(fieldInternals);
+        if (baseType === 'array') {
+            const elementInternals = resolveArrayElement(fieldInternals);
+            if (elementInternals && Array.isArray(record[key])) {
+                const elementType = resolveBaseType(elementInternals);
+                const coerced = (record[key] as unknown[]).map((item) => coerceValue(item, elementType));
+                result[key] = coerced;
+                changed = true;
+            } else {
+                result[key] = record[key];
+            }
+        } else {
+            const coerced = coerceValue(record[key], baseType);
+            result[key] = coerced;
+            if (coerced !== record[key]) changed = true;
+        }
+    }
+    return changed ? result : input;
+};
+
 export type HandlerReturn<R extends RouteDefinition> = {
     [Status in keyof R['responses']]: {
         status: Status extends number ? Status : never;
@@ -84,6 +171,8 @@ export interface ValidationFailure {
     issues: z.core.$ZodIssue[];
 }
 
+const COERCED_STAGES: ReadonlySet<ValidationStage> = new Set(['params', 'query', 'headers']);
+
 const STAGE_MESSAGES: Record<ValidationStage, string> = {
     params: 'Invalid path parameters',
     query: 'Invalid query parameters',
@@ -132,7 +221,8 @@ export const validateRequest = (
 
     for (const step of order) {
         if (!step.schema) continue;
-        const result = step.schema.safeParse(step.input);
+        const input = COERCED_STAGES.has(step.stage) ? coerceStringValues(step.input, step.schema) : step.input;
+        const result = step.schema.safeParse(input);
         if (!result.success) {
             return {
                 ok: false,
