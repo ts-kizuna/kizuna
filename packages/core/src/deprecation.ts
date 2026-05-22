@@ -96,20 +96,18 @@ const makeResolverWithCache = (contractPath: string): { resolve: IdentifierResol
     return { resolve, cache };
 };
 
-// Walk a call chain to find .meta({id: '...'}) and return the id string.
+// Find createModel({title: '...'}) and return the title string.
 const readAstMetaId = (expr: ts.Expression): string | undefined => {
-    if (!ts.isCallExpression(expr) || !ts.isPropertyAccessExpression(expr.expression)) return undefined;
-    if (expr.expression.name.text === 'meta') {
-        const firstArg = expr.arguments[0];
-        if (!firstArg || !ts.isObjectLiteralExpression(firstArg)) return undefined;
-        for (const prop of firstArg.properties) {
-            if (!ts.isPropertyAssignment(prop)) continue;
-            if (!ts.isIdentifier(prop.name) || prop.name.text !== 'id') continue;
-            if (ts.isStringLiteral(prop.initializer)) return prop.initializer.text;
-        }
-        return undefined;
+    if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
+    if (expr.expression.text !== 'createModel') return undefined;
+    const firstArg = expr.arguments[0];
+    if (!firstArg || !ts.isObjectLiteralExpression(firstArg)) return undefined;
+    for (const prop of firstArg.properties) {
+        if (!ts.isPropertyAssignment(prop)) continue;
+        if (!ts.isIdentifier(prop.name) || prop.name.text !== 'title') continue;
+        if (ts.isStringLiteral(prop.initializer)) return prop.initializer.text;
     }
-    return readAstMetaId(expr.expression.expression as ts.Expression);
+    return undefined;
 };
 
 const firstObjectLiteralIn = (node: ts.Node, resolve: IdentifierResolver, visited: Set<string>): ts.ObjectLiteralExpression | undefined => {
@@ -178,8 +176,26 @@ const makeScopedResolver = (
     return (node: ts.Identifier): ts.Expression | undefined => substitutions.get(node.text) ?? parent(node);
 };
 
+const extractCreateModelSchema = (node: ts.Node): ts.Expression | undefined => {
+    if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression)) return undefined;
+    if (node.expression.text !== 'createModel') return undefined;
+    const firstArg = node.arguments[0];
+    if (!firstArg || !ts.isObjectLiteralExpression(firstArg)) return undefined;
+    for (const property of firstArg.properties) {
+        if (!ts.isPropertyAssignment(property)) continue;
+        if (propertyName(property.name) === 'schema') return property.initializer;
+    }
+    return undefined;
+};
+
 const collectFieldDeprecations = (schemaNode: ts.Node, prefix: string, into: Map<string, string>, resolve: IdentifierResolver): void => {
     const resolved = ts.isIdentifier(schemaNode) ? (resolve(schemaNode) ?? schemaNode) : schemaNode;
+
+    const modelSchema = extractCreateModelSchema(resolved);
+    if (modelSchema) {
+        collectFieldDeprecations(modelSchema, prefix, into, resolve);
+        return;
+    }
 
     // When the schema is a call to a named wrapper function (e.g. Pagination(Item)),
     // substitute the parameter with the argument and walk the function body so that
