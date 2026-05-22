@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
-import { createContract, type Contract } from '@ts-kizuna/core';
+import { createContract, createTag, type Contract } from '@ts-kizuna/core';
 import { generateOpenApi, type GenerateOpenApiOptions } from './generator.js';
 import { contract as deprecatedContract } from '../../core/src/deprecation.fixture.js';
 
@@ -74,6 +74,19 @@ const baseConfig = {
         version: '1.0.0',
     },
 };
+
+const UsersTag = createTag({
+    title: 'Users',
+});
+
+const HealthTag = createTag({
+    title: 'Health',
+});
+
+const UsersTagWithDescription = createTag({
+    title: 'Users',
+    description: 'User management endpoints',
+});
 
 describe('generateOpenApi', () => {
     const spec = generateJson(contract, baseConfig);
@@ -253,7 +266,7 @@ describe('operation metadata passthrough', () => {
         getUser: {
             method: 'GET',
             path: '/users/:id',
-            tags: ['Users'],
+            tags: [UsersTag],
             security: [
                 {
                     bearerAuth: [],
@@ -348,7 +361,7 @@ describe('operation metadata passthrough', () => {
                 getUser: {
                     method: 'GET',
                     path: '/users/:id',
-                    tags: ['Health'],
+                    tags: [HealthTag],
                     responses: {
                         200: z.object({
                             id: z.string(),
@@ -861,7 +874,7 @@ describe('response headers', () => {
 
 describe('contract-level tag grouping', () => {
     it('applies tag from createContract to all routes in that group', () => {
-        const usersContract = createContract('Users', {
+        const usersContract = createContract(UsersTag, {
             listUsers: {
                 method: 'GET',
                 path: '/users',
@@ -885,11 +898,11 @@ describe('contract-level tag grouping', () => {
     });
 
     it('route-level tags merge with contract tag', () => {
-        const usersContract = createContract('Users', {
+        const usersContract = createContract(UsersTag, {
             listUsers: {
                 method: 'GET',
                 path: '/users',
-                tags: ['Health'],
+                tags: [HealthTag],
                 responses: {
                     200: z.object({ users: z.array(z.string()) }),
                 },
@@ -901,7 +914,7 @@ describe('contract-level tag grouping', () => {
     });
 
     it('accumulates tags from nested tagged contracts', () => {
-        const healthContract = createContract('Health', {
+        const healthContract = createContract(HealthTag, {
             deleteUser: {
                 method: 'DELETE',
                 path: '/users/:id',
@@ -910,7 +923,7 @@ describe('contract-level tag grouping', () => {
                 },
             },
         });
-        const usersContract = createContract('Users', {
+        const usersContract = createContract(UsersTag, {
             health: healthContract,
         });
         const contract = createContract({ users: usersContract });
@@ -948,8 +961,32 @@ describe('contract-level tag grouping', () => {
         expect(spec.paths['/users']?.get?.tags).toBeUndefined();
     });
 
+    it('collects tag descriptions from contract into document tags', () => {
+        const usersContract = createContract(UsersTagWithDescription, {
+            listUsers: {
+                method: 'GET',
+                path: '/users',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        });
+        const contract = createContract({
+            users: usersContract,
+        });
+        const spec = generateJson(contract, baseConfig);
+        expect(spec.tags).toEqual([
+            {
+                name: 'Users',
+                description: 'User management endpoints',
+            },
+        ]);
+    });
+
     it('explicit CONTRACT_TAG takes precedence over key-derived tag', () => {
-        const taggedUsers = createContract('Users', {
+        const taggedUsers = createContract(UsersTag, {
             listUsers: {
                 method: 'GET',
                 path: '/users',
@@ -964,7 +1001,7 @@ describe('contract-level tag grouping', () => {
     });
 
     it('untagged sub-group inside tagged contract inherits the outer tag', () => {
-        const usersContract = createContract('Users', {
+        const usersContract = createContract(UsersTag, {
             nested: {
                 listUsers: {
                     method: 'GET',

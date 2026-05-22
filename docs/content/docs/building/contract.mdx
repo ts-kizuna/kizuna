@@ -143,15 +143,35 @@ Without a title, the generators inline the schema everywhere it appears. With `c
 
 ## Nested contracts
 
-Split your contract across files using sub-contracts:
+Split your contract across files using sub-contracts. Use `createTag` to name and describe each group:
+
+```ts
+// contracts/tags.ts
+import { createTag } from '@ts-kizuna/core';
+
+export const Users = createTag({
+    title: 'Users',
+    description: 'User management endpoints',
+});
+
+export const Health = createTag({
+    title: 'Health',
+    description: 'Service health and uptime monitoring',
+});
+```
 
 ```ts
 // contracts/users.ts
-export const usersContract = createContract('Users', {
+import { createContract } from '@ts-kizuna/core';
+import { Users } from './tags';
+
+export const usersContract = createContract(Users, {
     listUsers: { ... },
     createUser: { ... },
 });
+```
 
+```ts
 // contract.ts
 export const contract = createContract({
     users: usersContract,
@@ -159,7 +179,20 @@ export const contract = createContract({
 });
 ```
 
-The optional string argument sets the OpenAPI tag for all routes in that sub-contract.
+The tag's `title` becomes the OpenAPI tag for all routes in that sub-contract. The optional `description` is included in the OpenAPI tag definition.
+
+Routes can also reference tags directly for cross-tagging:
+
+```ts
+import { Users, Health } from './tags';
+
+cancelAccount: {
+    method: 'POST',
+    path: '/account/cancel',
+    tags: [Users, Health],
+    ...
+},
+```
 
 ## Deprecating routes and fields
 

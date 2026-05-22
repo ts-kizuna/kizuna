@@ -121,6 +121,18 @@ const firstObjectLiteralIn = (node: ts.Node, resolve: IdentifierResolver, visite
         visited.add(name);
         return firstObjectLiteralIn(referenced, resolve, visited);
     }
+    if (ts.isCallExpression(node)) {
+        if (ts.isIdentifier(node.expression) && node.expression.text === 'createContract') {
+            const routesArg = routesArgFrom(node);
+            if (routesArg) return firstObjectLiteralIn(routesArg, resolve, visited);
+            return undefined;
+        }
+        if (isRoutesChainCall(node)) {
+            const routesArg = node.arguments[0];
+            if (routesArg) return firstObjectLiteralIn(routesArg, resolve, visited);
+            return undefined;
+        }
+    }
     let found: ts.ObjectLiteralExpression | undefined;
     ts.forEachChild(node, (child) => {
         if (found) return;
@@ -302,6 +314,9 @@ const findRouterCallInNode = (node: ts.Node): ts.CallExpression | undefined => {
         if (ts.isIdentifier(node.expression) && node.expression.text === 'createContract') {
             return node;
         }
+        if (isRoutesChainCall(node)) {
+            return node;
+        }
     }
     let found: ts.CallExpression | undefined;
     ts.forEachChild(node, (child) => {
@@ -311,10 +326,14 @@ const findRouterCallInNode = (node: ts.Node): ts.CallExpression | undefined => {
     return found;
 };
 
+const isRoutesChainCall = (node: ts.CallExpression): boolean =>
+    ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.name) && node.expression.name.text === 'routes';
+
 const routesArgFrom = (call: ts.CallExpression): ts.Expression | undefined => {
+    if (isRoutesChainCall(call)) return call.arguments[0];
     const firstArg = call.arguments[0];
     if (!firstArg) return undefined;
-    if (ts.isStringLiteral(firstArg)) return call.arguments[1];
+    if (call.arguments.length === 2) return call.arguments[1];
     return firstArg;
 };
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createContract } from './contract.js';
+import { createTag } from './tag.js';
+import { CONTRACT_TAG, CONTRACT_DESCRIPTION, type Contract } from './types.js';
 
 describe('createContract', () => {
     it('throws when a route has an empty body schema', () => {
@@ -87,5 +89,61 @@ describe('createContract', () => {
                 },
             })
         ).not.toThrow();
+    });
+
+    it('sets CONTRACT_TAG from createTag title', () => {
+        const Users = createTag({
+            title: 'Users',
+        });
+        const routes = createContract(Users, {
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        });
+        expect((routes as Contract)[CONTRACT_TAG]).toBe('Users');
+    });
+
+    it('sets CONTRACT_DESCRIPTION from createTag description', () => {
+        const Users = createTag({
+            title: 'Users',
+            description: 'User management endpoints',
+        });
+        const routes = createContract(Users, {
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        });
+        expect((routes as Contract)[CONTRACT_TAG]).toBe('Users');
+        expect((routes as Contract)[CONTRACT_DESCRIPTION]).toBe('User management endpoints');
+    });
+
+    it('does not set CONTRACT_DESCRIPTION when tag has no description', () => {
+        const Users = createTag({
+            title: 'Users',
+        });
+        const routes = createContract(Users, {
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        });
+        expect((routes as Contract)[CONTRACT_DESCRIPTION]).toBeUndefined();
     });
 });

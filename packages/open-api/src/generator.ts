@@ -13,6 +13,7 @@ import {
     type DeprecationWarnings,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
+import { CONTRACT_TAG, CONTRACT_DESCRIPTION } from '@ts-kizuna/core';
 
 export interface OpenApiInfo {
     title: string;
@@ -347,7 +348,8 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                     options.setOperationId === 'concatenated-path' ? routeKey : routeKey.slice(routeKey.lastIndexOf('.') + 1);
             }
             if (deprecated) operation.deprecated = true;
-            const mergedTags = [...contractTags, ...(route.tags ?? [])];
+            const resolvedRouteTags = (route.tags ?? []).map((tag) => tag.title);
+            const mergedTags = [...contractTags, ...resolvedRouteTags];
             if (mergedTags.length > 0) {
                 operation.tags = mergedTags;
             } else if (options.setTagsFromContractKeys !== false) {
@@ -547,6 +549,34 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
     };
 });
 
+const collectContractTags = (contract: Contract): OpenApiTag[] => {
+    const tags: OpenApiTag[] = [];
+    const tag = (contract as Record<typeof CONTRACT_TAG, string | undefined>)[CONTRACT_TAG];
+    const description = (contract as Record<typeof CONTRACT_DESCRIPTION, string | undefined>)[CONTRACT_DESCRIPTION];
+    if (tag) {
+        const entry: OpenApiTag = { name: tag };
+        if (description) entry.description = description;
+        tags.push(entry);
+    }
+    for (const value of Object.values(contract)) {
+        if (!value || typeof value !== 'object') continue;
+        if ('method' in value) {
+            const route = value as RouteDefinition;
+            for (const routeTag of route.tags ?? []) {
+                if (routeTag.description) {
+                    tags.push({
+                        name: routeTag.title,
+                        description: routeTag.description,
+                    });
+                }
+            }
+        } else {
+            tags.push(...collectContractTags(value as Contract));
+        }
+    }
+    return tags;
+};
+
 /**
  * Generate an OpenAPI 3.1.0 document from a contract.
  *
@@ -567,5 +597,16 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
  * ```
  */
 export function generateOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer {
-    return openApiGenerator(contract, options);
+    const renderer = openApiGenerator(contract, options);
+    const contractTags = collectContractTags(contract);
+    if (contractTags.length > 0) {
+        const originalJson = renderer('json') as OpenApiDocument;
+        const existingTags = originalJson.tags ?? [];
+        const existingNames = new Set(existingTags.map((tag) => tag.name));
+        const newTags = contractTags.filter((tag) => !existingNames.has(tag.name));
+        if (newTags.length > 0) {
+            originalJson.tags = [...existingTags, ...newTags];
+        }
+    }
+    return renderer;
 }

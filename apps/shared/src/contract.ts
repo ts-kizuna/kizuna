@@ -1,4 +1,4 @@
-import { createContract, createModel } from '@ts-kizuna/core';
+import { createContract, createModel, createTag } from '@ts-kizuna/core';
 import { z } from 'zod';
 
 export const UserSchema = createModel({
@@ -102,7 +102,21 @@ export const EventRecord = createModel({
     }),
 });
 
-const healthContract = createContract('Health', {
+const Health = createTag({
+    title: 'Health',
+    description: 'Service health and uptime monitoring',
+});
+
+const Users = createTag({
+    title: 'Users',
+    description: 'User management endpoints',
+});
+
+const Notifications = createTag({
+    title: 'Notifications',
+});
+
+const healthContract = createContract(Health, {
     check: {
         method: 'GET',
         path: '/health',
@@ -129,7 +143,7 @@ const healthContract = createContract('Health', {
     },
 });
 
-const usersContract = createContract('Users', {
+const usersContract = createContract(Users, {
     listUsers: {
         method: 'GET',
         path: '/users',
@@ -268,8 +282,16 @@ const usersContract = createContract('Users', {
     },
 });
 
+const Members = createTag({
+    title: 'Members',
+});
+
+const Workspace = createTag({
+    title: 'Workspace',
+});
+
 export const workspaceContract = createContract({
-    members: createContract('Members', {
+    members: createContract(Members, {
         listMembers: {
             method: 'GET',
             path: '/workspace/members',
@@ -295,7 +317,7 @@ export const workspaceContract = createContract({
             summary: 'Invite a member to the workspace',
         },
     }),
-    info: createContract('Workspace', {
+    info: createContract(Workspace, {
         getWorkspace: {
             method: 'GET',
             path: '/workspace',
@@ -315,7 +337,7 @@ export const contract = createContract({
     sendNotification: {
         method: 'POST',
         path: '/notifications',
-        tags: ['Notifications', 'Health'],
+        tags: [Notifications, Health],
         body: NotificationEvent,
         responses: {
             202: z.object({
