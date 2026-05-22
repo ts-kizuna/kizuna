@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import {
-    createDeprecationMap,
+    resolveDeprecationMap,
     createGenerator,
     parsePath,
     resolveResponseBody,
@@ -25,6 +25,13 @@ import {
 
 export interface SwiftConfig {
     namespaceName: string;
+    /**
+     * Surface `@deprecated` JSDoc tags from the contract source as
+     * `@available(*, deprecated)` in the Swift output.
+     *
+     * Pass `{ contractPath }` to parse from source, a `DeprecationMap`,
+     * or a `SerializedDeprecationMap` (JSON import from the tsdown plugin).
+     */
     deprecationWarnings?: DeprecationWarnings;
 }
 
@@ -307,8 +314,7 @@ const buildRouteMethod = (
 const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
-    const deprecationSchemas =
-        options.deprecationWarnings !== undefined ? createDeprecationMap(options.deprecationWarnings.contractPath).schemas : undefined;
+    const deprecationSchemas = resolveDeprecationMap(options.deprecationWarnings)?.schemas;
 
     return {
         processRoute({ routeKey, route, deprecated, deprecationMessage, fieldDeprecations }) {
