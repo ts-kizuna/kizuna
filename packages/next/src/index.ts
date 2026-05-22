@@ -3,7 +3,7 @@ import { createApi as coreCreateApi, type ApiWithRouter, ROUTER_META } from '@ts
 import { handleNextRequest, type Router, type NextHandlerOptions } from './handler.js';
 import { type NextRequest, NextResponse } from 'next/server';
 
-export type { RouteHandler, Router, NextHandlerOptions, NextHandlerContext } from './handler.js';
+export type { RouteHandler, Router, NextHandlerOptions, NextHandlerContext, NextMiddlewareRoute } from './handler.js';
 export { NextRequest, NextResponse } from 'next/server';
 
 type HttpHandlers = {
@@ -63,6 +63,7 @@ export function createNextEndpoints(api: NextApiWithRouter, options?: NextHandle
         handleNextRequest(request, api as unknown as Contract, api[ROUTER_META] as Router<Contract>, {
             basePath: options?.basePath,
             onError: options?.onError ?? api[_ON_ERROR],
+            requestMiddleware: options?.requestMiddleware,
             responseValidation: options?.responseValidation,
         });
     return {

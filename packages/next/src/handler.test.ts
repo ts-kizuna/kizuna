@@ -550,3 +550,164 @@ describe('Next.js handler — Accept header / 406', () => {
         expect(response.status).not.toBe(406);
     });
 });
+
+describe('Next.js handler — requestMiddleware', () => {
+    const middlewareContract = createContract({
+        getResource: {
+            method: 'GET',
+            path: '/resources/:id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                    userId: z.string(),
+                }),
+            },
+        },
+    });
+
+    it('runs requestMiddleware before the handler with the matched route', async () => {
+        const routesSeen: Array<{ path: string; method: string }> = [];
+
+        const middlewareApi = createApi({
+            contract: middlewareContract,
+            router: {
+                getResource: ({ params, request }) => ({
+                    status: 200,
+                    body: {
+                        id: params.id,
+                        userId: (request as any).userId,
+                    },
+                }),
+            },
+        });
+
+        const { GET: middlewareGET } = createNextEndpoints(middlewareApi, {
+            basePath: '/api',
+            requestMiddleware: [
+                async (request, route) => {
+                    routesSeen.push(route);
+                    (request as any).userId = 'user-42';
+                },
+            ],
+        });
+
+        const response = await middlewareGET(makeRequest('GET', '/api/resources/7'));
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.id).toBe('7');
+        expect(body.userId).toBe('user-42');
+        expect(routesSeen).toEqual([
+            {
+                path: '/resources/:id',
+                method: 'GET',
+            },
+        ]);
+    });
+
+    it('short-circuits when middleware returns a Response', async () => {
+        let handlerCalled = false;
+
+        const middlewareApi = createApi({
+            contract: middlewareContract,
+            router: {
+                getResource: ({ params }) => {
+                    handlerCalled = true;
+                    return {
+                        status: 200,
+                        body: {
+                            id: params.id,
+                            userId: '',
+                        },
+                    };
+                },
+            },
+        });
+
+        const { GET: middlewareGET } = createNextEndpoints(middlewareApi, {
+            basePath: '/api',
+            requestMiddleware: [
+                async () => {
+                    return new Response(JSON.stringify({ message: 'Forbidden' }), {
+                        status: 403,
+                        headers: {
+                            'content-type': 'application/json',
+                        },
+                    });
+                },
+            ],
+        });
+
+        const response = await middlewareGET(makeRequest('GET', '/api/resources/1'));
+        expect(response.status).toBe(403);
+        const body = await response.json();
+        expect(body.message).toBe('Forbidden');
+        expect(handlerCalled).toBe(false);
+    });
+
+    it('runs middleware functions in order and stops at the first Response', async () => {
+        const order: number[] = [];
+
+        const middlewareApi = createApi({
+            contract: middlewareContract,
+            router: {
+                getResource: ({ params }) => ({
+                    status: 200,
+                    body: {
+                        id: params.id,
+                        userId: '',
+                    },
+                }),
+            },
+        });
+
+        const { GET: middlewareGET } = createNextEndpoints(middlewareApi, {
+            basePath: '/api',
+            requestMiddleware: [
+                async () => {
+                    order.push(1);
+                },
+                async () => {
+                    order.push(2);
+                    return new Response(null, { status: 401 });
+                },
+                async () => {
+                    order.push(3);
+                },
+            ],
+        });
+
+        const response = await middlewareGET(makeRequest('GET', '/api/resources/1'));
+        expect(response.status).toBe(401);
+        expect(order).toEqual([1, 2]);
+    });
+
+    it('skips middleware for unmatched routes and returns 404', async () => {
+        let middlewareCalled = false;
+
+        const middlewareApi = createApi({
+            contract: middlewareContract,
+            router: {
+                getResource: ({ params }) => ({
+                    status: 200,
+                    body: {
+                        id: params.id,
+                        userId: '',
+                    },
+                }),
+            },
+        });
+
+        const { GET: middlewareGET } = createNextEndpoints(middlewareApi, {
+            basePath: '/api',
+            requestMiddleware: [
+                async () => {
+                    middlewareCalled = true;
+                },
+            ],
+        });
+
+        const response = await middlewareGET(makeRequest('GET', '/api/unknown'));
+        expect(response.status).toBe(404);
+        expect(middlewareCalled).toBe(false);
+    });
+});

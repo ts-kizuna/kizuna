@@ -109,6 +109,7 @@ createNextEndpoints(api, {
 | Option               | Default | Description                                                                                          |
 | -------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
 | `basePath`           | `''`    | Path prefix to strip when matching contract routes                                                   |
+| `requestMiddleware`  | `[]`    | Middleware functions that run after route matching and before the handler                            |
 | `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                      |
 | `onError`            | —       | Custom handler for unhandled errors. Return an `AdapterResult` to override the default 500 response. |
 
@@ -147,6 +148,96 @@ export const api = createApi({
 ```
 
 Returning `undefined` lets the default 500 flow run.
+
+## `requestMiddleware`
+
+Middleware functions that run after route matching but before the handler. Each function receives `(request, route)` where `request` is the `NextRequest` and `route` contains the matched contract `path` and `method`.
+
+Return a `Response` to short-circuit — remaining middleware and the handler are skipped. Return `undefined` to continue to the next middleware or the handler. Functions run in order. Properties set on `request` are accessible in the handler via `{ request }`.
+
+```ts
+export const { GET, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
+    basePath: '/api',
+    requestMiddleware: [
+        async (request, route) => {
+            const session = await getSession(request);
+            if (!session) {
+                return new Response(
+                    JSON.stringify({
+                        message: 'Unauthorized',
+                    }),
+                    {
+                        status: 401,
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    }
+                );
+            }
+            request.session = session;
+        },
+    ],
+});
+```
+
+The `route` argument lets you make per-route decisions:
+
+```ts
+requestMiddleware: [
+    async (request, route) => {
+        if (route.path === '/admin/:id') {
+            const session = await getSession(request);
+            if (!session?.isAdmin) {
+                return new Response(null, {
+                    status: 403,
+                });
+            }
+        }
+    },
+],
+```
+
+Middleware only runs for matched routes. Requests that don't match any contract route skip middleware and receive the standard 404 or 405 response.
+
+## Type-safe request properties
+
+If your middleware sets custom properties on the request, use module augmentation to extend `NextRequest` so handlers can access them without casts:
+
+```ts
+// types/next.d.ts
+import 'next/server';
+
+declare module 'next/server' {
+    interface NextRequest {
+        userId: string;
+        sessionId?: string | null;
+    }
+}
+```
+
+With the augmentation in place, both middleware and handlers are fully typed:
+
+```ts
+requestMiddleware: [
+    async (request) => {
+        const session = await getSession(request);
+        if (!session) {
+            return new Response(null, {
+                status: 401,
+            });
+        }
+        request.userId = session.userId;
+        request.sessionId = session.id;
+    },
+],
+```
+
+```ts
+getUser: async ({ params, request }) => {
+    console.log(request.userId);
+    // ...
+},
+```
 
 ## Multipart / file uploads
 
