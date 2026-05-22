@@ -416,8 +416,6 @@ type SerializedDeprecationMap = {
     schemas?: Record<string, Record<string, string>>;
 };
 
-const cachePath = (contractPath: string): string => contractPath.replace(/\.ts$/, '.deprecations.json');
-
 const serialize = (map: DeprecationMap): SerializedDeprecationMap => ({
     routes: Object.fromEntries(map.routes),
     fields: Object.fromEntries(Array.from(map.fields, ([key, value]) => [key, Object.fromEntries(value)])),
@@ -458,22 +456,13 @@ const parseFromSource = (contractPath: string): DeprecationMap => {
 };
 
 /**
- * Read JSDoc `@deprecated` tags from a contract source file and return a `DeprecationMap`.
+ * Parse JSDoc `@deprecated` tags from a contract `.ts` source file.
  *
- * Writes a `.deprecations.json` next to the contract for runtime use.
+ * Requires the `.ts` file to exist on disk. For environments where source
+ * files are unavailable (e.g. production Docker images), generate the map
+ * at build time with `serializeDeprecationMap` and pass the result directly
+ * to the generator.
  */
 export const createDeprecationMap = (contractPath: string): DeprecationMap => {
-    if (fs.existsSync(contractPath)) {
-        const map = parseFromSource(contractPath);
-        fs.writeFileSync(cachePath(contractPath), JSON.stringify(serialize(map)), 'utf8');
-        return map;
-    }
-    const jsonPath = cachePath(contractPath);
-    if (fs.existsSync(jsonPath)) {
-        return deserialize(JSON.parse(fs.readFileSync(jsonPath, 'utf8')) as SerializedDeprecationMap);
-    }
-    throw new Error(
-        `Deprecation contract not found: "${contractPath}" does not exist and no cached .deprecations.json was found beside it. ` +
-            `Either fix the contractPath in your deprecationWarnings config or remove the deprecationWarnings option.`
-    );
+    return parseFromSource(contractPath);
 };

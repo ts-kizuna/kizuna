@@ -8,7 +8,6 @@ dist
 next-env.d.ts
 *.tsbuildinfo
 tsconfig.tsbuildinfo
-*.deprecations.json
 
 # Swift / SwiftPM build artifacts
 .build/
