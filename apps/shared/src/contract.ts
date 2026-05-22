@@ -1,8 +1,10 @@
-import { createContract } from '@ts-kizuna/core';
+import { createContract, createModel } from '@ts-kizuna/core';
 import { z } from 'zod';
 
-export const UserSchema = z
-    .object({
+export const UserSchema = createModel({
+    title: 'User',
+    description: 'A user in the system',
+    schema: z.object({
         id: z.string().meta({
             description: 'Unique user identifier',
             example: 'usr_abc123',
@@ -26,16 +28,14 @@ export const UserSchema = z
             description: 'Family name on the wire as `last_name` — exercises snake_case fidelity through the generators.',
             example: 'Hopper',
         }),
-    })
-    .meta({
-        id: 'User',
-        description: 'A user in the system',
-    });
+    }),
+});
 
 export type User = z.infer<typeof UserSchema>;
 
-export const CreateUserSchema = z
-    .object({
+export const CreateUserSchema = createModel({
+    title: 'CreateUserInput',
+    schema: z.object({
         name: z.string().min(1).meta({
             description: 'Display name',
             example: 'Alice Johnson',
@@ -48,10 +48,8 @@ export const CreateUserSchema = z
             description: 'Family name. Snake_case wire key, kept verbatim by both clients.',
             example: 'Hopper',
         }),
-    })
-    .meta({
-        id: 'CreateUserInput',
-    });
+    }),
+});
 
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 
@@ -66,44 +64,43 @@ const PaginationQuery = z.object({
     }),
 });
 
-export const EmailEvent = z
-    .object({
+export const EmailEvent = createModel({
+    title: 'EmailEvent',
+    schema: z.object({
         channel: z.literal('email'),
         to: z.email(),
         subject: z.string(),
-    })
-    .meta({
-        id: 'EmailEvent',
-    });
+    }),
+});
 
-export const SmsEvent = z
-    .object({
+export const SmsEvent = createModel({
+    title: 'SmsEvent',
+    schema: z.object({
         channel: z.literal('sms'),
         phone: z.string(),
         text: z.string(),
-    })
-    .meta({
-        id: 'SmsEvent',
-    });
-
-export const NotificationEvent = z.discriminatedUnion('channel', [EmailEvent, SmsEvent]).meta({
-    id: 'NotificationEvent',
+    }),
 });
 
-export const EventKind = z.enum(['login', 'logout', 'signup']).meta({
-    id: 'EventKind',
+export const NotificationEvent = createModel({
+    title: 'NotificationEvent',
+    schema: z.discriminatedUnion('channel', [EmailEvent, SmsEvent]),
 });
 
-export const EventRecord = z
-    .object({
+export const EventKind = createModel({
+    title: 'EventKind',
+    schema: z.enum(['login', 'logout', 'signup']),
+});
+
+export const EventRecord = createModel({
+    title: 'EventRecord',
+    schema: z.object({
         id: z.string(),
         kind: EventKind,
         occurredAt: z.iso.datetime(),
         userId: z.string(),
-    })
-    .meta({
-        id: 'EventRecord',
-    });
+    }),
+});
 
 const healthContract = createContract('Health', {
     check: {
@@ -381,7 +378,12 @@ export const contract = createContract({
                 .meta({
                     description: 'Validation result',
                 }),
-            400: z.object({ message: z.string() }).meta({ id: 'Error' }),
+            400: createModel({
+                title: 'Error',
+                schema: z.object({
+                    message: z.string(),
+                }),
+            }),
             401: z.void(),
         },
         summary: 'Validate config — exercises generator bug coverage',
