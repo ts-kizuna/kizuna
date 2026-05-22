@@ -1,10 +1,24 @@
 import type { z } from 'zod';
-import { createDeprecationMap, type DeprecationMap } from './deprecation.js';
+import {
+    createDeprecationMap,
+    resolveDeprecationMap,
+    serializeDeprecationMap,
+    deserializeDeprecationMap,
+    type DeprecationMap,
+    type SerializedDeprecationMap,
+} from './deprecation.js';
 import { flattenContract } from './handler-pipeline.js';
 import { parsePath } from './path-params.js';
 import type { Contract, RouteDefinition } from './types.js';
 
-export { createDeprecationMap, type DeprecationMap };
+export {
+    createDeprecationMap,
+    resolveDeprecationMap,
+    serializeDeprecationMap,
+    deserializeDeprecationMap,
+    type DeprecationMap,
+    type SerializedDeprecationMap,
+};
 export type { Contract, RouteDefinition };
 export { parsePath };
 
@@ -91,16 +105,24 @@ export const readDiscriminatorLiteral = (variant: z.ZodType, propertyName: strin
 };
 
 /**
- * Controls how `@deprecated` JSDoc tags in the contract source are surfaced in
- * generated output (OpenAPI `deprecated: true`, Swift `@available(*, deprecated)`).
+ * Controls how `@deprecated` JSDoc tags in the contract source are surfaced
+ * in generated output (OpenAPI `deprecated: true`, Swift `@available`).
+ *
+ * Three forms:
+ * - `{ contractPath: string }` — parse live from the `.ts` source file.
+ * - `DeprecationMap` — pre-computed Maps (from `createDeprecationMap`).
+ * - `SerializedDeprecationMap` — plain JSON import (from the tsdown plugin).
+ *
+ * ```ts
+ * // From source (dev / build):
+ * deprecationWarnings: { contractPath: path.resolve(import.meta.dirname, './contract.ts') }
+ *
+ * // From JSON (production):
+ * import deprecations from './deprecations.json';
+ * deprecationWarnings: deprecations
+ * ```
  */
-export interface DeprecationWarnings {
-    /**
-     * Absolute path to the contract `.ts` source file.
-     * Pass `path.resolve(import.meta.dirname, './contract.ts')`.
-     */
-    contractPath: string;
-}
+export type DeprecationWarnings = { contractPath: string } | DeprecationMap | SerializedDeprecationMap;
 
 export interface GeneratorOptions {
     deprecationWarnings?: DeprecationWarnings;
@@ -156,8 +178,7 @@ export const createGenerator =
     ): ((contract: Contract, options: Options) => Output) =>
     (contract, options) => {
         const { processRoute, finalize } = factory(options);
-        const deprecation =
-            options.deprecationWarnings !== undefined ? createDeprecationMap(options.deprecationWarnings.contractPath) : undefined;
+        const deprecation = resolveDeprecationMap(options.deprecationWarnings);
         for (const { routeKey, route, contractTags } of flattenContract(contract)) {
             const rawMessage = deprecation?.routes.get(routeKey);
             processRoute({

@@ -96,17 +96,29 @@ const makeResolverWithCache = (contractPath: string): { resolve: IdentifierResol
     return { resolve, cache };
 };
 
-// Find createModel({title: '...'}) and return the title string.
-const readAstMetaId = (expr: ts.Expression): string | undefined => {
-    if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
-    if (expr.expression.text !== 'createModel') return undefined;
-    const firstArg = expr.arguments[0];
-    if (!firstArg || !ts.isObjectLiteralExpression(firstArg)) return undefined;
-    for (const prop of firstArg.properties) {
-        if (!ts.isPropertyAssignment(prop)) continue;
-        if (!ts.isIdentifier(prop.name) || prop.name.text !== 'title') continue;
-        if (ts.isStringLiteral(prop.initializer)) return prop.initializer.text;
+const readObjectStringProperty = (object: ts.ObjectLiteralExpression, name: string): string | undefined => {
+    for (const property of object.properties) {
+        if (!ts.isPropertyAssignment(property)) continue;
+        if (!ts.isIdentifier(property.name) || property.name.text !== name) continue;
+        if (ts.isStringLiteral(property.initializer)) return property.initializer.text;
     }
+    return undefined;
+};
+
+const readAstMetaId = (expr: ts.Expression): string | undefined => {
+    if (!ts.isCallExpression(expr)) return undefined;
+    const firstArg = expr.arguments[0];
+
+    if (ts.isIdentifier(expr.expression) && expr.expression.text === 'createModel') {
+        if (!firstArg || !ts.isObjectLiteralExpression(firstArg)) return undefined;
+        return readObjectStringProperty(firstArg, 'title');
+    }
+
+    if (ts.isPropertyAccessExpression(expr.expression) && expr.expression.name.text === 'meta') {
+        if (!firstArg || !ts.isObjectLiteralExpression(firstArg)) return undefined;
+        return readObjectStringProperty(firstArg, 'id') ?? readAstMetaId(expr.expression.expression as ts.Expression);
+    }
+
     return undefined;
 };
 
@@ -410,21 +422,19 @@ const findAllRouteObjectLiterals = (sourceFile: ts.SourceFile, resolve: Identifi
     return lit ? [lit] : [];
 };
 
-type SerializedDeprecationMap = {
+export type SerializedDeprecationMap = {
     routes: Record<string, string>;
     fields: Record<string, Record<string, string>>;
     schemas?: Record<string, Record<string, string>>;
 };
 
-const cachePath = (contractPath: string): string => contractPath.replace(/\.ts$/, '.deprecations.json');
-
-const serialize = (map: DeprecationMap): SerializedDeprecationMap => ({
+export const serializeDeprecationMap = (map: DeprecationMap): SerializedDeprecationMap => ({
     routes: Object.fromEntries(map.routes),
     fields: Object.fromEntries(Array.from(map.fields, ([key, value]) => [key, Object.fromEntries(value)])),
     schemas: map.schemas ? Object.fromEntries(Array.from(map.schemas, ([key, value]) => [key, Object.fromEntries(value)])) : undefined,
 });
 
-const deserialize = (data: SerializedDeprecationMap): DeprecationMap => ({
+export const deserializeDeprecationMap = (data: SerializedDeprecationMap): DeprecationMap => ({
     routes: new Map(Object.entries(data.routes)),
     fields: new Map(Object.entries(data.fields).map(([key, value]) => [key, new Map(Object.entries(value))])),
     schemas: data.schemas ? new Map(Object.entries(data.schemas).map(([key, value]) => [key, new Map(Object.entries(value))])) : undefined,
@@ -458,22 +468,31 @@ const parseFromSource = (contractPath: string): DeprecationMap => {
 };
 
 /**
- * Read JSDoc `@deprecated` tags from a contract source file and return a `DeprecationMap`.
+ * Parse JSDoc `@deprecated` tags from a contract `.ts` source file.
  *
- * Writes a `.deprecations.json` next to the contract for runtime use.
+ * Requires the `.ts` file to exist on disk. For environments where source
+ * files are unavailable (e.g. production Docker images), generate the map
+ * at build time with `serializeDeprecationMap` and pass the result directly
+ * to the generator.
  */
 export const createDeprecationMap = (contractPath: string): DeprecationMap => {
-    if (fs.existsSync(contractPath)) {
-        const map = parseFromSource(contractPath);
-        fs.writeFileSync(cachePath(contractPath), JSON.stringify(serialize(map)), 'utf8');
-        return map;
-    }
-    const jsonPath = cachePath(contractPath);
-    if (fs.existsSync(jsonPath)) {
-        return deserialize(JSON.parse(fs.readFileSync(jsonPath, 'utf8')) as SerializedDeprecationMap);
-    }
-    throw new Error(
-        `Deprecation contract not found: "${contractPath}" does not exist and no cached .deprecations.json was found beside it. ` +
-            `Either fix the contractPath in your deprecationWarnings config or remove the deprecationWarnings option.`
-    );
+    return parseFromSource(contractPath);
+};
+
+/**
+ * Resolve a `DeprecationWarnings` value into a concrete `DeprecationMap`.
+ *
+ * Accepts all three forms:
+ * - `undefined` → `undefined` (no deprecation tracking)
+ * - `{ contractPath }` → parse from `.ts` source
+ * - `DeprecationMap` → returned as-is (routes/fields are Maps)
+ * - `SerializedDeprecationMap` → deserialized from plain objects (JSON import)
+ */
+export const resolveDeprecationMap = (
+    warnings: { contractPath: string } | DeprecationMap | SerializedDeprecationMap | undefined
+): DeprecationMap | undefined => {
+    if (warnings === undefined) return undefined;
+    if ('contractPath' in warnings) return createDeprecationMap(warnings.contractPath);
+    if (warnings.routes instanceof Map) return warnings as DeprecationMap;
+    return deserializeDeprecationMap(warnings as SerializedDeprecationMap);
 };

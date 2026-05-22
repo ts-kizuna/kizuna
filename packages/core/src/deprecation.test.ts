@@ -1,9 +1,13 @@
 import { describe, expect, test } from 'vitest';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import * as url from 'node:url';
-import { createDeprecationMap } from './deprecation.js';
+import {
+    createDeprecationMap,
+    resolveDeprecationMap,
+    serializeDeprecationMap,
+    deserializeDeprecationMap,
+    type DeprecationMap,
+} from './deprecation.js';
 
 const fixtureDir = path.dirname(url.fileURLToPath(import.meta.url));
 const fixturePath = path.join(fixtureDir, 'deprecation.fixture.ts');
@@ -65,42 +69,6 @@ describe('createDeprecationMap', () => {
     });
 });
 
-describe('createDeprecationMap JSON cache', () => {
-    test('writes a .deprecations.json and reads it back when the .ts is missing', () => {
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-deprecation-'));
-        const fakeTsPath = path.join(tmpDir, 'contract.ts');
-        const jsonPath = path.join(tmpDir, 'contract.deprecations.json');
-
-        // First call: .ts exists → parses and writes .json cache
-        const fromSource = createDeprecationMap(fixturePath);
-        const cacheJsonPath = fixturePath.replace(/\.ts$/, '.deprecations.json');
-        expect(fs.existsSync(cacheJsonPath)).toBe(true);
-
-        // Copy only the .json to a directory with no .ts file
-        fs.copyFileSync(cacheJsonPath, jsonPath);
-        expect(fs.existsSync(fakeTsPath)).toBe(false);
-
-        // Second call: .ts missing, .json present → loads from cache
-        const fromCache = createDeprecationMap(fakeTsPath);
-
-        expect(fromCache.routes.get('oldRoute')).toBe(fromSource.routes.get('oldRoute'));
-        expect(fromCache.fields.get('getUser')?.get('responses.200.email')).toBe(
-            fromSource.fields.get('getUser')?.get('responses.200.email')
-        );
-        expect(fromCache.fields.get('newRoute')?.get('body.name')).toBe(fromSource.fields.get('newRoute')?.get('body.name'));
-
-        fs.rmSync(tmpDir, {
-            recursive: true,
-        });
-    });
-
-    test('throws when neither .ts nor .json exist', () => {
-        expect(() => createDeprecationMap('/nonexistent/contract.ts')).toThrow(
-            'Deprecation contract not found: "/nonexistent/contract.ts"'
-        );
-    });
-});
-
 describe('createDeprecationMap with createApi', () => {
     const map = createDeprecationMap(fixturePath);
 
@@ -122,5 +90,74 @@ describe('createDeprecationMap with createApi', () => {
     test('follows schema identifiers inside createApi routes through array wrappers', () => {
         // listUsers returns z.array(UserSchema)
         expect(map.fields.get('users.listUsers')?.has('responses.200.users.email')).toBe(true);
+    });
+});
+
+describe('serializeDeprecationMap / deserializeDeprecationMap', () => {
+    test('round-trips a deprecation map through JSON', () => {
+        const original = createDeprecationMap(fixturePath);
+        const serialized = serializeDeprecationMap(original);
+        const json = JSON.parse(JSON.stringify(serialized));
+        const restored = deserializeDeprecationMap(json);
+
+        expect(restored.routes.get('oldRoute')).toBe(original.routes.get('oldRoute'));
+        expect(restored.fields.get('getUser')?.get('responses.200.email')).toBe(original.fields.get('getUser')?.get('responses.200.email'));
+        expect(restored.fields.get('newRoute')?.get('body.name')).toBe(original.fields.get('newRoute')?.get('body.name'));
+    });
+
+    test('serialized form contains plain objects, not Maps', () => {
+        const original = createDeprecationMap(fixturePath);
+        const serialized = serializeDeprecationMap(original);
+
+        expect(serialized.routes).not.toBeInstanceOf(Map);
+        expect(serialized.fields).not.toBeInstanceOf(Map);
+    });
+
+    test('round-trips schema-level deprecations', () => {
+        const original = createDeprecationMap(fixturePath);
+        if (original.schemas && original.schemas.size > 0) {
+            const serialized = serializeDeprecationMap(original);
+            const restored = deserializeDeprecationMap(serialized);
+            for (const [schemaId, fieldMap] of original.schemas) {
+                for (const [field, message] of fieldMap) {
+                    expect(restored.schemas?.get(schemaId)?.get(field)).toBe(message);
+                }
+            }
+        }
+    });
+});
+
+describe('resolveDeprecationMap', () => {
+    test('returns undefined when given undefined', () => {
+        expect(resolveDeprecationMap(undefined)).toBeUndefined();
+    });
+
+    test('parses from source when given a contractPath', () => {
+        const result = resolveDeprecationMap({
+            contractPath: fixturePath,
+        });
+        expect(result).toBeDefined();
+        expect(result!.routes.has('oldRoute')).toBe(true);
+    });
+
+    test('returns a DeprecationMap as-is', () => {
+        const map: DeprecationMap = {
+            routes: new Map([['oldRoute', 'use newRoute instead']]),
+            fields: new Map([['getUser', new Map([['responses.200.email', '']])]]),
+        };
+        const result = resolveDeprecationMap(map);
+        expect(result).toBe(map);
+    });
+
+    test('deserializes a SerializedDeprecationMap from a JSON import', () => {
+        const original = createDeprecationMap(fixturePath);
+        const serialized = serializeDeprecationMap(original);
+        const json = JSON.parse(JSON.stringify(serialized));
+
+        const result = resolveDeprecationMap(json);
+        expect(result).toBeDefined();
+        expect(result!.routes).toBeInstanceOf(Map);
+        expect(result!.routes.get('oldRoute')).toBe('use newRoute instead');
+        expect(result!.fields.get('getUser')?.get('responses.200.email')).toBe('');
     });
 });

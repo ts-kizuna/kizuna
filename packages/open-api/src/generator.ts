@@ -92,6 +92,22 @@ export interface GenerateOpenApiOptions {
     setOperationId?: boolean | 'concatenated-path';
     setTagsFromContractKeys?: boolean;
     operationMapper?: (operation: OpenApiOperation, route: RouteDefinition, operationId: string) => OpenApiOperation;
+    /**
+     * Surface `@deprecated` JSDoc tags from the contract source as
+     * `deprecated: true` in the OpenAPI output.
+     *
+     * Pass `{ contractPath }` to parse from source, a `DeprecationMap`,
+     * or a `SerializedDeprecationMap` (JSON import from the tsdown plugin).
+     *
+     * ```ts
+     * // From source:
+     * deprecationWarnings: { contractPath: path.resolve(import.meta.dirname, './contract.ts') }
+     *
+     * // From JSON:
+     * import deprecations from '@my-pkg/api-client/index.deprecations.json';
+     * deprecationWarnings: deprecations
+     * ```
+     */
     deprecationWarnings?: DeprecationWarnings;
 }
 

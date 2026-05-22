@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { createContract, createTag, type Contract } from '@ts-kizuna/core';
+import { createDeprecationMap, serializeDeprecationMap } from '@ts-kizuna/core/generator';
 import { generateOpenApi, type GenerateOpenApiOptions } from './generator.js';
 import { contract as deprecatedContract } from '../../core/src/deprecation.fixture.js';
 
@@ -258,6 +259,35 @@ describe('Zod meta() in OpenAPI output', () => {
         const userSchema = spec.components?.schemas?.User as Record<string, unknown> | undefined;
         const properties = (userSchema?.properties ?? {}) as Record<string, Record<string, unknown>>;
         expect(properties['email']?.deprecated).toBe(true);
+    });
+
+    it('applies deprecation from a pre-computed DeprecationMap', () => {
+        const deprecationMap = createDeprecationMap(path.resolve(import.meta.dirname, '../../core/src/deprecation.fixture.ts'));
+        const spec = generateJson(deprecatedContract, {
+            ...baseConfig,
+            deprecationWarnings: deprecationMap,
+        });
+        const userSchema = spec.components?.schemas?.User as Record<string, unknown> | undefined;
+        const properties = (userSchema?.properties ?? {}) as Record<string, Record<string, unknown>>;
+        expect(properties['email']?.deprecated).toBe(true);
+
+        const operation = spec.paths['/users/by-id/{id}']?.get;
+        expect(operation?.deprecated).toBe(true);
+    });
+
+    it('applies deprecation from a SerializedDeprecationMap (JSON import)', () => {
+        const deprecationMap = createDeprecationMap(path.resolve(import.meta.dirname, '../../core/src/deprecation.fixture.ts'));
+        const serialized = JSON.parse(JSON.stringify(serializeDeprecationMap(deprecationMap)));
+        const spec = generateJson(deprecatedContract, {
+            ...baseConfig,
+            deprecationWarnings: serialized,
+        });
+        const userSchema = spec.components?.schemas?.User as Record<string, unknown> | undefined;
+        const properties = (userSchema?.properties ?? {}) as Record<string, Record<string, unknown>>;
+        expect(properties['email']?.deprecated).toBe(true);
+
+        const operation = spec.paths['/users/by-id/{id}']?.get;
+        expect(operation?.deprecated).toBe(true);
     });
 });
 
