@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import * as path from 'node:path';
 import * as url from 'node:url';
-import { createDeprecationMap } from './deprecation.js';
+import { createDeprecationMap, serializeDeprecationMap, deserializeDeprecationMap, type DeprecationMap } from './deprecation.js';
 
 const fixtureDir = path.dirname(url.fileURLToPath(import.meta.url));
 const fixturePath = path.join(fixtureDir, 'deprecation.fixture.ts');
@@ -85,5 +85,43 @@ describe('createDeprecationMap with createApi', () => {
     test('follows schema identifiers inside createApi routes through array wrappers', () => {
         // listUsers returns z.array(UserSchema)
         expect(map.fields.get('users.listUsers')?.has('responses.200.users.email')).toBe(true);
+    });
+});
+
+describe('serializeDeprecationMap / deserializeDeprecationMap', () => {
+    test('round-trips a deprecation map through JSON', () => {
+        const original = createDeprecationMap(fixturePath);
+        const serialized = serializeDeprecationMap(original);
+        const json = JSON.parse(JSON.stringify(serialized));
+        const restored = deserializeDeprecationMap(json);
+
+        expect(restored.routes.get('oldRoute')).toBe(original.routes.get('oldRoute'));
+        expect(restored.fields.get('getUser')?.get('responses.200.email')).toBe(
+            original.fields.get('getUser')?.get('responses.200.email')
+        );
+        expect(restored.fields.get('newRoute')?.get('body.name')).toBe(
+            original.fields.get('newRoute')?.get('body.name')
+        );
+    });
+
+    test('serialized form contains plain objects, not Maps', () => {
+        const original = createDeprecationMap(fixturePath);
+        const serialized = serializeDeprecationMap(original);
+
+        expect(serialized.routes).not.toBeInstanceOf(Map);
+        expect(serialized.fields).not.toBeInstanceOf(Map);
+    });
+
+    test('round-trips schema-level deprecations', () => {
+        const original = createDeprecationMap(fixturePath);
+        if (original.schemas && original.schemas.size > 0) {
+            const serialized = serializeDeprecationMap(original);
+            const restored = deserializeDeprecationMap(serialized);
+            for (const [schemaId, fieldMap] of original.schemas) {
+                for (const [field, message] of fieldMap) {
+                    expect(restored.schemas?.get(schemaId)?.get(field)).toBe(message);
+                }
+            }
+        }
     });
 });

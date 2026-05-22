@@ -1,10 +1,10 @@
 import type { z } from 'zod';
-import { createDeprecationMap, type DeprecationMap } from './deprecation.js';
+import { createDeprecationMap, serializeDeprecationMap, deserializeDeprecationMap, type DeprecationMap, type SerializedDeprecationMap } from './deprecation.js';
 import { flattenContract } from './handler-pipeline.js';
 import { parsePath } from './path-params.js';
 import type { Contract, RouteDefinition } from './types.js';
 
-export { createDeprecationMap, type DeprecationMap };
+export { createDeprecationMap, serializeDeprecationMap, deserializeDeprecationMap, type DeprecationMap, type SerializedDeprecationMap };
 export type { Contract, RouteDefinition };
 export { parsePath };
 

@@ -410,19 +410,19 @@ const findAllRouteObjectLiterals = (sourceFile: ts.SourceFile, resolve: Identifi
     return lit ? [lit] : [];
 };
 
-type SerializedDeprecationMap = {
+export type SerializedDeprecationMap = {
     routes: Record<string, string>;
     fields: Record<string, Record<string, string>>;
     schemas?: Record<string, Record<string, string>>;
 };
 
-const serialize = (map: DeprecationMap): SerializedDeprecationMap => ({
+export const serializeDeprecationMap = (map: DeprecationMap): SerializedDeprecationMap => ({
     routes: Object.fromEntries(map.routes),
     fields: Object.fromEntries(Array.from(map.fields, ([key, value]) => [key, Object.fromEntries(value)])),
     schemas: map.schemas ? Object.fromEntries(Array.from(map.schemas, ([key, value]) => [key, Object.fromEntries(value)])) : undefined,
 });
 
-const deserialize = (data: SerializedDeprecationMap): DeprecationMap => ({
+export const deserializeDeprecationMap = (data: SerializedDeprecationMap): DeprecationMap => ({
     routes: new Map(Object.entries(data.routes)),
     fields: new Map(Object.entries(data.fields).map(([key, value]) => [key, new Map(Object.entries(value))])),
     schemas: data.schemas ? new Map(Object.entries(data.schemas).map(([key, value]) => [key, new Map(Object.entries(value))])) : undefined,
