@@ -6,21 +6,14 @@ import {
     type Contract,
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
+    type ApiWithRouter,
+    ROUTER_META,
     createAdapter,
     renderJsonResult,
 } from '@ts-kizuna/core/adapter';
-import { createApi as coreCreateApi, type ApiDefinition } from '@ts-kizuna/core/adapter';
+import { createApi as coreCreateApi } from '@ts-kizuna/core/adapter';
 
-const _ROUTER: unique symbol = Symbol('ts-kizuna.express.router');
-
-type ApiWithRouter = ApiDefinition & {
-    readonly [_ROUTER]: Router<any>;
-};
-
-export type ExpressApi<R extends Contract = Contract> = R &
-    ApiDefinition & {
-        readonly [_ROUTER]: Router<any>;
-    };
+export type ExpressApi<R extends Contract = Contract> = R & ApiWithRouter;
 
 export interface ExpressHandlerContext {
     req: Request;
@@ -120,7 +113,7 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
  * ```
  */
 export function createExpressEndpoints(api: ApiWithRouter, app: AppLike, options?: ExpressOptions): ExpressRouter {
-    const resolvedRouter = api[_ROUTER];
+    const resolvedRouter = api[ROUTER_META] as Router<Contract>;
     const resolvedOptions: ExpressOptions | undefined = options;
 
     const expressRouter = createExpressRouter();
@@ -184,6 +177,6 @@ export const createApi = <const R extends Contract>(options: { contract: R; rout
     const { contract, router } = options;
     const spec = coreCreateApi(contract);
     return Object.assign(spec, {
-        [_ROUTER]: router,
+        [ROUTER_META]: router,
     }) as unknown as ExpressApi<R>;
 };

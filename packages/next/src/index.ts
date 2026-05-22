@@ -1,5 +1,5 @@
 import type { Contract } from '@ts-kizuna/core';
-import { createApi as coreCreateApi, type ApiDefinition } from '@ts-kizuna/core/adapter';
+import { createApi as coreCreateApi, type ApiWithRouter, ROUTER_META } from '@ts-kizuna/core/adapter';
 import { handleNextRequest, type Router, type NextHandlerOptions } from './handler.js';
 import { type NextRequest, NextResponse } from 'next/server';
 
@@ -17,17 +17,14 @@ type HttpHandlers = {
 };
 type HttpHandler = (request: NextRequest) => Promise<NextResponse>;
 
-const _ROUTER: unique symbol = Symbol('ts-kizuna.next.router');
 const _ON_ERROR: unique symbol = Symbol('ts-kizuna.next.onError');
 
-type ApiWithRouter = ApiDefinition & {
-    readonly [_ROUTER]: Router<any>;
+type NextApiWithRouter = ApiWithRouter & {
     readonly [_ON_ERROR]?: NextHandlerOptions['onError'];
 };
 
 export type NextApi<R extends Contract = Contract> = R &
-    ApiDefinition & {
-        readonly [_ROUTER]: Router<any>;
+    ApiWithRouter & {
         readonly [_ON_ERROR]?: NextHandlerOptions['onError'];
         mount: (options?: NextHandlerOptions) => HttpHandlers;
     };
@@ -61,9 +58,9 @@ export const createRouter = <T extends Contract>(_contract: T, router: Router<T>
  * });
  * ```
  */
-export function createNextEndpoints(api: ApiWithRouter, options?: NextHandlerOptions): HttpHandlers {
+export function createNextEndpoints(api: NextApiWithRouter, options?: NextHandlerOptions): HttpHandlers {
     const handler = (request: NextRequest) =>
-        handleNextRequest(request, api as unknown as Contract, api[_ROUTER], {
+        handleNextRequest(request, api as unknown as Contract, api[ROUTER_META] as Router<Contract>, {
             basePath: options?.basePath,
             onError: options?.onError ?? api[_ON_ERROR],
             responseValidation: options?.responseValidation,
@@ -112,10 +109,10 @@ export const createApi = <const R extends Contract>(options: {
     const { contract, router, onError } = options;
     const spec = coreCreateApi(contract);
     return Object.assign(spec, {
-        [_ROUTER]: router,
+        [ROUTER_META]: router,
         [_ON_ERROR]: onError,
         mount(mountOptions?: NextHandlerOptions) {
-            return createNextEndpoints(this as unknown as ApiWithRouter, mountOptions);
+            return createNextEndpoints(this as unknown as NextApiWithRouter, mountOptions);
         },
     }) as unknown as NextApi<R>;
 };
