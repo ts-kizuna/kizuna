@@ -1,7 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import * as path from 'node:path';
 import * as url from 'node:url';
-import { createDeprecationMap, resolveDeprecationMap, serializeDeprecationMap, deserializeDeprecationMap, type DeprecationMap } from './deprecation.js';
+import {
+    createDeprecationMap,
+    resolveDeprecationMap,
+    serializeDeprecationMap,
+    deserializeDeprecationMap,
+    type DeprecationMap,
+} from './deprecation.js';
 
 const fixtureDir = path.dirname(url.fileURLToPath(import.meta.url));
 const fixturePath = path.join(fixtureDir, 'deprecation.fixture.ts');
@@ -63,7 +69,6 @@ describe('createDeprecationMap', () => {
     });
 });
 
-
 describe('createDeprecationMap with createApi', () => {
     const map = createDeprecationMap(fixturePath);
 
@@ -96,12 +101,8 @@ describe('serializeDeprecationMap / deserializeDeprecationMap', () => {
         const restored = deserializeDeprecationMap(json);
 
         expect(restored.routes.get('oldRoute')).toBe(original.routes.get('oldRoute'));
-        expect(restored.fields.get('getUser')?.get('responses.200.email')).toBe(
-            original.fields.get('getUser')?.get('responses.200.email')
-        );
-        expect(restored.fields.get('newRoute')?.get('body.name')).toBe(
-            original.fields.get('newRoute')?.get('body.name')
-        );
+        expect(restored.fields.get('getUser')?.get('responses.200.email')).toBe(original.fields.get('getUser')?.get('responses.200.email'));
+        expect(restored.fields.get('newRoute')?.get('body.name')).toBe(original.fields.get('newRoute')?.get('body.name'));
     });
 
     test('serialized form contains plain objects, not Maps', () => {

@@ -1,4 +1,10 @@
-export { type DeprecationWarnings, type DeprecationMap, type SerializedDeprecationMap, serializeDeprecationMap, deserializeDeprecationMap } from '@ts-kizuna/core/generator';
+export {
+    type DeprecationWarnings,
+    type DeprecationMap,
+    type SerializedDeprecationMap,
+    serializeDeprecationMap,
+    deserializeDeprecationMap,
+} from '@ts-kizuna/core/generator';
 export {
     generateOpenApi,
     type GenerateOpenApiOptions,

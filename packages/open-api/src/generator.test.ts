@@ -262,9 +262,7 @@ describe('Zod meta() in OpenAPI output', () => {
     });
 
     it('applies deprecation from a pre-computed DeprecationMap', () => {
-        const deprecationMap = createDeprecationMap(
-            path.resolve(import.meta.dirname, '../../core/src/deprecation.fixture.ts')
-        );
+        const deprecationMap = createDeprecationMap(path.resolve(import.meta.dirname, '../../core/src/deprecation.fixture.ts'));
         const spec = generateJson(deprecatedContract, {
             ...baseConfig,
             deprecationWarnings: deprecationMap,
@@ -278,9 +276,7 @@ describe('Zod meta() in OpenAPI output', () => {
     });
 
     it('applies deprecation from a SerializedDeprecationMap (JSON import)', () => {
-        const deprecationMap = createDeprecationMap(
-            path.resolve(import.meta.dirname, '../../core/src/deprecation.fixture.ts')
-        );
+        const deprecationMap = createDeprecationMap(path.resolve(import.meta.dirname, '../../core/src/deprecation.fixture.ts'));
         const serialized = JSON.parse(JSON.stringify(serializeDeprecationMap(deprecationMap)));
         const spec = generateJson(deprecatedContract, {
             ...baseConfig,

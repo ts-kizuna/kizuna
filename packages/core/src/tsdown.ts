@@ -43,19 +43,14 @@ export const kizunaDeprecations = (options: KizunaDeprecationsOptions) => {
     return {
         name: 'kizuna-deprecations',
         writeBundle(outputOptions: { dir?: string; file?: string }) {
-            const outDir = outputOptions.dir
-                ?? (outputOptions.file ? path.dirname(outputOptions.file) : undefined);
+            const outDir = outputOptions.dir ?? (outputOptions.file ? path.dirname(outputOptions.file) : undefined);
             if (!outDir) return;
             for (const contractPath of options.contracts) {
                 const resolved = path.resolve(contractPath);
                 const map = createDeprecationMap(resolved);
                 const serialized = serializeDeprecationMap(map);
                 const basename = path.basename(resolved, '.ts');
-                fs.writeFileSync(
-                    path.join(outDir, `${basename}.deprecations.json`),
-                    JSON.stringify(serialized),
-                    'utf8'
-                );
+                fs.writeFileSync(path.join(outDir, `${basename}.deprecations.json`), JSON.stringify(serialized), 'utf8');
             }
         },
     };

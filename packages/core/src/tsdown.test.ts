@@ -21,9 +21,12 @@ describe('kizunaDeprecations', () => {
             contracts: [fixturePath],
         });
 
-        (plugin as any).writeBundle({
-            dir: tmpDir,
-        }, {});
+        (plugin as any).writeBundle(
+            {
+                dir: tmpDir,
+            },
+            {}
+        );
 
         const outputPath = path.join(tmpDir, 'deprecation.fixture.deprecations.json');
         expect(fs.existsSync(outputPath)).toBe(true);
@@ -44,9 +47,12 @@ describe('kizunaDeprecations', () => {
             contracts: [fixturePath],
         });
 
-        (plugin as any).writeBundle({
-            dir: tmpDir,
-        }, {});
+        (plugin as any).writeBundle(
+            {
+                dir: tmpDir,
+            },
+            {}
+        );
 
         const files = fs.readdirSync(tmpDir);
         expect(files).toContain('deprecation.fixture.deprecations.json');
