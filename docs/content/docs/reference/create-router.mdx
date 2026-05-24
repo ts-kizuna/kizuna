@@ -1,0 +1,106 @@
+---
+title: createRouter
+description: Bind typed handler implementations to a contract with full type inference for inputs and outputs.
+---
+
+Bind typed handler implementations to a contract. Each handler receives validated inputs and must return a response matching the contract's declared status codes.
+
+<AdapterTabs functionName="createRouter" />
+
+## Parameters
+
+```ts
+createRouter(contract: Contract, handlers: Router<Contract>): Router<Contract>
+```
+
+| Parameter  | Type               | Description                                                                   |
+| ---------- | ------------------ | ----------------------------------------------------------------------------- |
+| `contract` | `Contract`         | The contract created with [`createContract`](/docs/reference/create-contract) |
+| `handlers` | `Router<Contract>` | An object with a handler function for each route in the contract              |
+
+## Returns
+
+The router object, type-checked against the contract.
+
+## Example
+
+```ts
+import { createRouter } from '@ts-kizuna/express';
+import { contract } from './contract';
+
+export const router = createRouter(contract, {
+    listUsers: async ({ query }) => {
+        const users = await db.users.findMany({
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+        });
+        return {
+            status: 200,
+            body: {
+                users,
+                total: await db.users.count(),
+            },
+        };
+    },
+    getUser: async ({ params, error }) => {
+        const user = await db.users.findById(params.id);
+        if (!user) {
+            return error({
+                status: 404,
+                body: {
+                    message: 'Not found',
+                },
+            });
+        }
+        return {
+            status: 200,
+            body: user,
+        };
+    },
+});
+```
+
+## Handler arguments
+
+Each handler receives an object with the validated inputs for that route:
+
+| Property  | Available when                       |
+| --------- | ------------------------------------ |
+| `params`  | Route path has `:param` placeholders |
+| `query`   | Route has a `query` schema           |
+| `body`    | Route has a `body` schema            |
+| `headers` | Route has a `headers` schema         |
+| `error`   | Always                               |
+
+## Handler return type
+
+Return `{ status, body }` matching one of the route's declared responses. TypeScript enforces that the status code and body type match. For routes with typed response headers, include `headers` too.
+
+## Adapter-specific context
+
+Each adapter adds framework-specific properties to the handler arguments:
+
+| Adapter | Extra properties | Description                       |
+| ------- | ---------------- | --------------------------------- |
+| Express | `req`, `res`     | Native Express request / response |
+| Hono    | `c`              | Hono context                      |
+| Next.js | `request`        | `NextRequest` object              |
+
+## `RouteHandler` and `Router` types
+
+Annotate handlers individually or as a group:
+
+```ts
+import type { RouteHandler, Router } from '@ts-kizuna/express';
+import { contract } from './contract';
+
+const getUser: RouteHandler<typeof contract.getUser> = async ({ params }) => {
+    // ...
+};
+
+const router: Router<typeof contract> = {
+    // ...
+};
+```
+
+See the [Router guide](/docs/building/router) for validation errors, error responses, and more.

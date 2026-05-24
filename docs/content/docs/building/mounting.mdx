@@ -3,7 +3,7 @@ title: Mounting
 description: Combine a contract and a router into an API object.
 ---
 
-`createApi` wraps a contract and a router into an API object that an adapter can mount.
+Once you have a contract and a router, combine them into an API object that an adapter can mount.
 
 ## `createApi`
 
@@ -62,6 +62,12 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoi
     basePath: '/api',
 });
 ```
+
+## Reference
+
+- [`createApi`](/docs/reference/create-api)
+
+## Next steps
 
 For adapter-specific options (error handling, middleware, `onError`, etc.) see the adapter pages:
 

@@ -1,0 +1,51 @@
+---
+title: generateSwiftClient
+description: Generate a native Swift client from a ts-kizuna contract with URLSession and Codable.
+---
+
+Generate a native Swift client from a contract. The generated client uses `URLSession` and `Codable` — no third-party Swift dependencies required.
+
+<InstallTabs packageName="@ts-kizuna/swift" />
+
+```ts
+import { generateSwiftClient } from '@ts-kizuna/swift';
+```
+
+## Parameters
+
+```ts
+generateSwiftClient(contract: Contract, config: SwiftConfig): string
+```
+
+| Parameter  | Type          | Description                                                                   |
+| ---------- | ------------- | ----------------------------------------------------------------------------- |
+| `contract` | `Contract`    | The contract created with [`createContract`](/docs/reference/create-contract) |
+| `config`   | `SwiftConfig` | Generation configuration                                                      |
+
+## `SwiftConfig`
+
+| Option                | Type                  | Required | Description                                                                    |
+| --------------------- | --------------------- | -------- | ------------------------------------------------------------------------------ |
+| `namespaceName`       | `string`              | Yes      | Name for the generated Swift enum and client type (e.g. `'API'`)               |
+| `deprecationWarnings` | `DeprecationWarnings` | No       | Deprecation metadata from the contract source — marks deprecated routes/fields |
+
+## Returns
+
+A `string` containing the generated Swift source code.
+
+## Example
+
+```ts
+import path from 'path';
+import { writeFileSync } from 'fs';
+import { generateSwiftClient } from '@ts-kizuna/swift';
+import { contract } from '../src/contract';
+
+const swift = generateSwiftClient(contract, {
+    namespaceName: 'API',
+});
+
+writeFileSync('generated/API.swift', swift);
+```
+
+See the [Swift client guide](/docs/clients/swift) for CLI usage and integration patterns.

@@ -1,0 +1,45 @@
+---
+title: createApi
+description: Combine a contract and router into an API object that an adapter can mount.
+---
+
+Combine a contract and router into an API object that an adapter can mount.
+
+<AdapterTabs functionName="createApi" />
+
+## Parameters
+
+```ts
+createApi(options: { contract, router, onError? }): Api
+```
+
+| Option     | Type               | Required | Description                                                                                        |
+| ---------- | ------------------ | -------- | -------------------------------------------------------------------------------------------------- |
+| `contract` | `Contract`         | Yes      | The contract created with [`createContract`](/docs/reference/create-contract)                      |
+| `router`   | `Router<Contract>` | Yes      | The router created with [`createRouter`](/docs/reference/create-router)                            |
+| `onError`  | `Function`         | No       | Error handler (Next.js adapter only) — receives `(error, request)` and can return a `NextResponse` |
+
+## Returns
+
+An API object that carries the contract and router together. Pass it to the adapter's endpoint function:
+
+- [`createExpressEndpoints`](/docs/adapters/express)
+- [`createHonoEndpoints`](/docs/adapters/hono)
+- [`createNextEndpoints`](/docs/adapters/next)
+
+The Next.js API also exposes a `mount()` convenience method that calls `createNextEndpoints` internally.
+
+## Example
+
+```ts
+import { createApi } from '@ts-kizuna/express';
+import { contract } from './contract';
+import { router } from './router';
+
+export const api = createApi({
+    contract,
+    router,
+});
+```
+
+See the [Mounting guide](/docs/building/mounting) for full setup with each adapter.

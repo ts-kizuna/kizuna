@@ -1,0 +1,78 @@
+---
+title: createTag
+description: Create a tag for grouping routes in nested contracts and the OpenAPI spec.
+---
+
+Create a tag for grouping routes in nested contracts and the OpenAPI spec.
+
+<InstallTabs packageName="@ts-kizuna/core" />
+
+```ts
+import { createTag } from '@ts-kizuna/core';
+```
+
+## Parameters
+
+```ts
+createTag(options: TagOptions): Tag
+```
+
+| Option        | Type     | Required | Description                                        |
+| ------------- | -------- | -------- | -------------------------------------------------- |
+| `title`       | `string` | Yes      | Tag name shown in OpenAPI                          |
+| `description` | `string` | No       | Description included in the OpenAPI tag definition |
+
+## Returns
+
+A `Tag` object. Pass it to [`createContract`](/docs/reference/create-contract) to tag all routes in a sub-contract, or reference it directly in a route's `tags` array.
+
+## Example
+
+```ts
+import { createTag, createContract } from '@ts-kizuna/core';
+
+export const Users = createTag({
+    title: 'Users',
+    description: 'User management endpoints',
+});
+
+export const usersContract = createContract(Users, {
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        responses: {
+            200: z.object({
+                users: z.array(UserSchema),
+            }),
+        },
+    },
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        body: z.object({
+            name: z.string().min(1),
+            email: z.email(),
+        }),
+        responses: {
+            201: UserSchema,
+        },
+    },
+});
+```
+
+## Cross-tagging
+
+Routes can reference tags directly for cross-tagging across groups:
+
+```ts
+import { Users, Health } from './tags';
+
+cancelAccount: {
+    method: 'POST',
+    path: '/account/cancel',
+    tags: [Users, Health],
+    ...
+},
+```
+
+See the [Contract guide](/docs/building/contract#nested-contracts) for the full nested contracts pattern.
