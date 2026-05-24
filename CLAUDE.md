@@ -60,7 +60,7 @@ onError?: (...) => ...;
 
 # Git
 
-Never add `Co-Authored-By` to commit messages.
+Never add `Co-Authored-By` trailers for AI agents (Claude, Copilot, Cursor, etc.) to commit messages. AI is a tool, not an author.
 
 # Comments
 
