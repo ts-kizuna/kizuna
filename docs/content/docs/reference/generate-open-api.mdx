@@ -1,0 +1,77 @@
+---
+title: generateOpenApi
+description: Generate an OpenAPI 3.1.0 document from a ts-kizuna contract.
+---
+
+Generate an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from a contract. Returns a renderer function you call with `'json'` or `'yaml'`.
+
+<InstallTabs packageName="@ts-kizuna/open-api" />
+
+```ts
+import { generateOpenApi } from '@ts-kizuna/open-api';
+```
+
+## Parameters
+
+```ts
+generateOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer
+```
+
+| Parameter  | Type                     | Description                                                                   |
+| ---------- | ------------------------ | ----------------------------------------------------------------------------- |
+| `contract` | `Contract`               | The contract created with [`createContract`](/docs/reference/create-contract) |
+| `options`  | `GenerateOpenApiOptions` | OpenAPI generation options                                                    |
+
+## Options
+
+| Option                             | Type                                  | Default  | Description                                                                                                |
+| ---------------------------------- | ------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `info`                             | `{ title, version, description? }`    | required | OpenAPI `info` object                                                                                      |
+| `servers`                          | `{ url, description? }[]`             | —        | Server URLs                                                                                                |
+| `setOperationId`                   | `boolean \| 'concatenated-path'`      | `false`  | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys.                    |
+| `setTagsFromContractKeys`          | `boolean`                             | `false`  | Use contract sub-object keys as OpenAPI tags                                                               |
+| `tags`                             | `OpenApiTag[]`                        | —        | Top-level tag definitions                                                                                  |
+| `security`                         | `SecurityRequirement[]`               | —        | Global security requirements                                                                               |
+| `components.securitySchemes`       | `Record<string, unknown>`             | —        | Security scheme definitions                                                                                |
+| `operationMapper`                  | `(operation, route, id) => operation` | —        | Callback to transform each operation before it is added to the spec                                        |
+| `deprecationWarnings.contractPath` | `string`                              | —        | Absolute path to the contract `.ts` source file. Required to emit `deprecated: true` on routes and fields. |
+
+## Returns
+
+An `OpenApiRenderer` function:
+
+```ts
+renderer('json'); // OpenApiDocument object
+renderer('yaml'); // YAML string
+```
+
+## Example
+
+```ts
+import path from 'path';
+import { generateOpenApi } from '@ts-kizuna/open-api';
+import { contract } from '@shared/contract';
+
+const spec = generateOpenApi(contract, {
+    info: {
+        title: 'My API',
+        version: '1.0.0',
+    },
+    servers: [
+        {
+            url: 'https://api.example.com',
+            description: 'Production',
+        },
+    ],
+    deprecationWarnings: {
+        contractPath: path.resolve(import.meta.dirname, './contract.ts'),
+    },
+});
+
+// Serve as JSON endpoint
+app.get('/openapi.json', (_req, res) => {
+    res.json(spec('json'));
+});
+```
+
+See the [OpenAPI guide](/docs/open-api) for Scalar integration, writing specs to disk, and breaking change detection.

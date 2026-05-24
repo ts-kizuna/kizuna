@@ -136,7 +136,7 @@ Responses with status >= 400 set `isError: true` on the MCP result so the AI kno
 
 ## Standalone server
 
-If you don't want to mount on an existing app, `createMcpServer` returns a raw `McpServer` you can connect to any transport (stdio, SSE, etc.).
+If you don't want to mount on an existing app, [`createMcpServer`](/docs/reference/create-mcp-server) returns a raw `McpServer` you can connect to any transport (stdio, SSE, etc.).
 
 ```ts
 import { createMcpServer } from '@ts-kizuna/mcp';
@@ -150,3 +150,8 @@ const server = createMcpServer(api, {
 
 await server.connect(new StdioServerTransport());
 ```
+
+## Reference
+
+- [`createMcpEndpoint`](/docs/reference/create-mcp-endpoint)
+- [`createMcpServer`](/docs/reference/create-mcp-server)

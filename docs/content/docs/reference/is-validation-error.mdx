@@ -1,0 +1,71 @@
+---
+title: isValidationError
+description: Type guard to distinguish kizuna validation errors from custom 400 responses on the client.
+---
+
+Type guard to distinguish kizuna validation errors from custom 400 responses on the client.
+
+<InstallTabs packageName="@ts-kizuna/core" />
+
+```ts
+import { isValidationError } from '@ts-kizuna/core';
+// also re-exported from @ts-kizuna/fetch
+```
+
+## Parameters
+
+```ts
+isValidationError(body: unknown): body is ValidationError
+```
+
+| Parameter | Type      | Description        |
+| --------- | --------- | ------------------ |
+| `body`    | `unknown` | Any value to check |
+
+## Returns
+
+`true` if `body` is a `ValidationError`, narrowing the type for TypeScript.
+
+## `ValidationError` shape
+
+```ts
+interface ValidationError {
+    message: string;
+    issues: Array<{
+        code: string;
+        path: PropertyKey[];
+        message: string;
+    }>;
+}
+```
+
+Common issue codes: `invalid_type`, `too_small`, `too_big`, `invalid_string_format`, `unrecognized_keys`, `not_multiple_of`, `custom`.
+
+## Example
+
+When your contract declares its own `400` response on a route, the client sees a union of your type and `ValidationError`. Use `isValidationError` to distinguish them:
+
+```ts
+import { isValidationError } from '@ts-kizuna/fetch';
+
+const result = await client.createUser({
+    body: {
+        name: '',
+        email: 'not-an-email',
+    },
+});
+
+if (result.status === 400) {
+    if (isValidationError(result.body)) {
+        for (const issue of result.body.issues) {
+            console.log(issue.code, issue.path, issue.message);
+        }
+    } else {
+        console.error(result.body.message);
+    }
+}
+```
+
+If your contract does not declare a `400` response, you don't need this — `result.status === 400` narrows the body to `ValidationError` directly.
+
+See the [Fetch client guide](/docs/clients/fetch#validation-errors) for more details.

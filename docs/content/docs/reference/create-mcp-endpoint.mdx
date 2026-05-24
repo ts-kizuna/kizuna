@@ -1,0 +1,80 @@
+---
+title: createMcpEndpoint
+description: Mount an MCP endpoint on Express or Next.js so AI assistants can call your API as tools.
+---
+
+Mount a [Model Context Protocol](https://modelcontextprotocol.io) endpoint on your existing app. Each route in your contract becomes an MCP tool that AI assistants can discover and call.
+
+<InstallTabs packageName="@ts-kizuna/mcp" />
+
+Available for Express and Next.js:
+
+<AdapterTabs
+    functionName="createMcpEndpoint"
+    showInstall={false}
+    adapters={[
+        { label: 'Express', package: '@ts-kizuna/mcp/express' },
+        { label: 'Next.js', package: '@ts-kizuna/mcp/next' },
+    ]}
+/>
+
+## Express
+
+```ts
+createMcpEndpoint(api: Api, app: Express, options?: McpEndpointOptions): void
+```
+
+| Parameter | Type                 | Required | Description                                                |
+| --------- | -------------------- | -------- | ---------------------------------------------------------- |
+| `api`     | `Api`                | Yes      | API created with [`createApi`](/docs/reference/create-api) |
+| `app`     | `Express`            | Yes      | Express application instance                               |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                      |
+
+Mounts the MCP protocol handler at `/mcp` by default.
+
+```ts
+import express from 'express';
+import { createExpressEndpoints } from '@ts-kizuna/express';
+import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
+import { api } from './lib/api';
+
+const app = express();
+app.use(express.json());
+
+createExpressEndpoints(api, app);
+createMcpEndpoint(api, app);
+
+app.listen(3000);
+```
+
+## Next.js
+
+```ts
+createMcpEndpoint(api: Api, options?: McpEndpointOptions): { GET, POST, DELETE }
+```
+
+| Parameter | Type                 | Required | Description                                                |
+| --------- | -------------------- | -------- | ---------------------------------------------------------- |
+| `api`     | `Api`                | Yes      | API created with [`createApi`](/docs/reference/create-api) |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                      |
+
+Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HTTP transport requires.
+
+```ts
+// app/mcp/route.ts
+import { createMcpEndpoint } from '@ts-kizuna/mcp/next';
+import { api } from '../../lib/api';
+
+export const { GET, POST, DELETE } = createMcpEndpoint(api);
+```
+
+## Options
+
+| Option        | Default            | Description                                   |
+| ------------- | ------------------ | --------------------------------------------- |
+| `path`        | `'/mcp'`           | Mount path (Express only)                     |
+| `name`        | `'MCP Server'`     | Human-readable name shown to AI assistants    |
+| `version`     | `'1.0.0'`          | Semantic version string                       |
+| `routeFilter` | excludes multipart | Predicate to filter which routes become tools |
+
+See the [MCP guide](/docs/mcp) for connecting clients, tool input structure, and standalone server usage.

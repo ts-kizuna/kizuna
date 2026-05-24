@@ -1,0 +1,16 @@
+{
+    "title": "API Reference",
+    "pages": [
+        "create-contract",
+        "create-model",
+        "create-tag",
+        "create-router",
+        "create-api",
+        "create-client",
+        "is-validation-error",
+        "generate-open-api",
+        "generate-swift-client",
+        "create-mcp-endpoint",
+        "create-mcp-server"
+    ]
+}

@@ -1,0 +1,54 @@
+---
+title: createMcpServer
+description: Create a raw MCP server from a ts-kizuna API for use with any transport (stdio, SSE, etc.).
+---
+
+Create a raw [MCP](https://modelcontextprotocol.io) server from a ts-kizuna API. Use this when you want full control over the transport — for example, stdio for CLI tools or SSE for custom setups.
+
+For mounting on Express or Next.js, use [`createMcpEndpoint`](/docs/reference/create-mcp-endpoint) instead.
+
+<InstallTabs packageName="@ts-kizuna/mcp" />
+
+```ts
+import { createMcpServer } from '@ts-kizuna/mcp';
+```
+
+## Parameters
+
+```ts
+createMcpServer(api: Api, options?: McpServerOptions): McpServer
+```
+
+| Parameter | Type               | Required | Description                                                |
+| --------- | ------------------ | -------- | ---------------------------------------------------------- |
+| `api`     | `Api`              | Yes      | API created with [`createApi`](/docs/reference/create-api) |
+| `options` | `McpServerOptions` | No       | Configuration options                                      |
+
+## Options
+
+| Option        | Default            | Description                                   |
+| ------------- | ------------------ | --------------------------------------------- |
+| `name`        | `'MCP Server'`     | Human-readable name shown to AI assistants    |
+| `version`     | `'1.0.0'`          | Semantic version string                       |
+| `routeFilter` | excludes multipart | Predicate to filter which routes become tools |
+
+## Returns
+
+An `McpServer` instance from `@modelcontextprotocol/sdk`. Connect it to any transport.
+
+## Example
+
+```ts
+import { createMcpServer } from '@ts-kizuna/mcp';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { api } from './api';
+
+const server = createMcpServer(api, {
+    name: 'My API',
+    version: '1.0.0',
+});
+
+await server.connect(new StdioServerTransport());
+```
+
+See the [MCP guide](/docs/mcp) for connecting clients and tool input/output structure.

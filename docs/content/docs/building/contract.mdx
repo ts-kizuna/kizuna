@@ -119,7 +119,7 @@ responses: {
 
 ## Models
 
-Use `createModel` to give a Zod schema a name that the OpenAPI and Swift generators pick up.
+Use [`createModel`](/docs/reference/create-model) to give a Zod schema a name that the OpenAPI and Swift generators pick up.
 
 ```ts
 import { createModel } from '@ts-kizuna/core';
@@ -143,7 +143,7 @@ Without a title, the generators inline the schema everywhere it appears. With `c
 
 ## Nested contracts
 
-Split your contract across files using sub-contracts. Use `createTag` to name and describe each group:
+Split your contract across files using sub-contracts. Use [`createTag`](/docs/reference/create-tag) to name and describe each group:
 
 ```ts
 // contracts/tags.ts
@@ -258,3 +258,9 @@ function UserCard({ user }: { user: User }) {
     return <div>{user.name}</div>;
 }
 ```
+
+## Reference
+
+- [`createContract`](/docs/reference/create-contract)
+- [`createModel`](/docs/reference/create-model)
+- [`createTag`](/docs/reference/create-tag)

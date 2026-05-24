@@ -1,0 +1,119 @@
+---
+title: createContract
+description: Define the typed route contract shared between your server and client.
+---
+
+Define the typed route contract shared between your server and client. The contract describes every route in your API — methods, paths, and Zod schemas for inputs and outputs.
+
+<InstallTabs packageName="@ts-kizuna/core" />
+
+```ts
+import { createContract } from '@ts-kizuna/core';
+```
+
+## Parameters
+
+`createContract` has two overloads:
+
+```ts
+createContract(routes: Contract): Contract
+createContract(tag: Tag, routes: Contract): Contract
+```
+
+| Parameter | Type       | Description                                                                                      |
+| --------- | ---------- | ------------------------------------------------------------------------------------------------ |
+| `tag`     | `Tag`      | Optional. A tag created with [`createTag`](/docs/reference/create-tag) to group routes together. |
+| `routes`  | `Contract` | An object where each key is a route name and each value is a route definition.                   |
+
+### Route definition fields
+
+| Field         | Required | Type                                                                                           |
+| ------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `method`      | Yes      | `'GET'` `'POST'` `'PUT'` `'PATCH'` `'DELETE'` `'HEAD'` `'OPTIONS'`                             |
+| `path`        | Yes      | URL path — use `:name` for path parameters                                                     |
+| `body`        | —        | Zod schema for the request body                                                                |
+| `query`       | —        | Zod schema for the query string                                                                |
+| `headers`     | —        | Zod schema for request headers                                                                 |
+| `responses`   | Yes      | Response schemas keyed by status code                                                          |
+| `contentType` | —        | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
+| `summary`     | —        | Short description shown in OpenAPI                                                             |
+| `tags`        | —        | OpenAPI tags                                                                                   |
+
+## Returns
+
+The typed contract object. TypeScript infers the exact shape, giving you full type safety when you pass it to [`createRouter`](/docs/reference/create-router) and [`createClient`](/docs/reference/create-client).
+
+## Example
+
+```ts
+import { createContract } from '@ts-kizuna/core';
+import { z } from 'zod';
+
+const UserSchema = z
+    .object({
+        id: z.string(),
+        name: z.string(),
+        email: z.email(),
+    })
+    .meta({
+        id: 'User',
+    });
+
+export const contract = createContract({
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        query: z.object({
+            page: z.coerce.number().int().min(1).default(1),
+            limit: z.coerce.number().int().min(1).max(100).default(10),
+        }),
+        responses: {
+            200: z.object({
+                users: z.array(UserSchema),
+                total: z.number(),
+            }),
+        },
+    },
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        body: z.object({
+            name: z.string().min(1),
+            email: z.email(),
+        }),
+        responses: {
+            201: UserSchema,
+            400: z.object({
+                message: z.string(),
+            }),
+        },
+    },
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
+            404: z.object({
+                message: z.string(),
+            }),
+        },
+    },
+});
+```
+
+## Nested contracts
+
+Split large contracts across files by nesting sub-contracts. Use [`createTag`](/docs/reference/create-tag) to name each group:
+
+```ts
+import { createContract } from '@ts-kizuna/core';
+import { usersContract } from './users';
+import { healthContract } from './health';
+
+export const contract = createContract({
+    users: usersContract,
+    health: healthContract,
+});
+```
+
+See the [Contract guide](/docs/building/contract) for response schemas, deprecation, typed response headers, and more.

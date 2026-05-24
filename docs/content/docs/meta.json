@@ -9,6 +9,7 @@
         "open-api",
         "mcp",
         "breaking-changes",
+        "reference",
         "---Extras---",
         "extend",
         "migration"

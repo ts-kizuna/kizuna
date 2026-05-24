@@ -68,7 +68,7 @@ Examples in comments and JSDoc use names from this repo's own contract (`UserSch
 
 # Documentation
 
-When changing public API surface (types, function signatures, options), check if README.md or JSDoc examples reference the old API. If so, update them in the same change.
+When changing any exported function, type, or option in `packages/*/src/`, check if README.md, JSDoc examples, guide pages in `docs/content/docs/`, or API reference pages in `docs/content/docs/reference/` reference the old API. If so, update them in the same change. When in doubt, grep the `docs/` directory for the function or type name.
 
 # Running tests
 

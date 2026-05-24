@@ -1,0 +1,64 @@
+---
+title: createModel
+description: Give a Zod schema a named identity so OpenAPI and Swift generators produce named types instead of inline definitions.
+---
+
+Give a Zod schema a named identity so generators produce named types instead of inline definitions.
+
+<InstallTabs packageName="@ts-kizuna/core" />
+
+```ts
+import { createModel } from '@ts-kizuna/core';
+```
+
+## Parameters
+
+`createModel` accepts a single options object:
+
+```ts
+createModel(options: ModelOptions): ZodType
+```
+
+| Option        | Type      | Required | Description                                               |
+| ------------- | --------- | -------- | --------------------------------------------------------- |
+| `title`       | `string`  | Yes      | The name used in generated output (`User`, `Event`, etc.) |
+| `description` | `string`  | No       | Description included in the OpenAPI spec                  |
+| `schema`      | `ZodType` | Yes      | The Zod schema defining the shape and validation          |
+
+## Returns
+
+The Zod schema with metadata attached. Use it exactly like any other Zod schema in your contract.
+
+## Example
+
+```ts
+import { createModel } from '@ts-kizuna/core';
+import { z } from 'zod';
+
+export const UserSchema = createModel({
+    title: 'User',
+    description: 'A user in the system',
+    schema: z.object({
+        id: z.string(),
+        name: z.string(),
+        email: z.email(),
+    }),
+});
+```
+
+## Effect on generators
+
+Without a title, generators inline the schema everywhere it appears. With `createModel`:
+
+- **OpenAPI** — the schema is extracted into `components.schemas.User` and every usage becomes a `$ref` reference
+- **Swift** — the schema becomes a named `public struct User` in the generated client, shared across all routes that reference it
+
+## Extracting TypeScript types
+
+Export a type alongside the schema with `z.infer`:
+
+```ts
+export type User = z.infer<typeof UserSchema>;
+```
+
+See the [Contract guide](/docs/building/contract#models) for more details.
