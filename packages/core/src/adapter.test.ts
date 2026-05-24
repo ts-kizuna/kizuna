@@ -190,3 +190,29 @@ describe('responseValidation', () => {
         expect((errors[0] as Error).message).toBe('something broke');
     });
 });
+
+describe('eachRoute', () => {
+    it('yields static routes before parameterized routes at the same path segment', () => {
+        const c = createContract({
+            getById: {
+                method: 'GET',
+                path: '/items/:id',
+                responses: { 200: z.object({ id: z.string() }) },
+            },
+            getMine: {
+                method: 'GET',
+                path: '/items/mine',
+                responses: { 200: z.object({ id: z.string() }) },
+            },
+        });
+
+        const { adapter } = makeAdapter();
+        const router = {
+            getById: async () => ({ status: 200 as const, body: { id: '1' } }),
+            getMine: async () => ({ status: 200 as const, body: { id: 'me' } }),
+        };
+
+        const keys = [...adapter.eachRoute(c, router)].map((r) => r.routeKey);
+        expect(keys).toEqual(['getMine', 'getById']);
+    });
+});

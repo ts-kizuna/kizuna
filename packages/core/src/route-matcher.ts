@@ -69,6 +69,22 @@ const stripBasePath = (pathname: string, basePath: string | undefined): string =
     return pathname;
 };
 
+export const sortFlattenedRoutes = <T extends { route: RouteDefinition }>(routes: T[]): T[] => {
+    const parsed = routes.map((entry) => ({ entry, ...parsePath(entry.route.path) }));
+    parsed.sort((a, b) => {
+        const limit = Math.min(a.segments.length, b.segments.length);
+        for (let index = 0; index < limit; index++) {
+            const segmentA = a.segments[index]!;
+            const segmentB = b.segments[index]!;
+            if (segmentA.kind !== segmentB.kind) {
+                return segmentA.kind === 'literal' ? -1 : 1;
+            }
+        }
+        return a.paramNames.length - b.paramNames.length;
+    });
+    return parsed.map((p) => p.entry);
+};
+
 export const matchRoute = (method: string, pathname: string, contract: Contract, basePath?: string): MatchResult => {
     const target = stripBasePath(pathname, basePath);
     const compiled = getCompiled(contract);
