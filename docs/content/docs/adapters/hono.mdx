@@ -1,0 +1,170 @@
+---
+title: Hono
+description: Mount a ts-kizuna contract on a Hono application.
+---
+
+`@ts-kizuna/hono` connects a ts-kizuna contract to a [Hono](https://hono.dev) application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes — the adapter works the same everywhere.
+
+**Requires Hono >= 4.**
+
+<InstallTabs packageName="@ts-kizuna/hono hono" />
+
+## Setup
+
+The standard setup uses three functions:
+
+- `createRouter` — bind typed implementations to a contract
+- `createApi` — combine a contract and its handlers into an API object
+- `createHonoEndpoints` — mount the API on a Hono app
+
+```ts
+// src/lib/router.ts
+import { createRouter } from '@ts-kizuna/hono';
+import { contract } from '@shared/contract';
+
+export const router = createRouter(contract, {
+    listUsers: async ({ query }) => {
+        const users = await db.users.findMany({
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+        });
+        return {
+            status: 200,
+            body: {
+                users,
+                total: await db.users.count(),
+            },
+        };
+    },
+    createUser: async ({ body }) => {
+        const user = await db.users.create(body);
+        return {
+            status: 201,
+            body: user,
+        };
+    },
+    getUser: async ({ params }) => {
+        const user = await db.users.findById(params.id);
+        if (!user) {
+            return {
+                status: 404,
+                body: {
+                    message: 'Not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: user,
+        };
+    },
+});
+```
+
+```ts
+// src/lib/server.ts
+import { createApi } from '@ts-kizuna/hono';
+import { contract } from '@shared/contract';
+import { router } from './router';
+
+export const api = createApi({
+    contract,
+    router,
+});
+```
+
+```ts
+// src/index.ts
+import { Hono } from 'hono';
+import { createHonoEndpoints } from '@ts-kizuna/hono';
+import { api } from './lib/server';
+
+const app = new Hono();
+createHonoEndpoints(api, app);
+
+export default app;
+```
+
+## Handler context
+
+Each handler receives `{ params, query, body, headers, c }`. The `c` is the Hono `Context` object — useful when you need to access cookies, environment bindings, or other Hono-specific features.
+
+```ts
+getUser: async ({ params, c }) => {
+    const token = c.req.header('Authorization');
+    const user = await db.users.findById(params.id);
+    return {
+        status: 200,
+        body: user,
+    };
+},
+```
+
+## Typed environment bindings
+
+The `createRouter` and `Router` types accept a Hono `Env` type parameter for typed environment bindings. This is useful on runtimes like Cloudflare Workers where bindings are accessed via `c.env`.
+
+```ts
+import { createRouter } from '@ts-kizuna/hono';
+import { contract } from '@shared/contract';
+
+type AppEnv = {
+    Bindings: {
+        DB: D1Database;
+        KV: KVNamespace;
+    };
+};
+
+export const router = createRouter<typeof contract, AppEnv>(contract, {
+    getUser: async ({ params, c }) => {
+        const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?')
+            .bind(params.id)
+            .first();
+        return {
+            status: 200,
+            body: user,
+        };
+    },
+});
+```
+
+## Options
+
+```ts
+createHonoEndpoints(api, app, {
+    responseValidation: false,
+});
+```
+
+| Option               | Default | Description                                                                                   |
+| -------------------- | ------- | --------------------------------------------------------------------------------------------- |
+| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.               |
+
+## `RouteHandler` and `Router` types
+
+Annotate handlers individually or as a group:
+
+```ts
+import type { RouteHandler, Router } from '@ts-kizuna/hono';
+import { contract } from './contract';
+
+// Single route
+const getUser: RouteHandler<typeof contract.getUser> = async ({ params }) => {
+    const user = await db.users.findById(params.id);
+    if (!user) {
+        return {
+            status: 404,
+            body: {
+                message: 'Not found',
+            },
+        };
+    }
+    return {
+        status: 200,
+        body: user,
+    };
+};
+
+// All routes
+const router: Router<typeof contract> = { ... };
+```

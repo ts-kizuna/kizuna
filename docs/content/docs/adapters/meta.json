@@ -1,4 +1,4 @@
 {
     "title": "Adapters",
-    "pages": ["express", "next", "third-party"]
+    "pages": ["express", "hono", "next", "third-party"]
 }
