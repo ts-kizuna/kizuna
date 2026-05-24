@@ -117,9 +117,7 @@ type AppEnv = {
 
 export const router = createRouter<typeof contract, AppEnv>(contract, {
     getUser: async ({ params, c }) => {
-        const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?')
-            .bind(params.id)
-            .first();
+        const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(params.id).first();
         return {
             status: 200,
             body: user,
@@ -136,9 +134,9 @@ createHonoEndpoints(api, app, {
 });
 ```
 
-| Option               | Default | Description                                                                                   |
-| -------------------- | ------- | --------------------------------------------------------------------------------------------- |
-| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.               |
+| Option               | Default | Description                                                                     |
+| -------------------- | ------- | ------------------------------------------------------------------------------- |
+| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development. |
 
 ## `RouteHandler` and `Router` types
 
