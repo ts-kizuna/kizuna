@@ -9,7 +9,7 @@ description: Combine a contract and a router into an API object.
 
 ```ts
 // src/lib/server.ts
-import { createApi } from '@ts-kizuna/express'; // or @ts-kizuna/next
+import { createApi } from '@ts-kizuna/express'; // or @ts-kizuna/hono, @ts-kizuna/next
 import { contract } from './contract';
 import { router } from './router';
 
@@ -37,6 +37,20 @@ createExpressEndpoints(api, app);
 app.listen(3000);
 ```
 
+**Hono:**
+
+```ts
+// src/index.ts
+import { Hono } from 'hono';
+import { createHonoEndpoints } from '@ts-kizuna/hono';
+import { api } from './lib/server';
+
+const app = new Hono();
+createHonoEndpoints(api, app);
+
+export default app;
+```
+
 **Next.js:**
 
 ```ts
@@ -52,4 +66,5 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoi
 For adapter-specific options (error handling, middleware, `onError`, etc.) see the adapter pages:
 
 - [Express](/docs/adapters/express)
+- [Hono](/docs/adapters/hono)
 - [Next.js](/docs/adapters/next)
