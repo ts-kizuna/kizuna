@@ -10,7 +10,7 @@ import {
     formatValidationError,
     validateRequest,
 } from './handler-pipeline.js';
-import { type MatchResult, matchRoute as defaultMatchRoute } from './route-matcher.js';
+import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes } from './route-matcher.js';
 import { parsePath } from './path-params.js';
 import { ResponseError } from './response-error.js';
 
@@ -404,7 +404,8 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
         return definition.respond(result, responseContext);
     },
     eachRoute: function* (contract, router) {
-        for (const { routeKey, route } of flattenContract(contract)) {
+        const sorted = sortFlattenedRoutes(flattenContract(contract));
+        for (const { routeKey, route } of sorted) {
             const handler = resolveHandler(router, routeKey);
             if (typeof handler !== 'function') continue;
             yield {
