@@ -47,10 +47,7 @@ export interface HonoOptions {
  * });
  * ```
  */
-export const createRouter = <T extends Contract, E extends Env = Env>(
-    _contract: T,
-    router: Router<T, E>,
-): Router<T, E> => router;
+export const createRouter = <T extends Contract, E extends Env = Env>(_contract: T, router: Router<T, E>): Router<T, E> => router;
 
 const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { c: Context<Env> }>({
     buildHandlerContext: (_adapterRequest, { c }) => ({ c }),
@@ -80,10 +77,7 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
  * export const api = createApi({ contract, router });
  * ```
  */
-export function createApi<const R extends Contract, E extends Env = Env>(options: {
-    contract: R;
-    router: Router<R, E>;
-}): HonoApi<R> {
+export function createApi<const R extends Contract, E extends Env = Env>(options: { contract: R; router: Router<R, E> }): HonoApi<R> {
     const { contract, router } = options;
     const spec = coreCreateApi(contract);
     return Object.assign(spec, {
@@ -103,16 +97,12 @@ export function createApi<const R extends Contract, E extends Env = Env>(options
  * createHonoEndpoints(api, app);
  * ```
  */
-export function createHonoEndpoints<E extends Env>(
-    api: HonoApi,
-    app: Hono<E>,
-    options?: HonoOptions,
-): void {
+export function createHonoEndpoints<E extends Env>(api: HonoApi, app: Hono<E>, options?: HonoOptions): void {
     const resolvedRouter = api[ROUTER_META] as Router<Contract, E>;
 
     for (const { routeKey, route } of honoAdapter.eachRoute(
         api as unknown as Contract,
-        resolvedRouter as CoreRouter<Contract, HonoHandlerContext<Env>>,
+        resolvedRouter as CoreRouter<Contract, HonoHandlerContext<Env>>
     )) {
         const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
 
