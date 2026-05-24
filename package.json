@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.10.0",
   "scripts": {
-    "dev": "pnpm build && concurrently -n express,next -c cyan,magenta \"pnpm --filter @ts-kizuna-demo/express dev\" \"pnpm --filter @ts-kizuna-demo/next dev\"",
+    "dev": "pnpm build && concurrently -n express,hono,next -c cyan,yellow,magenta \"pnpm --filter @ts-kizuna-demo/express dev\" \"pnpm --filter @ts-kizuna-demo/hono dev\" \"pnpm --filter @ts-kizuna-demo/next dev\"",
     "build": "pnpm -r --filter \"./packages/*\" build && pnpm typecheck && pnpm generate:swift",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run && pnpm test:swift",
