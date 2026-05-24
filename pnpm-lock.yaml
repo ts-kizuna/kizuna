@@ -97,6 +97,49 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  apps/hono-demo:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^1.14.0
+        version: 1.19.14(hono@4.12.19)
+      '@scalar/hono-api-reference':
+        specifier: ^0.10.19
+        version: 0.10.19(hono@4.12.19)
+      '@ts-kizuna-demo/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@ts-kizuna/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@ts-kizuna/fetch':
+        specifier: workspace:*
+        version: link:../../packages/fetch
+      '@ts-kizuna/hono':
+        specifier: workspace:*
+        version: link:../../packages/hono
+      '@ts-kizuna/open-api':
+        specifier: workspace:*
+        version: link:../../packages/open-api
+      hono:
+        specifier: ^4.7.0
+        version: 4.12.19
+      zod:
+        specifier: ^4.0.0
+        version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.19.17
+      concurrently:
+        specifier: ^9.1.0
+        version: 9.2.1
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   apps/next-demo:
     dependencies:
       '@scalar/nextjs-api-reference':
@@ -1935,6 +1978,10 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@scalar/client-side-rendering@0.1.12':
+    resolution: {integrity: sha512-prwHK4ozTU268BHZ/5OstoKB23JSidDuvddAOp0bVz9c29ZxsyzzxPtPcVgF7X16LiZnS1OzY030FoDCM+iC9Q==}
+    engines: {node: '>=22'}
+
   '@scalar/client-side-rendering@0.1.4':
     resolution: {integrity: sha512-xriPrHrKs/FNQbMJTPWiP7bIualAobbJlzrDM5Tl+7nSgKMUUgpR60IcOphCsJ+iFcdOU/VTmjufBcOaVigDPg==}
     engines: {node: '>=22'}
@@ -1947,6 +1994,16 @@ packages:
     resolution: {integrity: sha512-PgQmhuV0oRoHtaqH0OhyCcSY9t35qm8ThNeuUMEAKeN+hW1ijBnJiUADpxaIfXPbLrpN9sjyYza0A16WFbLttg==}
     engines: {node: '>=22'}
 
+  '@scalar/helpers@0.8.0':
+    resolution: {integrity: sha512-gmOC6VravNB9VDl6wnt/GOj4K/hn48tj5bpW4AM4MhH8Ubil6uu7g1DSoKHwltu8Ks79KEtR6JmOrROi9R7jaQ==}
+    engines: {node: '>=22'}
+
+  '@scalar/hono-api-reference@0.10.19':
+    resolution: {integrity: sha512-6EfwN/lfPvePzAxe9UE8fr/ZuAAqS6ttUwQu9JTgk2Xl/clicaVVSOc0gyGt+8GLXdysoNinjZ74we8xqNWyCA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      hono: ^4.12.5
+
   '@scalar/nextjs-api-reference@0.10.11':
     resolution: {integrity: sha512-wp7FRjQdSjjlV53mKmL00gQ/4u7xQS4uYRt+JiavzSIHDRyVDjjJdjKacfDGFeEUY6o29VEFEOY1/2Ies6fLfA==}
     engines: {node: '>=22'}
@@ -1954,9 +2011,21 @@ packages:
       next: ^15.0.0 || ^16.0.0
       react: ^19.0.0
 
+  '@scalar/schemas@0.3.2':
+    resolution: {integrity: sha512-iadXBgJ02XUU5C5s6/xh/PmGLzUPd7X8upXIvPWBXDcQ4FHACNgkG8PPZ/beYM8UPDDkTUPM3ygEs0G6jKwGjQ==}
+    engines: {node: '>=22'}
+
+  '@scalar/types@0.12.2':
+    resolution: {integrity: sha512-EzLkubCb7xioiTm9eYnmn/032akaq4kkrrdclgV2uezwtniR8ErQICjhMl2AjBWL6nstHiFZ9RnPZm2Z2/KM0Q==}
+    engines: {node: '>=22'}
+
   '@scalar/types@0.9.3':
     resolution: {integrity: sha512-/cEFjVa8PxRIDyhcWKh7McT8pm5O0kbafzd1jvpVq69sgIIq0gJ0P1sCcPye6qJ2k478PK7VmpK9FxZcr6D4Kw==}
     engines: {node: '>=22'}
+
+  '@scalar/validation@0.6.0':
+    resolution: {integrity: sha512-tpmmG+/xRE2Kn9RpflU3AIyZv08v10+E1ZrJCx7z6+/91zHVxy0M73kC1LT4/8PbYNt85ywyC8+n+D99JdMcGA==}
+    engines: {node: '>=20'}
 
   '@shikijs/core@3.23.0':
     resolution: {integrity: sha512-NSWQz0riNb67xthdm5br6lAkvpDJRTgB36fxlo37ZzM2yq0PQFFzbd8psqC2XMPgCzo1fW6cVi18+ArJ44wqgA==}
@@ -6235,6 +6304,12 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.60.2':
     optional: true
 
+  '@scalar/client-side-rendering@0.1.12':
+    dependencies:
+      '@scalar/schemas': 0.3.2
+      '@scalar/types': 0.12.2
+      '@scalar/validation': 0.6.0
+
   '@scalar/client-side-rendering@0.1.4':
     dependencies:
       '@scalar/types': 0.9.3
@@ -6245,11 +6320,30 @@ snapshots:
 
   '@scalar/helpers@0.5.3': {}
 
+  '@scalar/helpers@0.8.0': {}
+
+  '@scalar/hono-api-reference@0.10.19(hono@4.12.19)':
+    dependencies:
+      '@scalar/client-side-rendering': 0.1.12
+      hono: 4.12.19
+
   '@scalar/nextjs-api-reference@0.10.11(next@16.2.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@scalar/client-side-rendering': 0.1.4
       next: 16.2.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react: 19.2.5
+
+  '@scalar/schemas@0.3.2':
+    dependencies:
+      '@scalar/helpers': 0.8.0
+      '@scalar/validation': 0.6.0
+
+  '@scalar/types@0.12.2':
+    dependencies:
+      '@scalar/helpers': 0.8.0
+      nanoid: 5.1.9
+      type-fest: 5.6.0
+      zod: 4.3.6
 
   '@scalar/types@0.9.3':
     dependencies:
@@ -6257,6 +6351,8 @@ snapshots:
       nanoid: 5.1.9
       type-fest: 5.6.0
       zod: 4.3.6
+
+  '@scalar/validation@0.6.0': {}
 
   '@shikijs/core@3.23.0':
     dependencies:
