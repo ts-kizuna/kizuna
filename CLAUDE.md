@@ -66,6 +66,14 @@ Never add `Co-Authored-By` trailers for AI agents (Claude, Copilot, Cursor, etc.
 
 Examples in comments and JSDoc use names from this repo's own contract (`UserSchema`, `createUser`, `listEvents`, etc.), not from consumer projects.
 
+# Adapters
+
+First-party adapters (in `packages/`) always ship with:
+
+- **MCP integration** — a framework-specific file in `packages/mcp/src/` with its own export in `packages/mcp/package.json`
+- **Demo app** — a working example app in `apps/` (e.g. `apps/express-demo`, `apps/hono-demo`)
+- **Documentation** — an adapter page in `docs/content/docs/adapters/`, plus updates to every doc page that lists adapters
+
 # Documentation
 
 When changing any exported function, type, or option in `packages/*/src/`, check if README.md, JSDoc examples, guide pages in `docs/content/docs/`, or API reference pages in `docs/content/docs/reference/` reference the old API. If so, update them in the same change. When in doubt, grep the `docs/` directory for the function or type name.

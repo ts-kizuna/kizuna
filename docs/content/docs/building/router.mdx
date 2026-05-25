@@ -8,7 +8,7 @@ A router implements each route in your contract.
 ## `createRouter`
 
 ```ts
-import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/hono, @ts-kizuna/next
+import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
 import { contract } from './contract';
 
 export const router = createRouter(contract, {
@@ -222,5 +222,6 @@ const router: Router<typeof contract> = { ... };
 Mount your router with an adapter:
 
 - [Express](/docs/adapters/express)
+- [Fastify](/docs/adapters/fastify)
 - [Hono](/docs/adapters/hono)
 - [Next.js](/docs/adapters/next)

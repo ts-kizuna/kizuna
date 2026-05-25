@@ -1,9 +1,9 @@
 ---
 title: MCP
-description: Mount an MCP endpoint on your Express, Hono, or Next.js app so AI assistants can call your API.
+description: Mount an MCP endpoint on your Express, Fastify, Hono, or Next.js app so AI assistants can call your API.
 ---
 
-`@ts-kizuna/mcp` adds a [Model Context Protocol](https://modelcontextprotocol.io) endpoint to your existing app. Each route in your contract becomes an MCP tool that AI assistants can discover and call.
+`@ts-kizuna/mcp` adds a [Model Context Protocol](https://modelcontextprotocol.io) endpoint to your existing app. Each route in your contract becomes an MCP tool that AI assistants can discover and call. Works with Express, Fastify, Hono, and Next.js.
 
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
@@ -26,6 +26,31 @@ app.listen(3000);
 ```
 
 `createMcpEndpoint` mounts the MCP protocol handler at `/mcp` by default. Change it with the `path` option.
+
+## Fastify
+
+```ts
+// src/index.ts
+import Fastify from 'fastify';
+import { fastifyKizuna } from '@ts-kizuna/fastify';
+import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
+import { api } from './lib/api';
+
+const app = Fastify();
+
+app.register(fastifyKizuna, {
+    api,
+});
+app.register(fastifyKizunaMcp, {
+    api,
+});
+
+app.listen({
+    port: 3000,
+});
+```
+
+Mounts at `/mcp` by default, configurable with the `path` option.
 
 ## Hono
 
@@ -74,6 +99,7 @@ Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-url
 Handlers called via MCP receive the same framework context as regular HTTP handlers. The MCP endpoint passes its incoming request through automatically:
 
 - **Express** — handlers receive `req` and `res`
+- **Fastify** — handlers receive `request` and `reply`
 - **Hono** — handlers receive `c` (Hono Context)
 - **Next.js** — handlers receive `request`
 
@@ -86,7 +112,7 @@ Auth middleware that reads headers and sets `req.user` works out of the box — 
 | `name`        | `'MCP Server'`                         | Human-readable name shown to AI assistants    |
 | `version`     | `'1.0.0'`                              | Semantic version string                       |
 | `routeFilter` | excludes multipart and form-urlencoded | Predicate to filter which routes become tools |
-| `path`        | `'/mcp'`                               | Mount path (Express and Hono)                 |
+| `path`        | `'/mcp'`                               | Mount path (Express, Fastify, and Hono)       |
 
 ## Connecting clients
 

@@ -76,6 +76,18 @@ const requireAdmin = createGuard(async (req, res, deny) => {
 });
 ```
 
+## Fastify
+
+```ts
+import { createGuard } from '@ts-kizuna/fastify';
+
+const requireAdmin = createGuard(async (request, reply, deny) => {
+    if (request.user.role !== 'admin') {
+        return deny(403, 'Forbidden');
+    }
+});
+```
+
 Type your request properties with [declaration merging](/docs/adapters/express#type-safe-request-properties) for full autocomplete in guards and handlers.
 
 ## Next.js

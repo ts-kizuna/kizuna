@@ -58,7 +58,7 @@ export const contract = createContract({
 ## Fulfill the contract on your server
 
 ```ts
-import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/hono, @ts-kizuna/next
+import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
 import { contract } from '@shared/contract';
 
 export const router = createRouter(contract, {
@@ -117,6 +117,7 @@ if (result.status === 200) {
 | `@ts-kizuna/core`     | Contract definition, validation, adapter API |
 | `@ts-kizuna/fetch`    | Typed fetch-based client                     |
 | `@ts-kizuna/express`  | Express adapter                              |
+| `@ts-kizuna/fastify`  | Fastify adapter                              |
 | `@ts-kizuna/hono`     | Hono adapter                                 |
 | `@ts-kizuna/next`     | Next.js App Router adapter                   |
 | `@ts-kizuna/open-api` | OpenAPI 3.1.0 spec generation                |

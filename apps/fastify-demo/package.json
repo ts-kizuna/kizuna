@@ -1,0 +1,29 @@
+{
+  "name": "@ts-kizuna-demo/fastify",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n server,client -c cyan,magenta \"tsx watch src/index.ts\" \"sleep 1.5 && tsx src/scripts/run-client.ts\"",
+    "server": "tsx watch src/index.ts",
+    "server:once": "tsx src/index.ts",
+    "client": "tsx src/scripts/run-client.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ts-kizuna-demo/shared": "workspace:*",
+    "@ts-kizuna/fetch": "workspace:*",
+    "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/fastify": "workspace:*",
+    "@ts-kizuna/mcp": "workspace:*",
+    "@ts-kizuna/open-api": "workspace:*",
+    "fastify": "^5.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "concurrently": "^9.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

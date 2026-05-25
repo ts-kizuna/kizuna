@@ -1,0 +1,48 @@
+---
+title: fastifyKizunaMcp
+description: Fastify plugin that mounts an MCP endpoint so AI assistants can call your API as tools.
+---
+
+Fastify plugin that mounts a [Model Context Protocol](https://modelcontextprotocol.io) endpoint. Each route in your contract becomes an MCP tool that AI assistants can discover and call.
+
+<InstallTabs packageName="@ts-kizuna/mcp" />
+
+```ts
+import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
+```
+
+## Usage
+
+```ts
+import Fastify from 'fastify';
+import { fastifyKizuna } from '@ts-kizuna/fastify';
+import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
+import { api } from './lib/api';
+
+const app = Fastify();
+
+app.register(fastifyKizuna, {
+    api,
+});
+app.register(fastifyKizunaMcp, {
+    api,
+});
+
+app.listen({
+    port: 3000,
+});
+```
+
+## Options
+
+Register the plugin with `app.register(fastifyKizunaMcp, options)`.
+
+| Option        | Type       | Required | Description                                                |
+| ------------- | ---------- | -------- | ---------------------------------------------------------- |
+| `api`         | `Api`      | Yes      | API created with [`createApi`](/docs/reference/create-api) |
+| `path`        | `string`   | No       | Mount path (default: `'/mcp'`)                             |
+| `name`        | `string`   | No       | Human-readable name (default: `'MCP Server'`)              |
+| `version`     | `string`   | No       | Semantic version (default: `'1.0.0'`)                      |
+| `routeFilter` | `Function` | No       | Predicate to filter which routes become tools              |
+
+See the [MCP guide](/docs/mcp) for connecting clients, tool input structure, and standalone server usage.

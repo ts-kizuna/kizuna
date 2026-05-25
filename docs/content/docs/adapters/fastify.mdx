@@ -1,0 +1,262 @@
+---
+title: Fastify
+description: Mount a ts-kizuna contract on a Fastify application.
+---
+
+`@ts-kizuna/fastify` connects a ts-kizuna contract to a [Fastify](https://fastify.dev) application.
+
+**Requires Fastify >= 5.**
+
+<InstallTabs packageName="@ts-kizuna/fastify fastify" />
+
+## Setup
+
+The standard setup uses three functions:
+
+- `createRouter` — bind typed implementations to a contract
+- `createApi` — combine a contract and its handlers into an API object
+- `fastifyKizuna` — Fastify plugin that mounts the API
+
+```ts
+// src/lib/router.ts
+import { createRouter } from '@ts-kizuna/fastify';
+import { contract } from '@shared/contract';
+
+export const router = createRouter(contract, {
+    listUsers: async ({ query }) => {
+        const users = await db.users.findMany({
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+        });
+        return {
+            status: 200,
+            body: {
+                users,
+                total: await db.users.count(),
+            },
+        };
+    },
+    createUser: async ({ body }) => {
+        const user = await db.users.create(body);
+        return {
+            status: 201,
+            body: user,
+        };
+    },
+    getUser: async ({ params }) => {
+        const user = await db.users.findById(params.id);
+        if (!user) {
+            return {
+                status: 404,
+                body: {
+                    message: 'Not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: user,
+        };
+    },
+});
+```
+
+```ts
+// src/lib/server.ts
+import { createApi } from '@ts-kizuna/fastify';
+import { contract } from '@shared/contract';
+import { router } from './router';
+
+export const api = createApi({
+    contract,
+    router,
+});
+```
+
+```ts
+// src/index.ts
+import Fastify from 'fastify';
+import { fastifyKizuna } from '@ts-kizuna/fastify';
+import { api } from './lib/server';
+
+const app = Fastify();
+app.register(fastifyKizuna, {
+    api,
+});
+
+app.listen({
+    port: 3000,
+});
+```
+
+## Handler context
+
+Each handler receives `{ params, query, body, headers, request, reply }`. The `request` is the Fastify `FastifyRequest` and `reply` is `FastifyReply` — useful when you need access to raw headers, cookies, or other Fastify-specific features.
+
+```ts
+getUser: async ({ params, request }) => {
+    const token = request.headers.authorization;
+    const user = await db.users.findById(params.id);
+    return {
+        status: 200,
+        body: user,
+    };
+},
+```
+
+## Middleware and guards
+
+Use `createGuard` to define access checks and `createMiddleware` to wire them to routes.
+
+### Defining guards
+
+`createGuard` creates a middleware that checks access before the handler runs. Call `deny` to reject the request, or return normally to allow it through.
+
+```ts
+// src/lib/guards.ts
+import { createGuard } from '@ts-kizuna/fastify';
+
+export const auth = createGuard(async (request, reply, deny) => {
+    const token = request.headers.authorization?.slice(7);
+    if (!token) {
+        return deny(401, 'Unauthorized');
+    }
+    const session = await verifyToken(token);
+    if (!session) {
+        return deny(401, 'Unauthorized');
+    }
+    request.userId = session.userId;
+    request.userRole = session.role;
+});
+
+export const requireAdmin = createGuard(async (request, reply, deny) => {
+    if (request.userRole !== 'admin') {
+        return deny(403, 'Forbidden');
+    }
+});
+```
+
+### Wiring guards to routes
+
+`createMiddleware` maps guards to contract routes. TypeScript autocompletes contract keys and rejects keys that don't exist.
+
+```ts
+// src/lib/middleware.ts
+import { createMiddleware } from '@ts-kizuna/fastify';
+import { contract } from '@shared/contract';
+import { auth, requireAdmin } from './guards';
+
+export const middleware = createMiddleware(contract, {
+    // Group-level: applies to all routes under "users"
+    users: [auth],
+    // Group default with per-route override
+    billing: {
+        '*': [auth],
+        webhook: [],
+    },
+    // Multiple guards compose left to right
+    admin: [auth, requireAdmin],
+    // Explicit public route
+    health: [],
+});
+```
+
+### Plugging into the API
+
+```ts
+// src/lib/server.ts
+import { createApi } from '@ts-kizuna/fastify';
+import { contract } from '@shared/contract';
+import { router } from './router';
+import { middleware } from './middleware';
+
+export const api = createApi({
+    contract,
+    router,
+    middleware,
+});
+```
+
+## Options
+
+```ts
+createFastifyEndpoints(api, app, {
+    responseValidation: false,
+});
+```
+
+| Option               | Default | Description                                                                     |
+| -------------------- | ------- | ------------------------------------------------------------------------------- |
+| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development. |
+
+## Type-safe request properties
+
+If your middleware or guards set custom properties on `request`, use Fastify's [declaration merging](https://fastify.dev/docs/latest/Reference/TypeScript/#creating-a-typescript-fastify-plugin) to extend the `FastifyRequest` interface:
+
+```ts
+// types/fastify.d.ts
+declare module 'fastify' {
+    interface FastifyRequest {
+        userId: string;
+        userRole: string;
+    }
+}
+```
+
+With the augmentation in place, both guards and handlers are fully typed:
+
+```ts
+// Guards can set typed properties
+export const auth = createGuard(async (request, reply, deny) => {
+    const session = await verifyToken(request.headers.authorization);
+    if (!session) {
+        return deny(401, 'Unauthorized');
+    }
+    request.userId = session.userId;
+    request.userRole = session.role;
+});
+
+// Handlers can read them
+getUser: async ({ params, request }) => {
+    console.log(request.userId);
+    // ...
+},
+```
+
+The adapter also sets `request.kizunaRoute` on every request before middleware runs, containing the matched `RouteDefinition`. This is available without any extra type setup.
+
+## `RouteHandler` and `Router` types
+
+Annotate handlers individually or as a group:
+
+```ts
+import type { RouteHandler, Router } from '@ts-kizuna/fastify';
+import { contract } from './contract';
+
+// Single route
+const getUser: RouteHandler<typeof contract.getUser> = async ({ params }) => {
+    const user = await db.users.findById(params.id);
+    if (!user) {
+        return {
+            status: 404,
+            body: {
+                message: 'Not found',
+            },
+        };
+    }
+    return {
+        status: 200,
+        body: user,
+    };
+};
+
+// All routes
+const router: Router<typeof contract> = { ... };
+```
+
+## Reference
+
+- [`createRouter`](/docs/reference/create-router)
+- [`createApi`](/docs/reference/create-api)
+- [`createMiddleware`](/docs/reference/create-middleware)
+- [`createGuard`](/docs/reference/create-guard)

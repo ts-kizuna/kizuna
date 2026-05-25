@@ -3,13 +3,13 @@ title: Create an Adapter
 description: Build a ts-kizuna adapter for any HTTP runtime using createAdapter from @ts-kizuna/core/adapter.
 ---
 
-`@ts-kizuna/core/adapter` exposes `createAdapter` so third parties can build and ship their own adapters independently. ts-kizuna ships Express and Next.js — everything else is up to the community.
+`@ts-kizuna/core/adapter` exposes `createAdapter` so third parties can build and ship their own adapters independently. ts-kizuna ships Express, Fastify, Hono, and Next.js — everything else is up to the community.
 
 New first-party adapter PRs will be declined — we can't maintain what we don't know well. The adapter API is public so you can build your own and own it.
 
 ## Overview
 
-An adapter translates between a native HTTP runtime (Bun, Hono, Cloudflare Workers, Fastify, etc.) and ts-kizuna's handler pipeline. You provide three things:
+An adapter translates between a native HTTP runtime (Bun, Cloudflare Workers, Deno, etc.) and ts-kizuna's handler pipeline. You provide three things:
 
 - `buildHandlerContext` — builds the context object your handlers receive alongside validated inputs
 - `respond` — translates an `AdapterResult` to a native response
