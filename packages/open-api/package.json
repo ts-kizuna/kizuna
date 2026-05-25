@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/open-api",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
