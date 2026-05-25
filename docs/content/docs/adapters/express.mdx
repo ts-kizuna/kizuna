@@ -161,6 +161,11 @@ import { authenticate, requireAdmin, requireMembership } from './guards';
 export const middleware = createMiddleware(contract, {
     // Group-level: applies to all routes under "users"
     users: [authenticate],
+    // Group default with per-route override
+    billing: {
+        '*': [authenticate],
+        webhook: [],
+    },
     // Multiple guards compose left to right
     admin: [authenticate, requireAdmin],
     // Individual route
