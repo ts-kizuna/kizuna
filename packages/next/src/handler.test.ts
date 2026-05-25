@@ -770,7 +770,9 @@ describe('Next.js — middleware map', () => {
 
     it('applies middleware to a specific route', async () => {
         const middleware = createMiddleware(middlewareContract, {
+            publicRoute: [],
             protectedRoute: [requireAuth],
+            admin: [],
         });
         const middlewareApi = createApi({
             contract: middlewareContract,
@@ -822,6 +824,8 @@ describe('Next.js — middleware map', () => {
 
     it('applies group-level middleware to all routes in a group', async () => {
         const middleware = createMiddleware(middlewareContract, {
+            publicRoute: [],
+            protectedRoute: [],
             admin: [requireAuth],
         });
         const middlewareApi = createApi({
@@ -919,6 +923,7 @@ describe('Next.js — createGuard', () => {
             },
             middleware: createMiddleware(guardContract, {
                 getUser: [requireAuth],
+                publicRoute: [],
             }),
         });
         const { GET } = createNextEndpoints(guardApi, {
@@ -957,6 +962,7 @@ describe('Next.js — createGuard', () => {
             },
             middleware: createMiddleware(guardContract, {
                 getUser: [requireAuth],
+                publicRoute: [],
             }),
         });
         const { GET } = createNextEndpoints(guardApi, {
@@ -996,6 +1002,7 @@ describe('Next.js — createGuard', () => {
             },
             middleware: createMiddleware(guardContract, {
                 getUser: [attachUser],
+                publicRoute: [],
             }),
         });
         const { GET } = createNextEndpoints(guardApi, {

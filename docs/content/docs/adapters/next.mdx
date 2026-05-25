@@ -163,7 +163,8 @@ export const middleware = createMiddleware(contract, {
     admin: [authenticate, requireAdmin],
     // Individual route
     locationOrders: [authenticate, requireMembership],
-    // Omitted keys have no middleware (public routes)
+    // Explicit public route
+    health: [],
 });
 ```
 

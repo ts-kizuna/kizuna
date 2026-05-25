@@ -3,7 +3,7 @@ title: createMiddleware
 description: Declare per-route middleware in the same shape as your contract.
 ---
 
-Declare per-route or per-group middleware that mirrors the contract structure. TypeScript autocompletes contract keys and rejects keys that don't exist.
+Declare per-route or per-group middleware that mirrors the contract structure. Every top-level contract key must be present — use `[]` for public routes. TypeScript autocompletes contract keys and rejects keys that don't exist.
 
 <AdapterTabs functionName="createMiddleware" />
 
@@ -40,6 +40,7 @@ export const middleware = createMiddleware(contract, {
     listUsers: [auth],
     createUser: [auth, rateLimit],
     admin: [auth, requireAdmin],
+    health: [],
 });
 ```
 
@@ -47,14 +48,19 @@ export const middleware = createMiddleware(contract, {
 
 The map mirrors the contract structure:
 
+- **Every top-level key is required** — prevents forgetting a route group and leaving it unprotected
+- **`[]` on a leaf key** — explicit public route, no middleware
 - **Array on a leaf key** — applies to that single route
 - **Array on a group key** — applies to every route in that group
-- **Nested object on a group key** — per-route middleware within the group
+- **Nested object on a group key** — per-route middleware within the group (individual route keys are optional)
 - **`'*'` in a nested group** — default middleware for routes not explicitly listed
-- **Omitted keys** — no middleware (public routes)
 
 ```ts
 export const middleware = createMiddleware(contract, {
+    // Explicit public routes
+    health: [],
+    register: [],
+
     // Group-level: applies to all routes under "users"
     users: [auth],
 
@@ -69,8 +75,6 @@ export const middleware = createMiddleware(contract, {
         '*': [auth],
         webhook: [],
     },
-
-    // "health" omitted — no middleware
 });
 ```
 
@@ -124,6 +128,7 @@ export const middleware = createMiddleware(contract, {
     locationOrders: [auth, requireMembership],
     locationCalendar: [auth, requireMembership],
     admin: [auth, requireAdmin],
+    health: [],
 });
 ```
 
