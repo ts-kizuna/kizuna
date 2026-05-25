@@ -3,9 +3,11 @@ import {
     type AdapterResult,
     type RouteDefinition,
     type Contract,
+    type MiddlewareMap,
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
     createAdapter,
+    resolveMiddleware,
     headersToObject,
     matchRoute,
     parseFetchBody,
@@ -21,11 +23,73 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, NextHa
 export type Router<T extends Contract> = CoreRouter<T, NextHandlerContext>;
 
 /**
- * Passed to each `requestMiddleware` function as the second argument.
+ * Passed to each middleware function as the second argument.
  */
 export interface NextMiddlewareRoute {
     path: string;
     method: string;
+}
+
+export type NextMiddlewareHandler = (request: NextRequest, route: NextMiddlewareRoute) => Response | void | Promise<Response | void>;
+
+/**
+ * Declare per-route middleware in the same shape as the contract.
+ *
+ * ```ts
+ * import { createMiddleware } from '@ts-kizuna/next';
+ * import { contract } from './contract';
+ *
+ * export const middleware = createMiddleware(contract, {
+ *     listUsers: [authenticate],
+ *     createUser: [authenticate, adminOnly],
+ * });
+ * ```
+ */
+export const createMiddleware = <T extends Contract>(
+    _contract: T,
+    map: MiddlewareMap<T, NextMiddlewareHandler>
+): MiddlewareMap<T, NextMiddlewareHandler> => map;
+
+type Deny = (status: number, message: string) => Response;
+
+const deny: Deny = (status, message) =>
+    new Response(
+        JSON.stringify({
+            message,
+        }),
+        {
+            status,
+            headers: {
+                'content-type': 'application/json',
+            },
+        }
+    );
+
+/**
+ * Create a guard — a middleware that checks access before the handler runs.
+ *
+ * Call `deny(status, message)` to reject the request.
+ * Return without calling `deny` to allow it through.
+ *
+ * ```ts
+ * import { createGuard } from '@ts-kizuna/next';
+ *
+ * const requireAdmin = createGuard(async (request, route, deny) => {
+ *     if (request.user.role !== 'admin') {
+ *         return deny(403, 'Forbidden');
+ *     }
+ * });
+ * ```
+ */
+export function createGuard(
+    guard: (request: NextRequest, route: NextMiddlewareRoute, deny: Deny) => Promise<Response | void> | Response | void
+): NextMiddlewareHandler {
+    return async (request, route) => {
+        const result = await guard(request, route, deny);
+        if (result instanceof Response) {
+            return result;
+        }
+    };
 }
 
 export interface NextHandlerOptions {
@@ -40,8 +104,10 @@ export interface NextHandlerOptions {
      * via `{ request }`.
      *
      * Functions run in order.
+     *
+     * @deprecated Use `middleware` via `createApi` instead.
      */
-    requestMiddleware?: Array<(request: NextRequest, route: NextMiddlewareRoute) => Response | void | Promise<Response | void>>;
+    requestMiddleware?: Array<NextMiddlewareHandler>;
     /**
      * Validate handler return values against the contract's response schemas.
      * Mismatches surface as 500 errors. Intended for development; disable in production.
@@ -61,6 +127,7 @@ export const handleNextRequest = async <T extends Contract>(
     request: NextRequest,
     contract: T,
     router: Router<T>,
+    middlewareMap: MiddlewareMap<Contract, NextMiddlewareHandler> | undefined,
     options?: NextHandlerOptions
 ): Promise<NextResponse> => {
     const url = new URL(request.url);
@@ -89,8 +156,10 @@ export const handleNextRequest = async <T extends Contract>(
         },
     });
 
-    const middleware = options?.requestMiddleware;
-    if (middleware && middleware.length > 0) {
+    const globalMiddleware = options?.requestMiddleware;
+    const hasMiddleware = middlewareMap || (globalMiddleware && globalMiddleware.length > 0);
+
+    if (hasMiddleware) {
         const matched = matchRoute(request.method, url.pathname, contract as unknown as Contract, options?.basePath);
 
         if (matched.kind === 'matched') {
@@ -98,7 +167,11 @@ export const handleNextRequest = async <T extends Contract>(
                 path: matched.match.route.path,
                 method: matched.match.route.method,
             };
-            for (const handler of middleware) {
+
+            const routeMiddleware = resolveMiddleware(matched.match.routeKey, middlewareMap);
+            const allMiddleware = [...routeMiddleware, ...(globalMiddleware ?? [])];
+
+            for (const handler of allMiddleware) {
                 const result = await handler(request, middlewareRoute);
                 if (result instanceof Response) {
                     return new NextResponse(result.body, {

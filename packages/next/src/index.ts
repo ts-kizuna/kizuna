@@ -1,9 +1,17 @@
-import type { Contract } from '@ts-kizuna/core';
-import { createApi as coreCreateApi, type ApiWithRouter, ROUTER_META } from '@ts-kizuna/core/adapter';
-import { handleNextRequest, type Router, type NextHandlerOptions } from './handler.js';
+import type { Contract, MiddlewareMap } from '@ts-kizuna/core';
+import { createApi as coreCreateApi, type ApiWithRouter, ROUTER_META, MIDDLEWARE_META } from '@ts-kizuna/core/adapter';
+import { handleNextRequest, type Router, type NextHandlerOptions, type NextMiddlewareHandler } from './handler.js';
 import { type NextRequest, NextResponse } from 'next/server';
 
-export type { RouteHandler, Router, NextHandlerOptions, NextHandlerContext, NextMiddlewareRoute } from './handler.js';
+export type {
+    RouteHandler,
+    Router,
+    NextHandlerOptions,
+    NextHandlerContext,
+    NextMiddlewareRoute,
+    NextMiddlewareHandler,
+} from './handler.js';
+export { createMiddleware, createGuard } from './handler.js';
 export { NextRequest, NextResponse } from 'next/server';
 
 type HttpHandlers = {
@@ -21,11 +29,13 @@ const _ON_ERROR: unique symbol = Symbol('ts-kizuna.next.onError');
 
 type NextApiWithRouter = ApiWithRouter & {
     readonly [_ON_ERROR]?: NextHandlerOptions['onError'];
+    readonly [MIDDLEWARE_META]?: unknown;
 };
 
 export type NextApi<R extends Contract = Contract> = R &
     ApiWithRouter & {
         readonly [_ON_ERROR]?: NextHandlerOptions['onError'];
+        readonly [MIDDLEWARE_META]?: unknown;
         mount: (options?: NextHandlerOptions) => HttpHandlers;
     };
 
@@ -59,8 +69,9 @@ export const createRouter = <T extends Contract>(_contract: T, router: Router<T>
  * ```
  */
 export function createNextEndpoints(api: NextApiWithRouter, options?: NextHandlerOptions): HttpHandlers {
+    const middlewareMap = api[MIDDLEWARE_META] as MiddlewareMap<Contract, NextMiddlewareHandler> | undefined;
     const handler = (request: NextRequest) =>
-        handleNextRequest(request, api as unknown as Contract, api[ROUTER_META] as Router<Contract>, {
+        handleNextRequest(request, api as unknown as Contract, api[ROUTER_META] as Router<Contract>, middlewareMap, {
             basePath: options?.basePath,
             onError: options?.onError ?? api[_ON_ERROR],
             requestMiddleware: options?.requestMiddleware,
@@ -105,12 +116,14 @@ export function createNextEndpoints(api: NextApiWithRouter, options?: NextHandle
 export const createApi = <const R extends Contract>(options: {
     contract: R;
     router: Router<R>;
+    middleware?: MiddlewareMap<R, NextMiddlewareHandler>;
     onError?: NextHandlerOptions['onError'];
 }): NextApi<R> => {
-    const { contract, router, onError } = options;
+    const { contract, router, middleware, onError } = options;
     const spec = coreCreateApi(contract);
     return Object.assign(spec, {
         [ROUTER_META]: router,
+        [MIDDLEWARE_META]: middleware,
         [_ON_ERROR]: onError,
         mount(mountOptions?: NextHandlerOptions) {
             return createNextEndpoints(this as unknown as NextApiWithRouter, mountOptions);

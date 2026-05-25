@@ -1,0 +1,141 @@
+---
+title: createGuard
+description: Create a route guard that checks access before the handler runs.
+---
+
+Create a guard — a middleware that checks whether a request should proceed or be rejected. Guards handle the boilerplate of error responses and calling `next()`. You just write the check.
+
+<AdapterTabs functionName="createGuard" />
+
+## How it works
+
+A guard receives the framework's request context and a `deny` function. Call `deny(status, message)` to reject the request with a JSON error response. Return without calling `deny` to allow the request through.
+
+No `next()` calls. No manual `res.json()` or `c.json()`. Just check and deny or continue.
+
+## Hono
+
+```ts
+import { createGuard } from '@ts-kizuna/hono';
+
+type AuthEnv = {
+    Variables: {
+        user: {
+            id: string;
+            role: string;
+        };
+    };
+};
+
+const requireAdmin = createGuard<AuthEnv>(async (c, deny) => {
+    const user = c.get('user');
+    if (user.role !== 'admin') {
+        return deny(403, 'Forbidden');
+    }
+});
+```
+
+The `Env` type parameter follows Hono's convention for typed context variables.
+
+### Resolving entities
+
+Guards are ideal for multi-tenant apps where you need to resolve an entity and check membership before the handler runs.
+
+```ts
+const requireLocationMembership = createGuard<AuthEnv>(async (c, deny) => {
+    const user = c.get('user');
+    const locationId = c.req.param('id');
+    if (!locationId) {
+        return deny(400, 'Missing location ID');
+    }
+
+    const location = await resolveLocation(locationId);
+    if (!location) {
+        return deny(404, 'Location not found');
+    }
+
+    const membership = await checkMembership(user.id, location.organizationId);
+    if (!membership) {
+        return deny(403, 'Forbidden');
+    }
+
+    c.set('location', location);
+    c.set('member', membership);
+});
+```
+
+## Express
+
+```ts
+import { createGuard } from '@ts-kizuna/express';
+
+const requireAdmin = createGuard(async (req, res, deny) => {
+    if (req.user.role !== 'admin') {
+        return deny(403, 'Forbidden');
+    }
+});
+```
+
+Type your request properties with [declaration merging](/docs/adapters/express#type-safe-request-properties) for full autocomplete in guards and handlers.
+
+## Next.js
+
+```ts
+import { createGuard } from '@ts-kizuna/next';
+
+const requireAdmin = createGuard(async (request, route, deny) => {
+    if (request.user.role !== 'admin') {
+        return deny(403, 'Forbidden');
+    }
+});
+```
+
+Type your request properties with [module augmentation](/docs/adapters/next#type-safe-request-properties) for full autocomplete in guards and handlers.
+
+The `route` parameter contains the matched contract `path` and `method`, useful for per-route decisions inside a shared guard.
+
+## Using guards with `createMiddleware`
+
+Guards return a middleware function, so they plug directly into `createMiddleware`:
+
+```ts
+import { createMiddleware } from '@ts-kizuna/hono';
+import { contract } from './contract';
+
+const middleware = createMiddleware(contract, {
+    users: [auth, requireAdmin],
+    posts: [auth, requireMembership],
+    // "health" omitted — no middleware (public)
+});
+```
+
+## `deny` and `ErrorResponse`
+
+When a guard calls `deny(status, message)`, the response matches kizuna's standard [`ErrorResponse`](/docs/reference/error-response) shape:
+
+```json
+{
+    "message": "Forbidden"
+}
+```
+
+This is the same shape used by kizuna's built-in errors (404, 400 validation, 405, etc.). Use `ErrorResponse` in your contracts to document these status codes:
+
+```ts
+import { createContract, ErrorResponse } from '@ts-kizuna/core';
+
+const contract = createContract({
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
+            401: ErrorResponse,
+            403: ErrorResponse,
+            404: ErrorResponse,
+        },
+    },
+});
+```
+
+The contract, the guards, and kizuna's built-in errors all produce the same shape.

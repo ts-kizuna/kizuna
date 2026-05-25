@@ -15,6 +15,7 @@ import { parsePath } from './path-params.js';
 import { ResponseError } from './response-error.js';
 
 export type { RouteDefinition, Contract, Method } from './types.js';
+export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
 
 export class ResponseValidationError extends Error {
     readonly routeKey: string;
@@ -32,6 +33,7 @@ export class ResponseValidationError extends Error {
 
 export const API_META: unique symbol = Symbol('ts-kizuna.api.meta');
 export const ROUTER_META: unique symbol = Symbol('ts-kizuna.router');
+export const MIDDLEWARE_META: unique symbol = Symbol('ts-kizuna.middleware');
 
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter = ApiDefinition & { readonly [ROUTER_META]: Record<string, unknown> };

@@ -1,21 +1,24 @@
-import type { Context, Env, Hono } from 'hono';
+import type { Context, Env, Hono, MiddlewareHandler } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
     type AdapterRequest,
     type RouteDefinition,
     type Contract,
+    type MiddlewareMap,
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
     type ApiWithRouter,
     ROUTER_META,
+    MIDDLEWARE_META,
     createAdapter,
     createApi as coreCreateApi,
+    resolveMiddleware,
     renderJsonResult,
     parseFetchBody,
     headersToObject,
 } from '@ts-kizuna/core/adapter';
 
-export type HonoApi<R extends Contract = Contract> = R & ApiWithRouter;
+export type HonoApi<R extends Contract = Contract> = R & ApiWithRouter & { readonly [MIDDLEWARE_META]?: unknown };
 
 export interface HonoHandlerContext<E extends Env = Env> {
     c: Context<E>;
@@ -49,6 +52,65 @@ export interface HonoOptions {
  */
 export const createRouter = <T extends Contract, E extends Env = Env>(_contract: T, router: Router<T, E>): Router<T, E> => router;
 
+/**
+ * Declare per-route middleware in the same shape as the contract.
+ *
+ * ```ts
+ * import { createMiddleware } from '@ts-kizuna/hono';
+ * import { contract } from './contract';
+ *
+ * export const middleware = createMiddleware(contract, {
+ *     listUsers: [auth],
+ *     createUser: [auth, adminOnly],
+ * });
+ * ```
+ */
+export const createMiddleware = <T extends Contract, E extends Env = Env>(
+    _contract: T,
+    map: MiddlewareMap<T, MiddlewareHandler<E>>
+): MiddlewareMap<T, MiddlewareHandler<E>> => map;
+
+type Deny = (status: number, message: string) => Response;
+
+const deny: Deny = (status, message) =>
+    Response.json(
+        {
+            message,
+        },
+        {
+            status,
+        }
+    );
+
+/**
+ * Create a guard — a middleware that checks access before the handler runs.
+ *
+ * Call `deny(status, message)` to reject the request.
+ * Return without calling `deny` to allow it through.
+ *
+ * ```ts
+ * import { createGuard } from '@ts-kizuna/hono';
+ *
+ * const requireAdmin = createGuard<AuthEnv>(async (c, deny) => {
+ *     const user = c.get('user');
+ *     if (user.role !== 'admin') {
+ *         return deny(403, 'Forbidden');
+ *     }
+ * });
+ * ```
+ */
+export function createGuard<E extends Env = Env>(
+    guard: (context: Context<E>, deny: Deny) => Promise<Response | void> | Response | void
+): MiddlewareHandler<E> {
+    return async (context, next) => {
+        const result = await guard(context, deny);
+        if (result instanceof Response) {
+            return result;
+        }
+        await next();
+    };
+}
+
 const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { c: Context<Env> }>({
     buildHandlerContext: (_adapterRequest, { c }) => ({ c }),
     respond: (result, { c }) => {
@@ -67,21 +129,31 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
 });
 
 /**
- * Define a fully-typed Hono API — routes and handlers in one call.
+ * Define a fully-typed Hono API — routes, handlers, and middleware in one call.
  *
  * ```ts
  * import { createApi } from '@ts-kizuna/hono';
  * import { contract } from './contract';
  * import { router } from './router';
+ * import { middleware } from './middleware';
  *
- * export const api = createApi({ contract, router });
+ * export const api = createApi({
+ *     contract,
+ *     router,
+ *     middleware,
+ * });
  * ```
  */
-export function createApi<const R extends Contract, E extends Env = Env>(options: { contract: R; router: Router<R, E> }): HonoApi<R> {
-    const { contract, router } = options;
+export function createApi<const R extends Contract, E extends Env = Env>(options: {
+    contract: R;
+    router: Router<R, E>;
+    middleware?: MiddlewareMap<R, MiddlewareHandler<E>>;
+}): HonoApi<R> {
+    const { contract, router, middleware } = options;
     const spec = coreCreateApi(contract);
     return Object.assign(spec, {
         [ROUTER_META]: router,
+        [MIDDLEWARE_META]: middleware,
     }) as unknown as HonoApi<R>;
 }
 
@@ -97,16 +169,17 @@ export function createApi<const R extends Contract, E extends Env = Env>(options
  * createHonoEndpoints(api, app);
  * ```
  */
-export function createHonoEndpoints<E extends Env>(api: HonoApi, app: Hono<E>, options?: HonoOptions): void {
+export function createHonoEndpoints<E extends Env = Env>(api: HonoApi, app: Hono<E>, options?: HonoOptions): void {
     const resolvedRouter = api[ROUTER_META] as Router<Contract, E>;
+    const middlewareMap = api[MIDDLEWARE_META] as MiddlewareMap<Contract, MiddlewareHandler<E>> | undefined;
 
     for (const { routeKey, route } of honoAdapter.eachRoute(
         api as unknown as Contract,
         resolvedRouter as CoreRouter<Contract, HonoHandlerContext<Env>>
     )) {
         const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
-
-        app.on(method, route.path, async (c: Context<E>) => {
+        const routeMiddleware = resolveMiddleware(routeKey, middlewareMap);
+        const kizunaHandler = async (c: Context<E>) => {
             const url = new URL(c.req.url);
 
             const adapterRequest: AdapterRequest<Request> = {
@@ -127,9 +200,13 @@ export function createHonoEndpoints<E extends Env>(api: HonoApi, app: Hono<E>, o
                 contract: api as unknown as Contract,
                 router: resolvedRouter as CoreRouter<Contract, HonoHandlerContext<Env>>,
                 request: adapterRequest,
-                responseContext: { c: c as unknown as Context<Env> },
+                responseContext: {
+                    c: c as unknown as Context<Env>,
+                },
                 responseValidation: options?.responseValidation,
             });
-        });
+        };
+        const handlers: MiddlewareHandler[] = [...routeMiddleware, kizunaHandler];
+        (app.on as (method: string, path: string, ...handlers: MiddlewareHandler[]) => void)(method, route.path, ...handlers);
     }
 }

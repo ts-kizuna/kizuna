@@ -126,6 +126,113 @@ export const router = createRouter<typeof contract, AppEnv>(contract, {
 });
 ```
 
+## Middleware and guards
+
+Use `createGuard` to define access checks and `createMiddleware` to wire them to routes.
+
+### Defining guards
+
+`createGuard` creates a middleware that checks access before the handler runs. Call `deny` to reject the request, or return normally to allow it through. No `next()`, no `c.json()` boilerplate.
+
+```ts
+// src/lib/guards.ts
+import { createGuard } from '@ts-kizuna/hono';
+
+type AuthEnv = {
+    Variables: {
+        userId: string;
+        userRole: string;
+    };
+};
+
+export const auth = createGuard<AuthEnv>(async (c, deny) => {
+    const token = c.req.header('authorization')?.slice(7);
+    if (!token) {
+        return deny(401, 'Unauthorized');
+    }
+    const session = await verifyToken(token);
+    if (!session) {
+        return deny(401, 'Unauthorized');
+    }
+    c.set('userId', session.userId);
+    c.set('userRole', session.role);
+});
+
+export const requireAdmin = createGuard<AuthEnv>(async (c, deny) => {
+    if (c.get('userRole') !== 'admin') {
+        return deny(403, 'Forbidden');
+    }
+});
+
+export const requireMembership = createGuard<AuthEnv>(async (c, deny) => {
+    const userId = c.get('userId');
+    const locationId = c.req.param('id');
+    if (!locationId) {
+        return deny(400, 'Missing location ID');
+    }
+
+    const location = await resolveLocation(locationId);
+    if (!location) {
+        return deny(404, 'Location not found');
+    }
+
+    const membership = await checkMembership(userId, location.organizationId);
+    if (!membership) {
+        return deny(403, 'Forbidden');
+    }
+
+    c.set('location', location);
+    c.set('member', membership);
+});
+```
+
+### Wiring guards to routes
+
+`createMiddleware` maps guards to contract routes. TypeScript autocompletes contract keys and rejects keys that don't exist.
+
+```ts
+// src/lib/middleware.ts
+import { createMiddleware } from '@ts-kizuna/hono';
+import { contract } from '@shared/contract';
+import { auth, requireAdmin, requireMembership } from './guards';
+
+export const middleware = createMiddleware(contract, {
+    // Group-level: applies to all routes under "users"
+    users: [auth],
+    // Multiple guards compose left to right
+    admin: [auth, requireAdmin],
+    // Individual route
+    locationOrders: [auth, requireMembership],
+    locationCalendar: [auth, requireMembership],
+    // Omitted keys have no middleware (public routes)
+});
+```
+
+### Plugging into the API
+
+```ts
+// src/lib/server.ts
+import { createApi } from '@ts-kizuna/hono';
+import { contract } from '@shared/contract';
+import { router } from './router';
+import { middleware } from './middleware';
+
+export const api = createApi({
+    contract,
+    router,
+    middleware,
+});
+```
+
+Handlers access context variables set by guards via `c`:
+
+```ts
+getUser: async ({ params, c }) => {
+    const userId = c.get('userId');
+    // ...
+},
+```
+
 ## Options
 
 ```ts
@@ -171,3 +278,5 @@ const router: Router<typeof contract> = { ... };
 
 - [`createRouter`](/docs/reference/create-router)
 - [`createApi`](/docs/reference/create-api)
+- [`createMiddleware`](/docs/reference/create-middleware)
+- [`createGuard`](/docs/reference/create-guard)

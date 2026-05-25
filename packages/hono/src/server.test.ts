@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
+import { createMiddleware as createHonoMiddleware } from 'hono/factory';
 import { z } from 'zod';
 import { createContract } from '@ts-kizuna/core';
-import { createApi, createHonoEndpoints } from './server.js';
+import { createApi, createHonoEndpoints, createMiddleware } from './server.js';
 
 interface User {
     id: string;
@@ -404,5 +405,192 @@ describe('Hono — handler context', () => {
         expect(response.status).toBe(200);
         const body = await response.json();
         expect(body.url).toContain('/echo');
+    });
+});
+
+describe('Hono — middleware', () => {
+    const middlewareContract = createContract({
+        publicRoute: {
+            method: 'GET',
+            path: '/public',
+            responses: {
+                200: z.object({
+                    message: z.string(),
+                }),
+            },
+        },
+        protectedRoute: {
+            method: 'GET',
+            path: '/protected',
+            responses: {
+                200: z.object({
+                    message: z.string(),
+                }),
+            },
+        },
+        admin: createContract({
+            dashboard: {
+                method: 'GET',
+                path: '/admin/dashboard',
+                responses: {
+                    200: z.object({
+                        message: z.string(),
+                    }),
+                },
+            },
+            settings: {
+                method: 'GET',
+                path: '/admin/settings',
+                responses: {
+                    200: z.object({
+                        message: z.string(),
+                    }),
+                },
+            },
+        }),
+    });
+
+    type AuthEnv = {
+        Variables: {
+            authenticated: boolean;
+        };
+    };
+
+    const requireAuth = createHonoMiddleware<AuthEnv>(async (context, next) => {
+        const token = context.req.header('authorization');
+        if (!token || token !== 'Bearer valid') {
+            return context.json(
+                {
+                    error: 'Unauthorized',
+                },
+                401
+            );
+        }
+        context.set('authenticated', true);
+        await next();
+    });
+
+    const createTestRouter = () => ({
+        publicRoute: () => ({
+            status: 200 as const,
+            body: {
+                message: 'public',
+            },
+        }),
+        protectedRoute: () => ({
+            status: 200 as const,
+            body: {
+                message: 'protected',
+            },
+        }),
+        admin: {
+            dashboard: () => ({
+                status: 200 as const,
+                body: {
+                    message: 'dashboard',
+                },
+            }),
+            settings: () => ({
+                status: 200 as const,
+                body: {
+                    message: 'settings',
+                },
+            }),
+        },
+    });
+
+    it('applies middleware to a specific route', async () => {
+        const testApp = new Hono<AuthEnv>();
+        const middleware = createMiddleware(middlewareContract, {
+            protectedRoute: [requireAuth],
+        });
+        const api = createApi({
+            contract: middlewareContract,
+            router: createTestRouter(),
+            middleware,
+        });
+        createHonoEndpoints(api, testApp);
+
+        const publicResponse = await testApp.request('/public');
+        expect(publicResponse.status).toBe(200);
+
+        const protectedNoAuth = await testApp.request('/protected');
+        expect(protectedNoAuth.status).toBe(401);
+
+        const protectedWithAuth = await testApp.request('/protected', {
+            headers: {
+                authorization: 'Bearer valid',
+            },
+        });
+        expect(protectedWithAuth.status).toBe(200);
+        const body = await protectedWithAuth.json();
+        expect(body.message).toBe('protected');
+    });
+
+    it('applies group-level middleware to all routes in a group', async () => {
+        const testApp = new Hono<AuthEnv>();
+        const middleware = createMiddleware(middlewareContract, {
+            admin: [requireAuth],
+        });
+        const api = createApi({
+            contract: middlewareContract,
+            router: createTestRouter(),
+            middleware,
+        });
+        createHonoEndpoints(api, testApp);
+
+        const dashboardNoAuth = await testApp.request('/admin/dashboard');
+        expect(dashboardNoAuth.status).toBe(401);
+
+        const settingsNoAuth = await testApp.request('/admin/settings');
+        expect(settingsNoAuth.status).toBe(401);
+
+        const dashboardWithAuth = await testApp.request('/admin/dashboard', {
+            headers: {
+                authorization: 'Bearer valid',
+            },
+        });
+        expect(dashboardWithAuth.status).toBe(200);
+
+        const publicResponse = await testApp.request('/public');
+        expect(publicResponse.status).toBe(200);
+    });
+
+    it('middleware sets context variables accessible in the handler', async () => {
+        const testApp = new Hono<AuthEnv>();
+        const api = createApi({
+            contract: createContract({
+                check: {
+                    method: 'GET',
+                    path: '/check',
+                    responses: {
+                        200: z.object({
+                            authenticated: z.boolean(),
+                        }),
+                    },
+                },
+            }),
+            router: {
+                check: ({ c }) => ({
+                    status: 200,
+                    body: {
+                        authenticated: c.get('authenticated'),
+                    },
+                }),
+            },
+            middleware: {
+                check: [requireAuth],
+            },
+        });
+        createHonoEndpoints(api, testApp);
+
+        const response = await testApp.request('/check', {
+            headers: {
+                authorization: 'Bearer valid',
+            },
+        });
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.authenticated).toBe(true);
     });
 });
