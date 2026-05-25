@@ -35,13 +35,23 @@
         "types": "./dist/next.d.cts",
         "default": "./dist/next.cjs"
       }
+    },
+    "./hono": {
+      "import": {
+        "types": "./dist/hono.d.mts",
+        "default": "./dist/hono.mjs"
+      },
+      "require": {
+        "types": "./dist/hono.d.cts",
+        "default": "./dist/hono.cjs"
+      }
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsdown src/index.ts src/express.ts src/next.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external @modelcontextprotocol/sdk --external express --external next",
+    "build": "tsdown src/index.ts src/express.ts src/next.ts src/hono.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external @modelcontextprotocol/sdk --external express --external next --external hono",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -51,15 +61,20 @@
   "peerDependenciesMeta": {
     "express": {
       "optional": true
+    },
+    "hono": {
+      "optional": true
     }
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {
+    "@hono/node-server": "^1.14.0",
     "@ts-kizuna/core": "workspace:*",
     "@types/express": "^5.0.0",
     "express": "^4.21.0",
+    "hono": "^4.7.0",
     "tsdown": "^0.21.0",
     "typescript": "^5.6.3",
     "zod": "^4.0.0"

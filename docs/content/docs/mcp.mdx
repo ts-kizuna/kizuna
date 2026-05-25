@@ -1,6 +1,6 @@
 ---
 title: MCP
-description: Mount an MCP endpoint on your Express or Next.js app so AI assistants can call your API.
+description: Mount an MCP endpoint on your Express, Hono, or Next.js app so AI assistants can call your API.
 ---
 
 `@ts-kizuna/mcp` adds a [Model Context Protocol](https://modelcontextprotocol.io) endpoint to your existing app. Each route in your contract becomes an MCP tool that AI assistants can discover and call.
@@ -26,6 +26,25 @@ app.listen(3000);
 ```
 
 `createMcpEndpoint` mounts the MCP protocol handler at `/mcp` by default. Change it with the `path` option.
+
+## Hono
+
+```ts
+// src/index.ts
+import { Hono } from 'hono';
+import { createHonoEndpoints } from '@ts-kizuna/hono';
+import { createMcpEndpoint } from '@ts-kizuna/mcp/hono';
+import { api } from './lib/api';
+
+const app = new Hono();
+
+createHonoEndpoints(api, app);
+createMcpEndpoint(api, app);
+
+export default app;
+```
+
+Same as Express — mounts at `/mcp` by default, configurable with the `path` option.
 
 ## Next.js
 
@@ -55,6 +74,7 @@ Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-url
 Handlers called via MCP receive the same framework context as regular HTTP handlers. The MCP endpoint passes its incoming request through automatically:
 
 - **Express** — handlers receive `req` and `res`
+- **Hono** — handlers receive `c` (Hono Context)
 - **Next.js** — handlers receive `request`
 
 Auth middleware that reads headers and sets `req.user` works out of the box — MCP clients can send authorization headers when connecting to the endpoint.
@@ -66,7 +86,7 @@ Auth middleware that reads headers and sets `req.user` works out of the box — 
 | `name`        | `'MCP Server'`                         | Human-readable name shown to AI assistants    |
 | `version`     | `'1.0.0'`                              | Semantic version string                       |
 | `routeFilter` | excludes multipart and form-urlencoded | Predicate to filter which routes become tools |
-| `path`        | `'/mcp'`                               | Mount path (Express only)                     |
+| `path`        | `'/mcp'`                               | Mount path (Express and Hono)                 |
 
 ## Connecting clients
 
