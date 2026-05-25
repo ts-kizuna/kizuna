@@ -9,7 +9,7 @@ Once you have a contract and a router, combine them into an API object that an a
 
 ```ts
 // src/lib/server.ts
-import { createApi } from '@ts-kizuna/express'; // or @ts-kizuna/hono, @ts-kizuna/next
+import { createApi } from '@ts-kizuna/express'; // or @ts-kizuna/hono, @ts-kizuna/next, @ts-kizuna/payload
 import { contract } from './contract';
 import { router } from './router';
 
@@ -63,6 +63,20 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoi
 });
 ```
 
+**Payload CMS:**
+
+```ts
+// payload.config.ts
+import { buildConfig } from 'payload';
+import { kizunaPlugin } from '@ts-kizuna/payload';
+import { api } from './lib/server';
+
+export default buildConfig({
+    // ...
+    plugins: [kizunaPlugin(api)],
+});
+```
+
 ## Reference
 
 - [`createApi`](/docs/reference/create-api)
@@ -74,3 +88,4 @@ For adapter-specific options (error handling, middleware, `onError`, etc.) see t
 - [Express](/docs/adapters/express)
 - [Hono](/docs/adapters/hono)
 - [Next.js](/docs/adapters/next)
+- [Payload CMS](/docs/adapters/payload)

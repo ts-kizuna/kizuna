@@ -1,6 +1,6 @@
 ---
 title: MCP
-description: Mount an MCP endpoint on your Express, Hono, or Next.js app so AI assistants can call your API.
+description: Mount an MCP endpoint on any adapter so AI assistants can call your API.
 ---
 
 `@ts-kizuna/mcp` adds a [Model Context Protocol](https://modelcontextprotocol.io) endpoint to your existing app. Each route in your contract becomes an MCP tool that AI assistants can discover and call.
@@ -58,6 +58,23 @@ export const { GET, POST, DELETE } = createMcpEndpoint(api);
 
 Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HTTP transport requires.
 
+## Payload CMS
+
+```ts
+// payload.config.ts
+import { buildConfig } from 'payload';
+import { kizunaPlugin } from '@ts-kizuna/payload';
+import { kizunaMcpPlugin } from '@ts-kizuna/mcp/payload';
+import { api } from './lib/api';
+
+export default buildConfig({
+    // ...
+    plugins: [kizunaPlugin(api), kizunaMcpPlugin(api)],
+});
+```
+
+`kizunaMcpPlugin` is a Payload plugin that registers the MCP endpoint at `/mcp` (accessible at `/api/mcp`).
+
 ## How it works
 
 Each route in your contract becomes an MCP tool:
@@ -76,6 +93,7 @@ Handlers called via MCP receive the same framework context as regular HTTP handl
 - **Express** — handlers receive `req` and `res`
 - **Hono** — handlers receive `c` (Hono Context)
 - **Next.js** — handlers receive `request`
+- **Payload** — handlers receive `req` (`PayloadRequest`)
 
 Auth middleware that reads headers and sets `req.user` works out of the box — MCP clients can send authorization headers when connecting to the endpoint.
 

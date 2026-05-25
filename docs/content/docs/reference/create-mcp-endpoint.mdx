@@ -1,6 +1,6 @@
 ---
 title: createMcpEndpoint
-description: Mount an MCP endpoint on Express, Hono, or Next.js so AI assistants can call your API as tools.
+description: Mount an MCP endpoint on any adapter so AI assistants can call your API as tools.
 ---
 
 Mount a [Model Context Protocol](https://modelcontextprotocol.io) endpoint on your existing app. Each route in your contract becomes an MCP tool that AI assistants can discover and call.
@@ -16,6 +16,8 @@ Mount a [Model Context Protocol](https://modelcontextprotocol.io) endpoint on yo
         { label: 'Next.js', package: '@ts-kizuna/mcp/next' },
     ]}
 />
+
+For Payload CMS, use [`kizunaMcpPlugin`](/docs/reference/kizuna-mcp-plugin) instead.
 
 ## Express
 

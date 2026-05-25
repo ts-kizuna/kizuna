@@ -1,0 +1,261 @@
+---
+title: Payload CMS
+description: Mount a ts-kizuna contract on Payload CMS custom endpoints.
+---
+
+`@ts-kizuna/payload` connects a ts-kizuna contract to [Payload CMS](https://payloadcms.com) custom endpoints. Handlers receive the full `PayloadRequest` — database access via `req.payload`, authentication via `req.user`, and everything else Payload provides.
+
+**Requires Payload >= 3.**
+
+<InstallTabs packageName="@ts-kizuna/payload" />
+
+## Setup
+
+The standard setup uses four functions:
+
+- `createRouter` — bind typed implementations to a contract
+- `createApi` — combine a contract, handlers, and middleware into an API object
+- `kizunaPlugin` — mount the API as a Payload plugin
+
+```ts
+// src/lib/router.ts
+import { createRouter } from '@ts-kizuna/payload';
+import { contract } from '../contract';
+
+export const router = createRouter(contract, {
+    createOrder: async ({ body, req }) => {
+        const order = await req.payload.create({
+            collection: 'orders',
+            data: {
+                customerName: body.customerName,
+                items: body.items,
+            },
+        });
+        return {
+            status: 201,
+            body: {
+                id: order.id,
+                customerName: body.customerName,
+            },
+        };
+    },
+    getOrder: async ({ params, req }) => {
+        const order = await req.payload.findByID({
+            collection: 'orders',
+            id: params.id,
+        });
+        if (!order) {
+            return {
+                status: 404,
+                body: {
+                    message: 'Not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: order,
+        };
+    },
+});
+```
+
+```ts
+// src/lib/api.ts
+import { createApi } from '@ts-kizuna/payload';
+import { contract } from '../contract';
+import { router } from './router';
+
+export const api = createApi({
+    contract,
+    router,
+});
+```
+
+```ts
+// payload.config.ts
+import { buildConfig } from 'payload';
+import { kizunaPlugin } from '@ts-kizuna/payload';
+import { api } from './lib/api';
+
+export default buildConfig({
+    // ...
+    plugins: [kizunaPlugin(api)],
+});
+```
+
+## Handler context
+
+Each handler receives `{ params, query, body, headers, req }`. The `req` is the Payload `PayloadRequest` object — use it to access the database, the authenticated user, translations, and other Payload features.
+
+```ts
+createOrder: async ({ body, req }) => {
+    const userId = req.user?.id;
+    const order = await req.payload.create({
+        collection: 'orders',
+        data: {
+            ...body,
+            createdBy: userId,
+        },
+    });
+    return {
+        status: 201,
+        body: order,
+    };
+},
+```
+
+## Middleware and guards
+
+Use `createGuard` to define access checks and `createMiddleware` to wire them to routes.
+
+### Defining guards
+
+`createGuard` creates a middleware that checks access before the handler runs. Call `deny` to reject the request, or return normally to allow it through. The guard receives the full `PayloadRequest`, so `req.user` is directly available.
+
+```ts
+// src/lib/guards.ts
+import { createGuard } from '@ts-kizuna/payload';
+
+export const requireAuth = createGuard(async (req, deny) => {
+    if (!req.user) {
+        return deny(401, 'Unauthorized');
+    }
+});
+
+export const requireAdmin = createGuard(async (req, deny) => {
+    if (!req.user?.roles?.includes('admin')) {
+        return deny(403, 'Forbidden');
+    }
+});
+```
+
+### Wiring guards to routes
+
+`createMiddleware` maps guards to contract routes. TypeScript autocompletes contract keys and rejects keys that don't exist.
+
+```ts
+// src/lib/middleware.ts
+import { createMiddleware } from '@ts-kizuna/payload';
+import { contract } from '../contract';
+import { requireAuth, requireAdmin } from './guards';
+
+export const middleware = createMiddleware(contract, {
+    createOrder: [requireAuth],
+    getOrder: [requireAuth],
+    // Group-level: applies to all routes under "admin"
+    admin: [requireAuth, requireAdmin],
+    // Explicit public route
+    health: [],
+});
+```
+
+### Plugging into the API
+
+```ts
+// src/lib/api.ts
+import { createApi } from '@ts-kizuna/payload';
+import { contract } from '../contract';
+import { router } from './router';
+import { middleware } from './middleware';
+
+export const api = createApi({
+    contract,
+    router,
+    middleware,
+});
+```
+
+## Options
+
+Payload serves custom endpoints under `/api/`. A contract path of `/orders/:id` is accessible at `/api/orders/:id`.
+
+```ts
+kizunaPlugin(api, {
+    basePath: '/store',
+    responseValidation: true,
+});
+```
+
+| Option               | Default     | Description                                                                                          |
+| -------------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
+| `basePath`           | `undefined` | Prefix all endpoint paths. With `basePath: '/store'`, `/orders/:id` becomes `/api/store/orders/:id`. |
+| `responseValidation` | `false`     | Validate handler return values against response schemas. Enable in development.                      |
+
+## `RouteHandler` and `Router` types
+
+Annotate handlers individually or as a group:
+
+```ts
+import type { RouteHandler, Router } from '@ts-kizuna/payload';
+import { contract } from './contract';
+
+// Single route
+const getOrder: RouteHandler<typeof contract.getOrder> = async ({ params, req }) => {
+    const order = await req.payload.findByID({
+        collection: 'orders',
+        id: params.id,
+    });
+    if (!order) {
+        return {
+            status: 404,
+            body: {
+                message: 'Not found',
+            },
+        };
+    }
+    return {
+        status: 200,
+        body: order,
+    };
+};
+
+// All routes
+const router: Router<typeof contract> = { ... };
+```
+
+## Type-safe request properties
+
+If your middleware sets custom properties on the request, use module augmentation to extend `PayloadRequest` so handlers can access them without casts:
+
+```ts
+// types/payload.d.ts
+import 'payload';
+
+declare module 'payload' {
+    interface PayloadRequest {
+        organizationId: string;
+    }
+}
+```
+
+With the augmentation in place, both middleware and handlers are fully typed:
+
+```ts
+const resolveOrganization = createGuard(async (req, deny) => {
+    const organization = await req.payload.findByID({
+        collection: 'organizations',
+        id: req.headers.get('x-organization-id') ?? '',
+    });
+    if (!organization) {
+        return deny(404, 'Organization not found');
+    }
+    req.organizationId = organization.id;
+});
+```
+
+```ts
+createOrder: async ({ body, req }) => {
+    console.log(req.organizationId);
+    // ...
+},
+```
+
+## Reference
+
+- [`kizunaPlugin`](/docs/reference/kizuna-plugin)
+- [`kizunaMcpPlugin`](/docs/reference/kizuna-mcp-plugin)
+- [`createRouter`](/docs/reference/create-router)
+- [`createApi`](/docs/reference/create-api)
+- [`createMiddleware`](/docs/reference/create-middleware)
+- [`createGuard`](/docs/reference/create-guard)

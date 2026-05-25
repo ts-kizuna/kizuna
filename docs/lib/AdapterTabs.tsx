@@ -14,6 +14,7 @@ const adapterPackages: Record<string, string> = {
     Express: '@ts-kizuna/express',
     Hono: '@ts-kizuna/hono',
     'Next.js': '@ts-kizuna/next',
+    Payload: '@ts-kizuna/payload',
 };
 
 function resolveAdapter(adapter: string | { label: string; package: string }) {
@@ -26,7 +27,7 @@ function resolveAdapter(adapter: string | { label: string; package: string }) {
     return adapter;
 }
 
-export function AdapterTabs({ functionName, adapters = ['Express', 'Hono', 'Next.js'], showInstall = true }: AdapterTabsProps) {
+export function AdapterTabs({ functionName, adapters = ['Express', 'Hono', 'Next.js', 'Payload'], showInstall = true }: AdapterTabsProps) {
     const resolved = adapters.map(resolveAdapter);
     return (
         <Tabs groupId="adapter" items={resolved.map((adapter) => adapter.label)}>

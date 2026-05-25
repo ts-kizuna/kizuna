@@ -35,6 +35,9 @@ import { Callout } from 'fumadocs-ui/components/callout';
     <Card title="Next.js" href="/docs/adapters/next">
         Single catch-all route file, native `Request`/`Response`, multipart built-in.
     </Card>
+    <Card title="Payload CMS" href="/docs/adapters/payload">
+        Type-safe custom endpoints with full access to `req.payload` and `req.user`.
+    </Card>
 </Cards>
 
 ## Define your API contract
@@ -90,7 +93,7 @@ export const contract = createContract({
 
 ```ts
 // src/lib/router.ts
-import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/hono, @ts-kizuna/next
+import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/hono, @ts-kizuna/next, @ts-kizuna/payload
 import { contract } from '@shared/contract';
 
 export const router = createRouter(contract, {

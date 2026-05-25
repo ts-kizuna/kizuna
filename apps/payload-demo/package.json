@@ -1,0 +1,29 @@
+{
+  "name": "@ts-kizuna-demo/payload",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "rm -rf .next demo.db && next dev --port 8002",
+    "build": "next build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@payloadcms/db-sqlite": "^3.84.0",
+    "@payloadcms/next": "^3.84.0",
+    "@payloadcms/ui": "^3.84.0",
+    "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/payload": "workspace:*",
+    "next": "^15.4.0",
+    "payload": "^3.84.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "typescript": "^5.6.3"
+  }
+}

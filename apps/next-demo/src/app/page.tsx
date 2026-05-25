@@ -39,6 +39,9 @@ export default async function Home() {
                 <a href="http://localhost:8000/" target="_blank" rel="noreferrer">
                     Express demo page (:8000) →
                 </a>
+                <a href="http://localhost:8002/api/orders" target="_blank" rel="noreferrer">
+                    Payload API (:8002/api/orders) →
+                </a>
             </nav>
 
             <h2>Users</h2>

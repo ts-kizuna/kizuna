@@ -13,6 +13,8 @@
         "is-validation-error",
         "generate-open-api",
         "generate-swift-client",
+        "kizuna-plugin",
+        "kizuna-mcp-plugin",
         "create-mcp-endpoint",
         "create-mcp-server"
     ]

@@ -1,0 +1,41 @@
+---
+title: kizunaPlugin
+description: Payload CMS plugin that mounts a ts-kizuna API as custom endpoints.
+---
+
+```ts
+import { kizunaPlugin } from '@ts-kizuna/payload';
+```
+
+## Signature
+
+```ts
+kizunaPlugin(api: PayloadApi, options?: PayloadOptions): Plugin
+```
+
+| Parameter | Type             | Required | Description                                                |
+| --------- | ---------------- | -------- | ---------------------------------------------------------- |
+| `api`     | `PayloadApi`     | Yes      | API created with [`createApi`](/docs/reference/create-api) |
+| `options` | `PayloadOptions` | No       | Configuration options                                      |
+
+Returns a Payload `Plugin` — a function that receives the incoming config and returns a modified config with the kizuna endpoints added.
+
+```ts
+import { buildConfig } from 'payload';
+import { kizunaPlugin } from '@ts-kizuna/payload';
+import { api } from './lib/api';
+
+export default buildConfig({
+    // ...
+    plugins: [kizunaPlugin(api)],
+});
+```
+
+## Options
+
+| Option               | Default     | Description                                                                                          |
+| -------------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
+| `basePath`           | `undefined` | Prefix all endpoint paths. With `basePath: '/store'`, `/orders/:id` becomes `/api/store/orders/:id`. |
+| `responseValidation` | `false`     | Validate handler return values against response schemas. Enable in development.                      |
+
+See the [Payload adapter guide](/docs/adapters/payload) for setup, handler context, middleware, and guards.

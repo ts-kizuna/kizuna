@@ -88,6 +88,8 @@ app.get('/', (_req, res) => {
             <li><a href="http://localhost:3030/api/users">Next.js API</a> — <code>:3030/api/users</code></li>
             <li><a href="http://localhost:3030/docs">Next.js API docs (Scalar)</a> — <code>:3030/docs</code></li>
             <li><a href="http://localhost:3030/">Next.js demo page</a> — <code>:3030</code></li>
+            <li><a href="http://localhost:8002/api/orders">Payload API</a> — <code>:8002/api/orders</code></li>
+            <li><a href="http://localhost:8002/admin">Payload Admin</a> — <code>:8002/admin</code></li>
         </ul>
     </body>
 </html>`);

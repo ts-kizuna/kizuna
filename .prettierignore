@@ -9,3 +9,7 @@ package.json
 **/package.json
 tsconfig.json
 **/tsconfig*.json
+
+# Payload auto-generated files
+**/importMap.js
+**/payload-types.ts

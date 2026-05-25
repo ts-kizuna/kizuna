@@ -8,7 +8,7 @@ A router implements each route in your contract.
 ## `createRouter`
 
 ```ts
-import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/hono, @ts-kizuna/next
+import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/hono, @ts-kizuna/next, @ts-kizuna/payload
 import { contract } from './contract';
 
 export const router = createRouter(contract, {
@@ -65,6 +65,7 @@ Each handler receives an object with the validated inputs for that route:
 | `req`, `res` | Express adapter                      |
 | `c`          | Hono adapter                         |
 | `request`    | Next.js adapter                      |
+| `req`        | Payload adapter (`PayloadRequest`)   |
 
 ## Return type
 
@@ -224,3 +225,4 @@ Mount your router with an adapter:
 - [Express](/docs/adapters/express)
 - [Hono](/docs/adapters/hono)
 - [Next.js](/docs/adapters/next)
+- [Payload CMS](/docs/adapters/payload)
