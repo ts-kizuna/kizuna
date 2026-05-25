@@ -649,7 +649,9 @@ describe('Express integration — middleware map', () => {
     it('applies middleware to a specific route', async () => {
         const app = express();
         const middleware = createMiddleware(middlewareContract, {
+            publicRoute: [],
             protectedRoute: [requireAuth],
+            admin: [],
         });
         const api = createApi({
             contract: middlewareContract,
@@ -699,6 +701,8 @@ describe('Express integration — middleware map', () => {
     it('applies group-level middleware to all routes in a group', async () => {
         const app = express();
         const middleware = createMiddleware(middlewareContract, {
+            publicRoute: [],
+            protectedRoute: [],
             admin: [requireAuth],
         });
         const api = createApi({

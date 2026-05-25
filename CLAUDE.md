@@ -76,3 +76,7 @@ When changing any exported function, type, or option in `packages/*/src/`, check
 - `pnpm test:types` — type-level tests only (`*.test-d.ts`).
 - `pnpm -r typecheck` — `tsc --noEmit` across all packages. Always pair with `pnpm test` before declaring something done.
 - `pnpm build` — rebuild all packages. Required before typechecking after changing cross-package exports.
+
+# Formatting
+
+After finishing code edits, always run `pnpm format:check` to verify formatting. If it fails, run `pnpm format` to fix it.

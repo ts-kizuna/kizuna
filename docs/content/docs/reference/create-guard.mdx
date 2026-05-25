@@ -105,7 +105,7 @@ import { contract } from './contract';
 const middleware = createMiddleware(contract, {
     users: [auth, requireAdmin],
     posts: [auth, requireMembership],
-    // "health" omitted — no middleware (public)
+    health: [],
 });
 ```
 

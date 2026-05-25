@@ -209,7 +209,8 @@ export const middleware = createMiddleware(contract, {
     // Individual route
     locationOrders: [auth, requireMembership],
     locationCalendar: [auth, requireMembership],
-    // Omitted keys have no middleware (public routes)
+    // Explicit public route
+    health: [],
 });
 ```
 

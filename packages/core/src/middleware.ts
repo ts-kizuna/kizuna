@@ -8,12 +8,19 @@ import type { Contract, RouteDefinition } from './types.js';
  * - A nested object on a group key allows per-route middleware within the group.
  * - A `'*'` key in a nested group provides default middleware for routes not explicitly listed.
  *
- * Keys are optional — omitted keys receive no middleware.
+ * Every top-level key in the contract must be present — use `[]` for public routes.
+ * Inside a group, individual route keys are optional because `'*'` provides the default.
  */
 export type MiddlewareMap<T extends Contract, M> = {
+    [K in keyof T as K extends symbol ? never : K]: T[K] extends RouteDefinition
+        ? M[]
+        : M[] | (MiddlewareGroupMap<Extract<T[K], Contract>, M> & { '*'?: M[] });
+};
+
+type MiddlewareGroupMap<T extends Contract, M> = {
     [K in keyof T as K extends symbol ? never : K]?: T[K] extends RouteDefinition
         ? M[]
-        : M[] | (MiddlewareMap<Extract<T[K], Contract>, M> & { '*'?: M[] });
+        : M[] | (MiddlewareGroupMap<Extract<T[K], Contract>, M> & { '*'?: M[] });
 };
 
 /**
