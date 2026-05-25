@@ -6,11 +6,14 @@ import type { Contract, RouteDefinition } from './types.js';
  * - An array on a leaf key applies that middleware to the single route.
  * - An array on a group key applies that middleware to every route in the group.
  * - A nested object on a group key allows per-route middleware within the group.
+ * - A `'*'` key in a nested group provides default middleware for routes not explicitly listed.
  *
  * Keys are optional — omitted keys receive no middleware.
  */
 export type MiddlewareMap<T extends Contract, M> = {
-    [K in keyof T as K extends symbol ? never : K]?: T[K] extends RouteDefinition ? M[] : M[] | MiddlewareMap<Extract<T[K], Contract>, M>;
+    [K in keyof T as K extends symbol ? never : K]?: T[K] extends RouteDefinition
+        ? M[]
+        : M[] | (MiddlewareMap<Extract<T[K], Contract>, M> & { '*'?: M[] });
 };
 
 /**
@@ -31,6 +34,10 @@ export function resolveMiddleware<M>(routeKey: string, map: MiddlewareMap<Contra
         }
         const value = (current as Record<string, unknown>)[segment];
         if (value === undefined) {
+            const fallback = (current as Record<string, unknown>)['*'];
+            if (Array.isArray(fallback)) {
+                return fallback as M[];
+            }
             return [];
         }
         if (Array.isArray(value)) {

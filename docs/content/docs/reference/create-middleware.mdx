@@ -50,6 +50,7 @@ The map mirrors the contract structure:
 - **Array on a leaf key** — applies to that single route
 - **Array on a group key** — applies to every route in that group
 - **Nested object on a group key** — per-route middleware within the group
+- **`'*'` in a nested group** — default middleware for routes not explicitly listed
 - **Omitted keys** — no middleware (public routes)
 
 ```ts
@@ -63,9 +64,30 @@ export const middleware = createMiddleware(contract, {
         settings: [auth, requireAdmin],
     },
 
+    // Group default with per-route override
+    billing: {
+        '*': [auth],
+        webhook: [],
+    },
+
     // "health" omitted — no middleware
 });
 ```
+
+## Group defaults
+
+Use `'*'` inside a nested group to set default middleware for all routes, then override individual routes as needed:
+
+```ts
+export const middleware = createMiddleware(contract, {
+    billing: {
+        '*': [auth],
+        webhook: [],
+    },
+});
+```
+
+Every route under `billing` receives `[auth]` except `webhook`, which receives no middleware. Explicitly listed routes always take precedence over `'*'`.
 
 ## Passing to `createApi`
 

@@ -73,4 +73,48 @@ describe('resolveMiddleware', () => {
             })
         ).toEqual([dummyA]);
     });
+
+    it('applies wildcard default to all routes in a group', () => {
+        const map = {
+            billing: {
+                '*': [dummyA],
+            },
+        };
+        expect(resolveMiddleware('billing.createInvoice', map)).toEqual([dummyA]);
+        expect(resolveMiddleware('billing.getInvoice', map)).toEqual([dummyA]);
+    });
+
+    it('uses explicit route middleware over wildcard default', () => {
+        const map = {
+            billing: {
+                '*': [dummyA],
+                webhook: [dummyB],
+            },
+        };
+        expect(resolveMiddleware('billing.createInvoice', map)).toEqual([dummyA]);
+        expect(resolveMiddleware('billing.webhook', map)).toEqual([dummyB]);
+    });
+
+    it('allows explicit empty array to override wildcard default', () => {
+        const map = {
+            billing: {
+                '*': [dummyA],
+                webhook: [] as unknown[],
+            },
+        };
+        expect(resolveMiddleware('billing.webhook', map)).toEqual([]);
+    });
+
+    it('resolves wildcard in deeply nested groups', () => {
+        const map = {
+            api: {
+                billing: {
+                    '*': [dummyC],
+                    webhook: [dummyA],
+                },
+            },
+        };
+        expect(resolveMiddleware('api.billing.createInvoice', map)).toEqual([dummyC]);
+        expect(resolveMiddleware('api.billing.webhook', map)).toEqual([dummyA]);
+    });
 });
