@@ -1,0 +1,110 @@
+---
+title: createMiddleware
+description: Declare per-route middleware in the same shape as your contract.
+---
+
+Declare per-route or per-group middleware that mirrors the contract structure. TypeScript autocompletes contract keys and rejects keys that don't exist.
+
+<AdapterTabs functionName="createMiddleware" />
+
+## Parameters
+
+```ts
+createMiddleware(contract: Contract, map: MiddlewareMap<Contract, Middleware>): MiddlewareMap<Contract, Middleware>
+```
+
+| Parameter  | Type                                  | Description                                                                   |
+| ---------- | ------------------------------------- | ----------------------------------------------------------------------------- |
+| `contract` | `Contract`                            | The contract created with [`createContract`](/docs/reference/create-contract) |
+| `map`      | `MiddlewareMap<Contract, Middleware>` | An object mapping contract keys to middleware arrays                          |
+
+The `Middleware` type depends on the adapter:
+
+| Adapter | Middleware type                                                                                       |
+| ------- | ----------------------------------------------------------------------------------------------------- |
+| Hono    | `MiddlewareHandler<E>` from `hono`                                                                    |
+| Express | `RequestHandler` from `express`                                                                       |
+| Next.js | `(request: NextRequest, route: NextMiddlewareRoute) => Response \| void \| Promise<Response \| void>` |
+
+## Returns
+
+The middleware map, type-checked against the contract.
+
+## Example
+
+```ts
+import { createMiddleware } from '@ts-kizuna/hono';
+import { contract } from './contract';
+
+export const middleware = createMiddleware(contract, {
+    listUsers: [auth],
+    createUser: [auth, rateLimit],
+    admin: [auth, requireAdmin],
+});
+```
+
+## Middleware map shape
+
+The map mirrors the contract structure:
+
+- **Array on a leaf key** — applies to that single route
+- **Array on a group key** — applies to every route in that group
+- **Nested object on a group key** — per-route middleware within the group
+- **Omitted keys** — no middleware (public routes)
+
+```ts
+export const middleware = createMiddleware(contract, {
+    // Group-level: applies to all routes under "users"
+    users: [auth],
+
+    // Per-route within a group
+    admin: {
+        dashboard: [auth],
+        settings: [auth, requireAdmin],
+    },
+
+    // "health" omitted — no middleware
+});
+```
+
+## Passing to `createApi`
+
+The recommended approach — middleware is bundled with the contract and router:
+
+```ts
+import { createApi } from '@ts-kizuna/hono';
+
+export const api = createApi({
+    contract,
+    router,
+    middleware,
+});
+```
+
+## Using with `createGuard`
+
+Use [`createGuard`](/docs/reference/create-guard) to create guards without boilerplate, then assign them to routes with `createMiddleware`:
+
+```ts
+import { createMiddleware, createGuard } from '@ts-kizuna/hono';
+import { contract } from './contract';
+
+const requireMembership = createGuard<AuthEnv>(async (c, deny) => {
+    const user = c.get('user');
+    const membership = await checkMembership(user.id, c.req.param('id'));
+    if (!membership) {
+        return deny(403, 'Forbidden');
+    }
+    c.set('member', membership);
+});
+
+export const middleware = createMiddleware(contract, {
+    locationOrders: [auth, requireMembership],
+    locationCalendar: [auth, requireMembership],
+    admin: [auth, requireAdmin],
+});
+```
+
+## Creating guards
+
+Use [`createGuard`](/docs/reference/create-guard) to define access checks, then wire them to routes with `createMiddleware`. See the [createGuard reference](/docs/reference/create-guard) for adapter-specific examples.

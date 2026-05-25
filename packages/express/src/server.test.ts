@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import express from 'express';
+import express, { type Request, type Response, type NextFunction } from 'express';
 import request from 'supertest';
 import { z } from 'zod';
 import { createContract } from '@ts-kizuna/core';
-import { createApi, createExpressEndpoints } from './server.js';
+import { createApi, createExpressEndpoints, createMiddleware } from './server.js';
 
 interface User {
     id: string;
@@ -590,5 +590,161 @@ describe('Express handler — responseValidation', () => {
 
         const response = await request(app).get('/items/1');
         expect(response.status).toBe(500);
+    });
+});
+
+describe('Express integration — middleware map', () => {
+    const middlewareContract = createContract({
+        publicRoute: {
+            method: 'GET',
+            path: '/public',
+            responses: {
+                200: z.object({
+                    message: z.string(),
+                }),
+            },
+        },
+        protectedRoute: {
+            method: 'GET',
+            path: '/protected',
+            responses: {
+                200: z.object({
+                    message: z.string(),
+                }),
+            },
+        },
+        admin: createContract({
+            dashboard: {
+                method: 'GET',
+                path: '/admin/dashboard',
+                responses: {
+                    200: z.object({
+                        message: z.string(),
+                    }),
+                },
+            },
+            settings: {
+                method: 'GET',
+                path: '/admin/settings',
+                responses: {
+                    200: z.object({
+                        message: z.string(),
+                    }),
+                },
+            },
+        }),
+    });
+
+    const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+        const token = req.headers.authorization;
+        if (!token || token !== 'Bearer valid') {
+            res.status(401).json({
+                error: 'Unauthorized',
+            });
+            return;
+        }
+        next();
+    };
+
+    it('applies middleware to a specific route', async () => {
+        const app = express();
+        const middleware = createMiddleware(middlewareContract, {
+            protectedRoute: [requireAuth],
+        });
+        const api = createApi({
+            contract: middlewareContract,
+            router: {
+                publicRoute: () => ({
+                    status: 200,
+                    body: {
+                        message: 'public',
+                    },
+                }),
+                protectedRoute: () => ({
+                    status: 200,
+                    body: {
+                        message: 'protected',
+                    },
+                }),
+                admin: {
+                    dashboard: () => ({
+                        status: 200,
+                        body: {
+                            message: 'dashboard',
+                        },
+                    }),
+                    settings: () => ({
+                        status: 200,
+                        body: {
+                            message: 'settings',
+                        },
+                    }),
+                },
+            },
+            middleware,
+        });
+        createExpressEndpoints(api, app);
+
+        const publicResponse = await request(app).get('/public');
+        expect(publicResponse.status).toBe(200);
+
+        const protectedNoAuth = await request(app).get('/protected');
+        expect(protectedNoAuth.status).toBe(401);
+
+        const protectedWithAuth = await request(app).get('/protected').set('authorization', 'Bearer valid');
+        expect(protectedWithAuth.status).toBe(200);
+        expect(protectedWithAuth.body.message).toBe('protected');
+    });
+
+    it('applies group-level middleware to all routes in a group', async () => {
+        const app = express();
+        const middleware = createMiddleware(middlewareContract, {
+            admin: [requireAuth],
+        });
+        const api = createApi({
+            contract: middlewareContract,
+            router: {
+                publicRoute: () => ({
+                    status: 200,
+                    body: {
+                        message: 'public',
+                    },
+                }),
+                protectedRoute: () => ({
+                    status: 200,
+                    body: {
+                        message: 'unprotected here',
+                    },
+                }),
+                admin: {
+                    dashboard: () => ({
+                        status: 200,
+                        body: {
+                            message: 'dashboard',
+                        },
+                    }),
+                    settings: () => ({
+                        status: 200,
+                        body: {
+                            message: 'settings',
+                        },
+                    }),
+                },
+            },
+            middleware,
+        });
+        createExpressEndpoints(api, app);
+
+        const dashboardNoAuth = await request(app).get('/admin/dashboard');
+        expect(dashboardNoAuth.status).toBe(401);
+
+        const settingsNoAuth = await request(app).get('/admin/settings');
+        expect(settingsNoAuth.status).toBe(401);
+
+        const dashboardWithAuth = await request(app).get('/admin/dashboard').set('authorization', 'Bearer valid');
+        expect(dashboardWithAuth.status).toBe(200);
+
+        const publicResponse = await request(app).get('/public');
+        expect(publicResponse.status).toBe(200);
     });
 });

@@ -96,6 +96,86 @@ getUser: async ({ params, request }) => {
 },
 ```
 
+## Middleware and guards
+
+Use `createGuard` to define access checks and `createMiddleware` to wire them to routes.
+
+### Defining guards
+
+`createGuard` creates a middleware that checks access before the handler runs. Call `deny` to reject, return normally to allow. No manual `new Response()` boilerplate.
+
+```ts
+// src/lib/guards.ts
+import { createGuard } from '@ts-kizuna/next';
+
+export const authenticate = createGuard(async (request, route, deny) => {
+    const session = await getSession(request);
+    if (!session) {
+        return deny(401, 'Unauthorized');
+    }
+    request.userId = session.userId;
+});
+
+export const requireAdmin = createGuard(async (request, route, deny) => {
+    if (request.userRole !== 'admin') {
+        return deny(403, 'Forbidden');
+    }
+});
+
+export const requireMembership = createGuard(async (request, route, deny) => {
+    const locationId = route.params?.id;
+    if (!locationId) {
+        return deny(400, 'Missing location ID');
+    }
+
+    const location = await resolveLocation(locationId);
+    if (!location) {
+        return deny(404, 'Location not found');
+    }
+
+    const membership = await checkMembership(request.userId, location.organizationId);
+    if (!membership) {
+        return deny(403, 'Forbidden');
+    }
+
+    request.location = location;
+    request.member = membership;
+});
+```
+
+### Wiring guards to routes
+
+```ts
+// src/lib/middleware.ts
+import { createMiddleware } from '@ts-kizuna/next';
+import { contract } from '@shared/contract';
+import { authenticate, requireAdmin, requireMembership } from './guards';
+
+export const middleware = createMiddleware(contract, {
+    // Group-level: applies to all routes under "users"
+    users: [authenticate],
+    // Multiple guards compose left to right
+    admin: [authenticate, requireAdmin],
+    // Individual route
+    locationOrders: [authenticate, requireMembership],
+    // Omitted keys have no middleware (public routes)
+});
+```
+
+### Plugging into the API
+
+```ts
+import { createApi } from '@ts-kizuna/next';
+
+export const api = createApi({
+    contract,
+    router,
+    middleware,
+});
+```
+
+Properties set on `request` by guards are accessible in handlers via `{ request }`.
+
 ## Options
 
 ```ts
@@ -109,7 +189,7 @@ createNextEndpoints(api, {
 | Option               | Default | Description                                                                                          |
 | -------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
 | `basePath`           | `''`    | Path prefix to strip when matching contract routes                                                   |
-| `requestMiddleware`  | `[]`    | Middleware functions that run after route matching and before the handler                            |
+| `requestMiddleware`  | `[]`    | **Deprecated.** Use `middleware` via `createApi` instead.                                            |
 | `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                      |
 | `onError`            | —       | Custom handler for unhandled errors. Return an `AdapterResult` to override the default 500 response. |
 
@@ -149,55 +229,11 @@ export const api = createApi({
 
 Returning `undefined` lets the default 500 flow run.
 
-## `requestMiddleware`
+## `requestMiddleware` (deprecated)
 
-Middleware functions that run after route matching but before the handler. Each function receives `(request, route)` where `request` is the `NextRequest` and `route` contains the matched contract `path` and `method`.
+> Use [`middleware`](#middleware) instead. `requestMiddleware` applies globally to all routes; `middleware` lets you declare per-route and per-group middleware that mirrors the contract shape.
 
-Return a `Response` to short-circuit — remaining middleware and the handler are skipped. Return `undefined` to continue to the next middleware or the handler. Functions run in order. Properties set on `request` are accessible in the handler via `{ request }`.
-
-```ts
-export const { GET, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
-    basePath: '/api',
-    requestMiddleware: [
-        async (request, route) => {
-            const session = await getSession(request);
-            if (!session) {
-                return new Response(
-                    JSON.stringify({
-                        message: 'Unauthorized',
-                    }),
-                    {
-                        status: 401,
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                    }
-                );
-            }
-            request.session = session;
-        },
-    ],
-});
-```
-
-The `route` argument lets you make per-route decisions:
-
-```ts
-requestMiddleware: [
-    async (request, route) => {
-        if (route.path === '/admin/:id') {
-            const session = await getSession(request);
-            if (!session?.isAdmin) {
-                return new Response(null, {
-                    status: 403,
-                });
-            }
-        }
-    },
-],
-```
-
-Middleware only runs for matched routes. Requests that don't match any contract route skip middleware and receive the standard 404 or 405 response.
+`requestMiddleware` applies a flat array of middleware to every matched route. It still works alongside `middleware` — global middleware runs after per-route middleware.
 
 ## Type-safe request properties
 
@@ -261,3 +297,5 @@ uploadAvatar: async ({ body }) => {
 
 - [`createRouter`](/docs/reference/create-router)
 - [`createApi`](/docs/reference/create-api)
+- [`createMiddleware`](/docs/reference/create-middleware)
+- [`createGuard`](/docs/reference/create-guard)

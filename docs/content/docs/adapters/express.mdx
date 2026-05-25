@@ -103,23 +103,100 @@ getUser: async ({ params, req, res }) => {
 },
 ```
 
+## Middleware and guards
+
+Use `createGuard` to define access checks and `createMiddleware` to wire them to routes.
+
+### Defining guards
+
+`createGuard` creates a middleware that checks access before the handler runs. Call `deny` to reject, return normally to allow. No `next()`, no `res.json()` boilerplate.
+
+```ts
+// src/lib/guards.ts
+import { createGuard } from '@ts-kizuna/express';
+
+export const authenticate = createGuard(async (req, res, deny) => {
+    const session = getSession(req);
+    if (!session) {
+        return deny(401, 'Unauthorized');
+    }
+    req.userId = session.userId;
+});
+
+export const requireAdmin = createGuard(async (req, res, deny) => {
+    if (req.userRole !== 'admin') {
+        return deny(403, 'Forbidden');
+    }
+});
+
+export const requireMembership = createGuard(async (req, res, deny) => {
+    const locationId = req.params.id;
+    if (!locationId) {
+        return deny(400, 'Missing location ID');
+    }
+
+    const location = await resolveLocation(locationId);
+    if (!location) {
+        return deny(404, 'Location not found');
+    }
+
+    const membership = await checkMembership(req.userId, location.organizationId);
+    if (!membership) {
+        return deny(403, 'Forbidden');
+    }
+
+    req.location = location;
+    req.member = membership;
+});
+```
+
+### Wiring guards to routes
+
+```ts
+// src/lib/middleware.ts
+import { createMiddleware } from '@ts-kizuna/express';
+import { contract } from '@shared/contract';
+import { authenticate, requireAdmin, requireMembership } from './guards';
+
+export const middleware = createMiddleware(contract, {
+    // Group-level: applies to all routes under "users"
+    users: [authenticate],
+    // Multiple guards compose left to right
+    admin: [authenticate, requireAdmin],
+    // Individual route
+    locationOrders: [authenticate, requireMembership],
+    // Omitted keys have no middleware (public routes)
+});
+```
+
+### Plugging into the API
+
+```ts
+import { createApi } from '@ts-kizuna/express';
+
+export const api = createApi({
+    contract,
+    router,
+    middleware,
+});
+```
+
 ## Options
 
 ```ts
 createExpressEndpoints(api, app, {
     responseValidation: false,
-    globalMiddleware: [],
 });
 ```
 
-| Option               | Default | Description                                                                                                           |
-| -------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
-| `responseValidation` | `false` | Validate handler return values against response schemas — surfaces as 500 on mismatch. Enable in development.         |
-| `globalMiddleware`   | `[]`    | Middleware inserted after route matching, before the handler runs. Use `req.kizunaRoute` to branch on route metadata. |
+| Option               | Default | Description                                                                                                   |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `responseValidation` | `false` | Validate handler return values against response schemas — surfaces as 500 on mismatch. Enable in development. |
+| `globalMiddleware`   | `[]`    | **Deprecated.** Use `middleware` via `createApi` instead.                                                     |
 
 ## Type-safe request properties
 
-If your `globalMiddleware` sets custom properties on `req`, use declaration merging to extend the Express `Request` interface:
+If your middleware sets custom properties on `req`, use declaration merging to extend the Express `Request` interface:
 
 ```ts
 // types/express.d.ts
@@ -134,25 +211,6 @@ declare global {
 ```
 
 With the augmentation in place, both middleware and handlers are fully typed:
-
-```ts
-createExpressEndpoints(api, app, {
-    globalMiddleware: [
-        (req, res, next) => {
-            const session = getSession(req);
-            if (!session) {
-                res.status(401).json({
-                    message: 'Unauthorized',
-                });
-                return;
-            }
-            req.userId = session.userId;
-            req.sessionId = session.id;
-            next();
-        },
-    ],
-});
-```
 
 ```ts
 getUser: async ({ params, req }) => {
@@ -187,3 +245,5 @@ createExpressEndpoints(api, app);
 
 - [`createRouter`](/docs/reference/create-router)
 - [`createApi`](/docs/reference/create-api)
+- [`createMiddleware`](/docs/reference/create-middleware)
+- [`createGuard`](/docs/reference/create-guard)

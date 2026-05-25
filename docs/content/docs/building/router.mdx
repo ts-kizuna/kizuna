@@ -99,7 +99,24 @@ return {
 
 ## Error responses
 
-Use the `error` helper to return typed error responses. It accepts the same `{ status, body }` as a normal return but throws internally — useful in branching logic where you want to bail out early.
+Use [`ErrorResponse`](/docs/reference/error-response) from `@ts-kizuna/core` in your contract to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/create-guard#deny-and-errorresponse) in guards and all built-in kizuna errors.
+
+```ts
+import { createContract, ErrorResponse } from '@ts-kizuna/core';
+
+const contract = createContract({
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
+            404: ErrorResponse,
+        },
+    },
+});
+```
+
+In the handler, use the `error` helper to return typed error responses. It accepts the same `{ status, body }` as a normal return but throws internally — useful in branching logic where you want to bail out early.
 
 ```ts
 getUser: async ({ params, error }) => {
