@@ -53,14 +53,38 @@ export const ValidationErrorResponse = createModel({
     title: 'ValidationErrorResponse',
     description: 'RFC 9457 Problem Details error response for validation failures.',
     schema: z.object({
+        /**
+         * Problem type URI. `about:blank` means no additional semantics beyond the status code.
+         */
         type: z.string(),
+        /**
+         * Short human-readable summary matching the HTTP status phrase (e.g. "Bad Request").
+         */
         title: z.string(),
+        /**
+         * HTTP status code repeated inside the body for clients that cannot inspect headers.
+         */
         status: z.number().int(),
+        /**
+         * Human-readable explanation specific to this occurrence of the problem.
+         */
         detail: z.string(),
+        /**
+         * Field-level validation failures produced by Zod.
+         */
         errors: z.array(
             z.object({
+                /**
+                 * Machine-readable error classification (e.g. `invalid_type`, `too_small`, `custom`).
+                 */
                 code: ValidationIssueCodeSchema,
+                /**
+                 * JSON path segments to the invalid field (e.g. `["address", "zip"]`).
+                 */
                 path: z.array(z.string()),
+                /**
+                 * Human-readable description of the validation failure.
+                 */
                 message: z.string(),
             })
         ),
