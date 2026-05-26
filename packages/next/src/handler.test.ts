@@ -138,8 +138,8 @@ describe('Next.js handler', () => {
         );
         expect(response.status).toBe(400);
         const body = await response.json();
-        expect(body.message).toBe('Invalid request body');
-        expect(Array.isArray(body.issues)).toBe(true);
+        expect(body.detail).toBe('Invalid request body');
+        expect(Array.isArray(body.errors)).toBe(true);
     });
 
     it('returns 404 for an unmatched route', async () => {
@@ -168,9 +168,9 @@ describe('Next.js handler', () => {
         );
         expect(response.status).toBe(415);
         const body = await response.json();
-        expect(body.message).toContain('Unsupported Media Type');
-        expect(body.message).toContain('application/json');
-        expect(body.message).toContain('application/xml');
+        expect(body.detail).toContain('Unsupported Media Type');
+        expect(body.detail).toContain('application/json');
+        expect(body.detail).toContain('application/xml');
     });
 
     it('returns 404 for a missing user', async () => {
@@ -518,7 +518,7 @@ describe('Next.js handler — Accept header / 406', () => {
         );
         expect(response.status).toBe(406);
         const body = await response.json();
-        expect(body.message).toBe('Not Acceptable');
+        expect(body.detail).toBe('Not Acceptable');
     });
 
     it('returns 200 when Accept is */*', async () => {
@@ -933,7 +933,7 @@ describe('Next.js — createGuard', () => {
         const noAuth = await GET(makeRequest('GET', '/users/1'));
         expect(noAuth.status).toBe(401);
         const body = await noAuth.json();
-        expect(body.message).toBe('Unauthorized');
+        expect(body.detail).toBe('Unauthorized');
     });
 
     it('allows requests when guard does not call deny', async () => {

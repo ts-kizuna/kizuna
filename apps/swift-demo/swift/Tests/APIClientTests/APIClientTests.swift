@@ -43,7 +43,7 @@ final class APIClientTests: XCTestCase {
             _ = try await client.users.getUser(id: "does-not-exist", xRequestIdHeader: "test-2")
             XCTFail("expected .notFound to be thrown")
         } catch .notFound(let payload) {
-            XCTAssertFalse(payload.message.isEmpty, "expected non-empty error message")
+            XCTAssertFalse(payload.detail.isEmpty, "expected non-empty error message")
         } catch {
             XCTFail("expected GetUserFailure.notFound, got \(error)")
         }
@@ -87,7 +87,7 @@ final class APIClientTests: XCTestCase {
             _ = try await client.users.deleteUser(id: "missing-id")
             XCTFail("expected .notFound to be thrown")
         } catch .notFound(let payload) {
-            XCTAssertFalse(payload.message.isEmpty)
+            XCTAssertFalse(payload.detail.isEmpty)
         } catch {
             XCTFail("expected DeleteUserFailure.notFound, got \(error)")
         }
@@ -154,7 +154,7 @@ final class APIClientTests: XCTestCase {
             _ = try await client.users.getUser(id: "a/b", xRequestIdHeader: "test-5")
             XCTFail("expected .notFound")
         } catch .notFound(let payload) {
-            XCTAssertFalse(payload.message.isEmpty)
+            XCTAssertFalse(payload.detail.isEmpty)
         } catch {
             XCTFail("expected GetUserFailure.notFound for slash-id, got \(error)")
         }

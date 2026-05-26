@@ -256,8 +256,8 @@ describe('Hono integration', () => {
         });
         expect(response.status).toBe(400);
         const body = await response.json();
-        expect(body.message).toBe('Invalid request body');
-        expect(Array.isArray(body.issues)).toBe(true);
+        expect(body.detail).toBe('Invalid request body');
+        expect(Array.isArray(body.errors)).toBe(true);
     });
 });
 
@@ -287,7 +287,7 @@ describe('Hono — content type', () => {
         });
         expect(response.status).toBe(415);
         const body = await response.json();
-        expect(body.message).toContain('Unsupported Media Type');
+        expect(body.detail).toContain('Unsupported Media Type');
     });
 });
 
@@ -305,7 +305,7 @@ describe('Hono — Accept header / 406', () => {
         });
         expect(response.status).toBe(406);
         const body = await response.json();
-        expect(body.message).toBe('Not Acceptable');
+        expect(body.detail).toBe('Not Acceptable');
     });
 
     it('returns 200 when Accept is */*', async () => {

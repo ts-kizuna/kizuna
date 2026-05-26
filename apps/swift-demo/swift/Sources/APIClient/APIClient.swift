@@ -36,6 +36,26 @@ public enum API {
         }
     }
 
+    /// RFC 9457 Problem Details error response.
+    public struct ErrorResponse: Codable, Sendable, Equatable {
+        public let type: String
+        public let title: String
+        public let status: Int
+        public let detail: String
+
+        public init(
+            type: String,
+            title: String,
+            status: Int,
+            detail: String
+        ) {
+            self.type = type
+            self.title = title
+            self.status = status
+            self.detail = detail
+        }
+    }
+
     public struct CreateUserInput: Codable, Sendable, Equatable {
         /// Display name
         public let name: String
@@ -144,14 +164,6 @@ public enum API {
             self.userId = userId
         }
     }
-
-    public struct Error: Codable, Sendable, Equatable {
-        public let message: String
-
-        public init(message: String) {
-            self.message = message
-        }
-    }
 }
 
 public actor APIClient {
@@ -169,12 +181,18 @@ public actor APIClient {
     }
 
     public struct ValidationError: Codable, Sendable, Equatable {
-        public let message: String
-        public let issues: [ValidationIssue]
+        public let type: String
+        public let title: String
+        public let status: Int
+        public let detail: String
+        public let errors: [ValidationIssue]
 
-        public init(message: String, issues: [ValidationIssue]) {
-            self.message = message
-            self.issues = issues
+        public init(type: String, title: String, status: Int, detail: String, errors: [ValidationIssue]) {
+            self.type = type
+            self.title = title
+            self.status = status
+            self.detail = detail
+            self.errors = errors
         }
     }
 
@@ -391,7 +409,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
-            case badRequest(API.Error)
+            case badRequest(API.ErrorResponse)
             case unauthorized
             case validationError(APIClient.ValidationError)
         }
@@ -478,14 +496,6 @@ public actor APIClient {
 
     public enum UsersGetUser {
 
-        public struct Response404: Codable, Sendable, Equatable {
-            public let message: String
-
-            public init(message: String) {
-                self.message = message
-            }
-        }
-
         public struct Result: Sendable {
             public let body: API.User
             public let headers: Headers
@@ -500,19 +510,11 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
-            case notFound(Response404)
+            case notFound(API.ErrorResponse)
         }
     }
 
     public enum UsersCreateUser {
-
-        public struct Response400: Codable, Sendable, Equatable {
-            public let message: String
-
-            public init(message: String) {
-                self.message = message
-            }
-        }
 
         public struct Result: Sendable {
             public let body: API.User
@@ -523,7 +525,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
-            case badRequest(Response400)
+            case badRequest(API.ErrorResponse)
             case validationError(APIClient.ValidationError)
         }
     }
@@ -538,14 +540,6 @@ public actor APIClient {
             }
         }
 
-        public struct Response404: Codable, Sendable, Equatable {
-            public let message: String
-
-            public init(message: String) {
-                self.message = message
-            }
-        }
-
         public struct Result: Sendable {
             public let body: Response
         }
@@ -555,7 +549,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
-            case notFound(Response404)
+            case notFound(API.ErrorResponse)
         }
     }
 
@@ -929,7 +923,7 @@ public actor APIClient {
             }
         case 400:
             do {
-                let payload = try decoder.decode(API.Error.self, from: data)
+                let payload = try decoder.decode(API.ErrorResponse.self, from: data)
                 throw APIClient.ValidateConfig.Failure.badRequest(payload)
             } catch let error as APIClient.ValidateConfig.Failure {
                 throw error
@@ -1165,7 +1159,7 @@ public struct APIUsersClient: Sendable {
             }
         case 404:
             do {
-                let payload = try decoder.decode(APIClient.UsersGetUser.Response404.self, from: data)
+                let payload = try decoder.decode(API.ErrorResponse.self, from: data)
                 throw APIClient.UsersGetUser.Failure.notFound(payload)
             } catch let error as APIClient.UsersGetUser.Failure {
                 throw error
@@ -1218,7 +1212,7 @@ public struct APIUsersClient: Sendable {
             }
         case 400:
             do {
-                let payload = try decoder.decode(APIClient.UsersCreateUser.Response400.self, from: data)
+                let payload = try decoder.decode(API.ErrorResponse.self, from: data)
                 throw APIClient.UsersCreateUser.Failure.badRequest(payload)
             } catch let error as APIClient.UsersCreateUser.Failure {
                 throw error
@@ -1273,7 +1267,7 @@ public struct APIUsersClient: Sendable {
             }
         case 404:
             do {
-                let payload = try decoder.decode(APIClient.UsersDeleteUser.Response404.self, from: data)
+                let payload = try decoder.decode(API.ErrorResponse.self, from: data)
                 throw APIClient.UsersDeleteUser.Failure.notFound(payload)
             } catch let error as APIClient.UsersDeleteUser.Failure {
                 throw error

@@ -84,9 +84,9 @@ describe('Zod validation', () => {
             email: 'bad',
         });
         expect(response.status).toBe(400);
-        expect(response.body.message).toBe('Invalid request body');
-        expect(Array.isArray(response.body.issues)).toBe(true);
-        const issue = response.body.issues[0];
+        expect(response.body.detail).toBe('Invalid request body');
+        expect(Array.isArray(response.body.errors)).toBe(true);
+        const issue = response.body.errors[0];
         expect(typeof issue.code).toBe('string');
         expect(Array.isArray(issue.path)).toBe(true);
         expect(typeof issue.message).toBe('string');
@@ -152,7 +152,7 @@ describe('validation issue codes', () => {
     it('returns invalid_type when a required field is missing', async () => {
         const response = await request(refinedApp).post('/register').send({});
         expect(response.status).toBe(400);
-        const phoneIssue = response.body.issues.find((issue: { path: string[] }) => issue.path[0] === 'phone');
+        const phoneIssue = response.body.errors.find((issue: { path: string[] }) => issue.path[0] === 'phone');
         expect(phoneIssue.code).toBe('invalid_type');
     });
 
@@ -163,7 +163,7 @@ describe('validation issue codes', () => {
             tags: [],
         });
         expect(response.status).toBe(400);
-        const phoneIssue = response.body.issues.find((issue: { path: string[] }) => issue.path[0] === 'phone');
+        const phoneIssue = response.body.errors.find((issue: { path: string[] }) => issue.path[0] === 'phone');
         expect(phoneIssue.code).toBe('too_small');
     });
 
@@ -174,7 +174,7 @@ describe('validation issue codes', () => {
             tags: [],
         });
         expect(response.status).toBe(400);
-        const ageIssue = response.body.issues.find((issue: { path: string[] }) => issue.path[0] === 'age');
+        const ageIssue = response.body.errors.find((issue: { path: string[] }) => issue.path[0] === 'age');
         expect(ageIssue.code).toBe('too_big');
     });
 
@@ -185,7 +185,7 @@ describe('validation issue codes', () => {
             tags: [],
         });
         expect(response.status).toBe(400);
-        const phoneIssue = response.body.issues.find((issue: { path: string[] }) => issue.path[0] === 'phone');
+        const phoneIssue = response.body.errors.find((issue: { path: string[] }) => issue.path[0] === 'phone');
         expect(phoneIssue.code).toBe('custom');
         expect(phoneIssue.message).toBe('Phone must include country code');
     });
@@ -197,7 +197,7 @@ describe('validation issue codes', () => {
             tags: [],
         });
         expect(response.status).toBe(400);
-        const topLevelIssue = response.body.issues.find((issue: { path: string[] }) => issue.path.length === 0);
+        const topLevelIssue = response.body.errors.find((issue: { path: string[] }) => issue.path.length === 0);
         expect(topLevelIssue.code).toBe('custom');
         expect(topLevelIssue.message).toBe('Suspicious registration');
     });
@@ -211,7 +211,7 @@ describe('validation issue codes', () => {
                 tags: ['a', 'b', 'c', 'd'],
             });
         expect(response.status).toBe(400);
-        const tagsIssue = response.body.issues.find((issue: { path: string[] }) => issue.path[0] === 'tags');
+        const tagsIssue = response.body.errors.find((issue: { path: string[] }) => issue.path[0] === 'tags');
         expect(tagsIssue.code).toBe('too_big');
     });
 
@@ -222,7 +222,7 @@ describe('validation issue codes', () => {
             tags: 'not-an-array',
         });
         expect(response.status).toBe(400);
-        for (const issue of response.body.issues) {
+        for (const issue of response.body.errors) {
             expect(Object.keys(issue).sort()).toEqual(['code', 'message', 'path']);
         }
     });

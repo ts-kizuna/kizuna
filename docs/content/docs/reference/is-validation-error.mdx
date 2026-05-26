@@ -28,18 +28,23 @@ isValidationError(body: unknown): body is ValidationError
 
 ## `ValidationError` shape
 
+An RFC 9457 Problem Details body with an `errors` extension:
+
 ```ts
 interface ValidationError {
-    message: string;
-    issues: Array<{
+    type: string;
+    title: string;
+    status: number;
+    detail: string;
+    errors: Array<{
         code: string;
-        path: PropertyKey[];
+        path: string[];
         message: string;
     }>;
 }
 ```
 
-Common issue codes: `invalid_type`, `too_small`, `too_big`, `invalid_string_format`, `unrecognized_keys`, `not_multiple_of`, `custom`.
+Common error codes: `invalid_type`, `too_small`, `too_big`, `invalid_string_format`, `unrecognized_keys`, `not_multiple_of`, `custom`.
 
 ## Example
 
@@ -57,11 +62,11 @@ const result = await client.createUser({
 
 if (result.status === 400) {
     if (isValidationError(result.body)) {
-        for (const issue of result.body.issues) {
-            console.log(issue.code, issue.path, issue.message);
+        for (const error of result.body.errors) {
+            console.log(error.code, error.path, error.message);
         }
     } else {
-        console.error(result.body.message);
+        console.error(result.body.detail);
     }
 }
 ```

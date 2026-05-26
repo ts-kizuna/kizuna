@@ -12,6 +12,7 @@ import {
     matchRoute,
     parseFetchBody,
     renderJsonResult,
+    problemDetails,
 } from '@ts-kizuna/core/adapter';
 import { type NextRequest, NextResponse } from 'next/server';
 
@@ -50,20 +51,15 @@ export const createMiddleware = <T extends Contract>(
     map: MiddlewareMap<T, NextMiddlewareHandler>
 ): MiddlewareMap<T, NextMiddlewareHandler> => map;
 
-type Deny = (status: number, message: string) => Response;
+type Deny = (status: number, detail: string) => Response;
 
-const deny: Deny = (status, message) =>
-    new Response(
-        JSON.stringify({
-            message,
-        }),
-        {
-            status,
-            headers: {
-                'content-type': 'application/json',
-            },
-        }
-    );
+const deny: Deny = (status, detail) =>
+    new Response(JSON.stringify(problemDetails(status, detail)), {
+        status,
+        headers: {
+            'content-type': 'application/problem+json',
+        },
+    });
 
 /**
  * Create a guard — a middleware that checks access before the handler runs.

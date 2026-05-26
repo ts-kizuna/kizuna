@@ -147,8 +147,8 @@ const executeToolCall = async (
                         {
                             status: 400,
                             body: {
-                                message: `Validation failed: ${validation.error.stage}`,
-                                issues: validation.error.issues,
+                                detail: `Validation failed: ${validation.error.stage}`,
+                                errors: validation.error.issues,
                             },
                         },
                         null,
@@ -170,7 +170,7 @@ const executeToolCall = async (
                         {
                             status: 500,
                             body: {
-                                message: `Handler not implemented: ${routeKey}`,
+                                detail: `Handler not implemented: ${routeKey}`,
                             },
                         },
                         null,
@@ -242,7 +242,7 @@ const executeToolCall = async (
                         {
                             status: 500,
                             body: {
-                                message: error instanceof Error ? error.message : 'Internal Server Error',
+                                detail: error instanceof Error ? error.message : 'Internal Server Error',
                             },
                         },
                         null,

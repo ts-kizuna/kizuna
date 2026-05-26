@@ -55,7 +55,7 @@ export const router = createRouter(contract, {
                 return {
                     status: 404,
                     body: {
-                        message: 'User not found',
+                        detail: 'User not found',
                     },
                 };
             }
@@ -85,7 +85,7 @@ export const router = createRouter(contract, {
                 return {
                     status: 404,
                     body: {
-                        message: 'User not found',
+                        detail: 'User not found',
                     },
                 };
             }
