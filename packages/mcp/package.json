@@ -45,13 +45,23 @@
         "types": "./dist/hono.d.cts",
         "default": "./dist/hono.cjs"
       }
+    },
+    "./fastify": {
+      "import": {
+        "types": "./dist/fastify.d.mts",
+        "default": "./dist/fastify.mjs"
+      },
+      "require": {
+        "types": "./dist/fastify.d.cts",
+        "default": "./dist/fastify.cjs"
+      }
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsdown src/index.ts src/express.ts src/next.ts src/hono.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external @modelcontextprotocol/sdk --external express --external next --external hono",
+    "build": "tsdown src/index.ts src/express.ts src/next.ts src/hono.ts src/fastify.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external @modelcontextprotocol/sdk --external express --external next --external hono --external fastify",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -64,6 +74,9 @@
     },
     "hono": {
       "optional": true
+    },
+    "fastify": {
+      "optional": true
     }
   },
   "dependencies": {
@@ -74,6 +87,7 @@
     "@ts-kizuna/core": "workspace:*",
     "@types/express": "^5.0.0",
     "express": "^4.21.0",
+    "fastify": "^5.0.0",
     "hono": "^4.7.0",
     "tsdown": "^0.21.0",
     "typescript": "^5.6.3",

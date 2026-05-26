@@ -9,7 +9,7 @@ Once you have a contract and a router, combine them into an API object that an a
 
 ```ts
 // src/lib/server.ts
-import { createApi } from '@ts-kizuna/express'; // or @ts-kizuna/hono, @ts-kizuna/next
+import { createApi } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
 import { contract } from './contract';
 import { router } from './router';
 
@@ -35,6 +35,23 @@ const app = express();
 app.use(express.json());
 createExpressEndpoints(api, app);
 app.listen(3000);
+```
+
+**Fastify:**
+
+```ts
+// src/index.ts
+import Fastify from 'fastify';
+import { fastifyKizuna } from '@ts-kizuna/fastify';
+import { api } from './lib/server';
+
+const app = Fastify();
+app.register(fastifyKizuna, {
+    api,
+});
+app.listen({
+    port: 3000,
+});
 ```
 
 **Hono:**
@@ -72,5 +89,6 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoi
 For adapter-specific options (error handling, middleware, `onError`, etc.) see the adapter pages:
 
 - [Express](/docs/adapters/express)
+- [Fastify](/docs/adapters/fastify)
 - [Hono](/docs/adapters/hono)
 - [Next.js](/docs/adapters/next)

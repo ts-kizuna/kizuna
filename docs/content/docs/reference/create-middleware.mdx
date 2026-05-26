@@ -22,8 +22,9 @@ The `Middleware` type depends on the adapter:
 
 | Adapter | Middleware type                                                                                       |
 | ------- | ----------------------------------------------------------------------------------------------------- |
-| Hono    | `MiddlewareHandler<E>` from `hono`                                                                    |
 | Express | `RequestHandler` from `express`                                                                       |
+| Fastify | `FastifyPreHandler` — `(request: FastifyRequest, reply: FastifyReply) => void \| Promise<void>`       |
+| Hono    | `MiddlewareHandler<E>` from `hono`                                                                    |
 | Next.js | `(request: NextRequest, route: NextMiddlewareRoute) => Response \| void \| Promise<Response \| void>` |
 
 ## Returns

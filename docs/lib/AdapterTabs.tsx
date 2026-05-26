@@ -12,6 +12,7 @@ interface AdapterTabsProps {
 
 const adapterPackages: Record<string, string> = {
     Express: '@ts-kizuna/express',
+    Fastify: '@ts-kizuna/fastify',
     Hono: '@ts-kizuna/hono',
     'Next.js': '@ts-kizuna/next',
 };
@@ -26,7 +27,7 @@ function resolveAdapter(adapter: string | { label: string; package: string }) {
     return adapter;
 }
 
-export function AdapterTabs({ functionName, adapters = ['Express', 'Hono', 'Next.js'], showInstall = true }: AdapterTabsProps) {
+export function AdapterTabs({ functionName, adapters = ['Express', 'Fastify', 'Hono', 'Next.js'], showInstall = true }: AdapterTabsProps) {
     const resolved = adapters.map(resolveAdapter);
     return (
         <Tabs groupId="adapter" items={resolved.map((adapter) => adapter.label)}>

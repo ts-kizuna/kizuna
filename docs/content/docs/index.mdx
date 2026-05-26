@@ -29,6 +29,9 @@ import { Callout } from 'fumadocs-ui/components/callout';
     <Card title="Express" href="/docs/adapters/express">
         Classic middleware setup, access to native `req`/`res` in every handler.
     </Card>
+    <Card title="Fastify" href="/docs/adapters/fastify">
+        Plugin-based setup, access to `request`/`reply` in every handler.
+    </Card>
     <Card title="Hono" href="/docs/adapters/hono">
         Lightweight, runs on Cloudflare Workers, Deno, Bun, and Node.
     </Card>
@@ -90,7 +93,7 @@ export const contract = createContract({
 
 ```ts
 // src/lib/router.ts
-import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/hono, @ts-kizuna/next
+import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
 import { contract } from '@shared/contract';
 
 export const router = createRouter(contract, {
@@ -167,5 +170,5 @@ await client.deleteUser({
 
 - [Quickstart](/docs/quickstart) — end-to-end example in 5 minutes
 - [Contract](/docs/building/contract) — all route fields and options
-- [Express](/docs/adapters/express), [Hono](/docs/adapters/hono), or [Next.js](/docs/adapters/next) — mount your handlers
+- [Express](/docs/adapters/express), [Fastify](/docs/adapters/fastify), [Hono](/docs/adapters/hono), or [Next.js](/docs/adapters/next) — mount your handlers
 - [API Reference](/docs/reference/create-contract) — look up any function by name

@@ -80,11 +80,12 @@ Return `{ status, body }` matching one of the route's declared responses. TypeSc
 
 Each adapter adds framework-specific properties to the handler arguments:
 
-| Adapter | Extra properties | Description                       |
-| ------- | ---------------- | --------------------------------- |
-| Express | `req`, `res`     | Native Express request / response |
-| Hono    | `c`              | Hono context                      |
-| Next.js | `request`        | `NextRequest` object              |
+| Adapter | Extra properties   | Description                       |
+| ------- | ------------------ | --------------------------------- |
+| Express | `req`, `res`       | Native Express request / response |
+| Fastify | `request`, `reply` | Fastify request / reply           |
+| Hono    | `c`                | Hono context                      |
+| Next.js | `request`          | `NextRequest` object              |
 
 ## `RouteHandler` and `Router` types
 
