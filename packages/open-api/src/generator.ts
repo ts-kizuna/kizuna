@@ -469,10 +469,13 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
             if (hasValidation) {
                 const validationSchema = {
                     type: 'object',
-                    required: ['message', 'issues'],
+                    required: ['type', 'title', 'status', 'detail', 'errors'],
                     properties: {
-                        message: { type: 'string' },
-                        issues: {
+                        type: { type: 'string' },
+                        title: { type: 'string' },
+                        status: { type: 'integer' },
+                        detail: { type: 'string' },
+                        errors: {
                             type: 'array',
                             items: {
                                 type: 'object',

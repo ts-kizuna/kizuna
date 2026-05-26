@@ -62,9 +62,9 @@ const main = async () => {
                 'x-request-id': 'demo-2',
             },
         });
-        if (miss.status === 404) console.log('expected 404:', miss.body.message);
+        if (miss.status === 404) console.log('expected 404:', miss.body.detail);
     } else {
-        console.log('create failed:', created.body.message);
+        console.log('create failed:', created.body.detail);
     }
 
     console.log('--- createUser invalid email (expect 400) ---');

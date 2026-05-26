@@ -16,6 +16,16 @@
         "default": "./dist/index.cjs"
       }
     },
+    "./schemas": {
+      "import": {
+        "types": "./src/schemas.ts",
+        "default": "./dist/schemas.mjs"
+      },
+      "require": {
+        "types": "./src/schemas.ts",
+        "default": "./dist/schemas.cjs"
+      }
+    },
     "./adapter": {
       "import": {
         "types": "./dist/adapter.d.mts",
@@ -48,13 +58,17 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test-d.ts",
+    "!src/**/*.fixture.ts"
   ],
   "publishConfig": {
     "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/adapter.ts src/generator.ts src/tsdown.ts --format esm,cjs --dts --clean",
+    "build": "tsdown src/index.ts src/adapter.ts src/generator.ts src/tsdown.ts src/schemas.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

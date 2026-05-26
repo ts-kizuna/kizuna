@@ -102,7 +102,8 @@ return {
 Use [`ErrorResponse`](/docs/reference/error-response) from `@ts-kizuna/core` in your contract to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/create-guard#deny-and-errorresponse) in guards and all built-in kizuna errors.
 
 ```ts
-import { createContract, ErrorResponse } from '@ts-kizuna/core';
+import { createContract } from '@ts-kizuna/core';
+import { ErrorResponse } from '@ts-kizuna/core/schemas';
 
 const contract = createContract({
     getUser: {

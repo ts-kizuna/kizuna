@@ -1,4 +1,5 @@
 import { createContract, createModel, createTag } from '@ts-kizuna/core';
+import { ErrorResponse } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
 
 export const UserSchema = createModel({
@@ -185,9 +186,7 @@ const usersContract = createContract(Users, {
                     'x-request-id': z.string().optional(),
                 }),
             },
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ErrorResponse,
         },
         summary: 'Get a user by id',
     },
@@ -197,9 +196,7 @@ const usersContract = createContract(Users, {
         body: CreateUserSchema,
         responses: {
             201: UserSchema,
-            400: z.object({
-                message: z.string(),
-            }),
+            400: ErrorResponse,
         },
         summary: 'Create a user',
     },
@@ -213,9 +210,7 @@ const usersContract = createContract(Users, {
             200: z.object({
                 success: z.boolean(),
             }),
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ErrorResponse,
         },
         summary: 'Delete a user',
     },
@@ -310,9 +305,7 @@ export const workspaceContract = createContract({
             }),
             responses: {
                 201: UserSchema,
-                409: z.object({
-                    message: z.string(),
-                }),
+                409: ErrorResponse,
             },
             summary: 'Invite a member to the workspace',
         },
@@ -400,12 +393,7 @@ export const contract = createContract({
                 .meta({
                     description: 'Validation result',
                 }),
-            400: createModel({
-                title: 'Error',
-                schema: z.object({
-                    message: z.string(),
-                }),
-            }),
+            400: ErrorResponse,
             401: z.void(),
         },
         summary: 'Validate config — exercises generator bug coverage',

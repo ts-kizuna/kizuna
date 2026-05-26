@@ -44,7 +44,7 @@ type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends t
         fetchOptions?: RequestInit;
     };
 
-type ValidationErrorResponse = {
+type ValidationErrorResult = {
     status: 400;
     body: ValidationError;
     headers: Record<string, string>;
@@ -53,7 +53,7 @@ type ValidationErrorResponse = {
 type HasValidation<R extends RouteDefinition> = R extends { body: z.ZodType } ? true : R extends { query: z.ZodType } ? true : false;
 
 type ClientResponse<R extends RouteDefinition> =
-    HasValidation<R> extends true ? ResponseUnion<R> | ValidationErrorResponse : ResponseUnion<R>;
+    HasValidation<R> extends true ? ResponseUnion<R> | ValidationErrorResult : ResponseUnion<R>;
 
 type ClientFn<R extends RouteDefinition> =
     {} extends ClientArgs<R> ? (args?: ClientArgs<R>) => Promise<ClientResponse<R>> : (args: ClientArgs<R>) => Promise<ClientResponse<R>>;

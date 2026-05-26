@@ -89,14 +89,22 @@ const coerceStringValues = (input: unknown, schema: z.ZodType): unknown => {
     return changed ? result : input;
 };
 
+type ProblemDetailsEnvelope = { type: string; title: string; status: number; detail: string };
+
+type StripProblemEnvelope<T> = T extends ProblemDetailsEnvelope
+    ? Omit<T, 'type' | 'title' | 'status'> & Partial<Pick<T, 'type'>> & { title?: never; status?: never }
+    : T;
+
+type HandlerBody<S> = S extends z.ZodType
+    ? StripProblemEnvelope<z.input<S>>
+    : S extends { body: z.ZodType }
+      ? StripProblemEnvelope<z.input<S['body']>>
+      : never;
+
 export type HandlerReturn<R extends RouteDefinition> = {
     [Status in keyof R['responses']]: {
         status: Status extends number ? Status : never;
-        body: R['responses'][Status] extends z.ZodType
-            ? z.input<R['responses'][Status]>
-            : R['responses'][Status] extends { body: z.ZodType }
-              ? z.input<R['responses'][Status]['body']>
-              : never;
+        body: HandlerBody<R['responses'][Status]>;
         headers?: Record<string, string>;
     };
 }[keyof R['responses']];
@@ -180,8 +188,8 @@ const STAGE_MESSAGES: Record<ValidationStage, string> = {
     body: 'Invalid request body',
 };
 
-export const formatValidationError = (failure: ValidationFailure): { message: string; issues: z.core.$ZodIssue[] } => ({
-    message: STAGE_MESSAGES[failure.stage],
+export const formatValidationError = (failure: ValidationFailure): { detail: string; issues: z.core.$ZodIssue[] } => ({
+    detail: STAGE_MESSAGES[failure.stage],
     issues: failure.issues,
 });
 

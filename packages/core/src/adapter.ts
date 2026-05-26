@@ -13,6 +13,7 @@ import {
 import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes } from './route-matcher.js';
 import { parsePath } from './path-params.js';
 import { ResponseError } from './response-error.js';
+import { problemDetails } from './problem-details.js';
 
 export type { RouteDefinition, Contract, Method } from './types.js';
 export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
@@ -63,6 +64,7 @@ export const createApi = <const R extends Contract>(contract: R): R & ApiDefinit
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
 export { allowedMethodsForPath, flattenContract, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
 export { ResponseError } from './response-error.js';
+export { problemDetails, type ProblemDetails } from './problem-details.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';
 export { matchRoute } from './route-matcher.js';
 
@@ -112,12 +114,12 @@ export type AdapterResult =
       }
     | {
           kind: 'invalid-body';
-          message: string;
+          detail: string;
       }
     | {
           kind: 'validation-failed';
           stage: ValidationStage;
-          message: string;
+          detail: string;
           issues: z.core.$ZodIssue[];
       }
     | {
@@ -298,7 +300,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         } catch {
             return {
                 kind: 'invalid-body',
-                message: 'Bad Request',
+                detail: 'Bad Request',
             };
         }
     }
@@ -309,7 +311,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         return {
             kind: 'validation-failed',
             stage: validation.error.stage,
-            message: formatted.message,
+            detail: formatted.detail,
             issues: formatted.issues,
         };
     }
@@ -421,7 +423,7 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
 
 /**
  * Maps an `AdapterResult` to `{ status, headers, body }` using ts-kizuna's default
- * JSON conventions (e.g. 405 with an `Allow` header, 400 with `{ message, issues }`
+ * JSON conventions (e.g. 405 with an `Allow` header, 400 with `{ detail, errors }`
  * for validation failures). Adapters that speak JSON delegate `respond` to this
  * instead of writing the switch by hand.
  *
@@ -432,101 +434,94 @@ export const renderJsonResult = (
     result: Exclude<AdapterResult, { kind: 'raw-response' }>
 ): { status: number; headers: Record<string, string>; body: unknown } => {
     switch (result.kind) {
-        case 'success':
+        case 'success': {
+            const body = result.body;
+            const isError = result.status >= 400;
+            const needsWrap = isError && body !== null && body !== undefined && typeof body === 'object' && 'detail' in body;
+            const finalBody = needsWrap
+                ? problemDetails(result.status, (body as { detail: string }).detail, body as Record<string, unknown>)
+                : body;
             return {
                 status: result.status,
                 headers: {
-                    ...(result.body !== undefined ? { 'content-type': 'application/json' } : {}),
+                    ...(finalBody !== undefined ? { 'content-type': isError ? 'application/problem+json' : 'application/json' } : {}),
                     ...(result.headers ?? {}),
                 },
-                body: result.body,
+                body: finalBody,
             };
+        }
         case 'not-found':
             return {
                 status: 404,
                 headers: {
-                    'content-type': 'application/json',
+                    'content-type': 'application/problem+json',
                 },
-                body: {
-                    message: 'Not Found',
-                },
+                body: problemDetails(404, 'Not Found'),
             };
         case 'method-not-allowed':
             return {
                 status: 405,
                 headers: {
-                    'content-type': 'application/json',
+                    'content-type': 'application/problem+json',
                     Allow: result.allowed.join(', '),
                 },
-                body: {
-                    message: 'Method Not Allowed',
+                body: problemDetails(405, 'Method Not Allowed', {
                     allowed: result.allowed,
-                },
+                }),
             };
         case 'invalid-body':
             return {
                 status: 400,
                 headers: {
-                    'content-type': 'application/json',
+                    'content-type': 'application/problem+json',
                 },
-                body: {
-                    message: result.message,
-                },
+                body: problemDetails(400, result.detail),
             };
         case 'validation-failed':
             return {
                 status: 400,
                 headers: {
-                    'content-type': 'application/json',
+                    'content-type': 'application/problem+json',
                 },
-                body: {
-                    message: result.message,
-                    issues: result.issues.map((issue) => ({
+                body: problemDetails(400, result.detail, {
+                    errors: result.issues.map((issue) => ({
                         code: issue.code ?? 'custom',
                         path: issue.path,
                         message: issue.message,
                     })),
-                },
+                }),
             };
         case 'no-handler':
             return {
                 status: 500,
                 headers: {
-                    'content-type': 'application/json',
+                    'content-type': 'application/problem+json',
                 },
-                body: {
-                    message: `Handler not implemented: ${result.routeKey}`,
-                },
+                body: problemDetails(500, `Handler not implemented: ${result.routeKey}`),
             };
         case 'unsupported-media-type':
             return {
                 status: 415,
                 headers: {
-                    'content-type': 'application/json',
+                    'content-type': 'application/problem+json',
                 },
-                body: {
-                    message: `Unsupported Media Type: expected ${result.expected}, received ${result.received}`,
-                },
+                body: problemDetails(415, `Unsupported Media Type: expected ${result.expected}, received ${result.received}`),
             };
         case 'not-acceptable':
             return {
                 status: 406,
                 headers: {
-                    'content-type': 'application/json',
+                    'content-type': 'application/problem+json',
                 },
-                body: {
-                    message: 'Not Acceptable',
-                },
+                body: problemDetails(406, 'Not Acceptable'),
             };
         case 'handler-error':
             return {
                 status: 500,
                 headers: {
-                    'content-type': 'application/json',
+                    'content-type': 'application/problem+json',
                 },
-                body: {
-                    message: 'Internal Server Error',
-                },
+                body: problemDetails(500, 'Internal Server Error'),
             };
     }
 };
