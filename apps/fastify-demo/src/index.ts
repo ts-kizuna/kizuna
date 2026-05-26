@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 import { createApi, fastifyKizuna } from '@ts-kizuna/fastify';
 import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
 import { generateOpenApi } from '@ts-kizuna/open-api';
+import fastifyApiReference from '@scalar/fastify-api-reference';
 import { contract } from '@ts-kizuna-demo/shared';
 
 import { router } from './lib/server';
@@ -54,6 +55,13 @@ app.get('/openapi.yaml', async (_request, reply) => {
     reply.header('content-type', 'text/yaml; charset=utf-8').send(openApiSpec('yaml'));
 });
 
+app.register(fastifyApiReference, {
+    routePrefix: '/docs',
+    configuration: {
+        url: '/openapi.json',
+    },
+});
+
 app.get('/', async (_request, reply) => {
     reply.header('content-type', 'text/html; charset=utf-8').send(`<!doctype html>
 <html lang="en">
@@ -72,6 +80,7 @@ app.get('/', async (_request, reply) => {
         <p>This demo shares the same contract from <code>@ts-kizuna-demo/shared</code>.</p>
         <ul>
             <li><a href="http://localhost:8002/users">Fastify API</a> — <code>:8002/users</code></li>
+            <li><a href="http://localhost:8002/docs">Fastify API docs (Scalar)</a> — <code>:8002/docs</code></li>
             <li><a href="http://localhost:8002/openapi.json">OpenAPI spec (JSON)</a> — <code>:8002/openapi.json</code></li>
             <li><a href="http://localhost:8002/openapi.yaml">OpenAPI spec (YAML)</a> — <code>:8002/openapi.yaml</code></li>
         </ul>

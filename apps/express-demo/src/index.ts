@@ -86,6 +86,7 @@ app.get('/', (_req, res) => {
             <li><a href="http://localhost:8001/users">Hono API</a> — <code>:8001/users</code></li>
             <li><a href="http://localhost:8001/docs">Hono API docs (Scalar)</a> — <code>:8001/docs</code></li>
             <li><a href="http://localhost:8002/users">Fastify API</a> — <code>:8002/users</code></li>
+            <li><a href="http://localhost:8002/docs">Fastify API docs (Scalar)</a> — <code>:8002/docs</code></li>
             <li><a href="http://localhost:3030/api/users">Next.js API</a> — <code>:3030/api/users</code></li>
             <li><a href="http://localhost:3030/docs">Next.js API docs (Scalar)</a> — <code>:3030/docs</code></li>
             <li><a href="http://localhost:3030/">Next.js demo page</a> — <code>:3030</code></li>

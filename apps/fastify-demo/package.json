@@ -11,10 +11,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@scalar/fastify-api-reference": "^1.57.5",
     "@ts-kizuna-demo/shared": "workspace:*",
-    "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/core": "workspace:*",
     "@ts-kizuna/fastify": "workspace:*",
+    "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/mcp": "workspace:*",
     "@ts-kizuna/open-api": "workspace:*",
     "fastify": "^5.0.0",
