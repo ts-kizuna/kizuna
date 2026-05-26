@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/fastify",
-  "version": "1.13.0",
+  "version": "1.15.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
