@@ -587,7 +587,7 @@ describe('MCP server e2e', () => {
         const content = result.content as Array<{ type: string; text: string }>;
         const parsed = JSON.parse(content[0]!.text);
         expect(parsed.status).toBe(500);
-        expect(parsed.body.message).toBe('database connection failed');
+        expect(parsed.body.detail).toBe('database connection failed');
 
         await close();
     });

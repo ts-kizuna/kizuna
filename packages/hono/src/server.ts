@@ -16,6 +16,7 @@ import {
     renderJsonResult,
     parseFetchBody,
     headersToObject,
+    problemDetails,
 } from '@ts-kizuna/core/adapter';
 
 export type HonoApi<R extends Contract = Contract> = R & ApiWithRouter & { readonly [MIDDLEWARE_META]?: unknown };
@@ -70,17 +71,15 @@ export const createMiddleware = <T extends Contract, E extends Env = Env>(
     map: MiddlewareMap<T, MiddlewareHandler<E>>
 ): MiddlewareMap<T, MiddlewareHandler<E>> => map;
 
-type Deny = (status: number, message: string) => Response;
+type Deny = (status: number, detail: string) => Response;
 
-const deny: Deny = (status, message) =>
-    Response.json(
-        {
-            message,
+const deny: Deny = (status, detail) =>
+    new Response(JSON.stringify(problemDetails(status, detail)), {
+        status,
+        headers: {
+            'content-type': 'application/problem+json',
         },
-        {
-            status,
-        }
-    );
+    });
 
 /**
  * Create a guard — a middleware that checks access before the handler runs.

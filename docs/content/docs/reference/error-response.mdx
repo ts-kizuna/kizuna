@@ -1,21 +1,31 @@
 ---
 title: ErrorResponse
-description: Standard error response schema used across kizuna.
+description: RFC 9457 Problem Details error response schema used across kizuna.
 ---
 
-The standard error response shape used by kizuna. Matches the format produced by [`deny()`](/docs/reference/create-guard#deny-and-errorresponse) in guards, validation errors, and all built-in error responses (404, 405, 415, etc.).
+The standard [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) error response shape used by kizuna. Matches the format produced by [`deny()`](/docs/reference/create-guard#deny-and-errorresponse) in guards and all built-in error responses (404, 405, 415, etc.).
 
 ```ts
-import { ErrorResponse } from '@ts-kizuna/core';
+import { ErrorResponse } from '@ts-kizuna/core/schemas';
 ```
 
 ## Shape
 
 ```json
 {
-    "message": "string"
+    "type": "about:blank",
+    "title": "Not Found",
+    "status": 404,
+    "detail": "User not found"
 }
 ```
+
+| Field    | Description                                                                             |
+| -------- | --------------------------------------------------------------------------------------- |
+| `type`   | Problem type URI. `about:blank` means "no additional semantics beyond the status code." |
+| `title`  | Short human-readable summary matching the HTTP status phrase.                           |
+| `status` | HTTP status code.                                                                       |
+| `detail` | Human-readable explanation specific to this occurrence.                                 |
 
 ## Usage in contracts
 
@@ -23,7 +33,7 @@ Use `ErrorResponse` in your contract's `responses` to document error status code
 
 ```ts
 import { createContract } from '@ts-kizuna/core';
-import { ErrorResponse } from '@ts-kizuna/core';
+import { ErrorResponse } from '@ts-kizuna/core/schemas';
 
 const contract = createContract({
     getUser: {
@@ -36,30 +46,57 @@ const contract = createContract({
             404: ErrorResponse,
         },
     },
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        body: CreateUserSchema,
-        responses: {
-            201: UserSchema,
-            400: ErrorResponse,
-        },
+});
+```
+
+## Usage in handlers
+
+Handlers only need to provide `detail` — kizuna fills in `type`, `title`, and `status` automatically:
+
+```ts
+const router = createRouter(contract, {
+    getUser: ({ params, error }) => {
+        const user = users.get(params.id);
+        if (!user) {
+            return error({
+                status: 404,
+                body: {
+                    detail: 'User not found',
+                },
+            });
+        }
+        return {
+            status: 200,
+            body: user,
+        };
     },
 });
+```
+
+The response sent to the client includes the full RFC 9457 envelope:
+
+```json
+{
+    "type": "about:blank",
+    "title": "Not Found",
+    "status": 404,
+    "detail": "User not found"
+}
 ```
 
 ## What produces it
 
 Everything in kizuna that returns a non-success response uses this shape:
 
-| Source                 | Example                             |
-| ---------------------- | ----------------------------------- |
-| Guards (`deny`)        | `deny(403, 'Forbidden')`            |
-| Validation errors      | Invalid body, query, or path params |
-| Route not found        | 404 for unmatched paths             |
-| Method not allowed     | 405 with `Allow` header             |
-| Unsupported media type | 415 for wrong `Content-Type`        |
-| Handler errors         | 500 for unhandled exceptions        |
+| Source                 | Example                      |
+| ---------------------- | ---------------------------- |
+| Guards (`deny`)        | `deny(403, 'Forbidden')`     |
+| Route not found        | 404 for unmatched paths      |
+| Method not allowed     | 405 with `Allow` header      |
+| Unsupported media type | 415 for wrong `Content-Type` |
+| Handler errors         | 500 for unhandled exceptions |
+
+All built-in error responses use `application/problem+json` as the content type.
 
 ## OpenAPI
 

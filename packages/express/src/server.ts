@@ -14,6 +14,7 @@ import {
     resolveMiddleware,
     renderJsonResult,
     createApi as coreCreateApi,
+    problemDetails,
 } from '@ts-kizuna/core/adapter';
 
 export type ExpressApi<R extends Contract = Contract> = R & ApiWithRouter & { readonly [MIDDLEWARE_META]?: unknown };
@@ -85,11 +86,11 @@ export const createMiddleware = <T extends Contract>(
     map: MiddlewareMap<T, RequestHandler>
 ): MiddlewareMap<T, RequestHandler> => map;
 
-type Deny = (status: number, message: string) => { status: number; message: string };
+type Deny = (status: number, detail: string) => { status: number; detail: string };
 
-const deny: Deny = (status, message) => ({
+const deny: Deny = (status, detail) => ({
     status,
-    message,
+    detail,
 });
 
 /**
@@ -114,9 +115,10 @@ export function createGuard(
     return async (request, response, next) => {
         const result = await guard(request, response, deny);
         if (result && typeof result === 'object' && 'status' in result) {
-            response.status(result.status).json({
-                message: result.message,
-            });
+            response
+                .status(result.status)
+                .set('content-type', 'application/problem+json')
+                .json(problemDetails(result.status, result.detail));
             return;
         }
         next();

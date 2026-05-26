@@ -15,8 +15,8 @@ export class ResponseError<R extends RouteDefinition = never> extends Error {
     constructor(response: [R] extends [never] ? ResponseErrorPayload : HandlerReturn<R>) {
         const body = response.body;
         const message =
-            body && typeof body === 'object' && 'message' in body && typeof body.message === 'string'
-                ? body.message
+            body && typeof body === 'object' && 'detail' in body && typeof body.detail === 'string'
+                ? body.detail
                 : body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
                   ? body.error
                   : 'Response error';

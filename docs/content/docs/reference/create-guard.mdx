@@ -122,7 +122,8 @@ When a guard calls `deny(status, message)`, the response matches kizuna's standa
 This is the same shape used by kizuna's built-in errors (404, 400 validation, 405, etc.). Use `ErrorResponse` in your contracts to document these status codes:
 
 ```ts
-import { createContract, ErrorResponse } from '@ts-kizuna/core';
+import { createContract } from '@ts-kizuna/core';
+import { ErrorResponse } from '@ts-kizuna/core/schemas';
 
 const contract = createContract({
     getUser: {

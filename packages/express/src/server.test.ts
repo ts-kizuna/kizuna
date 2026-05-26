@@ -466,8 +466,8 @@ describe('Express integration — requestValidationErrorHandler', () => {
             name: '',
         });
         expect(response.status).toBe(400);
-        expect(response.body.message).toBeDefined();
-        expect(Array.isArray(response.body.issues)).toBe(true);
+        expect(response.body.detail).toBeDefined();
+        expect(Array.isArray(response.body.errors)).toBe(true);
     });
 
     it('returns application/json content type for validation errors', async () => {
@@ -492,7 +492,7 @@ describe('Express integration — requestValidationErrorHandler', () => {
             name: '',
         });
         expect(response.status).toBe(400);
-        expect(response.headers['content-type']).toContain('application/json');
+        expect(response.headers['content-type']).toContain('application/problem+json');
     });
 });
 

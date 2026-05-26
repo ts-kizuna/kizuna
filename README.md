@@ -11,7 +11,7 @@ Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, pow
 - **Contract-first** — define request/response schemas once, share between server and client
 - **Type-safe everywhere** — full inference on both sides, no casting
 - **RPC-like client** — call your API like a function, get fully typed responses back
-- **HTTP/REST** — follows HTTP and REST standards. RFC 9110 semantics
+- **HTTP/REST** — follows HTTP and REST standards. RFC 9110 semantics, RFC 9457 Problem Details
 - **OpenAPI 3.1.0 generation** — from the same contract, no annotations needed
 - **Swift client generation** — typed API client for iOS/macOS
 - **MCP server generation** — expose your API as MCP tools so AI assistants can call your endpoints

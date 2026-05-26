@@ -1235,12 +1235,18 @@ const emitClient = (
         if (hasValidation) {
             writer.blank();
             writer.block('public struct ValidationError: Codable, Sendable, Equatable', () => {
-                writer.line('public let message: String');
-                writer.line('public let issues: [ValidationIssue]');
+                writer.line('public let type: String');
+                writer.line('public let title: String');
+                writer.line('public let status: Int');
+                writer.line('public let detail: String');
+                writer.line('public let errors: [ValidationIssue]');
                 writer.blank();
-                writer.block('public init(message: String, issues: [ValidationIssue])', () => {
-                    writer.line('self.message = message');
-                    writer.line('self.issues = issues');
+                writer.block('public init(type: String, title: String, status: Int, detail: String, errors: [ValidationIssue])', () => {
+                    writer.line('self.type = type');
+                    writer.line('self.title = title');
+                    writer.line('self.status = status');
+                    writer.line('self.detail = detail');
+                    writer.line('self.errors = errors');
                 });
             });
             writer.blank();

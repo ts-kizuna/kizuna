@@ -1096,10 +1096,10 @@ describe('automatic validation error response', () => {
         expect(response).toBeDefined();
         expect(response?.description).toBe('Validation Error');
         const schema = response?.content?.['application/json']?.schema as Record<string, unknown> | undefined;
-        expect(schema?.required).toContain('message');
-        expect(schema?.required).toContain('issues');
+        expect(schema?.required).toContain('detail');
+        expect(schema?.required).toContain('errors');
         const properties = schema?.properties as Record<string, Record<string, unknown>> | undefined;
-        expect(properties?.issues?.type).toBe('array');
+        expect(properties?.errors?.type).toBe('array');
     });
 
     it('adds 400 validation error to routes with query', () => {
@@ -1130,6 +1130,6 @@ describe('automatic validation error response', () => {
         const schema = response?.content?.['application/json']?.schema as Record<string, unknown> | undefined;
         const oneOf = schema?.oneOf as Array<Record<string, unknown>> | undefined;
         expect(oneOf).toHaveLength(2);
-        expect(oneOf?.[1]?.required).toContain('issues');
+        expect(oneOf?.[1]?.required).toContain('errors');
     });
 });
