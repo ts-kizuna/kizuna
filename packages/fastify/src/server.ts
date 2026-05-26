@@ -14,6 +14,7 @@ import {
     createApi as coreCreateApi,
     resolveMiddleware,
     renderJsonResult,
+    problemDetails,
 } from '@ts-kizuna/core/adapter';
 
 export type FastifyApi<R extends Contract = Contract> = R & ApiWithRouter & { readonly [MIDDLEWARE_META]?: unknown };
@@ -77,11 +78,11 @@ export const createMiddleware = <T extends Contract>(
     map: MiddlewareMap<T, FastifyPreHandler>
 ): MiddlewareMap<T, FastifyPreHandler> => map;
 
-type Deny = (status: number, message: string) => { status: number; message: string };
+type Deny = (status: number, detail: string) => { status: number; detail: string };
 
-const deny: Deny = (status, message) => ({
+const deny: Deny = (status, detail) => ({
     status,
-    message,
+    detail,
 });
 
 /**
@@ -106,9 +107,10 @@ export function createGuard(
     return async (request, reply) => {
         const result = await guard(request, reply, deny);
         if (result && typeof result === 'object' && 'status' in result) {
-            reply.status(result.status).send({
-                message: result.message,
-            });
+            reply
+                .header('content-type', 'application/problem+json')
+                .status(result.status)
+                .send(problemDetails(result.status, result.detail));
         }
     };
 }

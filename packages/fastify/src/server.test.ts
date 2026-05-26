@@ -261,8 +261,8 @@ describe('Fastify integration', () => {
         });
         expect(response.statusCode).toBe(400);
         const body = response.json();
-        expect(body.message).toBe('Invalid request body');
-        expect(Array.isArray(body.issues)).toBe(true);
+        expect(body.detail).toBe('Invalid request body');
+        expect(Array.isArray(body.errors)).toBe(true);
     });
 });
 
@@ -309,7 +309,7 @@ describe('Fastify — Accept header / 406', () => {
         });
         expect(response.statusCode).toBe(406);
         const body = response.json();
-        expect(body.message).toBe('Not Acceptable');
+        expect(body.detail).toBe('Not Acceptable');
     });
 
     it('returns 200 when Accept is */*', async () => {
