@@ -10,6 +10,7 @@
         "error-response",
         "create-api",
         "create-client",
+        "create-server-action",
         "is-validation-error",
         "generate-open-api",
         "generate-swift-client",

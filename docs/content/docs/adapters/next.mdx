@@ -299,9 +299,142 @@ uploadAvatar: async ({ body }) => {
 },
 ```
 
+## Server Actions
+
+`createServerAction` turns a typed client method into a React Server Action. Point it at a client method, export it from a `'use server'` module, and call it like a function. The result is a discriminated union — `{ ok: true, status, data }` on success, `{ ok: false, status, error }` on any other status — and paths/tags are revalidated on success.
+
+```ts
+// src/lib/api-client.ts
+import { createClient } from '@ts-kizuna/fetch';
+import { contract } from '@shared/contract';
+
+export const client = createClient(contract, {
+    baseUrl: process.env.API_URL!,
+});
+```
+
+```ts
+// src/app/users/actions.ts
+'use server';
+import { createServerAction } from '@ts-kizuna/next';
+import { client } from '@/lib/api-client';
+
+export const createUser = createServerAction(client.users.createUser, {
+    revalidate: {
+        paths: ['/users'],
+    },
+});
+
+export const deleteUser = createServerAction(client.users.deleteUser, {
+    revalidate: {
+        paths: ['/users'],
+    },
+});
+```
+
+Call it with the route's input and branch on the result:
+
+```ts
+const result = await createUser({
+    body: {
+        name: 'Ada',
+        email: 'ada@example.com',
+    },
+});
+
+if (result.ok) {
+    console.log(result.data.id); // typed success body
+} else {
+    console.error(result.error.detail); // typed Problem Details for result.status
+}
+```
+
+### What it returns
+
+The result is a discriminated union:
+
+- **Success** (2xx) → `{ ok: true, status, data }`, with `data` typed from the success body (`undefined` for `204`).
+- **Failure** (≥ 400) → `{ ok: false, status, error }`, with `error` typed from the route's error schema for that status.
+
+`result.ok` splits success from failure, and `result.status` narrows `error` to a specific error response. A genuine transport failure (the API is unreachable) throws by default — pass `onError` to catch it as `{ ok: false, status: 0, error }`, or let a Next.js error boundary handle it.
+
+### Field-level validation errors
+
+For any route with a body or query, the client types a `400` as kizuna's `ValidationError` — each entry in `errors` carries the failing field's `path`. Narrow on `status` and render each message above its input:
+
+```tsx
+'use client';
+import { useState, useTransition } from 'react';
+import { createUser } from './actions';
+
+export function AddUserForm() {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [pending, startTransition] = useTransition();
+
+    function addUser() {
+        startTransition(async () => {
+            const result = await createUser({ body: { name, email } });
+            if (result.ok) {
+                setErrors({});
+                return;
+            }
+            if (result.status === 400) {
+                setErrors(Object.fromEntries(result.error.errors.map((issue) => [issue.path[0], issue.message])));
+            }
+        });
+    }
+
+    return (
+        <div>
+            <label>
+                Name
+                {errors.name && <span>{errors.name}</span>}
+                <input value={name} onChange={(event) => setName(event.target.value)} />
+            </label>
+            <label>
+                Email
+                {errors.email && <span>{errors.email}</span>}
+                <input value={email} onChange={(event) => setEmail(event.target.value)} />
+            </label>
+            <button onClick={addUser} disabled={pending}>
+                Add user
+            </button>
+        </div>
+    );
+}
+```
+
+If a route declares its **own** `400` schema, that status carries both your error and the validation error — use `isValidationError` (re-exported from `@ts-kizuna/next`) to tell them apart.
+
+### Options
+
+| Option       | Default | Description                                                                                                              |
+| ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `revalidate` | —       | `{ paths?, tags? }`. Paths call `revalidatePath`; tags call `revalidateTag(tag, 'max')`.                                 |
+| `onError`    | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing. |
+| `raw`        | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                        |
+
+### Authentication
+
+Attach credentials in the client's `onRequest` — it runs per request, so you can read cookies server-side:
+
+```ts
+import { cookies } from 'next/headers';
+
+export const client = createClient(contract, {
+    baseUrl: process.env.API_URL!,
+    onRequest: async ({ headers }) => {
+        headers.set('cookie', (await cookies()).toString());
+    },
+});
+```
+
 ## Reference
 
 - [`createRouter`](/docs/reference/create-router)
 - [`createApi`](/docs/reference/create-api)
 - [`createMiddleware`](/docs/reference/create-middleware)
 - [`createGuard`](/docs/reference/create-guard)
+- [`createServerAction`](/docs/reference/create-server-action)

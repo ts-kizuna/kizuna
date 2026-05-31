@@ -1,5 +1,5 @@
 import { apiClient } from '../lib/api-client';
-import { createUserAction, deleteUserAction } from './actions';
+import { AddUserForm, DeleteUserButton } from './users-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,17 +42,11 @@ export default async function Home() {
             </nav>
 
             <h2>Users</h2>
-            <form
-                action={createUserAction}
-                style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    marginBottom: '1rem',
-                }}>
-                <input name="name" placeholder="Name" required />
-                <input name="email" type="email" placeholder="Email" required />
-                <button type="submit">Add user</button>
-            </form>
+            <p>
+                The form and delete buttons call server actions built with <code>createServerAction</code> — typed input, automatic{' '}
+                <code>{'{ data } | { error }'}</code> collapse, and <code>revalidate</code> built in.
+            </p>
+            <AddUserForm />
 
             <ul>
                 {users.map((user) => (
@@ -67,10 +61,7 @@ export default async function Home() {
                         <span>
                             {user.name} ({user.email})
                         </span>
-                        <form action={deleteUserAction}>
-                            <input type="hidden" name="id" value={user.id} />
-                            <button type="submit">Delete</button>
-                        </form>
+                        <DeleteUserButton id={user.id} />
                     </li>
                 ))}
                 {users.length === 0 && <li>No users yet.</li>}

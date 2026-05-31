@@ -1,0 +1,126 @@
+---
+title: createServerAction
+description: Turn a typed client method into a React Server Action with built-in result handling.
+---
+
+`createServerAction` (from `@ts-kizuna/next`) wraps a `@ts-kizuna/fetch` client method as a React Server Action. The returned action runs server-side, resolves to a discriminated `{ ok, status, data | error }` result, and revalidates on success.
+
+Export it from a `'use server'` module:
+
+```ts
+// src/app/users/actions.ts
+'use server';
+import { createServerAction } from '@ts-kizuna/next';
+import { client } from '@/lib/api-client';
+
+export const createUser = createServerAction(client.users.createUser, {
+    revalidate: {
+        paths: ['/users'],
+    },
+});
+```
+
+Call it with the route's input:
+
+```ts
+const result = await createUser({
+    body: {
+        name: 'Ada',
+        email: 'ada@example.com',
+    },
+});
+
+if (result.ok) {
+    console.log(result.data.id); // typed success body
+} else if (result.status === 400) {
+    console.log(result.error.errors); // field-level Zod issues — fully typed
+} else {
+    console.error(result.error.detail);
+}
+```
+
+## Result
+
+The action resolves to a discriminated union:
+
+```ts
+| { ok: true; status: number; data: SuccessBody }
+| { ok: false; status: number; error: ErrorBody };
+```
+
+- A **2xx** response → `{ ok: true, status, data }`, `data` typed from the success body (`undefined` for `204`).
+- A response with status **≥ 400** → `{ ok: false, status, error }`, `error` typed from the route's error schema for that status.
+
+`result.ok` splits success from failure, and `result.status` narrows `error` to a specific error response — the same typing the `@ts-kizuna/fetch` client already gives. A genuine transport failure throws by default — pass `onError` to catch it as `{ ok: false, status: 0, error }`, or let a Next.js error boundary handle it.
+
+For any route with a body or query, the client adds a typed `400` (`ValidationError`), so narrowing on `status` reads the field-level Zod issues directly — no helper:
+
+```ts
+if (!result.ok && result.status === 400) {
+    for (const issue of result.error.errors) {
+        // issue.path → ['email'], issue.code → 'invalid_format', issue.message → 'Invalid email'
+    }
+}
+```
+
+[`isValidationError`](/docs/reference/is-validation-error) (re-exported from `@ts-kizuna/next`) is only needed when a route declares its **own** `400` schema, so a custom error and a validation error share the status.
+
+## Options
+
+```ts
+createServerAction(client.users.createUser, {
+    revalidate: {
+        paths: ['/users'],
+        tags: ['users'],
+    },
+});
+```
+
+| Option       | Default | Description                                                                                                              |
+| ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `revalidate` | —       | `{ paths?, tags? }`. Paths call `revalidatePath`; tags call `revalidateTag(tag, 'max')`.                                 |
+| `onError`    | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing. |
+| `raw`        | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                        |
+
+### `onError`
+
+Without `onError`, a thrown error (network failure, unexpected crash) propagates. With it, the action catches the error and resolves to `{ ok: false, status: 0, error }` — `status: 0` marks "never reached the server". HTTP errors are unaffected:
+
+```ts
+export const createUser = createServerAction(client.users.createUser, {
+    onError: async (error) => {
+        const t = await getTranslations('errors');
+        return t('users.createFailed');
+    },
+});
+
+const result = await createUser({ body: { name: 'Ada', email: 'ada@example.com' } });
+if (!result.ok && result.status === 0) {
+    showToast(result.error); // the onError message — the API was unreachable
+}
+```
+
+### `raw`
+
+With `{ raw: true }` the action returns exactly what the client method returns — the full `{ status, body }` response union — so you can branch on `status` yourself:
+
+```ts
+export const createUser = createServerAction(client.users.createUser, {
+    raw: true,
+});
+
+const response = await createUser({
+    body: {
+        name: 'Ada',
+        email: 'ada@example.com',
+    },
+});
+if (response.status === 201) {
+    console.log(response.body.id);
+}
+```
+
+## See also
+
+- [Next.js adapter — Server Actions](/docs/adapters/next#server-actions)
+- [`createClient`](/docs/reference/create-client)
