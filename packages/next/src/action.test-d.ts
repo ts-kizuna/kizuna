@@ -18,19 +18,6 @@ const contract = createContract({
             }),
         },
     },
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        body: z.object({
-            name: z.string(),
-        }),
-        responses: {
-            201: z.object({
-                id: z.string(),
-                name: z.string(),
-            }),
-        },
-    },
     createPost: {
         method: 'POST',
         path: '/posts',
@@ -50,46 +37,16 @@ const client = createClient(contract, {
     baseUrl: '',
 });
 
-test('collapsed result is a discriminated union of success and typed errors', () => {
+test('the action returns the client response union — narrow on status', () => {
     const getUser = createServerAction(client.getUser);
     type Result = Awaited<ReturnType<typeof getUser>>;
     expectTypeOf<Result>().toEqualTypeOf<
-        | { ok: true; status: 200; data: { id: string; name: string }; headers: Record<string, string> }
-        | { ok: false; status: 404; error: { detail: string }; headers: Record<string, string> }
+        | { status: 200; body: { id: string; name: string }; headers: Record<string, string> }
+        | { status: 404; body: { detail: string }; headers: Record<string, string> }
     >();
 });
 
-test('a route with a body surfaces the validation error on failure', () => {
-    const createUser = createServerAction(client.createUser);
-    type Result = Awaited<ReturnType<typeof createUser>>;
-    type Failure = Extract<Result, { ok: false }>;
-    expectTypeOf<Failure['status']>().toEqualTypeOf<400>();
-    expectTypeOf<Failure['error']>().toMatchTypeOf<{ errors: Array<{ path: string[]; message: string }> }>();
-});
-
-test('raw mode returns the response union', () => {
-    const getUser = createServerAction(client.getUser, {
-        raw: true,
-    });
-    type Result = Awaited<ReturnType<typeof getUser>>;
-    expectTypeOf<Result>().toMatchTypeOf<{ status: number; body: unknown }>();
-    expectTypeOf<Extract<Result, { status: 200 }>['body']>().toEqualTypeOf<{ id: string; name: string }>();
-});
-
-test('action requires the route input', () => {
-    const createUser = createServerAction(client.createUser);
-    expectTypeOf(createUser).parameter(0).toMatchTypeOf<{ body: { name: string } }>();
-});
-
-test('onError adds the thrown { status: 0 } case to the result', () => {
-    const getUser = createServerAction(client.getUser, {
-        onError: () => 'unreachable',
-    });
-    type Result = Awaited<ReturnType<typeof getUser>>;
-    expectTypeOf<Extract<Result, { status: 0 }>>().toEqualTypeOf<{ ok: false; status: 0; error: string }>();
-});
-
-test('inject drops the injected field from the action input', () => {
+test('inject strips the injected field from the action input', () => {
     const createPost = createServerAction(client.createPost, {
         inject: async () => ({
             body: {
@@ -101,9 +58,15 @@ test('inject drops the injected field from the action input', () => {
     expectTypeOf<Body>().toEqualTypeOf<{ title: string }>();
 });
 
+test('the action input drops the client-only fetchOptions', () => {
+    const createPost = createServerAction(client.createPost);
+    type Input = Parameters<typeof createPost>[0];
+    expectTypeOf<'fetchOptions' extends keyof Input ? true : false>().toEqualTypeOf<false>();
+});
+
 test('inject rejects a key that is not a route argument', () => {
+    // @ts-expect-error - `bodssy` is not a field of the route arguments
     createServerAction(client.createPost, {
-        // @ts-expect-error - `bodssy` is not a field of the route arguments
         inject: async () => ({
             bodssy: {
                 authorId: '',
@@ -113,8 +76,8 @@ test('inject rejects a key that is not a route argument', () => {
 });
 
 test('inject rejects a wrong field type', () => {
+    // @ts-expect-error - authorId must be a string
     createServerAction(client.createPost, {
-        // @ts-expect-error - authorId must be a string
         inject: async () => ({
             body: {
                 authorId: 123,

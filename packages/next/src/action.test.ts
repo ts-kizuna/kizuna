@@ -75,7 +75,7 @@ beforeEach(() => {
 });
 
 describe('createServerAction', () => {
-    it('resolves a 2xx response to { ok: true, data }', async () => {
+    it('returns the client response — narrow on status for the body', async () => {
         const client = makeClient(async () => jsonResponse(201, { id: '1', name: 'Ada' }));
         const createUser = createServerAction(client.createUser);
 
@@ -85,17 +85,15 @@ describe('createServerAction', () => {
             },
         });
 
-        expect(result).toMatchObject({
-            ok: true,
-            status: 201,
-            data: {
-                id: '1',
-                name: 'Ada',
-            },
+        expect(result.status).toBe(201);
+        if (result.status !== 201) throw new Error('expected 201');
+        expect(result.body).toEqual({
+            id: '1',
+            name: 'Ada',
         });
     });
 
-    it('resolves a 204 (no body) to { ok: true, data: undefined }', async () => {
+    it('returns a 204 with an undefined body', async () => {
         const client = makeClient(async () => jsonResponse(204));
         const deleteUser = createServerAction(client.deleteUser);
 
@@ -105,13 +103,11 @@ describe('createServerAction', () => {
             },
         });
 
-        expect(result.ok).toBe(true);
-        if (!result.ok) throw new Error('expected success');
         expect(result.status).toBe(204);
-        expect(result.data).toBeUndefined();
+        expect(result.body).toBeUndefined();
     });
 
-    it('resolves an error status to { ok: false, status, error }', async () => {
+    it('returns an error response with its typed body', async () => {
         const client = makeClient(async () => jsonResponse(404, { detail: 'Not found' }));
         const getUser = createServerAction(client.getUser);
 
@@ -121,29 +117,29 @@ describe('createServerAction', () => {
             },
         });
 
-        expect(result.ok).toBe(false);
-        if (result.ok) throw new Error('expected failure');
         expect(result.status).toBe(404);
-        expect(result.error).toEqual({
+        if (result.status !== 404) throw new Error('expected 404');
+        expect(result.body).toEqual({
             detail: 'Not found',
         });
     });
 
-    it('preserves field-level validation errors', async () => {
-        const validationBody = {
-            type: 'about:blank',
-            title: 'Bad Request',
-            status: 400,
-            detail: 'Request validation failed',
-            errors: [
-                {
-                    code: 'invalid_format',
-                    path: ['email'],
-                    message: 'Invalid email',
-                },
-            ],
-        };
-        const client = makeClient(async () => jsonResponse(400, validationBody));
+    it('keeps field-level validation errors on the 400 body', async () => {
+        const client = makeClient(async () =>
+            jsonResponse(400, {
+                type: 'about:blank',
+                title: 'Bad Request',
+                status: 400,
+                detail: 'Request validation failed',
+                errors: [
+                    {
+                        code: 'invalid_format',
+                        path: ['email'],
+                        message: 'Invalid email',
+                    },
+                ],
+            })
+        );
         const createUser = createServerAction(client.createUser);
 
         const result = await createUser({
@@ -152,71 +148,13 @@ describe('createServerAction', () => {
             },
         });
 
-        expect(result.ok).toBe(false);
-        if (result.ok) throw new Error('expected failure');
         expect(result.status).toBe(400);
-        expect(isValidationError(result.error)).toBe(true);
-        if (!isValidationError(result.error)) throw new Error('expected validation error');
-        expect(result.error.errors[0]?.path).toEqual(['email']);
-        expect(result.error.errors[0]?.code).toBe('invalid_format');
+        expect(isValidationError(result.body)).toBe(true);
+        if (!isValidationError(result.body)) throw new Error('expected validation error');
+        expect(result.body.errors[0]?.path).toEqual(['email']);
     });
 
-    it('returns the raw response union with { raw: true }', async () => {
-        const client = makeClient(async () => jsonResponse(201, { id: '1', name: 'Ada' }));
-        const createUser = createServerAction(client.createUser, {
-            raw: true,
-        });
-
-        const result = await createUser({
-            body: {
-                name: 'Ada',
-            },
-        });
-
-        expect(result.status).toBe(201);
-        expect(result.body).toEqual({
-            id: '1',
-            name: 'Ada',
-        });
-    });
-
-    it('propagates a thrown fetch error', async () => {
-        const client = makeClient(async () => {
-            throw new Error('network down');
-        });
-        const getUser = createServerAction(client.getUser);
-
-        await expect(
-            getUser({
-                params: {
-                    id: '1',
-                },
-            })
-        ).rejects.toThrow('network down');
-    });
-
-    it('catches a thrown error via onError as { ok: false, status: 0 }', async () => {
-        const client = makeClient(async () => {
-            throw new Error('network down');
-        });
-        const getUser = createServerAction(client.getUser, {
-            onError: (error) => `unreachable: ${(error as Error).message}`,
-        });
-
-        const result = await getUser({
-            params: {
-                id: '1',
-            },
-        });
-
-        expect(result).toEqual({
-            ok: false,
-            status: 0,
-            error: 'unreachable: network down',
-        });
-    });
-
-    it('merges injected fields and drops them from the caller args', async () => {
+    it('merges injected fields and strips them from the caller args', async () => {
         const sent: Array<unknown> = [];
         const client = makeClient(async (_url, init) => {
             sent.push(JSON.parse(String(init?.body ?? 'null')));
@@ -240,22 +178,15 @@ describe('createServerAction', () => {
             title: 'Hello',
             authorId: 'user-1',
         });
-        expect(result).toMatchObject({
-            ok: true,
-            status: 201,
-            data: {
-                id: '1',
-            },
-        });
+        expect(result.status).toBe(201);
     });
 
-    it('propagates an inject failure instead of folding it into onError', async () => {
+    it('propagates an inject failure', async () => {
         const client = makeClient(async () => jsonResponse(201, { id: '1' }));
         const createPost = createServerAction(client.createPost, {
             inject: async (): Promise<{ body: { authorId: string } }> => {
                 throw new Error('no session');
             },
-            onError: () => 'mapped',
         });
 
         await expect(
@@ -267,38 +198,14 @@ describe('createServerAction', () => {
         ).rejects.toThrow('no session');
     });
 
-    it('includes response headers in the result', async () => {
-        const client = makeClient(
-            async () =>
-                new Response(JSON.stringify({ id: '1', name: 'Ada' }), {
-                    status: 200,
-                    headers: {
-                        'content-type': 'application/json',
-                        'x-total': '5',
-                    },
-                })
-        );
-        const getUser = createServerAction(client.getUser);
-
-        const result = await getUser({
-            params: {
-                id: '1',
-            },
-        });
-
-        expect(result.ok).toBe(true);
-        if (!result.ok) throw new Error('expected success');
-        expect(result.headers['x-total']).toBe('5');
-    });
-
-    it('passes the success result (status, data, headers) to onSuccess, but not on an error', async () => {
+    it('runs onSuccess with the success response, but not on an error', async () => {
         const seen: Array<unknown> = [];
         const okClient = makeClient(async () => jsonResponse(201, { id: '1', name: 'Ada' }));
         const okAction = createServerAction(okClient.createUser, {
-            onSuccess: (success) => {
+            onSuccess: (response) => {
                 seen.push({
-                    status: success.status,
-                    data: success.data,
+                    status: response.status,
+                    body: response.body,
                 });
             },
         });
@@ -307,7 +214,7 @@ describe('createServerAction', () => {
                 name: 'Ada',
             },
         });
-        expect(seen).toEqual([{ status: 201, data: { id: '1', name: 'Ada' } }]);
+        expect(seen).toEqual([{ status: 201, body: { id: '1', name: 'Ada' } }]);
 
         const errorClient = makeClient(async () => jsonResponse(404, { detail: 'nope' }));
         const errorAction = createServerAction(errorClient.getUser, {
@@ -320,7 +227,22 @@ describe('createServerAction', () => {
                 id: '1',
             },
         });
-        expect(seen).toEqual([{ status: 201, data: { id: '1', name: 'Ada' } }]);
+        expect(seen).toEqual([{ status: 201, body: { id: '1', name: 'Ada' } }]);
+    });
+
+    it('propagates a thrown fetch error', async () => {
+        const client = makeClient(async () => {
+            throw new Error('network down');
+        });
+        const getUser = createServerAction(client.getUser);
+
+        await expect(
+            getUser({
+                params: {
+                    id: '1',
+                },
+            })
+        ).rejects.toThrow('network down');
     });
 
     it('forwards arguments to the client method', async () => {

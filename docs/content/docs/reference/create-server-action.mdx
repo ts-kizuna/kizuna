@@ -1,9 +1,9 @@
 ---
 title: createServerAction
-description: Turn a typed client method into a React Server Action with built-in result handling.
+description: Turn a typed client method into a React Server Action you use like the client.
 ---
 
-`createServerAction` (from `@ts-kizuna/next`) wraps a `@ts-kizuna/fetch` client method as a React Server Action. The returned action runs server-side and resolves to a discriminated `{ ok, status, data | error }` result, with hooks to shape the input, run success side effects, and handle errors.
+`createServerAction` (from `@ts-kizuna/next`) wraps a `@ts-kizuna/fetch` client method as a React Server Action. You use it **exactly like the client**: call it with the route's arguments and get back the same `{ status, body }` response, narrowed on `status`. The action runs server-side, strips the inputs a caller shouldn't supply, and runs `onSuccess` after a 2xx.
 
 Export it from a `'use server'` module:
 
@@ -21,7 +21,7 @@ export const createUser = createServerAction(client.users.createUser, {
 });
 ```
 
-Call it with the route's input:
+Call it and narrow on `status`:
 
 ```ts
 const result = await createUser({
@@ -31,60 +31,44 @@ const result = await createUser({
     },
 });
 
-if (result.ok) {
-    console.log(result.data.id); // typed success body
+if (result.status === 201) {
+    result.body.id; // typed success body
 } else if (result.status === 400) {
-    console.log(result.error.errors); // field-level Zod issues — fully typed
-} else {
-    console.error(result.error.detail);
+    result.body.errors; // validation issues, typed
 }
 ```
 
 ## Result
 
-The action resolves to a discriminated union:
+The action returns the client method's response **unchanged** — the same `{ status, body }` (with `headers`) discriminated union you'd get from the client. Narrow on `status` for the body; multiple success statuses (`200` and `201`) each keep their own typed body.
 
 ```ts
-| { ok: true; status: number; data: SuccessBody; headers: ResponseHeaders }
-| { ok: false; status: number; error: ErrorBody; headers: ResponseHeaders };
+const result = await archiveUser({ params: { id } });
+if (result.status === 200) {
+    result.body.alreadyArchived;
+} else if (result.status === 201) {
+    result.body.archivedAt;
+}
 ```
 
-- A **2xx** response → `{ ok: true, status, data, headers }`, `data` typed from the success body (`undefined` for `204`).
-- A response with status **≥ 400** → `{ ok: false, status, error, headers }`, `error` typed from the route's error schema for that status.
-
-`headers` carries the response headers, so you rarely need `{ raw: true }` just to read one.
-
-`result.ok` splits success from failure, and `result.status` narrows `error` to a specific error response — the same typing the `@ts-kizuna/fetch` client already gives. A genuine transport failure throws by default — pass `onError` to catch it as `{ ok: false, status: 0, error }`, or let a Next.js error boundary handle it.
-
-For any route with a body or query, the client adds a typed `400` (`ValidationError`), so narrowing on `status` reads the field-level Zod issues directly — no helper:
+For a `400`, `result.body` is kizuna's `ValidationError` with field-level Zod issues:
 
 ```ts
-if (!result.ok && result.status === 400) {
-    for (const issue of result.error.errors) {
+if (result.status === 400) {
+    for (const issue of result.body.errors) {
         // issue.path → ['email'], issue.code → 'invalid_format', issue.message → 'Invalid email'
     }
 }
 ```
 
-[`isValidationError`](/docs/reference/is-validation-error) (re-exported from `@ts-kizuna/next`) is only needed when a route declares its **own** `400` schema, so a custom error and a validation error share the status.
+When a route declares its **own** `400` alongside validation, `status === 400` carries both shapes; [`isValidationError`](/docs/reference/is-validation-error) (re-exported from `@ts-kizuna/next`) narrows `result.body` to just the validation shape. A genuine transport failure (the API is unreachable) throws; catch it or let a Next.js error boundary handle it.
 
 ## Options
 
-```ts
-createServerAction(client.users.createUser, {
-    onSuccess: () => {
-        revalidatePath('/users');
-        redirect('/users');
-    },
-});
-```
-
-| Option      | Default | Description                                                                                                                        |
-| ----------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `inject`    | —       | Supply server-derived parts of the request; the fields are merged in and removed from the caller's argument type.                  |
-| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success result (`status`, `data`, `headers`). |
-| `onError`   | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing.           |
-| `raw`       | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                                  |
+| Option      | Default | Description                                                                                                        |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `inject`    | —       | Supply server-derived parts of the request; the fields are merged in and **removed from the caller's input type**. |
+| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success response.             |
 
 ### `inject`
 
@@ -109,45 +93,7 @@ await createPost({
 
 ### `onSuccess`
 
-Runs after a 2xx response with the success result (`status`, `data`, `headers`) — the place to revalidate, redirect, or run other effects. A throw (as `redirect` does) propagates.
-
-### `onError`
-
-Without `onError`, a thrown error (network failure, unexpected crash) propagates. With it, the action catches the error and resolves to `{ ok: false, status: 0, error }` — `status: 0` marks "never reached the server". HTTP errors are unaffected:
-
-```ts
-export const createUser = createServerAction(client.users.createUser, {
-    onError: async (error) => {
-        const t = await getTranslations('errors');
-        return t('users.createFailed');
-    },
-});
-
-const result = await createUser({ body: { name: 'Ada', email: 'ada@example.com' } });
-if (!result.ok && result.status === 0) {
-    showToast(result.error); // the onError message — the API was unreachable
-}
-```
-
-### `raw`
-
-With `{ raw: true }` the action returns exactly what the client method returns — the full `{ status, body }` response union — so you can branch on `status` yourself:
-
-```ts
-export const createUser = createServerAction(client.users.createUser, {
-    raw: true,
-});
-
-const response = await createUser({
-    body: {
-        name: 'Ada',
-        email: 'ada@example.com',
-    },
-});
-if (response.status === 201) {
-    console.log(response.body.id);
-}
-```
+Runs after a 2xx response with the success response — the place to revalidate, redirect, or run other effects. A throw (as `redirect` does) propagates.
 
 ## See also
 

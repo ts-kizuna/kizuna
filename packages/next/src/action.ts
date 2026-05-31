@@ -13,16 +13,17 @@ interface ClientResponse {
  */
 type AnyClientMethod = (...args: never[]) => Promise<ClientResponse>;
 
-/**
- * The 2xx status codes treated as success. Anything outside this set
- * (≥ 400 at runtime) becomes the failure branch.
- */
-type SuccessStatus = 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 226;
-
+/** The full `{ status, body }` response union a client method resolves to. */
 type ResponseUnion<Method extends AnyClientMethod> = Awaited<ReturnType<Method>>;
 
 /** The route's argument object (e.g. `{ params, body, query }`). */
 type RouteArgs<Method extends AnyClientMethod> = Parameters<Method>[0];
+
+/** The 2xx status codes. */
+type SuccessStatus = 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 226;
+
+/** The success (2xx) members of the response union — what `onSuccess` receives. */
+type SuccessResponse<Method extends AnyClientMethod> = Extract<ResponseUnion<Method>, { status: SuccessStatus }>;
 
 /** A recursive partial — what `inject` may supply for the route's arguments. */
 type DeepPartial<T> = T extends readonly unknown[] ? T : T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
@@ -38,53 +39,26 @@ type DeepOmitBy<T, O> = {
         : T[K];
 };
 
-/** The action's own argument list — the route's args minus whatever `inject` fills. */
-type ActionArgs<Method extends AnyClientMethod, Injected> = [DeepOmitBy<RouteArgs<Method>, Injected>];
+/** The action's input: the route's args, minus injected fields and the client-only `fetchOptions`. */
+type ActionInput<Method extends AnyClientMethod, Injected> = Omit<DeepOmitBy<RouteArgs<Method>, Injected>, 'fetchOptions'>;
 
 /**
- * Reshapes each 2xx response member into a success result, preserving its
- * status so `200` and `201` stay distinguishable.
+ * The action — same call and response as the client method, with injected
+ * inputs stripped. Args are optional when the route needs none.
  */
-type SuccessResult<Response> = Response extends { status: infer Status; body: infer Body; headers: infer Headers }
-    ? { ok: true; status: Status; data: Body; headers: Headers }
-    : never;
+type ServerAction<Method extends AnyClientMethod, Injected> =
+    {} extends ActionInput<Method, Injected>
+        ? (args?: ActionInput<Method, Injected>) => Promise<ResponseUnion<Method>>
+        : (args: ActionInput<Method, Injected>) => Promise<ResponseUnion<Method>>;
 
-/**
- * Reshapes each non-2xx response member into a failure result. The union stays
- * discriminated by `status`, so narrowing on `result.status` narrows `error` to
- * that route's specific error body (a custom schema or `ValidationError`).
- */
-type FailureResult<Response> = Response extends { status: infer Status; body: infer Body; headers: infer Headers }
-    ? { ok: false; status: Status; error: Body; headers: Headers }
-    : never;
-
-/**
- * The result of a thrown error caught by `onError`. `status` is `0` because the
- * request never produced an HTTP response.
- */
-type ThrownResult = { ok: false; status: 0; error: string };
-
-type OnError = (error: unknown) => string | Promise<string>;
-
-/**
- * Discriminated result: `{ ok: true, status, data }` on a 2xx response,
- * `{ ok: false, status, error }` otherwise, with `error` typed per the route.
- */
-export type ServerActionResult<Method extends AnyClientMethod> =
-    | SuccessResult<Extract<ResponseUnion<Method>, { status: SuccessStatus }>>
-    | FailureResult<Exclude<ResponseUnion<Method>, { status: SuccessStatus }>>;
-
-/** The success branch of {@link ServerActionResult} — `{ ok: true, status, data, headers }`. */
-type Success<Method extends AnyClientMethod> = SuccessResult<Extract<ResponseUnion<Method>, { status: SuccessStatus }>>;
-
-/** The success hook, shared by every form of {@link createServerAction}. */
+/** The success hook — kept separate from `inject` so the overloads can constrain `inject` precisely. */
 interface SuccessOption<Method extends AnyClientMethod> {
     /**
      * Run after a successful (2xx) response — the place for `revalidatePath`,
-     * `revalidateTag`, or `redirect`. Receives the success result (`status`,
-     * `data`, `headers`). Throwing here (as `redirect` does) propagates.
+     * `revalidateTag`, or `redirect`. Receives the success response. Throwing
+     * here (as `redirect` does) propagates.
      */
-    onSuccess?: (success: Success<Method>) => void | Promise<void>;
+    onSuccess?: (response: SuccessResponse<Method>) => void | Promise<void>;
 }
 
 /**
@@ -93,10 +67,9 @@ interface SuccessOption<Method extends AnyClientMethod> {
 export interface ServerActionOptions<Method extends AnyClientMethod = AnyClientMethod> extends SuccessOption<Method> {
     /**
      * Supply server-derived parts of the route's arguments (e.g. an owner id
-     * from the session). Typed to a partial of the route's arguments, so you get
-     * completion and typos are rejected. The returned fields are deep-merged into
-     * the request and **removed from the action's own argument type** — so the
-     * caller can't pass them. May be async.
+     * from the session). Typed to a partial of the route's args — completion and
+     * typos are checked — and **removed from the action's input type**, so the
+     * caller can't pass (or forge) them. May be async.
      *
      * ```ts
      * inject: async () => ({
@@ -107,17 +80,6 @@ export interface ServerActionOptions<Method extends AnyClientMethod = AnyClientM
      * ```
      */
     inject?: () => DeepPartial<RouteArgs<Method>> | Promise<DeepPartial<RouteArgs<Method>>>;
-    /**
-     * Catch a thrown error and resolve to `{ ok: false, status: 0, error }`
-     * instead of letting it propagate. HTTP errors are unaffected — they
-     * already come back typed. Ignored when `raw` is set.
-     */
-    onError?: OnError;
-    /**
-     * Return the raw `{ status, body }` response union instead of the collapsed
-     * result.
-     */
-    raw?: boolean;
 }
 
 const isSuccess = (status: number): boolean => status >= 200 && status < 300;
@@ -138,14 +100,12 @@ const deepMerge = (base: Record<string, unknown>, extra: Record<string, unknown>
 };
 
 /**
- * Turn a `@ts-kizuna/fetch` client method into a typed React Server Action.
+ * Turn a `@ts-kizuna/fetch` client method into a React Server Action.
  *
- * The action takes the route's arguments and resolves to a discriminated
- * result: `{ ok: true, status, data }` on a 2xx response, `{ ok: false, status,
- * error }` on any other status — where `error` is the contract's typed error
- * body, including `ValidationError` (with the failing fields) for `400`s.
- * `result.status` narrows `error`; `isValidationError` (re-exported from
- * `@ts-kizuna/next`) is only needed when a route declares its own `400` too.
+ * Use it exactly like the client: call it with the route's arguments, get back
+ * the same `{ status, body }` response, and narrow on `status`. The action runs
+ * server-side and strips the inputs a caller shouldn't supply — anything
+ * `inject` fills (e.g. an owner id from the session) is removed from its type.
  *
  * ```ts
  * // app/posts/actions.ts
@@ -155,7 +115,6 @@ const deepMerge = (base: Record<string, unknown>, extra: Record<string, unknown>
  * import { client } from '@/lib/api-client';
  *
  * export const createPost = createServerAction(client.posts.createPost, {
- *     // `authorId` comes from the session and is dropped from the caller's type
  *     inject: async () => ({
  *         body: {
  *             authorId: await currentUserId(),
@@ -166,104 +125,41 @@ const deepMerge = (base: Record<string, unknown>, extra: Record<string, unknown>
  *     },
  * });
  *
- * // caller only knows about `title`
- * await createPost({
+ * // caller only knows about `title`; the result is the client's response
+ * const result = await createPost({
  *     body: {
  *         title,
  *     },
  * });
+ * if (result.status === 201) {
+ *     result.body.id;
+ * }
  * ```
- *
- * Use `inject` to fill server-derived fields, `onSuccess` to revalidate/redirect,
- * `onError` to turn a thrown error into `{ ok: false, status: 0, error }`, and
- * `raw` for the untouched `{ status, body }` response union.
  */
-export function createServerAction<Method extends AnyClientMethod>(
-    method: Method,
-    options: SuccessOption<Method> & { inject?: undefined; raw: true }
-): (...args: Parameters<Method>) => Promise<ResponseUnion<Method>>;
-export function createServerAction<Method extends AnyClientMethod>(
-    method: Method,
-    options: SuccessOption<Method> & { inject?: undefined; raw?: false; onError: OnError }
-): (...args: Parameters<Method>) => Promise<ServerActionResult<Method> | ThrownResult>;
-export function createServerAction<Method extends AnyClientMethod>(
-    method: Method,
-    options?: SuccessOption<Method> & { inject?: undefined; raw?: false; onError?: undefined }
-): (...args: Parameters<Method>) => Promise<ServerActionResult<Method>>;
 export function createServerAction<Method extends AnyClientMethod, Injected extends DeepPartial<RouteArgs<Method>>>(
     method: Method,
-    options: SuccessOption<Method> & { inject: () => Injected | Promise<Injected>; raw: true }
-): (...args: ActionArgs<Method, Injected>) => Promise<ResponseUnion<Method>>;
-export function createServerAction<Method extends AnyClientMethod, Injected extends DeepPartial<RouteArgs<Method>>>(
+    options: SuccessOption<Method> & { inject: () => Injected | Promise<Injected> }
+): ServerAction<Method, Injected>;
+export function createServerAction<Method extends AnyClientMethod>(
     method: Method,
-    options: SuccessOption<Method> & { inject: () => Injected | Promise<Injected>; raw?: false; onError: OnError }
-): (...args: ActionArgs<Method, Injected>) => Promise<ServerActionResult<Method> | ThrownResult>;
-export function createServerAction<Method extends AnyClientMethod, Injected extends DeepPartial<RouteArgs<Method>>>(
-    method: Method,
-    options: SuccessOption<Method> & { inject: () => Injected | Promise<Injected>; raw?: false; onError?: undefined }
-): (...args: ActionArgs<Method, Injected>) => Promise<ServerActionResult<Method>>;
-export function createServerAction(method: AnyClientMethod, options?: any): (...args: never[]) => Promise<unknown> {
-    const {
-        inject,
-        onSuccess,
-        onError,
-        raw = false,
-    } = (options ?? {}) as {
-        inject?: () => unknown | Promise<unknown>;
-        onSuccess?: (success: { ok: true; status: number; data: unknown; headers: unknown }) => void | Promise<void>;
-        onError?: OnError;
-        raw?: boolean;
-    };
+    options?: SuccessOption<Method> & { inject?: undefined }
+): ServerAction<Method, {}>;
+export function createServerAction(
+    method: AnyClientMethod,
+    options?: {
+        inject?: (...args: never[]) => unknown;
+        onSuccess?: (...args: never[]) => unknown;
+    }
+): (...args: never[]) => Promise<unknown> {
+    const { inject, onSuccess } = options ?? {};
 
     return async (...args: unknown[]): Promise<unknown> => {
-        // `inject` builds the request — a failure here is a real error, so it
-        // propagates instead of being folded into the `onError` (transport) path.
         const injected = inject ? await inject() : undefined;
         const callArgs = isPlainObject(injected) ? [deepMerge(isPlainObject(args[0]) ? args[0] : {}, injected)] : args;
-
-        let response: ClientResponse;
-        try {
-            response = await (method as (...callArgs: never[]) => Promise<ClientResponse>)(...(callArgs as never[]));
-        } catch (error) {
-            if (raw || !onError) {
-                throw error;
-            }
-            return {
-                ok: false,
-                status: 0,
-                error: await onError(error),
-            };
+        const response = await (method as (...callArgs: never[]) => Promise<ClientResponse>)(...(callArgs as never[]));
+        if (isSuccess(response.status) && onSuccess) {
+            await onSuccess(response as never);
         }
-
-        if (isSuccess(response.status)) {
-            if (onSuccess) {
-                await onSuccess({
-                    ok: true,
-                    status: response.status,
-                    data: response.body,
-                    headers: response.headers,
-                });
-            }
-            if (raw) {
-                return response;
-            }
-            return {
-                ok: true,
-                status: response.status,
-                data: response.body,
-                headers: response.headers,
-            };
-        }
-
-        if (raw) {
-            return response;
-        }
-
-        return {
-            ok: false,
-            status: response.status,
-            error: response.body,
-            headers: response.headers,
-        };
+        return response;
     };
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { type ReactNode, useState, useTransition } from 'react';
-import { isValidationError } from '@ts-kizuna/next';
 import { createUser, deleteUser } from './actions';
 
 export function AddUserForm() {
@@ -20,7 +19,7 @@ export function AddUserForm() {
                 },
             });
 
-            if (result.ok) {
+            if (result.status === 201) {
                 setFieldErrors({});
                 setFormError(null);
                 setName('');
@@ -29,22 +28,15 @@ export function AddUserForm() {
             }
 
             // Field-level validation: map each Zod issue to its input.
-            if (isValidationError(result.error)) {
-                const next: Record<string, string> = {};
-                for (const issue of result.error.errors) {
-                    const field = issue.path[0];
-                    if (field && !next[field]) {
-                        next[field] = issue.message;
-                    }
+            const next: Record<string, string> = {};
+            for (const issue of result.body.errors) {
+                const field = issue.path[0];
+                if (field && !next[field]) {
+                    next[field] = issue.message;
                 }
-                setFieldErrors(next);
-                setFormError(null);
-                return;
             }
-
-            // Any other error status (e.g. 409) — show the Problem Details message.
-            setFieldErrors({});
-            setFormError(result.error.detail);
+            setFieldErrors(next);
+            setFormError(null);
         });
     }
 

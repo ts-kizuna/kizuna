@@ -525,8 +525,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
-            case badRequest(API.ErrorResponse)
-            case validationError(APIClient.ValidationError)
+            case badRequest(APIClient.ValidationError)
         }
     }
 
@@ -1212,18 +1211,13 @@ public struct APIUsersClient: Sendable {
             }
         case 400:
             do {
-                let payload = try decoder.decode(API.ErrorResponse.self, from: data)
+                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
                 throw APIClient.UsersCreateUser.Failure.badRequest(payload)
             } catch let error as APIClient.UsersCreateUser.Failure {
                 throw error
-            } catch {}
-            do {
-                let payload = try decoder.decode(APIClient.ValidationError.self, from: data)
-                throw APIClient.UsersCreateUser.Failure.validationError(payload)
-            } catch let error as APIClient.UsersCreateUser.Failure {
-                throw error
-            } catch {}
-            throw APIClient.UsersCreateUser.Failure.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status 400")), statusCode: statusCode, data: data)
+            } catch {
+                throw APIClient.UsersCreateUser.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
         default:
             throw APIClient.UsersCreateUser.Failure.unexpectedStatus(statusCode, data)
         }

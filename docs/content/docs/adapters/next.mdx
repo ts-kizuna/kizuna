@@ -301,7 +301,7 @@ uploadAvatar: async ({ body }) => {
 
 ## Server Actions
 
-`createServerAction` turns a typed client method into a React Server Action. Point it at a client method, export it from a `'use server'` module, and call it like a function. The result is a discriminated union — `{ ok: true, status, data }` on success, `{ ok: false, status, error }` on any other status — and you revalidate or redirect from `onSuccess`.
+`createServerAction` turns a typed client method into a React Server Action. You use it **exactly like the client**: call it with the route's arguments, get back the same `{ status, body }` response, and narrow on `status`. The action runs server-side, strips the inputs a caller shouldn't supply (anything `inject` fills), and `onSuccess` is where you revalidate or redirect.
 
 ```ts
 // src/lib/api-client.ts
@@ -333,7 +333,7 @@ export const deleteUser = createServerAction(client.users.deleteUser, {
 });
 ```
 
-Call it with the route's input and branch on the result:
+Call it and narrow on `status` — just like the client:
 
 ```ts
 const result = await createUser({
@@ -343,25 +343,22 @@ const result = await createUser({
     },
 });
 
-if (result.ok) {
-    console.log(result.data.id); // typed success body
-} else {
-    console.error(result.error.detail); // typed Problem Details for result.status
+if (result.status === 201) {
+    result.body.id; // typed success body
+} else if (result.status === 400) {
+    result.body.errors; // validation issues, typed
 }
 ```
 
 ### What it returns
 
-The result is a discriminated union:
+The action returns the client method's response **unchanged** — the same `{ status, body }` discriminated union (with headers). Narrow on `status` to get the body for that response; multiple success statuses (e.g. `200` and `201`) each keep their own typed body.
 
-- **Success** (2xx) → `{ ok: true, status, data, headers }`, with `data` typed from the success body (`undefined` for `204`).
-- **Failure** (≥ 400) → `{ ok: false, status, error, headers }`, with `error` typed from the route's error schema for that status.
-
-`result.ok` splits success from failure, and `result.status` narrows `error` to a specific error response. A genuine transport failure (the API is unreachable) throws by default — pass `onError` to catch it as `{ ok: false, status: 0, error }`, or let a Next.js error boundary handle it.
+A genuine transport failure (the API is unreachable) throws — handle it with a `try/catch` or a Next.js error boundary.
 
 ### Field-level validation errors
 
-For any route with a body or query, the client types a `400` as kizuna's `ValidationError` — each entry in `errors` carries the failing field's `path`. Narrow on `status` and render each message above its input:
+For a `400`, `result.body` is kizuna's `ValidationError` — each entry in `errors` carries the failing field's `path`. Render each message above its input:
 
 ```tsx
 'use client';
@@ -377,12 +374,12 @@ export function AddUserForm() {
     function addUser() {
         startTransition(async () => {
             const result = await createUser({ body: { name, email } });
-            if (result.ok) {
+            if (result.status === 201) {
                 setErrors({});
                 return;
             }
             if (result.status === 400) {
-                setErrors(Object.fromEntries(result.error.errors.map((issue) => [issue.path[0], issue.message])));
+                setErrors(Object.fromEntries(result.body.errors.map((issue) => [issue.path[0], issue.message])));
             }
         });
     }
@@ -407,27 +404,20 @@ export function AddUserForm() {
 }
 ```
 
-If a route declares its **own** `400` schema, that status carries both your error and the validation error — use `isValidationError` (re-exported from `@ts-kizuna/next`) to tell them apart.
+When a route declares its **own** `400` as well, `status === 400` carries both shapes — the custom error _and_ validation. There, [`isValidationError`](/docs/reference/is-validation-error) (re-exported from `@ts-kizuna/next`) narrows `result.body` to just the validation shape:
+
+```ts
+if (result.status === 400 && isValidationError(result.body)) {
+    result.body.errors;
+}
+```
 
 ### Options
 
-| Option      | Default | Description                                                                                                                        |
-| ----------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `inject`    | —       | Supply server-derived parts of the request (e.g. an owner id). The fields are merged in and removed from the caller's type.        |
-| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success result (`status`, `data`, `headers`). |
-| `onError`   | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing.           |
-| `raw`       | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                                  |
-
-`onSuccess` is where you revalidate and redirect:
-
-```ts
-export const createUser = createServerAction(client.users.createUser, {
-    onSuccess: () => {
-        revalidatePath('/users');
-        redirect('/users');
-    },
-});
-```
+| Option      | Default | Description                                                                                                            |
+| ----------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `inject`    | —       | Supply server-derived parts of the request (e.g. an owner id). Merged in and **removed from the caller's input type**. |
+| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success response.                 |
 
 ### Injecting server-derived fields
 

@@ -196,7 +196,6 @@ const usersContract = createContract(Users, {
         body: CreateUserSchema,
         responses: {
             201: UserSchema,
-            400: ErrorResponse,
         },
         summary: 'Create a user',
     },
