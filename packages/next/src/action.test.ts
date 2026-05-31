@@ -85,7 +85,7 @@ describe('createServerAction', () => {
             },
         });
 
-        expect(result).toEqual({
+        expect(result).toMatchObject({
             ok: true,
             status: 201,
             data: {
@@ -240,7 +240,7 @@ describe('createServerAction', () => {
             title: 'Hello',
             authorId: 'user-1',
         });
-        expect(result).toEqual({
+        expect(result).toMatchObject({
             ok: true,
             status: 201,
             data: {
@@ -249,12 +249,57 @@ describe('createServerAction', () => {
         });
     });
 
-    it('runs onSuccess with the data on success, but not on an error response', async () => {
+    it('propagates an inject failure instead of folding it into onError', async () => {
+        const client = makeClient(async () => jsonResponse(201, { id: '1' }));
+        const createPost = createServerAction(client.createPost, {
+            inject: async (): Promise<{ body: { authorId: string } }> => {
+                throw new Error('no session');
+            },
+            onError: () => 'mapped',
+        });
+
+        await expect(
+            createPost({
+                body: {
+                    title: 'Hello',
+                },
+            })
+        ).rejects.toThrow('no session');
+    });
+
+    it('includes response headers in the result', async () => {
+        const client = makeClient(
+            async () =>
+                new Response(JSON.stringify({ id: '1', name: 'Ada' }), {
+                    status: 200,
+                    headers: {
+                        'content-type': 'application/json',
+                        'x-total': '5',
+                    },
+                })
+        );
+        const getUser = createServerAction(client.getUser);
+
+        const result = await getUser({
+            params: {
+                id: '1',
+            },
+        });
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) throw new Error('expected success');
+        expect(result.headers['x-total']).toBe('5');
+    });
+
+    it('passes the success result (status, data, headers) to onSuccess, but not on an error', async () => {
         const seen: Array<unknown> = [];
         const okClient = makeClient(async () => jsonResponse(201, { id: '1', name: 'Ada' }));
         const okAction = createServerAction(okClient.createUser, {
-            onSuccess: (data) => {
-                seen.push(data);
+            onSuccess: (success) => {
+                seen.push({
+                    status: success.status,
+                    data: success.data,
+                });
             },
         });
         await okAction({
@@ -262,7 +307,7 @@ describe('createServerAction', () => {
                 name: 'Ada',
             },
         });
-        expect(seen).toEqual([{ id: '1', name: 'Ada' }]);
+        expect(seen).toEqual([{ status: 201, data: { id: '1', name: 'Ada' } }]);
 
         const errorClient = makeClient(async () => jsonResponse(404, { detail: 'nope' }));
         const errorAction = createServerAction(errorClient.getUser, {
@@ -275,7 +320,7 @@ describe('createServerAction', () => {
                 id: '1',
             },
         });
-        expect(seen).toEqual([{ id: '1', name: 'Ada' }]);
+        expect(seen).toEqual([{ status: 201, data: { id: '1', name: 'Ada' } }]);
     });
 
     it('forwards arguments to the client method', async () => {

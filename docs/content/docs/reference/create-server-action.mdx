@@ -45,12 +45,14 @@ if (result.ok) {
 The action resolves to a discriminated union:
 
 ```ts
-| { ok: true; status: number; data: SuccessBody }
-| { ok: false; status: number; error: ErrorBody };
+| { ok: true; status: number; data: SuccessBody; headers: ResponseHeaders }
+| { ok: false; status: number; error: ErrorBody; headers: ResponseHeaders };
 ```
 
-- A **2xx** response → `{ ok: true, status, data }`, `data` typed from the success body (`undefined` for `204`).
-- A response with status **≥ 400** → `{ ok: false, status, error }`, `error` typed from the route's error schema for that status.
+- A **2xx** response → `{ ok: true, status, data, headers }`, `data` typed from the success body (`undefined` for `204`).
+- A response with status **≥ 400** → `{ ok: false, status, error, headers }`, `error` typed from the route's error schema for that status.
+
+`headers` carries the response headers, so you rarely need `{ raw: true }` just to read one.
 
 `result.ok` splits success from failure, and `result.status` narrows `error` to a specific error response — the same typing the `@ts-kizuna/fetch` client already gives. A genuine transport failure throws by default — pass `onError` to catch it as `{ ok: false, status: 0, error }`, or let a Next.js error boundary handle it.
 
@@ -77,12 +79,12 @@ createServerAction(client.users.createUser, {
 });
 ```
 
-| Option      | Default | Description                                                                                                              |
-| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `inject`    | —       | Supply server-derived parts of the request; the fields are merged in and removed from the caller's argument type.        |
-| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success body.                       |
-| `onError`   | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing. |
-| `raw`       | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                        |
+| Option      | Default | Description                                                                                                                        |
+| ----------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `inject`    | —       | Supply server-derived parts of the request; the fields are merged in and removed from the caller's argument type.                  |
+| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success result (`status`, `data`, `headers`). |
+| `onError`   | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing.           |
+| `raw`       | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                                  |
 
 ### `inject`
 
@@ -107,7 +109,7 @@ await createPost({
 
 ### `onSuccess`
 
-Runs after a 2xx response with the success body — the place to revalidate, redirect, or run other effects. A throw (as `redirect` does) propagates.
+Runs after a 2xx response with the success result (`status`, `data`, `headers`) — the place to revalidate, redirect, or run other effects. A throw (as `redirect` does) propagates.
 
 ### `onError`
 

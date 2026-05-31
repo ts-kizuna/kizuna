@@ -54,7 +54,8 @@ test('collapsed result is a discriminated union of success and typed errors', ()
     const getUser = createServerAction(client.getUser);
     type Result = Awaited<ReturnType<typeof getUser>>;
     expectTypeOf<Result>().toEqualTypeOf<
-        { ok: true; status: 200; data: { id: string; name: string } } | { ok: false; status: 404; error: { detail: string } }
+        | { ok: true; status: 200; data: { id: string; name: string }; headers: Record<string, string> }
+        | { ok: false; status: 404; error: { detail: string }; headers: Record<string, string> }
     >();
 });
 

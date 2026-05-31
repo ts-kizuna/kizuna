@@ -354,8 +354,8 @@ if (result.ok) {
 
 The result is a discriminated union:
 
-- **Success** (2xx) → `{ ok: true, status, data }`, with `data` typed from the success body (`undefined` for `204`).
-- **Failure** (≥ 400) → `{ ok: false, status, error }`, with `error` typed from the route's error schema for that status.
+- **Success** (2xx) → `{ ok: true, status, data, headers }`, with `data` typed from the success body (`undefined` for `204`).
+- **Failure** (≥ 400) → `{ ok: false, status, error, headers }`, with `error` typed from the route's error schema for that status.
 
 `result.ok` splits success from failure, and `result.status` narrows `error` to a specific error response. A genuine transport failure (the API is unreachable) throws by default — pass `onError` to catch it as `{ ok: false, status: 0, error }`, or let a Next.js error boundary handle it.
 
@@ -411,12 +411,12 @@ If a route declares its **own** `400` schema, that status carries both your erro
 
 ### Options
 
-| Option      | Default | Description                                                                                                                 |
-| ----------- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `inject`    | —       | Supply server-derived parts of the request (e.g. an owner id). The fields are merged in and removed from the caller's type. |
-| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success body.                          |
-| `onError`   | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing.    |
-| `raw`       | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                           |
+| Option      | Default | Description                                                                                                                        |
+| ----------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `inject`    | —       | Supply server-derived parts of the request (e.g. an owner id). The fields are merged in and removed from the caller's type.        |
+| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success result (`status`, `data`, `headers`). |
+| `onError`   | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing.           |
+| `raw`       | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                                  |
 
 `onSuccess` is where you revalidate and redirect:
 

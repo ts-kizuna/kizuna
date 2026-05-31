@@ -24,9 +24,6 @@ type ResponseUnion<Method extends AnyClientMethod> = Awaited<ReturnType<Method>>
 /** The route's argument object (e.g. `{ params, body, query }`). */
 type RouteArgs<Method extends AnyClientMethod> = Parameters<Method>[0];
 
-/** Union of the route's success (2xx) bodies — passed to `onSuccess`. */
-type SuccessData<Method extends AnyClientMethod> = Extract<ResponseUnion<Method>, { status: SuccessStatus }>['body'];
-
 /** A recursive partial — what `inject` may supply for the route's arguments. */
 type DeepPartial<T> = T extends readonly unknown[] ? T : T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
@@ -48,8 +45,8 @@ type ActionArgs<Method extends AnyClientMethod, Injected> = [DeepOmitBy<RouteArg
  * Reshapes each 2xx response member into a success result, preserving its
  * status so `200` and `201` stay distinguishable.
  */
-type SuccessResult<Response> = Response extends { status: infer Status; body: infer Body }
-    ? { ok: true; status: Status; data: Body }
+type SuccessResult<Response> = Response extends { status: infer Status; body: infer Body; headers: infer Headers }
+    ? { ok: true; status: Status; data: Body; headers: Headers }
     : never;
 
 /**
@@ -57,8 +54,8 @@ type SuccessResult<Response> = Response extends { status: infer Status; body: in
  * discriminated by `status`, so narrowing on `result.status` narrows `error` to
  * that route's specific error body (a custom schema or `ValidationError`).
  */
-type FailureResult<Response> = Response extends { status: infer Status; body: infer Body }
-    ? { ok: false; status: Status; error: Body }
+type FailureResult<Response> = Response extends { status: infer Status; body: infer Body; headers: infer Headers }
+    ? { ok: false; status: Status; error: Body; headers: Headers }
     : never;
 
 /**
@@ -77,14 +74,17 @@ export type ServerActionResult<Method extends AnyClientMethod> =
     | SuccessResult<Extract<ResponseUnion<Method>, { status: SuccessStatus }>>
     | FailureResult<Exclude<ResponseUnion<Method>, { status: SuccessStatus }>>;
 
+/** The success branch of {@link ServerActionResult} — `{ ok: true, status, data, headers }`. */
+type Success<Method extends AnyClientMethod> = SuccessResult<Extract<ResponseUnion<Method>, { status: SuccessStatus }>>;
+
 /** The success hook, shared by every form of {@link createServerAction}. */
 interface SuccessOption<Method extends AnyClientMethod> {
     /**
      * Run after a successful (2xx) response — the place for `revalidatePath`,
-     * `revalidateTag`, or `redirect`. Receives the success body. Throwing here
-     * (as `redirect` does) propagates.
+     * `revalidateTag`, or `redirect`. Receives the success result (`status`,
+     * `data`, `headers`). Throwing here (as `redirect` does) propagates.
      */
-    onSuccess?: (data: SuccessData<Method>) => void | Promise<void>;
+    onSuccess?: (success: Success<Method>) => void | Promise<void>;
 }
 
 /**
@@ -210,16 +210,19 @@ export function createServerAction(method: AnyClientMethod, options?: any): (...
         raw = false,
     } = (options ?? {}) as {
         inject?: () => unknown | Promise<unknown>;
-        onSuccess?: (data: unknown) => void | Promise<void>;
+        onSuccess?: (success: { ok: true; status: number; data: unknown; headers: unknown }) => void | Promise<void>;
         onError?: OnError;
         raw?: boolean;
     };
 
     return async (...args: unknown[]): Promise<unknown> => {
+        // `inject` builds the request — a failure here is a real error, so it
+        // propagates instead of being folded into the `onError` (transport) path.
+        const injected = inject ? await inject() : undefined;
+        const callArgs = isPlainObject(injected) ? [deepMerge(isPlainObject(args[0]) ? args[0] : {}, injected)] : args;
+
         let response: ClientResponse;
         try {
-            const injected = inject ? await inject() : undefined;
-            const callArgs = isPlainObject(injected) ? [deepMerge(isPlainObject(args[0]) ? args[0] : {}, injected)] : args;
             response = await (method as (...callArgs: never[]) => Promise<ClientResponse>)(...(callArgs as never[]));
         } catch (error) {
             if (raw || !onError) {
@@ -232,26 +235,35 @@ export function createServerAction(method: AnyClientMethod, options?: any): (...
             };
         }
 
-        if (isSuccess(response.status) && onSuccess) {
-            await onSuccess(response.body as never);
+        if (isSuccess(response.status)) {
+            if (onSuccess) {
+                await onSuccess({
+                    ok: true,
+                    status: response.status,
+                    data: response.body,
+                    headers: response.headers,
+                });
+            }
+            if (raw) {
+                return response;
+            }
+            return {
+                ok: true,
+                status: response.status,
+                data: response.body,
+                headers: response.headers,
+            };
         }
 
         if (raw) {
             return response;
         }
 
-        if (isSuccess(response.status)) {
-            return {
-                ok: true,
-                status: response.status,
-                data: response.body,
-            };
-        }
-
         return {
             ok: false,
             status: response.status,
             error: response.body,
+            headers: response.headers,
         };
     };
 }
