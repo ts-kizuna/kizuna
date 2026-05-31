@@ -1,5 +1,3 @@
-import { revalidatePath, revalidateTag } from 'next/cache';
-
 /**
  * The shape every `@ts-kizuna/fetch` client method resolves to.
  */
@@ -22,6 +20,9 @@ type AnyClientMethod = (...args: never[]) => Promise<ClientResponse>;
 type SuccessStatus = 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 226;
 
 type ResponseUnion<Method extends AnyClientMethod> = Awaited<ReturnType<Method>>;
+
+/** Union of the route's success (2xx) bodies — passed to `onSuccess`. */
+type SuccessData<Method extends AnyClientMethod> = Extract<ResponseUnion<Method>, { status: SuccessStatus }>['body'];
 
 /**
  * Reshapes each 2xx response member into a success result, preserving its
@@ -46,19 +47,6 @@ type FailureResult<Response> = Response extends { status: infer Status; body: in
  */
 type ThrownResult = { ok: false; status: 0; error: string };
 
-/**
- * What to revalidate after a successful action. `paths` are passed to
- * `revalidatePath`; `tags` to `revalidateTag` (with the `'max'`
- * stale-while-revalidate profile).
- */
-interface Revalidate {
-    paths?: string[];
-    tags?: string[];
-}
-
-/**
- * Maps a thrown error (e.g. the API is unreachable) to a message.
- */
 type OnError = (error: unknown) => string | Promise<string>;
 
 /**
@@ -70,107 +58,98 @@ export type ServerActionResult<Method extends AnyClientMethod> =
     | FailureResult<Exclude<ResponseUnion<Method>, { status: SuccessStatus }>>;
 
 /**
+ * Options common to every form of {@link createServerAction}.
+ */
+interface BaseOptions<Method extends AnyClientMethod> {
+    /**
+     * Run after a successful (2xx) response — the place for `revalidatePath`,
+     * `revalidateTag`, or `redirect`. Receives the success body. Throwing here
+     * (as `redirect` does) propagates.
+     *
+     * ```ts
+     * onSuccess: () => {
+     *     revalidatePath('/users');
+     *     redirect('/users');
+     * };
+     * ```
+     */
+    onSuccess?: (data: SuccessData<Method>) => void | Promise<void>;
+}
+
+/**
  * Options for {@link createServerAction}.
  */
-export interface ServerActionOptions {
-    /**
-     * Paths and/or tags to revalidate after the action succeeds.
-     */
-    revalidate?: Revalidate;
+export interface ServerActionOptions<Method extends AnyClientMethod = AnyClientMethod> extends BaseOptions<Method> {
     /**
      * Catch a thrown error and resolve to `{ ok: false, status: 0, error }`
      * instead of letting it propagate. HTTP errors are unaffected — they
      * already come back typed. Ignored when `raw` is set.
      */
     onError?: OnError;
+    /**
+     * Return the raw `{ status, body }` response union instead of the collapsed
+     * result.
+     */
+    raw?: boolean;
 }
 
-type CollapsedAction<Method extends AnyClientMethod> = (...args: Parameters<Method>) => Promise<ServerActionResult<Method>>;
-
-/**
- * Collapsed action whose result also includes the `onError` (thrown) case.
- */
-type SafeAction<Method extends AnyClientMethod> = (...args: Parameters<Method>) => Promise<ServerActionResult<Method> | ThrownResult>;
-
-/**
- * A server action that returns the raw `{ status, body }` response union,
- * identical to calling the client method directly.
- */
-type RawAction<Method extends AnyClientMethod> = (...args: Parameters<Method>) => Promise<ResponseUnion<Method>>;
-
 const isSuccess = (status: number): boolean => status >= 200 && status < 300;
-
-const runRevalidate = (revalidate: Revalidate | undefined): void => {
-    if (!revalidate) {
-        return;
-    }
-    for (const path of revalidate.paths ?? []) {
-        revalidatePath(path);
-    }
-    for (const tag of revalidate.tags ?? []) {
-        revalidateTag(tag, 'max');
-    }
-};
 
 /**
  * Turn a `@ts-kizuna/fetch` client method into a typed React Server Action.
  *
- * A 2xx response resolves to `{ ok: true, status, data }`; any other status to
- * `{ ok: false, status, error }`, where `error` is the contract's typed error
- * body for that status — a custom schema, or `ValidationError` with the failing
- * fields for `400`s. Paths and tags are revalidated on success.
+ * The action takes the route's arguments and resolves to a discriminated
+ * result: `{ ok: true, status, data }` on a 2xx response, `{ ok: false, status,
+ * error }` on any other status — where `error` is the contract's typed error
+ * body, including `ValidationError` (with the failing fields) for `400`s.
+ * `result.status` narrows `error`; `isValidationError` (re-exported from
+ * `@ts-kizuna/next`) is only needed when a route declares its own `400` too.
  *
  * ```ts
  * // app/users/actions.ts
  * 'use server';
+ * import { revalidatePath } from 'next/cache';
+ * import { redirect } from 'next/navigation';
  * import { createServerAction } from '@ts-kizuna/next';
  * import { client } from '@/lib/api-client';
  *
- * export const createUser = createServerAction(client.createUser, {
- *     revalidate: {
- *         paths: ['/users'],
+ * export const createUser = createServerAction(client.users.createUser, {
+ *     onSuccess: () => {
+ *         revalidatePath('/users');
+ *         redirect('/users');
  *     },
  * });
  * ```
  *
- * ```ts
- * const result = await createUser({ body: { name: 'Ada' } });
- * if (result.ok) {
- *     result.data; // typed from the success body
- * } else if (result.status === 400) {
- *     result.error.errors; // field-level Zod issues
- * }
- * ```
- *
- * `result.status` narrows `error`. `isValidationError` (re-exported from
- * `@ts-kizuna/next`) is only needed when a route declares its own `400` too.
- *
- * By default a thrown error (e.g. the API is unreachable) propagates. Pass
- * `onError` to catch it as `{ ok: false, status: 0, error }`, or `{ raw: true }`
- * for the untouched `{ status, body }` response union.
+ * Use `onSuccess` to revalidate/redirect, `onError` to turn a thrown error into
+ * `{ ok: false, status: 0, error }`, and `raw` for the untouched response union.
  */
 export function createServerAction<Method extends AnyClientMethod>(
     method: Method,
-    options: ServerActionOptions & { raw: true }
-): RawAction<Method>;
+    options: BaseOptions<Method> & { raw: true }
+): (...args: Parameters<Method>) => Promise<ResponseUnion<Method>>;
 export function createServerAction<Method extends AnyClientMethod>(
     method: Method,
-    options: ServerActionOptions & { raw?: false; onError: OnError }
-): SafeAction<Method>;
+    options: BaseOptions<Method> & { raw?: false; onError: OnError }
+): (...args: Parameters<Method>) => Promise<ServerActionResult<Method> | ThrownResult>;
 export function createServerAction<Method extends AnyClientMethod>(
     method: Method,
-    options?: ServerActionOptions & { raw?: false }
-): CollapsedAction<Method>;
-export function createServerAction<Method extends AnyClientMethod>(
-    method: Method,
-    options: ServerActionOptions & { raw?: boolean } = {}
-): RawAction<Method> | CollapsedAction<Method> | SafeAction<Method> {
-    const { revalidate, raw = false, onError } = options;
+    options?: BaseOptions<Method> & { raw?: false; onError?: undefined }
+): (...args: Parameters<Method>) => Promise<ServerActionResult<Method>>;
+export function createServerAction(
+    method: AnyClientMethod,
+    options: {
+        onSuccess?: (data: unknown) => void | Promise<void>;
+        onError?: OnError;
+        raw?: boolean;
+    } = {}
+): (...args: unknown[]) => Promise<unknown> {
+    const { onSuccess, onError, raw = false } = options;
 
-    const action = async (...args: Parameters<Method>): Promise<unknown> => {
+    return async (...args: unknown[]): Promise<unknown> => {
         let response: ClientResponse;
         try {
-            response = await (method as (...callArgs: Parameters<Method>) => Promise<ClientResponse>)(...args);
+            response = await (method as (...callArgs: never[]) => Promise<ClientResponse>)(...(args as never[]));
         } catch (error) {
             if (raw || !onError) {
                 throw error;
@@ -182,8 +161,8 @@ export function createServerAction<Method extends AnyClientMethod>(
             };
         }
 
-        if (isSuccess(response.status)) {
-            runRevalidate(revalidate);
+        if (isSuccess(response.status) && onSuccess) {
+            await onSuccess(response.body);
         }
 
         if (raw) {
@@ -204,6 +183,4 @@ export function createServerAction<Method extends AnyClientMethod>(
             error: response.body,
         };
     };
-
-    return action as RawAction<Method> | CollapsedAction<Method> | SafeAction<Method>;
 }

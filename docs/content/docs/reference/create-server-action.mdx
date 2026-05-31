@@ -3,19 +3,20 @@ title: createServerAction
 description: Turn a typed client method into a React Server Action with built-in result handling.
 ---
 
-`createServerAction` (from `@ts-kizuna/next`) wraps a `@ts-kizuna/fetch` client method as a React Server Action. The returned action runs server-side, resolves to a discriminated `{ ok, status, data | error }` result, and revalidates on success.
+`createServerAction` (from `@ts-kizuna/next`) wraps a `@ts-kizuna/fetch` client method as a React Server Action. The returned action runs server-side and resolves to a discriminated `{ ok, status, data | error }` result, with hooks to shape the input, run success side effects, and handle errors.
 
 Export it from a `'use server'` module:
 
 ```ts
 // src/app/users/actions.ts
 'use server';
+import { revalidatePath } from 'next/cache';
 import { createServerAction } from '@ts-kizuna/next';
 import { client } from '@/lib/api-client';
 
 export const createUser = createServerAction(client.users.createUser, {
-    revalidate: {
-        paths: ['/users'],
+    onSuccess: () => {
+        revalidatePath('/users');
     },
 });
 ```
@@ -69,18 +70,22 @@ if (!result.ok && result.status === 400) {
 
 ```ts
 createServerAction(client.users.createUser, {
-    revalidate: {
-        paths: ['/users'],
-        tags: ['users'],
+    onSuccess: () => {
+        revalidatePath('/users');
+        redirect('/users');
     },
 });
 ```
 
-| Option       | Default | Description                                                                                                              |
-| ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `revalidate` | —       | `{ paths?, tags? }`. Paths call `revalidatePath`; tags call `revalidateTag(tag, 'max')`.                                 |
-| `onError`    | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing. |
-| `raw`        | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                        |
+| Option      | Default | Description                                                                                                              |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success body.                       |
+| `onError`   | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing. |
+| `raw`       | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                        |
+
+### `onSuccess`
+
+Runs after a 2xx response with the success body — the place to revalidate, redirect, or run other effects. A throw (as `redirect` does) propagates.
 
 ### `onError`
 

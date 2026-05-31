@@ -301,7 +301,7 @@ uploadAvatar: async ({ body }) => {
 
 ## Server Actions
 
-`createServerAction` turns a typed client method into a React Server Action. Point it at a client method, export it from a `'use server'` module, and call it like a function. The result is a discriminated union — `{ ok: true, status, data }` on success, `{ ok: false, status, error }` on any other status — and paths/tags are revalidated on success.
+`createServerAction` turns a typed client method into a React Server Action. Point it at a client method, export it from a `'use server'` module, and call it like a function. The result is a discriminated union — `{ ok: true, status, data }` on success, `{ ok: false, status, error }` on any other status — and you revalidate or redirect from `onSuccess`.
 
 ```ts
 // src/lib/api-client.ts
@@ -316,18 +316,19 @@ export const client = createClient(contract, {
 ```ts
 // src/app/users/actions.ts
 'use server';
+import { revalidatePath } from 'next/cache';
 import { createServerAction } from '@ts-kizuna/next';
 import { client } from '@/lib/api-client';
 
 export const createUser = createServerAction(client.users.createUser, {
-    revalidate: {
-        paths: ['/users'],
+    onSuccess: () => {
+        revalidatePath('/users');
     },
 });
 
 export const deleteUser = createServerAction(client.users.deleteUser, {
-    revalidate: {
-        paths: ['/users'],
+    onSuccess: () => {
+        revalidatePath('/users');
     },
 });
 ```
@@ -410,11 +411,22 @@ If a route declares its **own** `400` schema, that status carries both your erro
 
 ### Options
 
-| Option       | Default | Description                                                                                                              |
-| ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `revalidate` | —       | `{ paths?, tags? }`. Paths call `revalidatePath`; tags call `revalidateTag(tag, 'max')`.                                 |
-| `onError`    | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing. |
-| `raw`        | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                        |
+| Option      | Default | Description                                                                                                              |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success body.                       |
+| `onError`   | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing. |
+| `raw`       | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                        |
+
+`onSuccess` is where you revalidate and redirect:
+
+```ts
+export const createUser = createServerAction(client.users.createUser, {
+    onSuccess: () => {
+        revalidatePath('/users');
+        redirect('/users');
+    },
+});
+```
 
 ### Authentication
 

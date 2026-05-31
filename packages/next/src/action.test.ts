@@ -2,13 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createContract, isValidationError } from '@ts-kizuna/core';
 import { createClient } from '@ts-kizuna/fetch';
-import { revalidatePath, revalidateTag } from 'next/cache';
 import { createServerAction } from './action.js';
-
-vi.mock('next/cache', () => ({
-    revalidatePath: vi.fn(),
-    revalidateTag: vi.fn(),
-}));
 
 const contract = createContract({
     getUser: {
@@ -68,13 +62,9 @@ beforeEach(() => {
 });
 
 describe('createServerAction', () => {
-    it('resolves a 2xx response to { ok: true, data } and revalidates', async () => {
+    it('resolves a 2xx response to { ok: true, data }', async () => {
         const client = makeClient(async () => jsonResponse(201, { id: '1', name: 'Ada' }));
-        const createUser = createServerAction(client.createUser, {
-            revalidate: {
-                paths: ['/users'],
-            },
-        });
+        const createUser = createServerAction(client.createUser);
 
         const result = await createUser({
             body: {
@@ -90,7 +80,6 @@ describe('createServerAction', () => {
                 name: 'Ada',
             },
         });
-        expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/users');
     });
 
     it('resolves a 204 (no body) to { ok: true, data: undefined }', async () => {
@@ -109,13 +98,9 @@ describe('createServerAction', () => {
         expect(result.data).toBeUndefined();
     });
 
-    it('resolves an error status to { ok: false, status, error } and does not revalidate', async () => {
+    it('resolves an error status to { ok: false, status, error }', async () => {
         const client = makeClient(async () => jsonResponse(404, { detail: 'Not found' }));
-        const getUser = createServerAction(client.getUser, {
-            revalidate: {
-                paths: ['/users'],
-            },
-        });
+        const getUser = createServerAction(client.getUser);
 
         const result = await getUser({
             params: {
@@ -129,7 +114,6 @@ describe('createServerAction', () => {
         expect(result.error).toEqual({
             detail: 'Not found',
         });
-        expect(vi.mocked(revalidatePath)).not.toHaveBeenCalled();
     });
 
     it('preserves field-level validation errors', async () => {
@@ -219,24 +203,33 @@ describe('createServerAction', () => {
         });
     });
 
-    it('revalidates paths and tags', async () => {
-        const client = makeClient(async () => jsonResponse(201, { id: '1', name: 'Ada' }));
-        const createUser = createServerAction(client.createUser, {
-            revalidate: {
-                paths: ['/users', '/dashboard'],
-                tags: ['users'],
+    it('runs onSuccess with the data on success, but not on an error response', async () => {
+        const seen: Array<unknown> = [];
+        const okClient = makeClient(async () => jsonResponse(201, { id: '1', name: 'Ada' }));
+        const okAction = createServerAction(okClient.createUser, {
+            onSuccess: (data) => {
+                seen.push(data);
             },
         });
-
-        await createUser({
+        await okAction({
             body: {
                 name: 'Ada',
             },
         });
+        expect(seen).toEqual([{ id: '1', name: 'Ada' }]);
 
-        expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/users');
-        expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/dashboard');
-        expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith('users', 'max');
+        const errorClient = makeClient(async () => jsonResponse(404, { detail: 'nope' }));
+        const errorAction = createServerAction(errorClient.getUser, {
+            onSuccess: () => {
+                seen.push('should-not-run');
+            },
+        });
+        await errorAction({
+            params: {
+                id: '1',
+            },
+        });
+        expect(seen).toEqual([{ id: '1', name: 'Ada' }]);
     });
 
     it('forwards arguments to the client method', async () => {
