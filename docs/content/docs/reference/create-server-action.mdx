@@ -79,9 +79,31 @@ createServerAction(client.users.createUser, {
 
 | Option      | Default | Description                                                                                                              |
 | ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `inject`    | —       | Supply server-derived parts of the request; the fields are merged in and removed from the caller's argument type.        |
 | `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success body.                       |
 | `onError`   | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing. |
 | `raw`       | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                        |
+
+### `inject`
+
+For values that must come from the server (an owner id, a tenant id), not the client. The returned fields are deep-merged into the request and removed from the action's argument type, so the caller can't pass or forge them:
+
+```ts
+export const createPost = createServerAction(client.posts.createPost, {
+    inject: async () => ({
+        body: {
+            authorId: await currentUserId(),
+        },
+    }),
+});
+
+// the caller only knows about `title`
+await createPost({
+    body: {
+        title,
+    },
+});
+```
 
 ### `onSuccess`
 

@@ -411,11 +411,12 @@ If a route declares its **own** `400` schema, that status carries both your erro
 
 ### Options
 
-| Option      | Default | Description                                                                                                              |
-| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success body.                       |
-| `onError`   | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing. |
-| `raw`       | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                        |
+| Option      | Default | Description                                                                                                                 |
+| ----------- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `inject`    | —       | Supply server-derived parts of the request (e.g. an owner id). The fields are merged in and removed from the caller's type. |
+| `onSuccess` | —       | Run after a 2xx response — revalidate, redirect, or other side effects; receives the success body.                          |
+| `onError`   | —       | Catch a thrown error (e.g. the API is unreachable) and resolve to `{ ok: false, status: 0, error }` instead of throwing.    |
+| `raw`       | `false` | Return the raw `{ status, body }` response union instead of the collapsed result.                                           |
 
 `onSuccess` is where you revalidate and redirect:
 
@@ -424,6 +425,29 @@ export const createUser = createServerAction(client.users.createUser, {
     onSuccess: () => {
         revalidatePath('/users');
         redirect('/users');
+    },
+});
+```
+
+### Injecting server-derived fields
+
+Use `inject` for values that must come from the server, not the client — an owner id, a tenant id. The returned fields are deep-merged into the request and **removed from the action's argument type**, so the caller can't pass (or forge) them:
+
+```ts
+export const createPost = createServerAction(client.posts.createPost, {
+    inject: async () => ({
+        body: {
+            authorId: await currentUserId(),
+        },
+    }),
+});
+```
+
+```ts
+// the caller only knows about `title`; `authorId` is filled server-side
+await createPost({
+    body: {
+        title,
     },
 });
 ```

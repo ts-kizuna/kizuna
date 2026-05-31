@@ -41,6 +41,19 @@ const contract = createContract({
             204: z.void(),
         },
     },
+    createPost: {
+        method: 'POST',
+        path: '/posts',
+        body: z.object({
+            title: z.string(),
+            authorId: z.string(),
+        }),
+        responses: {
+            201: z.object({
+                id: z.string(),
+            }),
+        },
+    },
 });
 
 const jsonResponse = (status: number, body?: unknown): Response =>
@@ -200,6 +213,39 @@ describe('createServerAction', () => {
             ok: false,
             status: 0,
             error: 'unreachable: network down',
+        });
+    });
+
+    it('merges injected fields and drops them from the caller args', async () => {
+        const sent: Array<unknown> = [];
+        const client = makeClient(async (_url, init) => {
+            sent.push(JSON.parse(String(init?.body ?? 'null')));
+            return jsonResponse(201, { id: '1' });
+        });
+        const createPost = createServerAction(client.createPost, {
+            inject: async () => ({
+                body: {
+                    authorId: 'user-1',
+                },
+            }),
+        });
+
+        const result = await createPost({
+            body: {
+                title: 'Hello',
+            },
+        });
+
+        expect(sent[0]).toEqual({
+            title: 'Hello',
+            authorId: 'user-1',
+        });
+        expect(result).toEqual({
+            ok: true,
+            status: 201,
+            data: {
+                id: '1',
+            },
         });
     });
 

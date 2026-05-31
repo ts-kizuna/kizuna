@@ -31,6 +31,19 @@ const contract = createContract({
             }),
         },
     },
+    createPost: {
+        method: 'POST',
+        path: '/posts',
+        body: z.object({
+            title: z.string(),
+            authorId: z.string(),
+        }),
+        responses: {
+            201: z.object({
+                id: z.string(),
+            }),
+        },
+    },
 });
 
 const client = createClient(contract, {
@@ -73,4 +86,38 @@ test('onError adds the thrown { status: 0 } case to the result', () => {
     });
     type Result = Awaited<ReturnType<typeof getUser>>;
     expectTypeOf<Extract<Result, { status: 0 }>>().toEqualTypeOf<{ ok: false; status: 0; error: string }>();
+});
+
+test('inject drops the injected field from the action input', () => {
+    const createPost = createServerAction(client.createPost, {
+        inject: async () => ({
+            body: {
+                authorId: '',
+            },
+        }),
+    });
+    type Body = Parameters<typeof createPost>[0]['body'];
+    expectTypeOf<Body>().toEqualTypeOf<{ title: string }>();
+});
+
+test('inject rejects a key that is not a route argument', () => {
+    createServerAction(client.createPost, {
+        // @ts-expect-error - `bodssy` is not a field of the route arguments
+        inject: async () => ({
+            bodssy: {
+                authorId: '',
+            },
+        }),
+    });
+});
+
+test('inject rejects a wrong field type', () => {
+    createServerAction(client.createPost, {
+        // @ts-expect-error - authorId must be a string
+        inject: async () => ({
+            body: {
+                authorId: 123,
+            },
+        }),
+    });
 });
