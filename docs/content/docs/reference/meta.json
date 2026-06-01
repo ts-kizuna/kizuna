@@ -11,6 +11,7 @@
         "create-api",
         "create-client",
         "is-validation-error",
+        "add-coded-issue",
         "generate-open-api",
         "generate-swift-client",
         "create-mcp-endpoint",

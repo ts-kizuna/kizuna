@@ -1,0 +1,77 @@
+---
+title: addCodedIssue
+description: Emit a Zod validation issue with a custom machine-readable code, cast-free.
+---
+
+Emit a single Zod validation issue carrying a custom machine-readable `code`. The code is surfaced verbatim in the `errors[].code` field of kizuna's [`ValidationErrorResponse`](/docs/reference/is-validation-error).
+
+```ts
+import { addCodedIssue } from '@ts-kizuna/core/schemas';
+```
+
+## Why it exists
+
+Zod's runtime accepts any string as an issue `code`, but its types restrict `ctx.addIssue()` to the built-in issue union. A custom code therefore fails to type-check without an awkward cast at every call site:
+
+```ts
+// Without the helper — TS2322 unless you cast.
+ctx.addIssue({ code: 'invalid_phone_number', message: 'Invalid phone number', input: value }
+    as unknown as Parameters<typeof ctx.addIssue>[0]);
+```
+
+`addCodedIssue` owns that cast internally so call sites stay clean.
+
+## Parameters
+
+```ts
+addCodedIssue<Input>(
+    ctx: z.core.$RefinementCtx<Input>,
+    issue: { code: string; message: string; input: Input },
+): void
+```
+
+| Parameter       | Type                           | Description                                               |
+| --------------- | ------------------------------ | --------------------------------------------------------- |
+| `ctx`           | `z.core.$RefinementCtx<Input>` | The refinement context from `.superRefine()`.             |
+| `issue.code`    | `string`                       | Custom machine-readable code surfaced in `errors[].code`. |
+| `issue.message` | `string`                       | Human-readable description of the failure.                |
+| `issue.input`   | `Input`                        | The value that failed validation.                         |
+
+## Example
+
+```ts
+import { z } from 'zod';
+import { isValidPhoneNumber } from 'libphonenumber-js';
+import { addCodedIssue } from '@ts-kizuna/core/schemas';
+
+const CreateContactSchema = z.object({
+    phone: z.string().superRefine((value, ctx) => {
+        if (isValidPhoneNumber(value)) return;
+        addCodedIssue(ctx, {
+            code: 'invalid_phone_number',
+            message: 'Invalid phone number',
+            input: value,
+        });
+    }),
+});
+```
+
+A request whose body fails this refinement returns `400` with the custom code in the response:
+
+```json
+{
+    "type": "about:blank",
+    "title": "Bad Request",
+    "status": 400,
+    "detail": "Request validation failed",
+    "errors": [
+        {
+            "code": "invalid_phone_number",
+            "path": ["phone"],
+            "message": "Invalid phone number"
+        }
+    ]
+}
+```
+
+See [`isValidationError`](/docs/reference/is-validation-error) for how clients consume these codes.
