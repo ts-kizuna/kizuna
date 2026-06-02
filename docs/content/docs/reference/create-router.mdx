@@ -48,7 +48,7 @@ export const router = createRouter(contract, {
             return error({
                 status: 404,
                 body: {
-                    message: 'Not found',
+                    detail: 'Not found',
                 },
             });
         }

@@ -49,7 +49,7 @@ export const router = createRouter(contract, {
             return {
                 status: 404,
                 body: {
-                    message: 'Not found',
+                    detail: 'Not found',
                 },
             };
         }
@@ -185,9 +185,10 @@ createFastifyEndpoints(api, app, {
 });
 ```
 
-| Option               | Default | Description                                                                     |
-| -------------------- | ------- | ------------------------------------------------------------------------------- |
-| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development. |
+| Option               | Default | Description                                                                                                                                                                                |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                                                            |
+| `formatError`        | —       | Reshape error (`>= 400`) response bytes for migrating clients — most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
 
 ## Type-safe request properties
 
@@ -240,7 +241,7 @@ const getUser: RouteHandler<typeof contract.getUser> = async ({ params }) => {
         return {
             status: 404,
             body: {
-                message: 'Not found',
+                detail: 'Not found',
             },
         };
     }

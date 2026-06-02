@@ -8,6 +8,7 @@ import {
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
     type ApiWithRouter,
+    type ErrorFormatter,
     ROUTER_META,
     MIDDLEWARE_META,
     createAdapter,
@@ -50,6 +51,12 @@ export interface ExpressOptions {
      * @default false
      */
     responseValidation?: boolean;
+    /**
+     * Reshape error (status >= 400) response bytes — e.g. serve an older client a plain
+     * `application/json` body during migration. Most migrations don't need this (use Problem
+     * Details extension members instead). See {@link ErrorFormatter}.
+     */
+    formatError?: ErrorFormatter<Request>;
 }
 
 /**
@@ -132,6 +139,7 @@ export interface AppLike {
 interface ExpressResponseContext {
     res: Response;
     next: NextFunction;
+    formatError?: ErrorFormatter<Request>;
 }
 
 const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressResponseContext>({
@@ -139,7 +147,7 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
         req: adapterRequest.request,
         res,
     }),
-    respond: (result, { res, next }) => {
+    respond: (result, { res, next, formatError }) => {
         if (result.kind === 'handler-error') {
             next(result.error);
             return;
@@ -152,7 +160,7 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
             next();
             return;
         }
-        const rendered = renderJsonResult(result);
+        const rendered = renderJsonResult(result, formatError as ErrorFormatter, res.req);
         for (const [key, value] of Object.entries(rendered.headers)) {
             res.setHeader(key, value);
         }
@@ -212,6 +220,7 @@ export function createExpressEndpoints(api: ExpressApi, app: AppLike, options?: 
                     responseContext: {
                         res,
                         next,
+                        formatError: options?.formatError,
                     },
                     responseValidation: options?.responseValidation,
                 });

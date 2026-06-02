@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createContract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createApi, createGuard, createMiddleware, createNextEndpoints, NextRequest, NextResponse } from './index.js';
 
 const contract = createContract({
@@ -12,9 +13,7 @@ const contract = createContract({
                 id: z.string(),
                 name: z.string(),
             }),
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
     createUser: {
@@ -50,7 +49,7 @@ const api = createApi({
                 return {
                     status: 404,
                     body: {
-                        message: 'Not found',
+                        detail: 'Not found',
                     },
                 };
             }
@@ -177,7 +176,7 @@ describe('Next.js handler', () => {
         const response = await GET(makeRequest('GET', '/api/users/missing'));
         expect(response.status).toBe(404);
         const body = await response.json();
-        expect(body.message).toBe('Not found');
+        expect(body.detail).toBe('Not found');
     });
 
     it('routes onError hook overrides the default 500', async () => {

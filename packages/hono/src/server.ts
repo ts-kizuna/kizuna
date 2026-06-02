@@ -8,6 +8,7 @@ import {
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
     type ApiWithRouter,
+    type ErrorFormatter,
     ROUTER_META,
     MIDDLEWARE_META,
     createAdapter,
@@ -36,6 +37,12 @@ export interface HonoOptions {
      * @default false
      */
     responseValidation?: boolean;
+    /**
+     * Reshape error (status >= 400) response bytes — e.g. serve an older client a plain
+     * `application/json` body during migration. Most migrations don't need this (use Problem
+     * Details extension members instead). See {@link ErrorFormatter}.
+     */
+    formatError?: ErrorFormatter<Request>;
 }
 
 /**
@@ -110,16 +117,16 @@ export function createGuard<E extends Env = Env>(
     };
 }
 
-const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { c: Context<Env> }>({
+const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { c: Context<Env>; formatError?: ErrorFormatter<Request> }>({
     buildHandlerContext: (_adapterRequest, { c }) => ({ c }),
-    respond: (result, { c }) => {
+    respond: (result, { c, formatError }) => {
         if (result.kind === 'handler-error') {
             throw result.error;
         }
         if (result.kind === 'raw-response') {
             return result.response as Response;
         }
-        const rendered = renderJsonResult(result);
+        const rendered = renderJsonResult(result, formatError as ErrorFormatter, c.req.raw);
         if (rendered.body === undefined) {
             return c.body(null, rendered.status as ContentfulStatusCode, rendered.headers);
         }
@@ -201,6 +208,7 @@ export function createHonoEndpoints<E extends Env = Env>(api: HonoApi, app: Hono
                 request: adapterRequest,
                 responseContext: {
                     c: c as unknown as Context<Env>,
+                    formatError: options?.formatError,
                 },
                 responseValidation: options?.responseValidation,
             });

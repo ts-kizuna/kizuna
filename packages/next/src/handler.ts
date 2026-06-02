@@ -6,6 +6,7 @@ import {
     type MiddlewareMap,
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
+    type ErrorFormatter,
     createAdapter,
     resolveMiddleware,
     headersToObject,
@@ -90,7 +91,19 @@ export function createGuard(
 
 export interface NextHandlerOptions {
     basePath?: string;
+    /**
+     * Map a thrown error into a response — the inbound migration seam. Return a
+     * `NextResponse` (e.g. built from `problemDetails(...)`) to normalize existing thrown
+     * domain errors into the shared error shape without rewriting every route; return
+     * `void` to fall through to the default 500.
+     */
     onError?: (error: unknown, request: NextRequest) => NextResponse | Promise<NextResponse> | void | Promise<void>;
+    /**
+     * Reshape error (status >= 400) response bytes — e.g. serve an older client a plain
+     * `application/json` body during migration. Most migrations don't need this (use Problem
+     * Details extension members instead). See {@link ErrorFormatter}.
+     */
+    formatError?: ErrorFormatter<NextRequest>;
     /**
      * Middleware functions that run after route matching but before the handler.
      *
@@ -134,7 +147,7 @@ export const handleNextRequest = async <T extends Contract>(
         }),
         respond: (result) => {
             if (result.kind === 'raw-response') return result.response as NextResponse;
-            const rendered = renderJsonResult(result);
+            const rendered = renderJsonResult(result, options?.formatError as ErrorFormatter, request);
             return jsonResponse(rendered.status, rendered.body, rendered.headers);
         },
         onError: async (error): Promise<AdapterResult | void> => {

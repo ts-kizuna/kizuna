@@ -1,4 +1,4 @@
 {
     "title": "Migration",
-    "pages": ["from-ts-rest"]
+    "pages": ["existing-api", "from-ts-rest"]
 }

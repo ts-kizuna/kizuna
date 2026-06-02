@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createModel } from './model.js';
+import { ProblemDetailsSchema } from './error-response.js';
 
 /**
  * Machine-readable error classification from Zod.
@@ -34,7 +35,7 @@ export type ValidationIssueCode = z.infer<typeof ValidationIssueCodeSchema>;
  * listing each field-level validation failure.
  *
  * ```ts
- * import { ValidationErrorResponse } from '@ts-kizuna/core/schemas';
+ * import { ValidationErrorSchema } from '@ts-kizuna/core/schemas';
  *
  * const contract = createContract({
  *     createUser: {
@@ -43,32 +44,16 @@ export type ValidationIssueCode = z.infer<typeof ValidationIssueCodeSchema>;
  *         body: CreateUserSchema,
  *         responses: {
  *             201: UserSchema,
- *             400: ValidationErrorResponse,
+ *             400: ValidationErrorSchema,
  *         },
  *     },
  * });
  * ```
  */
-export const ValidationErrorResponse = createModel({
-    title: 'ValidationErrorResponse',
+export const ValidationErrorSchema = createModel({
+    title: 'ValidationError',
     description: 'RFC 9457 Problem Details error response for validation failures.',
-    schema: z.object({
-        /**
-         * Problem type URI. `about:blank` means no additional semantics beyond the status code.
-         */
-        type: z.string(),
-        /**
-         * Short human-readable summary matching the HTTP status phrase (e.g. "Bad Request").
-         */
-        title: z.string(),
-        /**
-         * HTTP status code repeated inside the body for clients that cannot inspect headers.
-         */
-        status: z.number().int(),
-        /**
-         * Human-readable explanation specific to this occurrence of the problem.
-         */
-        detail: z.string(),
+    schema: ProblemDetailsSchema.extend({
         /**
          * Field-level validation failures produced by Zod.
          */
@@ -91,7 +76,7 @@ export const ValidationErrorResponse = createModel({
     }),
 });
 
-export type ValidationError = z.infer<typeof ValidationErrorResponse>;
+export type ValidationError = z.infer<typeof ValidationErrorSchema>;
 
 /**
  * Type guard for ts-kizuna's validation error response body (400).

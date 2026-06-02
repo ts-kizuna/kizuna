@@ -3,6 +3,7 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import request from 'supertest';
 import { z } from 'zod';
 import { createContract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createApi, createExpressEndpoints, createMiddleware } from './server.js';
 
 interface User {
@@ -20,9 +21,7 @@ const contract = createContract({
                 id: z.string(),
                 name: z.string(),
             }),
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
     createUser: {
@@ -66,9 +65,7 @@ const contract = createContract({
             200: z.object({
                 success: z.boolean(),
             }),
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
 });
@@ -89,7 +86,7 @@ const createTestApp = () => {
                     return {
                         status: 404,
                         body: {
-                            message: 'Not found',
+                            detail: 'Not found',
                         },
                     };
                 }
@@ -132,7 +129,7 @@ const createTestApp = () => {
                     return {
                         status: 404,
                         body: {
-                            message: 'Not found',
+                            detail: 'Not found',
                         },
                     };
                 }
@@ -200,7 +197,7 @@ describe('Express integration', () => {
     it('returns 404 for an unknown user', async () => {
         const response = await request(app).get('/users/missing');
         expect(response.status).toBe(404);
-        expect(response.body.message).toBeDefined();
+        expect(response.body.detail).toBeDefined();
     });
 });
 

@@ -47,6 +47,7 @@ The typed contract object. TypeScript infers the exact shape, giving you full ty
 
 ```ts
 import { createContract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
 
 const UserSchema = z
@@ -83,9 +84,7 @@ export const contract = createContract({
         }),
         responses: {
             201: UserSchema,
-            400: z.object({
-                message: z.string(),
-            }),
+            400: ProblemDetailsSchema,
         },
     },
     getUser: {
@@ -93,9 +92,7 @@ export const contract = createContract({
         path: '/users/:id',
         responses: {
             200: UserSchema,
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
 });

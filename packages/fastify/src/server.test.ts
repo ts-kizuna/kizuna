@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { createContract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createApi, fastifyKizuna, createMiddleware, type FastifyPreHandler } from './server.js';
 
 interface User {
@@ -19,9 +20,7 @@ const contract = createContract({
                 id: z.string(),
                 name: z.string(),
             }),
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
     createUser: {
@@ -65,9 +64,7 @@ const contract = createContract({
             200: z.object({
                 success: z.boolean(),
             }),
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
 });
@@ -90,7 +87,7 @@ beforeEach(async () => {
                     return {
                         status: 404,
                         body: {
-                            message: 'Not found',
+                            detail: 'Not found',
                         },
                     };
                 }
@@ -134,7 +131,7 @@ beforeEach(async () => {
                     return {
                         status: 404,
                         body: {
-                            message: 'Not found',
+                            detail: 'Not found',
                         },
                     };
                 }
@@ -201,7 +198,7 @@ describe('Fastify integration', () => {
         });
         expect(response.statusCode).toBe(404);
         const body = response.json();
-        expect(body.message).toBe('Not found');
+        expect(body.detail).toBe('Not found');
     });
 
     it('lists users with query params', async () => {

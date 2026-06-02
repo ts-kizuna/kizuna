@@ -40,7 +40,7 @@ export const router = createRouter(contract, {
             return {
                 status: 404,
                 body: {
-                    message: 'Not found',
+                    detail: 'Not found',
                 },
             };
         }
@@ -71,7 +71,7 @@ Each handler receives an object with the validated inputs for that route:
 Return `{ status, body }` matching one of the route's declared responses. TypeScript enforces that the status and body match.
 
 ```ts
-// Route: responses: { 200: UserSchema, 404: z.object({ message: z.string() }) }
+// Route: responses: { 200: UserSchema, 404: ProblemDetailsSchema }
 return {
     status: 200,
     body: user,
@@ -80,7 +80,7 @@ return {
 return {
     status: 404,
     body: {
-        message: 'User not found',
+        detail: 'User not found',
     },
 };
 ```
@@ -99,11 +99,11 @@ return {
 
 ## Error responses
 
-Use [`ErrorResponse`](/docs/reference/error-response) from `@ts-kizuna/core` in your contract to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/create-guard#deny-and-errorresponse) in guards and all built-in kizuna errors.
+Error responses (status `>= 400`) are [RFC 9457 Problem Details](/docs/reference/problem-details-schema). Declare them in your contract with [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` — the same shape produced by [`deny()`](/docs/reference/create-guard#deny-and-problemdetailsschema) in guards and all built-in kizuna errors. Handlers supply only `detail` (plus any extension members); `type`, `title`, and `status` are auto-filled.
 
 ```ts
 import { createContract } from '@ts-kizuna/core';
-import { ErrorResponse } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 
 const contract = createContract({
     getUser: {
@@ -111,7 +111,7 @@ const contract = createContract({
         path: '/users/:id',
         responses: {
             200: UserSchema,
-            404: ErrorResponse,
+            404: ProblemDetailsSchema,
         },
     },
 });
@@ -126,7 +126,7 @@ getUser: async ({ params, error }) => {
         return error({
             status: 404,
             body: {
-                message: 'Not found',
+                detail: 'Not found',
             },
         });
     }
@@ -198,7 +198,7 @@ const getUser: RouteHandler<typeof contract.getUser> = async ({ params }) => {
         return {
             status: 404,
             body: {
-                message: 'Not found',
+                detail: 'Not found',
             },
         };
     }

@@ -45,7 +45,7 @@ export const router = createRouter(contract, {
             return {
                 status: 404,
                 body: {
-                    message: 'Not found',
+                    detail: 'Not found',
                 },
             };
         }
@@ -192,12 +192,13 @@ createNextEndpoints(api, {
 });
 ```
 
-| Option               | Default | Description                                                                                          |
-| -------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
-| `basePath`           | `''`    | Path prefix to strip when matching contract routes                                                   |
-| `requestMiddleware`  | `[]`    | **Deprecated.** Use `middleware` via `createApi` instead.                                            |
-| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                      |
-| `onError`            | —       | Custom handler for unhandled errors. Return an `AdapterResult` to override the default 500 response. |
+| Option               | Default | Description                                                                                                                                                                                |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `basePath`           | `''`    | Path prefix to strip when matching contract routes                                                                                                                                         |
+| `requestMiddleware`  | `[]`    | **Deprecated.** Use `middleware` via `createApi` instead.                                                                                                                                  |
+| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                                                            |
+| `formatError`        | —       | Reshape error (`>= 400`) response bytes for migrating clients — most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
+| `onError`            | —       | Map a thrown error into a response (inbound migration seam); return an `AdapterResult`/`Response` to override the default 500.                                                             |
 
 ## `onError`
 

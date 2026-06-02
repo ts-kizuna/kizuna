@@ -47,6 +47,7 @@ The contract is a plain TypeScript object. It lives in a shared package that bot
 ```ts
 // packages/contract/src/index.ts
 import { createContract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
 
 export const contract = createContract({
@@ -58,9 +59,7 @@ export const contract = createContract({
                 id: z.string(),
                 name: z.string(),
             }),
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
     createUser: {
@@ -81,9 +80,7 @@ export const contract = createContract({
         path: '/users/:id',
         responses: {
             204: z.void(),
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
 });
@@ -103,7 +100,7 @@ export const router = createRouter(contract, {
             return {
                 status: 404,
                 body: {
-                    message: 'Not found',
+                    detail: 'Not found',
                 },
             };
         }
@@ -127,7 +124,7 @@ export const router = createRouter(contract, {
             return {
                 status: 404,
                 body: {
-                    message: 'Not found',
+                    detail: 'Not found',
                 },
             };
         }

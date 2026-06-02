@@ -49,7 +49,7 @@ export const router = createRouter(contract, {
             return {
                 status: 404,
                 body: {
-                    message: 'Not found',
+                    detail: 'Not found',
                 },
             };
         }
@@ -195,10 +195,11 @@ createExpressEndpoints(api, app, {
 });
 ```
 
-| Option               | Default | Description                                                                                                   |
-| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
-| `responseValidation` | `false` | Validate handler return values against response schemas — surfaces as 500 on mismatch. Enable in development. |
-| `globalMiddleware`   | `[]`    | **Deprecated.** Use `middleware` via `createApi` instead.                                                     |
+| Option               | Default | Description                                                                                                                                                                                |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `responseValidation` | `false` | Validate handler return values against response schemas — surfaces as 500 on mismatch. Enable in development.                                                                              |
+| `formatError`        | —       | Reshape error (`>= 400`) response bytes for migrating clients — most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
+| `globalMiddleware`   | `[]`    | **Deprecated.** Use `middleware` via `createApi` instead.                                                                                                                                  |
 
 ## Type-safe request properties
 

@@ -1,5 +1,5 @@
 import { createContract, createModel, createTag } from '@ts-kizuna/core';
-import { ErrorResponse } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
 
 export const UserSchema = createModel({
@@ -186,7 +186,7 @@ const usersContract = createContract(Users, {
                     'x-request-id': z.string().optional(),
                 }),
             },
-            404: ErrorResponse,
+            404: ProblemDetailsSchema,
         },
         summary: 'Get a user by id',
     },
@@ -196,7 +196,7 @@ const usersContract = createContract(Users, {
         body: CreateUserSchema,
         responses: {
             201: UserSchema,
-            400: ErrorResponse,
+            400: ProblemDetailsSchema,
         },
         summary: 'Create a user',
     },
@@ -210,7 +210,7 @@ const usersContract = createContract(Users, {
             200: z.object({
                 success: z.boolean(),
             }),
-            404: ErrorResponse,
+            404: ProblemDetailsSchema,
         },
         summary: 'Delete a user',
     },
@@ -261,7 +261,7 @@ const usersContract = createContract(Users, {
             200: z.object({
                 exists: z.boolean(),
             }),
-            404: z.void(),
+            404: ProblemDetailsSchema,
         },
         summary: 'Check user existence — exercises HEAD body stripping',
     },
@@ -305,7 +305,7 @@ export const workspaceContract = createContract({
             }),
             responses: {
                 201: UserSchema,
-                409: ErrorResponse,
+                409: ProblemDetailsSchema,
             },
             summary: 'Invite a member to the workspace',
         },
@@ -393,7 +393,7 @@ export const contract = createContract({
                 .meta({
                     description: 'Validation result',
                 }),
-            400: ErrorResponse,
+            400: ProblemDetailsSchema,
             401: z.void(),
         },
         summary: 'Validate config — exercises generator bug coverage',
