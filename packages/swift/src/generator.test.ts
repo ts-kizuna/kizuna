@@ -595,6 +595,33 @@ describe('Swift generator — owned type nesting', () => {
         expect(output).not.toContain('public enum VideoStatus');
     });
 
+    it('sanitizes enum values that are not valid Swift identifiers into camelCase case names', () => {
+        const contract = createContract({
+            getFile: {
+                method: 'GET',
+                path: '/files/:id',
+                responses: {
+                    200: z
+                        .object({
+                            id: z.string(),
+                            contentType: z.enum(['image/jpeg', 'text-plain', 'video.mp4', '3d-model']),
+                        })
+                        .meta({ id: 'StoredFile' }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        // sanitized case name, original value preserved as the rawValue
+        expect(output).toContain('case imageJpeg = "image/jpeg"');
+        expect(output).toContain('case textPlain = "text-plain"');
+        expect(output).toContain('case videoMp4 = "video.mp4"');
+        // leading digit gets an underscore prefix
+        expect(output).toContain('case _3dModel = "3d-model"');
+        // no unsanitized identifier leaks through
+        expect(output).not.toContain('case image/jpeg');
+        expect(output).not.toContain('case 3d');
+    });
+
     it('nests an inline object inside its parent struct', () => {
         const contract = createContract({
             getPage: {

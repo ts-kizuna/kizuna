@@ -238,6 +238,26 @@ final class APIClientTests: XCTestCase {
         try await client.users.pingUser(id: created.body.id)
     }
 
+    func testGetMyWorkSanitizedEnumAndVoidSuccessArm() async throws {
+        // getMyWork has responses: { 200: { contentType: z.enum([...]) }, 204: z.void() }.
+        // The 200 arm carries a body whose enum values ("image/jpeg", "3d-model", ...) are not
+        // valid Swift identifiers, so the case names must be sanitized while the rawValue keeps
+        // the original string. The 204 arm is a bare `.status204` case with no associated value.
+        let result = try await client.users.getMyWork()
+        switch result.body {
+        case .status200(let payload):
+            XCTAssertEqual(payload.contentType, .imageJpeg)
+            XCTAssertEqual(payload.contentType.rawValue, "image/jpeg")
+            XCTAssertFalse(payload.items.isEmpty)
+            // exercise every sanitized case name so a regression in identifier sanitizing fails to compile
+            XCTAssertEqual(APIClient.UsersGetMyWork.ResponseContentType.textPlain.rawValue, "text-plain")
+            XCTAssertEqual(APIClient.UsersGetMyWork.ResponseContentType.videoMp4.rawValue, "video.mp4")
+            XCTAssertEqual(APIClient.UsersGetMyWork.ResponseContentType._3dModel.rawValue, "3d-model")
+        case .status204:
+            XCTFail("expected 200 work items, got 204")
+        }
+    }
+
     func testHealthSubClientHistory() async throws {
         let result = try await client.health.history()
         XCTAssertGreaterThanOrEqual(result.body.count, 1)

@@ -654,10 +654,22 @@ public actor APIClient {
 
         public struct Response: Codable, Sendable, Equatable {
             public let items: [String]
+            public let contentType: ResponseContentType
 
-            public init(items: [String]) {
+            public init(
+                items: [String],
+                contentType: ResponseContentType
+            ) {
                 self.items = items
+                self.contentType = contentType
             }
+        }
+
+        public enum ResponseContentType: String, Codable, Sendable {
+            case imageJpeg = "image/jpeg"
+            case textPlain = "text-plain"
+            case videoMp4 = "video.mp4"
+            case _3dModel = "3d-model"
         }
 
         public enum Success: Sendable, Equatable {
@@ -1451,7 +1463,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// List work items — exercises a z.void() arm in a multi-status success union
+    /// List work items — exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers
     public func getMyWork() async throws(APIClient.UsersGetMyWork.Failure) -> APIClient.UsersGetMyWork.Result {
         let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
