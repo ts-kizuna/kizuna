@@ -1,0 +1,206 @@
+---
+title: ProblemDetailsSchema
+description: RFC 9457 Problem Details error response schema (ProblemDetailsSchema) used across kizuna.
+---
+
+The standard [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) error response shape used by kizuna. Matches the format produced by [`deny()`](/docs/reference/create-guard#deny-and-problemdetailsschema) in guards and all built-in error responses (404, 405, 415, etc.).
+
+```ts
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+```
+
+## Shape
+
+```json
+{
+    "type": "about:blank",
+    "title": "Not Found",
+    "status": 404,
+    "detail": "User not found"
+}
+```
+
+| Field    | Description                                                                             |
+| -------- | --------------------------------------------------------------------------------------- |
+| `type`   | Problem type URI. `about:blank` means "no additional semantics beyond the status code." |
+| `title`  | Short human-readable summary matching the HTTP status phrase.                           |
+| `status` | HTTP status code.                                                                       |
+| `detail` | Human-readable explanation specific to this occurrence.                                 |
+
+## Usage in contracts
+
+Use `ProblemDetailsSchema` in your contract's `responses` to document error status codes:
+
+```ts
+import { createContract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+
+const contract = createContract({
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
+            401: ProblemDetailsSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+        },
+    },
+});
+```
+
+## Usage in handlers
+
+Handlers only need to provide `detail` — kizuna fills in `type`, `title`, and `status` automatically:
+
+```ts
+const router = createRouter(contract, {
+    getUser: ({ params, error }) => {
+        const user = users.get(params.id);
+        if (!user) {
+            return error({
+                status: 404,
+                body: {
+                    detail: 'User not found',
+                },
+            });
+        }
+        return {
+            status: 200,
+            body: user,
+        };
+    },
+});
+```
+
+The response sent to the client includes the full RFC 9457 envelope:
+
+```json
+{
+    "type": "about:blank",
+    "title": "Not Found",
+    "status": 404,
+    "detail": "User not found"
+}
+```
+
+## Extension members
+
+RFC 9457 lets a problem carry extra fields — **extension members** — alongside the standard envelope. `ProblemDetailsSchema` is a plain Zod object schema, so you add domain-specific fields with Zod's native `.extend()` — there's no builder function:
+
+```ts
+import { z } from 'zod';
+import { createContract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+
+const contract = createContract({
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        body: CreateUserSchema,
+        responses: {
+            201: UserSchema,
+            409: ProblemDetailsSchema.extend({
+                conflictingId: z.string(),
+            }),
+        },
+    },
+});
+```
+
+To reuse the extended schema across routes — and give it a name in the generated OpenAPI spec — wrap it in [`createModel`](/docs/reference/create-model):
+
+```ts
+import { z } from 'zod';
+import { createModel } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+
+const ConflictError = createModel({
+    title: 'ConflictError',
+    schema: ProblemDetailsSchema.extend({
+        conflictingId: z.string(),
+    }),
+});
+
+// responses: { 409: ConflictError }
+```
+
+The handler supplies `detail` plus the declared extensions; `type`, `title`, and `status` are still auto-filled:
+
+```ts
+return error({
+    status: 409,
+    body: {
+        detail: 'A user with that email already exists',
+        conflictingId: existing.id,
+    },
+});
+```
+
+```json
+{
+    "type": "about:blank",
+    "title": "Conflict",
+    "status": 409,
+    "detail": "A user with that email already exists",
+    "conflictingId": "usr_abc123"
+}
+```
+
+Extension members are also the cleanest way to preserve an existing API's error fields while moving onto kizuna — see [Migrating an existing API](/docs/migration/existing-api).
+
+## Checking for a Problem Details body
+
+`isProblemDetails` is a type guard for the shared error shape — the sibling of [`isValidationError`](/docs/reference/is-validation-error):
+
+```ts
+import { isProblemDetails } from '@ts-kizuna/core';
+
+if (isProblemDetails(response.body)) {
+    console.error(`${response.body.status}: ${response.body.detail}`);
+}
+```
+
+## Why Problem Details only
+
+Error responses (status `>= 400`) must be Problem Details — handlers cannot return an arbitrary error shape, and the type system enforces it. This is deliberate: a single shared error schema is what lets guards, validation, the type guards above, generated clients, and the OpenAPI spec all compose against one shape. Need extra fields? Use extension members. Need a non-JSON error (proxying, an HTML error page)? Use the adapter's `raw-response` escape hatch.
+
+## Migrating to a legacy wire shape
+
+The wire bytes are produced by a single, pluggable formatter. The default emits `application/problem+json`. Adapters accept a `formatError` option to reshape the bytes for clients that can't move to Problem Details yet. It receives the **request**, so during a transition you serve the legacy shape to old clients and Problem Details to new ones — branching on whatever signal your API has (a version header, `Accept`, …):
+
+```ts
+createExpressEndpoints(api, app, {
+    formatError: (problem, { request }) => {
+        // new clients opt in via a signal you control — here, a version header
+        if (request.headers.get('x-api-version') === '2') {
+            return { contentType: 'application/problem+json', body: problem };
+        }
+        // old clients keep the legacy shape
+        return {
+            contentType: 'application/json',
+            body: { ok: false, error: { code: problem.status, message: problem.detail } },
+        };
+    },
+});
+```
+
+The input is always the canonical problem; only the outgoing bytes change. This is a migration seam, not a way to define custom errors in the contract — the contract stays Problem Details. Most migrations don't need it at all (use extension members). See [Migrating an existing API](/docs/migration/existing-api).
+
+## What produces it
+
+Everything in kizuna that returns a non-success response uses this shape:
+
+| Source                 | Example                      |
+| ---------------------- | ---------------------------- |
+| Guards (`deny`)        | `deny(403, 'Forbidden')`     |
+| Route not found        | 404 for unmatched paths      |
+| Method not allowed     | 405 with `Allow` header      |
+| Unsupported media type | 415 for wrong `Content-Type` |
+| Handler errors         | 500 for unhandled exceptions |
+
+All built-in error responses use `application/problem+json` as the content type.
+
+## OpenAPI
+
+`ProblemDetailsSchema` is a named model — it appears as `ProblemDetails` in the generated OpenAPI spec under `components/schemas`, keeping your API documentation clean and consistent.

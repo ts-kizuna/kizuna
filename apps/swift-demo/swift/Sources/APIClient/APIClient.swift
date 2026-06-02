@@ -37,7 +37,7 @@ public enum API {
     }
 
     /// RFC 9457 Problem Details error response.
-    public struct ErrorResponse: Codable, Sendable, Equatable {
+    public struct ProblemDetails: Codable, Sendable, Equatable {
         public let type: String
         public let title: String
         public let status: Int
@@ -409,7 +409,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
-            case badRequest(API.ErrorResponse)
+            case badRequest(API.ProblemDetails)
             case unauthorized
             case validationError(APIClient.ValidationError)
         }
@@ -510,7 +510,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
-            case notFound(API.ErrorResponse)
+            case notFound(API.ProblemDetails)
         }
     }
 
@@ -525,7 +525,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
-            case badRequest(API.ErrorResponse)
+            case badRequest(API.ProblemDetails)
             case validationError(APIClient.ValidationError)
         }
     }
@@ -549,7 +549,7 @@ public actor APIClient {
             case cancelled
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
-            case notFound(API.ErrorResponse)
+            case notFound(API.ProblemDetails)
         }
     }
 
@@ -663,8 +663,9 @@ public actor APIClient {
         public enum Failure: Swift.Error, Sendable {
             case requestFailed(Swift.Error)
             case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
-            case notFound
+            case notFound(API.ProblemDetails)
         }
     }
 
@@ -923,7 +924,7 @@ public actor APIClient {
             }
         case 400:
             do {
-                let payload = try decoder.decode(API.ErrorResponse.self, from: data)
+                let payload = try decoder.decode(API.ProblemDetails.self, from: data)
                 throw APIClient.ValidateConfig.Failure.badRequest(payload)
             } catch let error as APIClient.ValidateConfig.Failure {
                 throw error
@@ -1159,7 +1160,7 @@ public struct APIUsersClient: Sendable {
             }
         case 404:
             do {
-                let payload = try decoder.decode(API.ErrorResponse.self, from: data)
+                let payload = try decoder.decode(API.ProblemDetails.self, from: data)
                 throw APIClient.UsersGetUser.Failure.notFound(payload)
             } catch let error as APIClient.UsersGetUser.Failure {
                 throw error
@@ -1212,7 +1213,7 @@ public struct APIUsersClient: Sendable {
             }
         case 400:
             do {
-                let payload = try decoder.decode(API.ErrorResponse.self, from: data)
+                let payload = try decoder.decode(API.ProblemDetails.self, from: data)
                 throw APIClient.UsersCreateUser.Failure.badRequest(payload)
             } catch let error as APIClient.UsersCreateUser.Failure {
                 throw error
@@ -1267,7 +1268,7 @@ public struct APIUsersClient: Sendable {
             }
         case 404:
             do {
-                let payload = try decoder.decode(API.ErrorResponse.self, from: data)
+                let payload = try decoder.decode(API.ProblemDetails.self, from: data)
                 throw APIClient.UsersDeleteUser.Failure.notFound(payload)
             } catch let error as APIClient.UsersDeleteUser.Failure {
                 throw error
@@ -1425,7 +1426,7 @@ public struct APIUsersClient: Sendable {
 
     /// Check user existence — exercises HEAD body stripping
     public func checkUser(id: String) async throws(APIClient.UsersCheckUser.Failure) {
-        let (baseURL, session, _, _, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
         var path = "/users/:id/check"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(id))
@@ -1454,7 +1455,14 @@ public struct APIUsersClient: Sendable {
         case 200:
             return
         case 404:
-            throw APIClient.UsersCheckUser.Failure.notFound
+            do {
+                let payload = try decoder.decode(API.ProblemDetails.self, from: data)
+                throw APIClient.UsersCheckUser.Failure.notFound(payload)
+            } catch let error as APIClient.UsersCheckUser.Failure {
+                throw error
+            } catch {
+                throw APIClient.UsersCheckUser.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
         default:
             throw APIClient.UsersCheckUser.Failure.unexpectedStatus(statusCode, data)
         }

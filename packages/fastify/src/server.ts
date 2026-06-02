@@ -8,6 +8,7 @@ import {
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
     type ApiWithRouter,
+    type ErrorFormatter,
     ROUTER_META,
     MIDDLEWARE_META,
     createAdapter,
@@ -43,6 +44,12 @@ export interface FastifyOptions {
      * @default false
      */
     responseValidation?: boolean;
+    /**
+     * Reshape error (status >= 400) response bytes — e.g. serve an older client a plain
+     * `application/json` body during migration. Most migrations don't need this (use Problem
+     * Details extension members instead). See {@link ErrorFormatter}.
+     */
+    formatError?: ErrorFormatter<FastifyRequest>;
 }
 
 /**
@@ -117,6 +124,7 @@ export function createGuard(
 
 interface FastifyResponseContext {
     reply: FastifyReply;
+    formatError?: ErrorFormatter<FastifyRequest>;
 }
 
 const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, FastifyResponseContext>({
@@ -124,14 +132,14 @@ const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
         request: adapterRequest.request,
         reply,
     }),
-    respond: (result, { reply }) => {
+    respond: (result, { reply, formatError }) => {
         if (result.kind === 'handler-error') {
             throw result.error;
         }
         if (result.kind === 'raw-response') {
             return;
         }
-        const rendered = renderJsonResult(result);
+        const rendered = renderJsonResult(result, formatError as ErrorFormatter, reply.request);
         for (const [key, value] of Object.entries(rendered.headers)) {
             reply.header(key, value);
         }
@@ -234,6 +242,7 @@ export const fastifyKizuna = fastifyPlugin(
                         request: adapterRequest,
                         responseContext: {
                             reply,
+                            formatError: options?.formatError,
                         },
                         responseValidation: options?.responseValidation,
                     });

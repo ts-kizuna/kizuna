@@ -9,6 +9,7 @@ The contract is a plain TypeScript object that describes every route in your API
 
 ```ts
 import { createContract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
 
 export const UserSchema = z
@@ -45,9 +46,7 @@ export const contract = createContract({
         }),
         responses: {
             201: UserSchema,
-            400: z.object({
-                message: z.string(),
-            }),
+            400: ProblemDetailsSchema,
         },
     },
     getUser: {
@@ -55,9 +54,7 @@ export const contract = createContract({
         path: '/users/:id',
         responses: {
             200: UserSchema,
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
 });
@@ -84,9 +81,7 @@ Simple form — a Zod schema per status code:
 ```ts
 responses: {
     200: UserSchema,
-    404: z.object({
-        message: z.string(),
-    }),
+    404: ProblemDetailsSchema,
 },
 ```
 
@@ -100,9 +95,7 @@ responses: {
             'x-request-id': z.string().optional(),
         }),
     },
-    404: z.object({
-        message: z.string(),
-    }),
+    404: ProblemDetailsSchema,
 },
 ```
 
@@ -111,9 +104,7 @@ No-content responses — use `z.void()` when a status code carries no body:
 ```ts
 responses: {
     204: z.void(),
-    404: z.object({
-        message: z.string(),
-    }),
+    404: ProblemDetailsSchema,
 },
 ```
 

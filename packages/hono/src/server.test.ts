@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { createMiddleware as createHonoMiddleware } from 'hono/factory';
 import { z } from 'zod';
 import { createContract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createApi, createHonoEndpoints, createMiddleware } from './server.js';
 
 interface User {
@@ -20,9 +21,7 @@ const contract = createContract({
                 id: z.string(),
                 name: z.string(),
             }),
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
     createUser: {
@@ -66,9 +65,7 @@ const contract = createContract({
             200: z.object({
                 success: z.boolean(),
             }),
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
 });
@@ -91,7 +88,7 @@ beforeEach(() => {
                     return {
                         status: 404,
                         body: {
-                            message: 'Not found',
+                            detail: 'Not found',
                         },
                     };
                 }
@@ -135,7 +132,7 @@ beforeEach(() => {
                     return {
                         status: 404,
                         body: {
-                            message: 'Not found',
+                            detail: 'Not found',
                         },
                     };
                 }
@@ -197,7 +194,7 @@ describe('Hono integration', () => {
         const response = await app.request('/users/missing');
         expect(response.status).toBe(404);
         const body = await response.json();
-        expect(body.message).toBe('Not found');
+        expect(body.detail).toBe('Not found');
     });
 
     it('lists users with query params', async () => {

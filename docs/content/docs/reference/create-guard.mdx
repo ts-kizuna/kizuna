@@ -121,9 +121,9 @@ const middleware = createMiddleware(contract, {
 });
 ```
 
-## `deny` and `ErrorResponse`
+## `deny` and `ProblemDetailsSchema`
 
-When a guard calls `deny(status, message)`, the response matches kizuna's standard [`ErrorResponse`](/docs/reference/error-response) shape:
+When a guard calls `deny(status, message)`, the response matches kizuna's standard [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) shape:
 
 ```json
 {
@@ -131,11 +131,11 @@ When a guard calls `deny(status, message)`, the response matches kizuna's standa
 }
 ```
 
-This is the same shape used by kizuna's built-in errors (404, 400 validation, 405, etc.). Use `ErrorResponse` in your contracts to document these status codes:
+This is the same shape used by kizuna's built-in errors (404, 400 validation, 405, etc.). Use `ProblemDetailsSchema` in your contracts to document these status codes:
 
 ```ts
 import { createContract } from '@ts-kizuna/core';
-import { ErrorResponse } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 
 const contract = createContract({
     getUser: {
@@ -143,9 +143,9 @@ const contract = createContract({
         path: '/users/:id',
         responses: {
             200: UserSchema,
-            401: ErrorResponse,
-            403: ErrorResponse,
-            404: ErrorResponse,
+            401: ProblemDetailsSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
         },
     },
 });

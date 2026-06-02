@@ -3,6 +3,7 @@ import express from 'express';
 import { z } from 'zod';
 import type { Server, AddressInfo } from 'node:net';
 import { createContract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createClient, type Client } from '@ts-kizuna/fetch';
 import { createApi, createExpressEndpoints } from './server.js';
 
@@ -31,9 +32,7 @@ const contract = createContract({
                 name: z.string(),
                 email: z.string(),
             }),
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
 });
@@ -69,7 +68,7 @@ describe('end-to-end: typed client → Express server', () => {
                         return {
                             status: 404,
                             body: {
-                                message: 'Not found',
+                                detail: 'Not found',
                             },
                         };
                     }
@@ -130,7 +129,7 @@ describe('end-to-end: typed client → Express server', () => {
         });
         expect(result.status).toBe(404);
         if (result.status === 404) {
-            expect(result.body.message).toBe('Not found');
+            expect(result.body.detail).toBe('Not found');
         }
     });
 });
@@ -149,9 +148,7 @@ const contractWithResponseHeaders = createContract({
                     'x-request-id': z.string().optional(),
                 }),
             },
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
 });

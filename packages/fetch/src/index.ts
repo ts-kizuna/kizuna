@@ -1,2 +1,2 @@
 export * from './client.js';
-export { isValidationError, type ValidationError } from '@ts-kizuna/core';
+export { isValidationError, isProblemDetails, type ValidationError } from '@ts-kizuna/core';

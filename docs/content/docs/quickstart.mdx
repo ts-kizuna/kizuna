@@ -46,6 +46,7 @@ The contract is the shared source of truth. It lives in a package (or file) that
 ```ts
 // packages/shared/src/contract.ts
 import { createContract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
 
 export const UserSchema = z.object({
@@ -78,9 +79,7 @@ export const contract = createContract({
         }),
         responses: {
             201: UserSchema,
-            400: z.object({
-                message: z.string(),
-            }),
+            400: ProblemDetailsSchema,
         },
     },
     getUser: {
@@ -88,9 +87,7 @@ export const contract = createContract({
         path: '/users/:id',
         responses: {
             200: UserSchema,
-            404: z.object({
-                message: z.string(),
-            }),
+            404: ProblemDetailsSchema,
         },
     },
 });
@@ -126,7 +123,7 @@ export const router = createRouter(contract, {
             return {
                 status: 400,
                 body: {
-                    message: 'Email already in use',
+                    detail: 'Email already in use',
                 },
             };
         }
@@ -143,7 +140,7 @@ export const router = createRouter(contract, {
             return {
                 status: 404,
                 body: {
-                    message: 'User not found',
+                    detail: 'User not found',
                 },
             };
         }

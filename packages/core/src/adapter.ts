@@ -13,7 +13,8 @@ import {
 import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes } from './route-matcher.js';
 import { parsePath } from './path-params.js';
 import { ResponseError } from './response-error.js';
-import { problemDetails } from './problem-details.js';
+import { problemDetails, type ProblemDetails } from './problem-details.js';
+import { STATUS_TITLES } from './status-titles.js';
 
 export type { RouteDefinition, Contract, Method } from './types.js';
 export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
@@ -343,7 +344,20 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             const responseSpec = route.responses[handlerResult.status];
             if (responseSpec !== undefined) {
                 const bodySchema = 'safeParse' in responseSpec ? responseSpec : responseSpec.body;
-                const parseResult = bodySchema.safeParse(handlerResult.body);
+                // Error responses (status >= 400) auto-fill the Problem Details envelope
+                // (`type`/`title`/`status`) at render time, so the handler only supplies
+                // `detail` plus extensions. Validate the final wire shape, not the partial
+                // body — otherwise every valid error handler would fail validation.
+                const bodyToValidate =
+                    handlerResult.status >= 400 && handlerResult.body !== null && typeof handlerResult.body === 'object'
+                        ? {
+                              type: 'about:blank',
+                              title: STATUS_TITLES[handlerResult.status] ?? 'Unknown Error',
+                              status: handlerResult.status,
+                              ...(handlerResult.body as Record<string, unknown>),
+                          }
+                        : handlerResult.body;
+                const parseResult = bodySchema.safeParse(bodyToValidate);
                 if (!parseResult.success) {
                     throw new ResponseValidationError(routeKey, handlerResult.status, parseResult.error.issues);
                 }
@@ -422,107 +436,117 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
 });
 
 /**
+ * Decides the bytes that go on the wire for an error (status >= 400). The default emits the
+ * canonical RFC 9457 Problem Details as `application/problem+json`.
+ *
+ * **Most migrations don't need this.** Carrying your existing fields as Problem Details
+ * extension members keeps a single body valid for both old and new clients.
+ *
+ * **Reach for it only when** an older client needs a different content type (plain
+ * `application/json`) or a structurally different body. It receives the request, so if you
+ * can tell clients apart (a version header, `Accept`, …) you can serve the legacy shape to
+ * old clients and Problem Details to new ones during a transition — then delete it.
+ */
+export type ErrorFormatter<NativeRequest = unknown> = (
+    problem: ProblemDetails & Record<string, unknown>,
+    context: {
+        status: number;
+        request: NativeRequest;
+    }
+) => {
+    contentType: string;
+    body: unknown;
+};
+
+const defaultErrorFormatter: ErrorFormatter = (problem) => ({
+    contentType: 'application/problem+json',
+    body: problem,
+});
+
+/**
  * Maps an `AdapterResult` to `{ status, headers, body }` using ts-kizuna's default
  * JSON conventions (e.g. 405 with an `Allow` header, 400 with `{ detail, errors }`
  * for validation failures). Adapters that speak JSON delegate `respond` to this
  * instead of writing the switch by hand.
  *
+ * Every error (status >= 400) is an RFC 9457 Problem Details object run through
+ * `formatError` — there is no custom-error-shape passthrough. Pass an `ErrorFormatter`
+ * to reshape the wire bytes for migration; the canonical problem is unchanged.
+ *
  * `raw-response` is excluded — it carries a framework-specific `NativeResponse`
  * the adapter must return directly, so handle that case before calling this.
  */
 export const renderJsonResult = (
-    result: Exclude<AdapterResult, { kind: 'raw-response' }>
+    result: Exclude<AdapterResult, { kind: 'raw-response' }>,
+    formatError: ErrorFormatter = defaultErrorFormatter,
+    request: unknown = undefined
 ): { status: number; headers: Record<string, string>; body: unknown } => {
+    const renderError = (
+        status: number,
+        detail: string,
+        extensions?: Record<string, unknown>,
+        extraHeaders?: Record<string, string>
+    ): { status: number; headers: Record<string, string>; body: unknown } => {
+        const problem = problemDetails(status, detail, extensions);
+        const { contentType, body } = formatError(problem, { status, request });
+        return {
+            status,
+            headers: {
+                'content-type': contentType,
+                ...(extraHeaders ?? {}),
+            },
+            body,
+        };
+    };
+
     switch (result.kind) {
         case 'success': {
-            const body = result.body;
-            const isError = result.status >= 400;
-            const needsWrap = isError && body !== null && body !== undefined && typeof body === 'object' && 'detail' in body;
-            const finalBody = needsWrap
-                ? problemDetails(result.status, (body as { detail: string }).detail, body as Record<string, unknown>)
-                : body;
+            if (result.status >= 400) {
+                const body = result.body;
+                const extensions = body !== null && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+                const detail = typeof extensions.detail === 'string' ? extensions.detail : (STATUS_TITLES[result.status] ?? 'Error');
+                return renderError(result.status, detail, extensions, result.headers);
+            }
             return {
                 status: result.status,
                 headers: {
-                    ...(finalBody !== undefined ? { 'content-type': isError ? 'application/problem+json' : 'application/json' } : {}),
+                    ...(result.body !== undefined ? { 'content-type': 'application/json' } : {}),
                     ...(result.headers ?? {}),
                 },
-                body: finalBody,
+                body: result.body,
             };
         }
         case 'not-found':
-            return {
-                status: 404,
-                headers: {
-                    'content-type': 'application/problem+json',
-                },
-                body: problemDetails(404, 'Not Found'),
-            };
+            return renderError(404, 'Not Found');
         case 'method-not-allowed':
-            return {
-                status: 405,
-                headers: {
-                    'content-type': 'application/problem+json',
-                    Allow: result.allowed.join(', '),
-                },
-                body: problemDetails(405, 'Method Not Allowed', {
+            return renderError(
+                405,
+                'Method Not Allowed',
+                {
                     allowed: result.allowed,
-                }),
-            };
+                },
+                {
+                    Allow: result.allowed.join(', '),
+                }
+            );
         case 'invalid-body':
-            return {
-                status: 400,
-                headers: {
-                    'content-type': 'application/problem+json',
-                },
-                body: problemDetails(400, result.detail),
-            };
+            return renderError(400, result.detail);
         case 'validation-failed':
-            return {
-                status: 400,
-                headers: {
-                    'content-type': 'application/problem+json',
-                },
-                body: problemDetails(400, result.detail, {
-                    errors: result.issues.map((issue) => ({
-                        code: issue.code ?? 'custom',
-                        path: issue.path,
-                        message: issue.message,
-                    })),
-                }),
-            };
+            return renderError(400, result.detail, {
+                errors: result.issues.map((issue) => ({
+                    code: issue.code ?? 'custom',
+                    path: issue.path,
+                    message: issue.message,
+                })),
+            });
         case 'no-handler':
-            return {
-                status: 500,
-                headers: {
-                    'content-type': 'application/problem+json',
-                },
-                body: problemDetails(500, `Handler not implemented: ${result.routeKey}`),
-            };
+            return renderError(500, `Handler not implemented: ${result.routeKey}`);
         case 'unsupported-media-type':
-            return {
-                status: 415,
-                headers: {
-                    'content-type': 'application/problem+json',
-                },
-                body: problemDetails(415, `Unsupported Media Type: expected ${result.expected}, received ${result.received}`),
-            };
+            return renderError(415, `Unsupported Media Type: expected ${result.expected}, received ${result.received}`);
         case 'not-acceptable':
-            return {
-                status: 406,
-                headers: {
-                    'content-type': 'application/problem+json',
-                },
-                body: problemDetails(406, 'Not Acceptable'),
-            };
+            return renderError(406, 'Not Acceptable');
         case 'handler-error':
-            return {
-                status: 500,
-                headers: {
-                    'content-type': 'application/problem+json',
-                },
-                body: problemDetails(500, 'Internal Server Error'),
-            };
+            return renderError(500, 'Internal Server Error');
     }
 };
 

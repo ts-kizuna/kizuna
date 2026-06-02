@@ -250,7 +250,7 @@ The `/** @deprecated */` JSDoc tag drives IDE strikethrough, the OpenAPI `deprec
 
 ## Error responses
 
-ts-kizuna returns `application/json` for all error responses. Validation errors use `{ message, issues }` — the same shape as ts-rest.
+This is a deliberate departure from ts-rest. ts-kizuna returns [RFC 9457 Problem Details](/docs/reference/problem-details-schema) (`application/problem+json`) for every error response — error responses in a contract must use `ProblemDetailsSchema` (or `ProblemDetailsSchema.extend({...})` for extra fields), not an arbitrary shape. Validation errors are Problem Details with a `detail` string and an `errors` array (instead of ts-rest's `{ message, issues }`). If you're porting an API whose clients expect the old shape, see [Migrating an existing API](/docs/migration/existing-api) for how to keep old clients working during the transition.
 
 ## Method mismatch behaviour
 

@@ -91,20 +91,39 @@ const coerceStringValues = (input: unknown, schema: z.ZodType): unknown => {
 
 type ProblemDetailsEnvelope = { type: string; title: string; status: number; detail: string };
 
-type StripProblemEnvelope<T> = T extends ProblemDetailsEnvelope
-    ? Omit<T, 'type' | 'title' | 'status'> & Partial<Pick<T, 'type'>> & { title?: never; status?: never }
-    : T;
+/**
+ * Strips the RFC 9457 envelope fields the adapter auto-fills (`type`/`title`/`status`),
+ * leaving the author to supply `detail` plus any extension members. `type` stays optional
+ * (authors may point it at their own problem-type URI); `title`/`status` are forbidden.
+ */
+type StripProblemEnvelope<T extends ProblemDetailsEnvelope> = Omit<T, 'type' | 'title' | 'status'> &
+    Partial<Pick<T, 'type'>> & { title?: never; status?: never };
 
-type HandlerBody<S> = S extends z.ZodType
-    ? StripProblemEnvelope<z.input<S>>
+/**
+ * True when a literal status key is in the 4xx/5xx range. Widened `number` keys (no
+ * `const` inference) resolve to `false`, so enforcement only kicks in when the concrete
+ * status is known — exactly where the wire output matters.
+ */
+type IsErrorStatus<Status> = `${Status & number}` extends `4${string}` | `5${string}` ? true : false;
+
+/**
+ * Error responses (4xx/5xx) must be RFC 9457 Problem Details — a schema assignable to the
+ * envelope. Anything else resolves to `never`, surfacing as a compile error at the handler
+ * return / `error()` site. Success responses pass through unchanged.
+ */
+type ApplyErrorEnvelope<Input, Status> =
+    IsErrorStatus<Status> extends true ? (Input extends ProblemDetailsEnvelope ? StripProblemEnvelope<Input> : never) : Input;
+
+type HandlerBody<S, Status> = S extends z.ZodType
+    ? ApplyErrorEnvelope<z.input<S>, Status>
     : S extends { body: z.ZodType }
-      ? StripProblemEnvelope<z.input<S['body']>>
+      ? ApplyErrorEnvelope<z.input<S['body']>, Status>
       : never;
 
 export type HandlerReturn<R extends RouteDefinition> = {
     [Status in keyof R['responses']]: {
         status: Status extends number ? Status : never;
-        body: HandlerBody<R['responses'][Status]>;
+        body: HandlerBody<R['responses'][Status], Status>;
         headers?: Record<string, string>;
     };
 }[keyof R['responses']];

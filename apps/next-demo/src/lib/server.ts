@@ -135,7 +135,9 @@ export const router = createRouter(contract, {
             if (!user) {
                 return {
                     status: 404,
-                    body: undefined,
+                    body: {
+                        detail: 'User not found',
+                    },
                 };
             }
             return {

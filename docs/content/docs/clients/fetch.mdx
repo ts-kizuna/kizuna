@@ -47,7 +47,7 @@ if (result.status === 201) {
     console.log(result.body.id);
 } else {
     // result.status === 400
-    console.error(result.body.message);
+    console.error(result.body.detail);
 }
 ```
 
@@ -123,7 +123,7 @@ const result = await apiClient.createUser({ body: { name: 'Alice', email: 'alice
 if (result.status === 201) {
     // result.body is User
 } else {
-    // result.status === 400, result.body is { message: string }
+    // result.status === 400, result.body is a Problem Details object
 }
 ```
 

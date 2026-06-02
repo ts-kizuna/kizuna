@@ -7,7 +7,7 @@
         "create-router",
         "create-middleware",
         "create-guard",
-        "error-response",
+        "problem-details-schema",
         "create-api",
         "create-client",
         "is-validation-error",
