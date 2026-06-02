@@ -757,7 +757,11 @@ const emitSuccessSumEnum = (writer: SwiftWriter, method: RouteMethod, context: E
     writer.block('public enum Success: Sendable, Equatable', () => {
         for (const successResponse of method.successResponses) {
             const resolved = resolveType(successResponse.type, method.operationName, context, 'operation-enum');
-            writer.line(`case status${successResponse.status}(${resolved})`);
+            if (resolved === 'Void') {
+                writer.line(`case status${successResponse.status}`);
+            } else {
+                writer.line(`case status${successResponse.status}(${resolved})`);
+            }
         }
     });
 };
@@ -1007,23 +1011,38 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                 .join(', ');
             if (method.successSumEnumName) {
                 const resolved = resolveType(successResponse.type, method.operationName, context);
-                writer.line('    do {');
-                writer.line(`        let payload = try decoder.decode(${resolved}.self, from: data)`);
-                for (const field of successResponse.responseHeaders) {
-                    writer.line(
-                        `        let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
-                    );
-                }
-                if (hasHeaders) {
-                    writer.line(
-                        `        return ${qualifiedResult}(body: .status${successResponse.status}(payload), headers: .init(${headersInitArgs}))`
-                    );
+                if (resolved === 'Void') {
+                    for (const field of successResponse.responseHeaders) {
+                        writer.line(
+                            `    let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
+                        );
+                    }
+                    if (hasHeaders) {
+                        writer.line(
+                            `    return ${qualifiedResult}(body: .status${successResponse.status}, headers: .init(${headersInitArgs}))`
+                        );
+                    } else {
+                        writer.line(`    return ${qualifiedResult}(body: .status${successResponse.status})`);
+                    }
                 } else {
-                    writer.line(`        return ${qualifiedResult}(body: .status${successResponse.status}(payload))`);
+                    writer.line('    do {');
+                    writer.line(`        let payload = try decoder.decode(${resolved}.self, from: data)`);
+                    for (const field of successResponse.responseHeaders) {
+                        writer.line(
+                            `        let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
+                        );
+                    }
+                    if (hasHeaders) {
+                        writer.line(
+                            `        return ${qualifiedResult}(body: .status${successResponse.status}(payload), headers: .init(${headersInitArgs}))`
+                        );
+                    } else {
+                        writer.line(`        return ${qualifiedResult}(body: .status${successResponse.status}(payload))`);
+                    }
+                    writer.line('    } catch {');
+                    writer.line(`        throw ${failure}.decoding(error, statusCode: statusCode, data: data)`);
+                    writer.line('    }');
                 }
-                writer.line('    } catch {');
-                writer.line(`        throw ${failure}.decoding(error, statusCode: statusCode, data: data)`);
-                writer.line('    }');
             } else {
                 const resolved = resolveType(successResponse.type, method.operationName, context);
                 writer.line('    do {');

@@ -254,6 +254,17 @@ const usersContract = createContract(Users, {
         },
         summary: 'Ping a user — exercises z.void() body and response',
     },
+    getMyWork: {
+        method: 'GET',
+        path: '/work',
+        responses: {
+            200: z.object({
+                items: z.array(z.string()),
+            }),
+            204: z.void(),
+        },
+        summary: 'List work items — exercises a z.void() arm in a multi-status success union',
+    },
     checkUser: {
         method: 'HEAD',
         path: '/users/:id/check',

@@ -650,6 +650,33 @@ public actor APIClient {
         }
     }
 
+    public enum UsersGetMyWork {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let items: [String]
+
+            public init(items: [String]) {
+                self.items = items
+            }
+        }
+
+        public enum Success: Sendable, Equatable {
+            case status200(Response)
+            case status204
+        }
+
+        public struct Result: Sendable {
+            public let body: Success
+        }
+
+        public enum Failure: Swift.Error, Sendable {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+        }
+    }
+
     public enum UsersCheckUser {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -1421,6 +1448,47 @@ public struct APIUsersClient: Sendable {
             }
         default:
             throw APIClient.UsersPingUser.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// List work items — exercises a z.void() arm in a multi-status success union
+    public func getMyWork() async throws(APIClient.UsersGetMyWork.Failure) -> APIClient.UsersGetMyWork.Result {
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
+        let timeout = _actor.timeout
+        let path = "/work"
+        guard let components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
+            throw APIClient.UsersGetMyWork.Failure.unexpectedStatus(-1, Data())
+        }
+        guard let url = components.url else { throw APIClient.UsersGetMyWork.Failure.unexpectedStatus(-1, Data()) }
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        if let middleware = requestMiddleware {
+            do { try await middleware(&request) }
+            catch is CancellationError { throw APIClient.UsersGetMyWork.Failure.cancelled }
+            catch { throw APIClient.UsersGetMyWork.Failure.requestFailed(error) }
+        }
+        let data: Foundation.Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch is CancellationError { throw APIClient.UsersGetMyWork.Failure.cancelled }
+        catch { throw APIClient.UsersGetMyWork.Failure.requestFailed(error) }
+        if let middleware = responseMiddleware {
+            await middleware(request, data, response)
+        }
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+        switch statusCode {
+        case 200:
+            do {
+                let payload = try decoder.decode(APIClient.UsersGetMyWork.Response.self, from: data)
+                return APIClient.UsersGetMyWork.Result(body: .status200(payload))
+            } catch {
+                throw APIClient.UsersGetMyWork.Failure.decoding(error, statusCode: statusCode, data: data)
+            }
+        case 204:
+            return APIClient.UsersGetMyWork.Result(body: .status204)
+        default:
+            throw APIClient.UsersGetMyWork.Failure.unexpectedStatus(statusCode, data)
         }
     }
 
