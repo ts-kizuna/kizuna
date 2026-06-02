@@ -135,6 +135,7 @@ export const router = createRouter(contract, {
             status: 200,
             body: {
                 items: ['draft report', 'review pull request'],
+                contentType: 'image/jpeg',
             },
         }),
         checkUser: ({ params }) => {

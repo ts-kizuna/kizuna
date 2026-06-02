@@ -9,7 +9,7 @@ import {
     type DeprecationWarnings,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
-import { SwiftWriter, pascalCase, stringLiteral } from './emit.js';
+import { SwiftWriter, camelCase, pascalCase, stringLiteral } from './emit.js';
 import {
     TypeRegistry,
     mapType,
@@ -432,6 +432,19 @@ const escapeKeyword = (name: string): string => {
     return SWIFT_KEYWORDS.has(name) ? `\`${name}\`` : name;
 };
 
+/**
+ * Turn an arbitrary enum value (e.g. `"image/jpeg"`) into a valid Swift case
+ * identifier (`imageJpeg`). The original value is preserved as the rawValue, so
+ * only the case name needs sanitizing: non-identifier characters are stripped
+ * via camelCase, and a leading digit is prefixed since Swift identifiers cannot
+ * start with one. Falls back to `_` when nothing identifier-safe remains.
+ */
+const sanitizeEnumCaseName = (value: string): string => {
+    const camel = camelCase(value);
+    if (!camel) return '_';
+    return /^[0-9]/.test(camel) ? `_${camel}` : camel;
+};
+
 const optionalize = (type: string, optional: boolean): string => {
     if (!optional) return type;
     return type.endsWith('?') ? type : `${type}?`;
@@ -472,7 +485,7 @@ const emitStringEnum = (writer: SwiftWriter, name: string, cases: string[], desc
     writer.docComment(description);
     writer.block(`public enum ${name}: String, Codable, Sendable`, () => {
         for (const caseName of cases) {
-            writer.line(`case ${escapeKeyword(caseName)} = ${stringLiteral(caseName)}`);
+            writer.line(`case ${escapeKeyword(sanitizeEnumCaseName(caseName))} = ${stringLiteral(caseName)}`);
         }
     });
 };

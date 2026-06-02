@@ -260,10 +260,12 @@ const usersContract = createContract(Users, {
         responses: {
             200: z.object({
                 items: z.array(z.string()),
+                contentType: z.enum(['image/jpeg', 'text-plain', 'video.mp4', '3d-model']),
             }),
             204: z.void(),
         },
-        summary: 'List work items — exercises a z.void() arm in a multi-status success union',
+        summary:
+            'List work items — exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers',
     },
     checkUser: {
         method: 'HEAD',
