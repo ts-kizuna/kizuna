@@ -432,14 +432,18 @@ const escapeKeyword = (name: string): string => {
     return SWIFT_KEYWORDS.has(name) ? `\`${name}\`` : name;
 };
 
+const isValidSwiftIdentifier = (value: string): boolean => {
+    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
+};
+
 /**
- * Turn an arbitrary enum value (e.g. `"image/jpeg"`) into a valid Swift case
- * identifier (`imageJpeg`). The original value is preserved as the rawValue, so
- * only the case name needs sanitizing: non-identifier characters are stripped
- * via camelCase, and a leading digit is prefixed since Swift identifiers cannot
- * start with one. Falls back to `_` when nothing identifier-safe remains.
+ * Rewrite an enum value into a valid Swift case name, preserving the original
+ * as the rawValue. Already-valid identifiers (e.g. `snake_case`) are kept
+ * verbatim; others are camelCased, with a `_` prefix when they start with a
+ * digit. Falls back to `_` when nothing identifier-safe remains.
  */
 const sanitizeEnumCaseName = (value: string): string => {
+    if (isValidSwiftIdentifier(value)) return value;
     const camel = camelCase(value);
     if (!camel) return '_';
     return /^[0-9]/.test(camel) ? `_${camel}` : camel;
