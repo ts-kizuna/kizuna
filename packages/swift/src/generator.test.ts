@@ -622,6 +622,30 @@ describe('Swift generator — owned type nesting', () => {
         expect(output).not.toContain('case 3d');
     });
 
+    it('leaves enum values that are already valid Swift identifiers untouched, including snake_case', () => {
+        const contract = createContract({
+            getOrder: {
+                method: 'GET',
+                path: '/orders/:id',
+                responses: {
+                    200: z
+                        .object({
+                            id: z.string(),
+                            status: z.enum(['in_progress', 'awaiting_payment', 'done']),
+                        })
+                        .meta({ id: 'Order' }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        // snake_case values are valid Swift identifiers — kept verbatim, NOT camelCased
+        expect(output).toContain('case in_progress = "in_progress"');
+        expect(output).toContain('case awaiting_payment = "awaiting_payment"');
+        expect(output).toContain('case done = "done"');
+        expect(output).not.toContain('case inProgress');
+        expect(output).not.toContain('case awaitingPayment');
+    });
+
     it('nests an inline object inside its parent struct', () => {
         const contract = createContract({
             getPage: {
