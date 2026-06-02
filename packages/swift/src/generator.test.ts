@@ -246,6 +246,25 @@ describe('Swift generator — Void error responses', () => {
         expect(output).toContain('throw TestAPIClient.GetUser.Failure.unauthorized');
         expect(output).not.toContain('decoder.decode(Void.self');
     });
+
+    it('emits a bare enum case and a payload-free return for a Void arm in a multi-status success union', () => {
+        const contract = createContract({
+            getMyWork: {
+                method: 'GET',
+                path: '/work',
+                responses: {
+                    200: z.object({ items: z.array(z.string()) }),
+                    204: z.void(),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).not.toContain('decoder.decode(Void.self');
+        expect(output).toContain('case status204');
+        expect(output).not.toContain('case status204(Void)');
+        expect(output).toContain('.status204');
+        expect(output).not.toContain('.status204(payload)');
+    });
 });
 
 describe('Swift generator — z.int() maps to Int', () => {

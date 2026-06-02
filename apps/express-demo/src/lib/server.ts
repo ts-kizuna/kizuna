@@ -131,6 +131,12 @@ export const router = createRouter(contract, {
             status: 204,
             body: undefined,
         }),
+        getMyWork: () => ({
+            status: 200,
+            body: {
+                items: ['draft report', 'review pull request'],
+            },
+        }),
         checkUser: ({ params }) => {
             const user = users.get(params.id);
             if (!user) {
