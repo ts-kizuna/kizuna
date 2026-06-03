@@ -22,8 +22,10 @@ describe('Swift generator — z.void()', () => {
             },
         });
         const output = generateSwiftClient(contract, baseConfig);
-        expect(output).toContain('func ping(id: String) async throws(TestAPIClient.Ping.Failure)');
-        expect(output).not.toContain('body: ');
+        expect(output).toContain('func ping(_ params: TestAPIClient.Ping.Params) async throws(TestAPIClient.Ping.Failure)');
+        // single path param → a Params struct + group-named `.params(id:)` factory, called as `.params(id: ...)`
+        expect(output).toContain('public static func params(id: String) -> Self');
+        expect(output).not.toContain('_ body: ');
     });
 });
 
@@ -377,9 +379,11 @@ describe('Swift generator — array type qualification', () => {
             }),
         });
         const output = generateSwiftClient(contract, baseConfig);
-        // operation-local enum in query param: bracket before client qualifier
-        expect(output).toContain('[TestAPIClient.');
+        // single-field query → a Query struct; the array element is the operation-local enum (short name).
+        // The element type must be well-formed `[Enum]` with the bracket outside any qualifier.
+        expect(output).toMatch(/public let kinds: \[[A-Za-z]/);
         expect(output).not.toMatch(/TestAPIClient\.\[/);
+        expect(output).not.toMatch(/\w\[/); // no `Type[` — bracket never trails the element
     });
 });
 
@@ -415,7 +419,7 @@ describe('Swift generator — nested sub-client routing', () => {
             }),
         });
         const output = generateSwiftClient(contract, baseConfig);
-        expect(output).toContain('public func getById(id: String)');
+        expect(output).toContain('public func getById(_ params: TestAPIClient.UsersGetById.Params)');
         expect(output).not.toContain('public func usersGetById');
     });
 
@@ -784,7 +788,7 @@ describe('Swift generator — HEAD method', () => {
             },
         });
         const output = generateSwiftClient(contract, baseConfig);
-        expect(output).toContain('func checkUser(id: String) async throws(TestAPIClient.CheckUser.Failure)');
+        expect(output).toContain('func checkUser(_ params: TestAPIClient.CheckUser.Params) async throws(TestAPIClient.CheckUser.Failure)');
         expect(output).not.toContain('decoder.decode(');
         expect(output).not.toContain('Result(body:');
     });
@@ -912,5 +916,138 @@ describe('Swift generator — automatic validation error', () => {
         });
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('catch let error as TestAPIClient.CreateUser.Failure');
+    });
+});
+
+describe('Swift generator — grouped request components (params/body/query/headers)', () => {
+    it('emits each group as a distinct positional parameter with a group-named leading-dot factory', () => {
+        const contract = createContract({
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                headers: z.object({ 'x-request-id': z.string() }),
+                responses: {
+                    200: z.object({ id: z.string() }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        // distinct positional params (compile-checked required) → call site `.params(id: …), .headers(xRequestId: …)`
+        expect(output).toContain('func getUser(_ params: TestAPIClient.GetUser.Params, _ headers: TestAPIClient.GetUser.Headers)');
+        // each group has a leading-dot factory named after the group — no `.init` at the call site
+        expect(output).toContain('public static func params(id: String) -> Self');
+        expect(output).toContain('public static func headers(xRequestId: String) -> Self');
+    });
+
+    it('emits a multi-field group factory taking all fields', () => {
+        const contract = createContract({
+            search: {
+                method: 'GET',
+                path: '/search',
+                query: z.object({ q: z.string(), limit: z.int() }),
+                responses: {
+                    200: z.object({ ok: z.boolean() }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        // required query (has required fields) → non-defaulted positional param
+        expect(output).toContain('func search(_ query: TestAPIClient.Search.Query)');
+        expect(output).toContain('public struct Query: Sendable');
+        expect(output).toContain('public let q: String');
+        expect(output).toContain('public let limit: Int');
+        expect(output).toContain('public static func query(');
+    });
+
+    it('defaults an all-optional group to .query() so it can be omitted at the call site', () => {
+        const contract = createContract({
+            list: {
+                method: 'GET',
+                path: '/items',
+                query: z.object({ page: z.int().optional(), limit: z.int().optional() }),
+                responses: {
+                    200: z.object({ ok: z.boolean() }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('_ query: TestAPIClient.List.Query = .query()');
+    });
+
+    it('wraps an object body in a Body group with a .body(...) factory building the Codable payload', () => {
+        const contract = createContract({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({ name: z.string(), email: z.string().optional() }).meta({ id: 'CreateUserInput' }),
+                responses: {
+                    201: z.object({ id: z.string() }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        // body is a Body group; the factory builds the Codable payload, encoded via body.payload
+        expect(output).toContain('func createUser(_ body: TestAPIClient.CreateUser.Body)');
+        expect(output).toContain('public static func body(');
+        expect(output).toContain('try encoder.encode(body.payload)');
+    });
+
+    it('emits a leading-dot static factory per discriminated-union variant (no .init at call site)', () => {
+        const contract = createContract({
+            notify: {
+                method: 'POST',
+                path: '/notify',
+                body: z.discriminatedUnion('channel', [
+                    z.object({ channel: z.literal('email'), to: z.string(), subject: z.string() }).meta({ id: 'EmailEvent' }),
+                    z.object({ channel: z.literal('sms'), phone: z.string() }).meta({ id: 'SmsEvent' }),
+                ]),
+                responses: {
+                    202: z.object({ accepted: z.boolean() }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        // call site: `body: .email(to:, subject:)` — the discriminator literal is injected inside the factory
+        expect(output).toContain('public static func email(to: String, subject: String) ->');
+        expect(output).toContain('public static func sms(phone: String) ->');
+        expect(output).toContain('channel: "email"');
+    });
+});
+
+describe('Swift generator — positional request groups (required-first, single signature)', () => {
+    it('emits one signature with groups in required-first order', () => {
+        const contract = createContract({
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                headers: z.object({ 'x-request-id': z.string() }),
+                responses: {
+                    200: z.object({ id: z.string() }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        // exactly one signature — groups must be passed in declared order
+        const signatureCount = output.split('func getUser(').length - 1;
+        expect(signatureCount).toBe(1);
+        expect(output).toContain('func getUser(_ params: TestAPIClient.GetUser.Params, _ headers: TestAPIClient.GetUser.Headers)');
+    });
+
+    it('orders required groups before optional ones so optional groups keep trailing defaults', () => {
+        const contract = createContract({
+            list: {
+                method: 'GET',
+                path: '/users/:id',
+                query: z.object({ page: z.int().optional() }),
+                responses: {
+                    200: z.object({ ok: z.boolean() }),
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        // required params first, optional query trailing with a default so it may be omitted
+        expect(output).toContain('func list(_ params: TestAPIClient.List.Params, _ query: TestAPIClient.List.Query = .query())');
+        const signatureCount = output.split('func list(').length - 1;
+        expect(signatureCount).toBe(1);
     });
 });
