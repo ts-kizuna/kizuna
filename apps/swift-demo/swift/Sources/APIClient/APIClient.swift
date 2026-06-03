@@ -78,6 +78,12 @@ public enum API {
     public enum NotificationEvent: Codable, Sendable, Equatable {
         case email(EmailEvent)
         case sms(SmsEvent)
+        public static func email(to: String, subject: String) -> NotificationEvent {
+            .email(EmailEvent(channel: "email", to: to, subject: subject))
+        }
+        public static func sms(phone: String, text: String) -> NotificationEvent {
+            .sms(SmsEvent(channel: "sms", phone: phone, text: text))
+        }
 
         private enum DiscriminatorKey: String, CodingKey {
             case discriminator = "channel"
@@ -296,6 +302,18 @@ public actor APIClient {
             }
         }
 
+        public struct Body: Sendable {
+            public let payload: API.NotificationEvent
+
+            public init(payload: API.NotificationEvent) {
+                self.payload = payload
+            }
+
+            public static func body(_ value: API.NotificationEvent) -> Self {
+                .init(payload: value)
+            }
+        }
+
         public struct Result: Sendable {
             public let body: Response202
         }
@@ -358,6 +376,38 @@ public actor APIClient {
             case signup = "signup"
         }
 
+        public struct Query: Sendable {
+            public let since: Date?
+            public let kind: QueryKind?
+            public let ids: [String]?
+            public let label: String?
+            public let tagIds: [String]?
+
+            public init(
+                since: Date? = nil,
+                kind: QueryKind? = nil,
+                ids: [String]? = nil,
+                label: String? = nil,
+                tagIds: [String]? = nil
+            ) {
+                self.since = since
+                self.kind = kind
+                self.ids = ids
+                self.label = label
+                self.tagIds = tagIds
+            }
+
+            public static func query(
+                since: Date? = nil,
+                kind: QueryKind? = nil,
+                ids: [String]? = nil,
+                label: String? = nil,
+                tagIds: [String]? = nil
+            ) -> Self {
+                .init(since: since, kind: kind, ids: ids, label: label, tagIds: tagIds)
+            }
+        }
+
         public struct Result: Sendable {
             public let body: Response
         }
@@ -400,6 +450,21 @@ public actor APIClient {
             }
         }
 
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(
+                `default`: String,
+                interval: Int
+            ) -> Self {
+                .init(payload: Input(default: `default`, interval: interval))
+            }
+        }
+
         public struct Result: Sendable {
             public let body: Response
         }
@@ -422,6 +487,18 @@ public actor APIClient {
 
             public init(received: Bool) {
                 self.received = received
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: APIClient.AnyCodable
+
+            public init(payload: APIClient.AnyCodable) {
+                self.payload = payload
+            }
+
+            public static func body(_ value: APIClient.AnyCodable) -> Self {
+                .init(payload: value)
             }
         }
 
@@ -453,6 +530,26 @@ public actor APIClient {
             }
         }
 
+        public struct Query: Sendable {
+            public let page: Int?
+            public let limit: Int?
+
+            public init(
+                page: Int? = nil,
+                limit: Int? = nil
+            ) {
+                self.page = page
+                self.limit = limit
+            }
+
+            public static func query(
+                page: Int? = nil,
+                limit: Int? = nil
+            ) -> Self {
+                .init(page: page, limit: limit)
+            }
+        }
+
         public struct Result: Sendable {
             public let body: Response
         }
@@ -481,6 +578,30 @@ public actor APIClient {
             }
         }
 
+        public struct Query: Sendable {
+            public let q: String
+            public let limit: Int
+            public let cursor: Int
+
+            public init(
+                q: String,
+                limit: Int,
+                cursor: Int
+            ) {
+                self.q = q
+                self.limit = limit
+                self.cursor = cursor
+            }
+
+            public static func query(
+                q: String,
+                limit: Int,
+                cursor: Int
+            ) -> Self {
+                .init(q: q, limit: limit, cursor: cursor)
+            }
+        }
+
         public struct Result: Sendable {
             public let body: Response
         }
@@ -495,6 +616,30 @@ public actor APIClient {
     }
 
     public enum UsersGetUser {
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
+            }
+        }
+
+        public struct Headers: Sendable {
+            public let xRequestId: String
+
+            public init(xRequestId: String) {
+                self.xRequestId = xRequestId
+            }
+
+            public static func headers(xRequestId: String) -> Self {
+                .init(xRequestId: xRequestId)
+            }
+        }
 
         public struct Result: Sendable {
             public let body: API.User
@@ -515,6 +660,22 @@ public actor APIClient {
     }
 
     public enum UsersCreateUser {
+
+        public struct Body: Sendable {
+            public let payload: API.CreateUserInput
+
+            public init(payload: API.CreateUserInput) {
+                self.payload = payload
+            }
+
+            public static func body(
+                name: String,
+                email: String,
+                last_name: String? = nil
+            ) -> Self {
+                .init(payload: API.CreateUserInput(name: name, email: email, last_name: last_name))
+            }
+        }
 
         public struct Result: Sendable {
             public let body: API.User
@@ -537,6 +698,18 @@ public actor APIClient {
 
             public init(success: Bool) {
                 self.success = success
+            }
+        }
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
             }
         }
 
@@ -578,6 +751,18 @@ public actor APIClient {
             ) {
                 self.archivedAt = archivedAt
                 self.userId = userId
+            }
+        }
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
             }
         }
 
@@ -626,6 +811,26 @@ public actor APIClient {
             }
         }
 
+        public struct Body: Sendable {
+            public let file: APIClient.MultipartFile
+            public let userId: String
+
+            public init(
+                file: APIClient.MultipartFile,
+                userId: String
+            ) {
+                self.file = file
+                self.userId = userId
+            }
+
+            public static func body(
+                file: APIClient.MultipartFile,
+                userId: String
+            ) -> Self {
+                .init(file: file, userId: userId)
+            }
+        }
+
         public struct Result: Sendable {
             public let body: Response
         }
@@ -640,6 +845,18 @@ public actor APIClient {
     }
 
     public enum UsersPingUser {
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
+            }
+        }
 
         public enum Failure: Swift.Error, Sendable {
             case requestFailed(Swift.Error)
@@ -696,6 +913,18 @@ public actor APIClient {
 
             public init(exists: Bool) {
                 self.exists = exists
+            }
+        }
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
             }
         }
 
@@ -802,7 +1031,7 @@ public actor APIClient {
     }
 
     /// Send a notification (discriminated by channel)
-    public func sendNotification(_ input: API.NotificationEvent) async throws(APIClient.SendNotification.Failure) -> APIClient.SendNotification.Result {
+    public func sendNotification(_ body: APIClient.SendNotification.Body) async throws(APIClient.SendNotification.Failure) -> APIClient.SendNotification.Result {
         let path = "/notifications"
         guard let components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
             throw APIClient.SendNotification.Failure.unexpectedStatus(-1, Data())
@@ -812,7 +1041,7 @@ public actor APIClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         do {
-            request.httpBody = try encoder.encode(input)
+            request.httpBody = try encoder.encode(body.payload)
         } catch { throw APIClient.SendNotification.Failure.requestFailed(error) }
         if let middleware = requestMiddleware {
             do { try await middleware(&request) }
@@ -852,33 +1081,33 @@ public actor APIClient {
     }
 
     /// List events — exercises Date / enum / array query params
-    public func listEvents(since: Date? = nil, kind: APIClient.ListEvents.QueryKind? = nil, ids: [String]? = nil, label: String? = nil, tagIds: [String]? = nil) async throws(APIClient.ListEvents.Failure) -> APIClient.ListEvents.Result {
+    public func listEvents(_ query: APIClient.ListEvents.Query = .query()) async throws(APIClient.ListEvents.Failure) -> APIClient.ListEvents.Result {
         let path = "/events"
         guard var components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
             throw APIClient.ListEvents.Failure.unexpectedStatus(-1, Data())
         }
         var queryItems: [URLQueryItem] = []
-        if let value = since {
+        if let value = query.since {
             for stringValue in Kizuna.stringifyQueryValue(value) {
                 queryItems.append(URLQueryItem(name: "since", value: stringValue))
             }
         }
-        if let value = kind {
+        if let value = query.kind {
             for stringValue in Kizuna.stringifyQueryValue(value) {
                 queryItems.append(URLQueryItem(name: "kind", value: stringValue))
             }
         }
-        if let value = ids {
+        if let value = query.ids {
             for stringValue in Kizuna.stringifyQueryValue(value) {
                 queryItems.append(URLQueryItem(name: "ids", value: stringValue))
             }
         }
-        if let value = label {
+        if let value = query.label {
             for stringValue in Kizuna.stringifyQueryValue(value) {
                 queryItems.append(URLQueryItem(name: "label", value: stringValue))
             }
         }
-        if let value = tagIds {
+        if let value = query.tagIds {
             for stringValue in Kizuna.stringifyQueryValue(value) {
                 queryItems.append(URLQueryItem(name: "tagIds", value: stringValue))
             }
@@ -925,7 +1154,7 @@ public actor APIClient {
     }
 
     /// Validate config — exercises generator bug coverage
-    public func validateConfig(`default`: String, interval: Int) async throws(APIClient.ValidateConfig.Failure) -> APIClient.ValidateConfig.Result {
+    public func validateConfig(_ body: APIClient.ValidateConfig.Body) async throws(APIClient.ValidateConfig.Failure) -> APIClient.ValidateConfig.Result {
         let path = "/config/validate"
         guard let components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
             throw APIClient.ValidateConfig.Failure.unexpectedStatus(-1, Data())
@@ -934,9 +1163,8 @@ public actor APIClient {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body = APIClient.ValidateConfig.Input(default: `default`, interval: interval)
         do {
-            request.httpBody = try encoder.encode(body)
+            request.httpBody = try encoder.encode(body.payload)
         } catch { throw APIClient.ValidateConfig.Failure.requestFailed(error) }
         if let middleware = requestMiddleware {
             do { try await middleware(&request) }
@@ -983,7 +1211,7 @@ public actor APIClient {
     }
 
     /// Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen
-    public func webhook(_ input: APIClient.AnyCodable) async throws(APIClient.Webhook.Failure) -> APIClient.Webhook.Result {
+    public func webhook(_ body: APIClient.Webhook.Body) async throws(APIClient.Webhook.Failure) -> APIClient.Webhook.Result {
         let path = "/webhook"
         guard let components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
             throw APIClient.Webhook.Failure.unexpectedStatus(-1, Data())
@@ -993,7 +1221,7 @@ public actor APIClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         do {
-            request.httpBody = try encoder.encode(input)
+            request.httpBody = try encoder.encode(body.payload)
         } catch { throw APIClient.Webhook.Failure.requestFailed(error) }
         if let middleware = requestMiddleware {
             do { try await middleware(&request) }
@@ -1041,7 +1269,7 @@ public struct APIUsersClient: Sendable {
     }
 
     /// List users with pagination
-    public func listUsers(page: Int? = nil, limit: Int? = nil) async throws(APIClient.UsersListUsers.Failure) -> APIClient.UsersListUsers.Result {
+    public func listUsers(_ query: APIClient.UsersListUsers.Query = .query()) async throws(APIClient.UsersListUsers.Failure) -> APIClient.UsersListUsers.Result {
         let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
         let path = "/users"
@@ -1049,12 +1277,12 @@ public struct APIUsersClient: Sendable {
             throw APIClient.UsersListUsers.Failure.unexpectedStatus(-1, Data())
         }
         var queryItems: [URLQueryItem] = []
-        if let value = page {
+        if let value = query.page {
             for stringValue in Kizuna.stringifyQueryValue(value) {
                 queryItems.append(URLQueryItem(name: "page", value: stringValue))
             }
         }
-        if let value = limit {
+        if let value = query.limit {
             for stringValue in Kizuna.stringifyQueryValue(value) {
                 queryItems.append(URLQueryItem(name: "limit", value: stringValue))
             }
@@ -1101,7 +1329,7 @@ public struct APIUsersClient: Sendable {
     }
 
     /// Search users — required coerced limit and cursor
-    public func searchUsers(q: String, limit: Int, cursor: Int) async throws(APIClient.UsersSearchUsers.Failure) -> APIClient.UsersSearchUsers.Result {
+    public func searchUsers(_ query: APIClient.UsersSearchUsers.Query) async throws(APIClient.UsersSearchUsers.Failure) -> APIClient.UsersSearchUsers.Result {
         let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
         let path = "/users/search"
@@ -1109,13 +1337,13 @@ public struct APIUsersClient: Sendable {
             throw APIClient.UsersSearchUsers.Failure.unexpectedStatus(-1, Data())
         }
         var queryItems: [URLQueryItem] = []
-        for stringValue in Kizuna.stringifyQueryValue(q) {
+        for stringValue in Kizuna.stringifyQueryValue(query.q) {
             queryItems.append(URLQueryItem(name: "q", value: stringValue))
         }
-        for stringValue in Kizuna.stringifyQueryValue(limit) {
+        for stringValue in Kizuna.stringifyQueryValue(query.limit) {
             queryItems.append(URLQueryItem(name: "limit", value: stringValue))
         }
-        for stringValue in Kizuna.stringifyQueryValue(cursor) {
+        for stringValue in Kizuna.stringifyQueryValue(query.cursor) {
             queryItems.append(URLQueryItem(name: "cursor", value: stringValue))
         }
         if !queryItems.isEmpty { components.queryItems = queryItems }
@@ -1160,18 +1388,18 @@ public struct APIUsersClient: Sendable {
     }
 
     /// Get a user by id
-    public func getUser(id: String, xRequestIdHeader: String) async throws(APIClient.UsersGetUser.Failure) -> APIClient.UsersGetUser.Result {
+    public func getUser(_ params: APIClient.UsersGetUser.Params, _ headers: APIClient.UsersGetUser.Headers) async throws(APIClient.UsersGetUser.Failure) -> APIClient.UsersGetUser.Result {
         let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
         var path = "/users/:id"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(id))
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
         guard let components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
             throw APIClient.UsersGetUser.Failure.unexpectedStatus(-1, Data())
         }
         guard let url = components.url else { throw APIClient.UsersGetUser.Failure.unexpectedStatus(-1, Data()) }
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
         request.httpMethod = "GET"
-        request.setValue(Kizuna.stringifyQueryValue(xRequestIdHeader).joined(separator: ", "), forHTTPHeaderField: "x-request-id")
+        request.setValue(Kizuna.stringifyQueryValue(headers.xRequestId).joined(separator: ", "), forHTTPHeaderField: "x-request-id")
         if let middleware = requestMiddleware {
             do { try await middleware(&request) }
             catch is CancellationError { throw APIClient.UsersGetUser.Failure.cancelled }
@@ -1212,7 +1440,7 @@ public struct APIUsersClient: Sendable {
     }
 
     /// Create a user
-    public func createUser(name: String, email: String, last_name: String? = nil) async throws(APIClient.UsersCreateUser.Failure) -> APIClient.UsersCreateUser.Result {
+    public func createUser(_ body: APIClient.UsersCreateUser.Body) async throws(APIClient.UsersCreateUser.Failure) -> APIClient.UsersCreateUser.Result {
         let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
         let path = "/users"
@@ -1223,9 +1451,8 @@ public struct APIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body = API.CreateUserInput(name: name, email: email, last_name: last_name)
         do {
-            request.httpBody = try encoder.encode(body)
+            request.httpBody = try encoder.encode(body.payload)
         } catch { throw APIClient.UsersCreateUser.Failure.requestFailed(error) }
         if let middleware = requestMiddleware {
             do { try await middleware(&request) }
@@ -1271,11 +1498,11 @@ public struct APIUsersClient: Sendable {
 
     /// Delete a user
     @available(*, deprecated)
-    public func deleteUser(id: String) async throws(APIClient.UsersDeleteUser.Failure) -> APIClient.UsersDeleteUser.Result {
+    public func deleteUser(_ params: APIClient.UsersDeleteUser.Params) async throws(APIClient.UsersDeleteUser.Failure) -> APIClient.UsersDeleteUser.Result {
         let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
         var path = "/users/:id"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(id))
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
         guard let components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
             throw APIClient.UsersDeleteUser.Failure.unexpectedStatus(-1, Data())
         }
@@ -1320,11 +1547,11 @@ public struct APIUsersClient: Sendable {
     }
 
     /// Archive a user — first call returns 201, subsequent calls 200
-    public func archiveUser(id: String) async throws(APIClient.UsersArchiveUser.Failure) -> APIClient.UsersArchiveUser.Result {
+    public func archiveUser(_ params: APIClient.UsersArchiveUser.Params) async throws(APIClient.UsersArchiveUser.Failure) -> APIClient.UsersArchiveUser.Result {
         let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
         var path = "/users/:id/archive"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(id))
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
         guard let components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
             throw APIClient.UsersArchiveUser.Failure.unexpectedStatus(-1, Data())
         }
@@ -1367,7 +1594,7 @@ public struct APIUsersClient: Sendable {
     }
 
     /// Upload an avatar image
-    public func uploadAvatar(file: APIClient.MultipartFile, userId: String) async throws(APIClient.UsersUploadAvatar.Failure) -> APIClient.UsersUploadAvatar.Result {
+    public func uploadAvatar(_ body: APIClient.UsersUploadAvatar.Body) async throws(APIClient.UsersUploadAvatar.Failure) -> APIClient.UsersUploadAvatar.Result {
         let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
         let path = "/avatar"
@@ -1378,8 +1605,8 @@ public struct APIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
         request.httpMethod = "POST"
         var multipart = Kizuna.MultipartBuilder()
-        multipart.appendFile(name: "file", file: file)
-        multipart.appendField(name: "userId", value: String(describing: userId))
+        multipart.appendFile(name: "file", file: body.file)
+        multipart.appendField(name: "userId", value: String(describing: body.userId))
         request.httpBody = multipart.finalize()
         request.setValue(multipart.contentType, forHTTPHeaderField: "Content-Type")
         if let middleware = requestMiddleware {
@@ -1420,11 +1647,11 @@ public struct APIUsersClient: Sendable {
     }
 
     /// Ping a user — exercises z.void() body and response
-    public func pingUser(id: String) async throws(APIClient.UsersPingUser.Failure) {
+    public func pingUser(_ params: APIClient.UsersPingUser.Params) async throws(APIClient.UsersPingUser.Failure) {
         let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
         var path = "/users/:id/ping"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(id))
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
         guard let components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
             throw APIClient.UsersPingUser.Failure.unexpectedStatus(-1, Data())
         }
@@ -1505,11 +1732,11 @@ public struct APIUsersClient: Sendable {
     }
 
     /// Check user existence — exercises HEAD body stripping
-    public func checkUser(id: String) async throws(APIClient.UsersCheckUser.Failure) {
+    public func checkUser(_ params: APIClient.UsersCheckUser.Params) async throws(APIClient.UsersCheckUser.Failure) {
         let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()
         let timeout = _actor.timeout
         var path = "/users/:id/check"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(id))
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
         guard let components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
             throw APIClient.UsersCheckUser.Failure.unexpectedStatus(-1, Data())
         }

@@ -35,8 +35,6 @@ export interface SwiftConfig {
     deprecationWarnings?: DeprecationWarnings;
 }
 
-const BODY_FLATTEN_MAX_FIELDS = 6;
-
 const statusName = (status: number): string => {
     const known: Record<number, string> = {
         400: 'badRequest',
@@ -124,6 +122,8 @@ interface EmitContext {
     // Types owned by a struct (by name-prefix convention) — nested inside that struct.
     // resolveType returns API.OwningStruct.ShortName for these.
     ownedTypeMap: Map<string, string>; // typeName → owningStructName
+    // Lets the tuple-based call surface recurse into nested object / union payload fields.
+    registry: TypeRegistry;
 }
 
 const shortTypeName = (typeName: string, structName: string): string =>
@@ -195,11 +195,12 @@ const buildRouteMethod = (
                     multipartFields: [],
                 };
             } else {
-                const useStruct = !isObject || fieldCount > BODY_FLATTEN_MAX_FIELDS;
                 const result = mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
                 const structName = result.expression;
 
-                if (useStruct) {
+                if (!isObject) {
+                    // Non-object JSON body (top-level array, primitive, record): passed as a single
+                    // typed `body:` value.
                     bodyDescriptor = {
                         kind: 'json-struct',
                         structName,
@@ -207,6 +208,8 @@ const buildRouteMethod = (
                         multipartFields: [],
                     };
                 } else {
+                    // Object body of any field count: exposed as a labeled tuple, rebuilt into the
+                    // Codable Input internally. Tuples handle any arity, so there is no flatten cap.
                     const flattened = collectObjectFields(
                         route.body as z.ZodType,
                         registry,
@@ -454,6 +457,43 @@ const optionalize = (type: string, optional: boolean): string => {
     return type.endsWith('?') ? type : `${type}?`;
 };
 
+// Emits the group-named factory (`.params(...)`, `.query(...)`) mirroring the memberwise init; optional
+// fields default to `nil`. `fields` carry resolved Swift types; `buildExpression` produces the returned
+// value (default `.init(args)`).
+const emitNamedFactory = (
+    writer: SwiftWriter,
+    factoryName: string,
+    fields: SwiftField[],
+    buildExpression?: (args: string) => string
+): void => {
+    const build = buildExpression ?? ((args: string) => `.init(${args})`);
+    if (fields.length === 0) {
+        writer.block(`public static func ${escapeKeyword(factoryName)}() -> Self`, () => {
+            writer.line(build(''));
+        });
+        return;
+    }
+    const params = fields.map((field) => {
+        const typeExpression = optionalize(field.type, field.optional);
+        const defaultPart = field.optional ? ' = nil' : '';
+        return `${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
+    });
+    const args = fields.map((field) => `${field.name}: ${escapeKeyword(field.name)}`).join(', ');
+    if (params.length === 1) {
+        writer.block(`public static func ${escapeKeyword(factoryName)}(${params[0]}) -> Self`, () => {
+            writer.line(build(args));
+        });
+        return;
+    }
+    writer.line(`public static func ${escapeKeyword(factoryName)}(`);
+    for (let index = 0; index < params.length; index += 1) {
+        writer.line(`    ${params[index]}${index === params.length - 1 ? '' : ','}`);
+    }
+    writer.block(') -> Self', () => {
+        writer.line(build(args));
+    });
+};
+
 const emitMemberwiseInit = (writer: SwiftWriter, fields: SwiftField[]): void => {
     if (fields.length === 0) {
         writer.line('public init() {}');
@@ -497,6 +537,7 @@ const emitStringEnum = (writer: SwiftWriter, name: string, cases: string[], desc
 const emitTypes = (
     writer: SwiftWriter,
     types: SwiftType[],
+    context: EmitContext,
     ownedTypeMap: Map<string, string> = new Map(),
     ownedTypeLookup: Map<string, SwiftType> = new Map()
 ): void => {
@@ -504,11 +545,11 @@ const emitTypes = (
         writer.blank();
         writer.docComment(type.description);
         if (type.kind === 'struct') {
-            emitStruct(writer, type, ownedTypeMap, ownedTypeLookup);
+            emitStruct(writer, type, context, ownedTypeMap, ownedTypeLookup);
         } else if (type.kind === 'enum') {
             emitStringEnum(writer, type.name, type.cases, type.description);
         } else {
-            emitDiscriminatedEnum(writer, type);
+            emitDiscriminatedEnum(writer, type, context);
         }
     }
 };
@@ -516,6 +557,7 @@ const emitTypes = (
 const emitStruct = (
     writer: SwiftWriter,
     type: Extract<SwiftType, { kind: 'struct' }>,
+    context: EmitContext,
     ownedTypeMap: Map<string, string>,
     ownedTypeLookup: Map<string, SwiftType>,
     registryName?: string
@@ -554,9 +596,9 @@ const emitStruct = (
             if (ownedType.kind === 'enum') {
                 emitStringEnum(writer, shortName, ownedType.cases, ownedType.description);
             } else if (ownedType.kind === 'struct') {
-                emitStruct(writer, { ...ownedType, name: shortName }, ownedTypeMap, ownedTypeLookup, ownedName);
+                emitStruct(writer, { ...ownedType, name: shortName }, context, ownedTypeMap, ownedTypeLookup, ownedName);
             } else if (ownedType.kind === 'discriminated-enum') {
-                emitDiscriminatedEnum(writer, { ...ownedType, name: shortName });
+                emitDiscriminatedEnum(writer, { ...ownedType, name: shortName }, context);
             }
         }
         for (const field of type.fields) {
@@ -583,10 +625,43 @@ const emitStruct = (
     });
 };
 
-const emitDiscriminatedEnum = (writer: SwiftWriter, type: Extract<SwiftType, { kind: 'discriminated-enum' }>): void => {
+const emitDiscriminatedEnum = (
+    writer: SwiftWriter,
+    type: Extract<SwiftType, { kind: 'discriminated-enum' }>,
+    context: EmitContext
+): void => {
     writer.block(`public enum ${type.name}: Codable, Sendable, Equatable`, () => {
         for (const variant of type.variants) {
             writer.line(`case ${escapeKeyword(variant.caseName)}(${variant.payloadType})`);
+        }
+
+        // Static factory per variant (`.email(to:subject:)`); the payload struct is built here with the
+        // discriminator literal injected.
+        for (const variant of type.variants) {
+            const registryKey = variant.payloadType.split('.').pop() ?? variant.payloadType;
+            const payloadStruct = registryStruct(registryKey, context);
+            if (!payloadStruct) continue;
+            const isDiscriminator = (field: SwiftField): boolean =>
+                field.wireName === type.discriminator || field.name === type.discriminator;
+            const valueFields = payloadStruct.fields.filter((field) => !isDiscriminator(field));
+            const factoryParams = valueFields
+                .map((field) => {
+                    const defaultPart = field.optional ? ' = nil' : '';
+                    return `${escapeKeyword(field.name)}: ${optionalize(resolveType(field.type, undefined, context), field.optional)}${defaultPart}`;
+                })
+                .join(', ');
+            const payloadArgs = payloadStruct.fields
+                .map((field) => {
+                    if (isDiscriminator(field)) {
+                        const literal = field.type === 'String' ? stringLiteral(variant.literal) : variant.literal;
+                        return `${field.name}: ${literal}`;
+                    }
+                    return `${field.name}: ${escapeKeyword(field.name)}`;
+                })
+                .join(', ');
+            writer.block(`public static func ${escapeKeyword(variant.caseName)}(${factoryParams}) -> ${type.name}`, () => {
+                writer.line(`.${escapeKeyword(variant.caseName)}(${variant.payloadType}(${payloadArgs}))`);
+            });
         }
         writer.blank();
         writer.block('private enum DiscriminatorKey: String, CodingKey', () => {
@@ -747,6 +822,88 @@ const emitResultStruct = (writer: SwiftWriter, method: RouteMethod, context: Emi
     });
 };
 
+// Emits a request-group struct (params / query / headers) with its fields, memberwise init, and group-named factory.
+const emitGroupStruct = (
+    writer: SwiftWriter,
+    structName: string,
+    factoryName: string,
+    fields: SwiftField[],
+    method: RouteMethod,
+    context: EmitContext
+): void => {
+    const resolved = fields.map((field) => ({
+        ...field,
+        type: resolveType(field.type, method.operationName, context, 'operation-enum'),
+    }));
+    writer.blank();
+    writer.block(`public struct ${structName}: Sendable`, () => {
+        for (const field of resolved) {
+            writer.line(`public let ${escapeKeyword(field.name)}: ${optionalize(field.type, field.optional)}`);
+        }
+        writer.blank();
+        emitMemberwiseInit(writer, resolved);
+        writer.blank();
+        emitNamedFactory(writer, factoryName, resolved);
+    });
+};
+
+// Emits the `Body` group struct and `.body(...)` factory. Object bodies take the fields (building the
+// Codable payload); union / non-object bodies take the value directly; multipart takes its fields.
+const emitBodyType = (writer: SwiftWriter, method: RouteMethod, context: EmitContext): void => {
+    const body = method.body;
+    if (!body || body.kind === 'json-empty') return;
+    const operationName = method.operationName;
+    writer.blank();
+
+    if (body.kind === 'multipart') {
+        const resolved = body.flattened.map((field) => ({
+            ...field,
+            type: resolveType(field.type, operationName, context, 'operation-enum'),
+        }));
+        writer.block('public struct Body: Sendable', () => {
+            for (const field of resolved) {
+                writer.line(`public let ${escapeKeyword(field.name)}: ${optionalize(field.type, field.optional)}`);
+            }
+            writer.blank();
+            emitMemberwiseInit(writer, resolved);
+            writer.blank();
+            emitNamedFactory(writer, 'body', resolved);
+        });
+        return;
+    }
+
+    const payloadType = body.structName
+        ? resolveType(body.structName, operationName, context, 'operation-enum')
+        : `${context.clientName}.AnyCodable`;
+    writer.block('public struct Body: Sendable', () => {
+        writer.line(`public let payload: ${payloadType}`);
+        writer.blank();
+        writer.block(`public init(payload: ${payloadType})`, () => {
+            writer.line('self.payload = payload');
+        });
+        writer.blank();
+        if (body.kind === 'json-flat') {
+            const resolved = body.flattened.map((field) => ({
+                ...field,
+                type: resolveType(field.type, operationName, context, 'operation-enum'),
+            }));
+            emitNamedFactory(writer, 'body', resolved, (args) => `.init(payload: ${payloadType}(${args}))`);
+        } else {
+            // union / non-object / AnyCodable body — the value is passed straight through, unlabeled.
+            writer.block(`public static func body(_ value: ${payloadType}) -> Self`, () => {
+                writer.line('.init(payload: value)');
+            });
+        }
+    });
+};
+
+const emitRequestGroupStructs = (writer: SwiftWriter, method: RouteMethod, context: EmitContext): void => {
+    if (method.pathParams.length > 0) emitGroupStruct(writer, 'Params', 'params', pathParamFields(method), method, context);
+    if (method.query.length > 0) emitGroupStruct(writer, 'Query', 'query', method.query, method, context);
+    if (method.headers.length > 0) emitGroupStruct(writer, 'Headers', 'headers', method.headers, method, context);
+    emitBodyType(writer, method, context);
+};
+
 const emitFailureEnum = (writer: SwiftWriter, method: RouteMethod, context: EmitContext): void => {
     writer.blank();
     const hasDecodedResponse = method.successReturnType !== 'Void' || method.errorCases.some((c) => c.type !== 'Void');
@@ -890,42 +1047,70 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
     });
 };
 
-const buildMethodParameters = (method: RouteMethod, context: EmitContext): string[] => {
-    const params: string[] = [];
-    for (const pathParam of method.pathParams) {
-        params.push(`${escapeKeyword(pathParam)}: String`);
-    }
-    if (method.body) {
-        if (method.body.kind === 'json-flat' || method.body.kind === 'multipart') {
-            for (const field of method.body.flattened) {
-                const rawType =
-                    field.type === 'MultipartFile'
-                        ? `${context.clientName}.MultipartFile`
-                        : resolveType(field.type, method.operationName, context);
-                const typeExpression = optionalize(rawType, field.optional);
-                const defaultPart = field.optional ? ' = nil' : '';
-                params.push(`${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`);
-            }
-        } else if (method.body.kind === 'json-struct' && method.body.structName) {
-            const resolved = resolveType(method.body.structName, method.operationName, context);
-            params.push(`_ input: ${resolved}`);
-        } else if (method.body.kind === 'union' && method.body.structName) {
-            const resolved = resolveType(method.body.structName, method.operationName, context);
-            params.push(`_ input: ${resolved}`);
-        }
-    }
-    for (const field of method.query) {
-        const typeExpression = optionalize(resolveType(field.type, method.operationName, context), field.optional);
-        const defaultPart = field.optional ? ' = nil' : '';
-        params.push(`${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`);
-    }
-    for (const field of method.headers) {
-        const typeExpression = optionalize(resolveType(field.type, method.operationName, context), field.optional);
-        const defaultPart = field.optional ? ' = nil' : '';
-        params.push(`${escapeKeyword(field.name)}Header: ${typeExpression}${defaultPart}`);
-    }
-    return params;
+// ----- Struct-based call surface -----
+//
+// Each request group (params / query / headers / body) is emitted as a typed struct with a group-named
+// static factory; a field reads back as `group.field`.
+
+const pathParamFields = (method: RouteMethod): SwiftField[] =>
+    method.pathParams.map((name) => ({ name, wireName: name, type: 'String', optional: false }));
+
+const registryStruct = (typeName: string, context: EmitContext): Extract<SwiftType, { kind: 'struct' }> | undefined => {
+    const found = context.registry.get(typeName);
+    return found && found.kind === 'struct' && found.fields.length > 0 ? found : undefined;
 };
+
+// How to read one field out of a group struct (`group.field`).
+const groupMemberAccessor = (groupLabel: string, field: SwiftField): string => `${groupLabel}.${escapeKeyword(field.name)}`;
+
+const groupTypeRef = (operationName: string, structName: string, context: EmitContext): string =>
+    `${context.clientName}.${operationName}.${structName}`;
+
+// The body's `Body` group type, or undefined when the body carries no call-site value (empty/void).
+const bodyParamType = (method: RouteMethod, context: EmitContext): string | undefined => {
+    if (!method.body || method.body.kind === 'json-empty') return undefined;
+    return groupTypeRef(method.operationName, 'Body', context);
+};
+
+type MethodGroup = { varName: string; type: string; factory: string; required: boolean };
+
+// The request groups of a method, required ones first. A group is required when it has any required field
+// (path params and object bodies always do); optional groups sort last so they can carry trailing defaults.
+const methodGroups = (method: RouteMethod, context: EmitContext): MethodGroup[] => {
+    const operationName = method.operationName;
+    const groups: MethodGroup[] = [];
+
+    if (method.pathParams.length > 0) {
+        groups.push({ varName: 'params', type: groupTypeRef(operationName, 'Params', context), factory: 'params', required: true });
+    }
+    const bodyType = bodyParamType(method, context);
+    if (bodyType) {
+        groups.push({ varName: 'body', type: bodyType, factory: 'body', required: true });
+    }
+    if (method.query.length > 0) {
+        groups.push({
+            varName: 'query',
+            type: groupTypeRef(operationName, 'Query', context),
+            factory: 'query',
+            required: method.query.some((field) => !field.optional),
+        });
+    }
+    if (method.headers.length > 0) {
+        groups.push({
+            varName: 'headers',
+            type: groupTypeRef(operationName, 'Headers', context),
+            factory: 'headers',
+            required: method.headers.some((field) => !field.optional),
+        });
+    }
+
+    return [...groups.filter((group) => group.required), ...groups.filter((group) => !group.required)];
+};
+
+// Each request group is a positional parameter typed as its group struct. Required groups are non-defaulted;
+// optional groups get a `.factory()` default so they can be omitted.
+const buildMethodParameters = (method: RouteMethod, context: EmitContext): string[] =>
+    methodGroups(method, context).map((group) => `_ ${group.varName}: ${group.type}${group.required ? '' : ` = .${group.factory}()`}`);
 
 const deprecatedAttribute = (message: string | undefined): string => {
     if (message === undefined || message === '') return '@available(*, deprecated)';
@@ -940,9 +1125,10 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
     const pathDecl = method.pathParams.length > 0 ? 'var' : 'let';
     const componentsDecl = method.query.length > 0 ? 'var' : 'let';
     writer.line(`${pathDecl} path = ${stringLiteral(method.pathTemplate)}`);
-    for (const pathParam of method.pathParams) {
+    for (const field of pathParamFields(method)) {
+        const accessor = groupMemberAccessor('params', field);
         writer.line(
-            `path = path.replacingOccurrences(of: ${stringLiteral(`:${pathParam}`)}, with: Kizuna.encodePathSegment(${escapeKeyword(pathParam)}))`
+            `path = path.replacingOccurrences(of: ${stringLiteral(`:${field.name}`)}, with: Kizuna.encodePathSegment(${accessor}))`
         );
     }
 
@@ -960,12 +1146,13 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                     writer.line(`queryItems.append(URLQueryItem(name: ${stringLiteral(field.wireName)}, value: stringValue))`);
                 });
             };
+            const accessor = groupMemberAccessor('query', field);
             if (field.optional) {
-                writer.block(`if let value = ${escapeKeyword(field.name)}`, () => {
+                writer.block(`if let value = ${accessor}`, () => {
                     appendBlock('value');
                 });
             } else {
-                appendBlock(escapeKeyword(field.name));
+                appendBlock(accessor);
             }
         }
         writer.line('if !queryItems.isEmpty { components.queryItems = queryItems }');
@@ -980,18 +1167,18 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
     }
 
     for (const field of method.headers) {
-        const headerParam = `${escapeKeyword(field.name)}Header`;
+        const accessor = groupMemberAccessor('headers', field);
         const setHeader = (sourceExpression: string): void => {
             writer.line(
                 `request.setValue(Kizuna.stringifyQueryValue(${sourceExpression}).joined(separator: ", "), forHTTPHeaderField: ${stringLiteral(field.wireName)})`
             );
         };
         if (field.optional) {
-            writer.block(`if let value = ${headerParam}`, () => {
+            writer.block(`if let value = ${accessor}`, () => {
                 setHeader('value');
             });
         } else {
-            setHeader(headerParam);
+            setHeader(accessor);
         }
     }
 
@@ -1132,20 +1319,24 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
     writer.line('}');
 };
 
-const buildMethodSignature = (method: RouteMethod, context: EmitContext): string => {
+const methodSuccessType = (method: RouteMethod, context: EmitContext): string => {
     const { clientName } = context;
+    if (method.resultWrapperName) {
+        return `${clientName}.${method.operationName}.${method.resultWrapperName}`;
+    }
+    if (method.successReturnType === 'Void') {
+        return 'Void';
+    }
+    if (method.successSumEnumName) {
+        return `${clientName}.${method.operationName}.Success`;
+    }
+    return resolveType(method.successReturnType, method.operationName, context);
+};
+
+const buildMethodSignature = (method: RouteMethod, context: EmitContext): string => {
     const failure = failureRef(method, context);
     const params = buildMethodParameters(method, context);
-    let successType: string;
-    if (method.resultWrapperName) {
-        successType = `${clientName}.${method.operationName}.${method.resultWrapperName}`;
-    } else if (method.successReturnType === 'Void') {
-        successType = 'Void';
-    } else if (method.successSumEnumName) {
-        successType = `${clientName}.${method.operationName}.Success`;
-    } else {
-        successType = resolveType(method.successReturnType, method.operationName, context);
-    }
+    const successType = methodSuccessType(method, context);
     const returnType = successType === 'Void' ? '' : ` -> ${successType}`;
     return `public func ${escapeKeyword(method.name)}(${params.join(', ')}) async throws(${failure})${returnType}`;
 };
@@ -1203,13 +1394,12 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
     if (body.kind === 'multipart') {
         writer.line('var multipart = Kizuna.MultipartBuilder()');
         for (const field of body.multipartFields) {
-            const isFlattenedFile = body.flattened.find((flatField) => flatField.name === field.name)?.isFile === true;
-            if (field.isFile || isFlattenedFile) {
-                writer.line(`multipart.appendFile(name: ${stringLiteral(field.wireName)}, file: ${escapeKeyword(field.name)})`);
+            const flattenedField = body.flattened.find((candidate) => candidate.name === field.name);
+            const accessor = `body.${escapeKeyword(field.name)}`;
+            if (field.isFile || flattenedField?.isFile === true) {
+                writer.line(`multipart.appendFile(name: ${stringLiteral(field.wireName)}, file: ${accessor})`);
             } else {
-                writer.line(
-                    `multipart.appendField(name: ${stringLiteral(field.wireName)}, value: String(describing: ${escapeKeyword(field.name)}))`
-                );
+                writer.line(`multipart.appendField(name: ${stringLiteral(field.wireName)}, value: String(describing: ${accessor}))`);
             }
         }
         writer.line('request.httpBody = multipart.finalize()');
@@ -1222,20 +1412,10 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
         writer.line('request.httpBody = Data("{}".utf8)');
         return;
     }
-    if (body.kind === 'json-struct' || body.kind === 'union') {
-        writer.line('do {');
-        writer.line('    request.httpBody = try encoder.encode(input)');
-        writer.line(`} catch { throw ${failure}.requestFailed(error) }`);
-        return;
-    }
-    if (body.kind === 'json-flat' && body.structName) {
-        const resolved = resolveType(body.structName, method.operationName, context);
-        const args = body.flattened.map((field) => `${field.name}: ${escapeKeyword(field.name)}`).join(', ');
-        writer.line(`let body = ${resolved}(${args})`);
-        writer.line('do {');
-        writer.line('    request.httpBody = try encoder.encode(body)');
-        writer.line(`} catch { throw ${failure}.requestFailed(error) }`);
-    }
+    // Object / non-object / union bodies: the `Body` group wraps the Codable payload.
+    writer.line('do {');
+    writer.line('    request.httpBody = try encoder.encode(body.payload)');
+    writer.line(`} catch { throw ${failure}.requestFailed(error) }`);
 };
 
 const emitClient = (
@@ -1399,7 +1579,8 @@ const emitClient = (
             );
             writer.blank();
             writer.block(`public enum ${method.operationName}`, () => {
-                emitTypes(writer, localTypes);
+                emitTypes(writer, localTypes, context);
+                emitRequestGroupStructs(writer, method, context);
                 emitSuccessSumEnum(writer, method, context);
                 emitResultStruct(writer, method, context);
                 emitFailureEnum(writer, method, context);
@@ -1485,10 +1666,11 @@ export const generateSwiftClient = (contract: Contract, config: SwiftConfig): st
         operationTypeMap,
         fileLevelTypeNames,
         ownedTypeMap,
+        registry,
     };
 
     writer.block(`public enum ${namespaceName}`, () => {
-        emitTypes(writer, topLevelSharedTypes, ownedTypeMap, ownedTypeLookup);
+        emitTypes(writer, topLevelSharedTypes, context, ownedTypeMap, ownedTypeLookup);
     });
 
     emitClient(writer, { clientName, anyCodable: registry.usesAnyCodable }, partition, context, typesByOperation);

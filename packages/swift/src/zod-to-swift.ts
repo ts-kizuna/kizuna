@@ -79,6 +79,10 @@ export class TypeRegistry {
         return this.types.has(name);
     }
 
+    get(name: string): SwiftType | undefined {
+        return this.types.get(name);
+    }
+
     add(type: SwiftType): void {
         if (this.types.has(type.name)) return;
         this.types.set(type.name, type);

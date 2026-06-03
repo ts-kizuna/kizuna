@@ -15,7 +15,9 @@ final class APIClientTests: XCTestCase {
     }
 
     func testListUsersReturnsSeededUsers() async throws {
-        let response = try await client.users.listUsers(page: 1, limit: 10)
+        let response = try await client.users.listUsers(
+            .query(page: 1, limit: 10)
+        )
         XCTAssertGreaterThanOrEqual(response.body.users.count, 2)
         XCTAssertGreaterThanOrEqual(response.body.total, 2)
         let names = response.body.users.map(\.name)
@@ -24,15 +26,22 @@ final class APIClientTests: XCTestCase {
     }
 
     func testListUsersPagination() async throws {
-        let firstPage = try await client.users.listUsers(page: 1, limit: 1)
+        let firstPage = try await client.users.listUsers(
+            .query(page: 1, limit: 1)
+        )
         XCTAssertEqual(firstPage.body.users.count, 1)
-        let secondPage = try await client.users.listUsers(page: 2, limit: 1)
+        let secondPage = try await client.users.listUsers(
+            .query(page: 2, limit: 1)
+        )
         XCTAssertEqual(secondPage.body.users.count, 1)
         XCTAssertNotEqual(firstPage.body.users[0].id, secondPage.body.users[0].id)
     }
 
     func testGetUserReturnsSeededUser() async throws {
-        let result = try await client.users.getUser(id: "1", xRequestIdHeader: "test-1")
+        let result = try await client.users.getUser(
+            .params(id: "1"),
+            .headers(xRequestId: "test-1")
+        )
         XCTAssertEqual(result.body.id, "1")
         XCTAssertEqual(result.body.name, "Ada Lovelace")
         XCTAssertEqual(result.body.email, "ada@example.com")
@@ -40,7 +49,10 @@ final class APIClientTests: XCTestCase {
 
     func testGetUserNotFoundThrowsTypedError() async throws {
         do {
-            _ = try await client.users.getUser(id: "does-not-exist", xRequestIdHeader: "test-2")
+            _ = try await client.users.getUser(
+                .params(id: "does-not-exist"),
+                .headers(xRequestId: "test-2")
+            )
             XCTFail("expected .notFound to be thrown")
         } catch .notFound(let payload) {
             XCTAssertFalse(payload.detail.isEmpty, "expected non-empty error message")
@@ -50,29 +62,51 @@ final class APIClientTests: XCTestCase {
     }
 
     func testCreateUserRoundTrip() async throws {
-        let created = try await client.users.createUser(name: "Grace Hopper", email: "grace@example.com", last_name: "Hopper")
+        let created = try await client.users.createUser(
+            .body(
+                name: "Grace Hopper",
+                email: "grace@example.com",
+                last_name: "Hopper"
+            )
+        )
         XCTAssertFalse(created.body.id.isEmpty)
         XCTAssertEqual(created.body.name, "Grace Hopper")
         XCTAssertEqual(created.body.email, "grace@example.com")
         XCTAssertEqual(created.body.last_name, "Hopper")
 
-        let fetched = try await client.users.getUser(id: created.body.id, xRequestIdHeader: "test-3")
+        let fetched = try await client.users.getUser(
+            .params(id: created.body.id),
+            .headers(xRequestId: "test-3")
+        )
         XCTAssertEqual(fetched.body, created.body)
     }
 
     func testSnakeCaseFieldDecodedFromSeed() async throws {
-        let result = try await client.users.getUser(id: "1", xRequestIdHeader: "snake-decode")
+        let result = try await client.users.getUser(
+            .params(id: "1"),
+            .headers(xRequestId: "snake-decode")
+        )
         XCTAssertEqual(result.body.last_name, "Lovelace", "snake_case wire key 'last_name' must round-trip into Swift property 'last_name'")
     }
 
     @available(*, deprecated)
     func testDeleteUserRoundTrip() async throws {
-        let created = try await client.users.createUser(name: "Temp User", email: "temp@example.com")
-        let result = try await client.users.deleteUser(id: created.body.id)
+        let created = try await client.users.createUser(
+            .body(
+                name: "Temp User",
+                email: "temp@example.com"
+            )
+        )
+        let result = try await client.users.deleteUser(
+            .params(id: created.body.id)
+        )
         XCTAssertTrue(result.body.success)
 
         do {
-            _ = try await client.users.getUser(id: created.body.id, xRequestIdHeader: "test-4")
+            _ = try await client.users.getUser(
+                .params(id: created.body.id),
+                .headers(xRequestId: "test-4")
+            )
             XCTFail("expected getUser of deleted id to throw")
         } catch .notFound {
             // expected
@@ -84,7 +118,9 @@ final class APIClientTests: XCTestCase {
     @available(*, deprecated)
     func testDeleteUserNotFoundThrowsTypedError() async throws {
         do {
-            _ = try await client.users.deleteUser(id: "missing-id")
+            _ = try await client.users.deleteUser(
+                .params(id: "missing-id")
+            )
             XCTFail("expected .notFound to be thrown")
         } catch .notFound(let payload) {
             XCTAssertFalse(payload.detail.isEmpty)
@@ -94,7 +130,10 @@ final class APIClientTests: XCTestCase {
     }
 
     func testResponseHeaderEchoedInResult() async throws {
-        let result = try await client.users.getUser(id: "1", xRequestIdHeader: "trace-xyz-999")
+        let result = try await client.users.getUser(
+            .params(id: "1"),
+            .headers(xRequestId: "trace-xyz-999")
+        )
         XCTAssertEqual(result.headers.xRequestId, "trace-xyz-999", "server must echo x-request-id back and client must expose it on Result")
     }
 
@@ -104,7 +143,10 @@ final class APIClientTests: XCTestCase {
         let testClient = APIClient(baseURL: url, responseMiddleware: { request, _, _ in
             await captured.set(request: request)
         })
-        _ = try await testClient.users.getUser(id: "1", xRequestIdHeader: "trace-abc-123")
+        _ = try await testClient.users.getUser(
+            .params(id: "1"),
+            .headers(xRequestId: "trace-abc-123")
+        )
         let value = await captured.headerValue(for: "x-request-id")
         XCTAssertEqual(value, "trace-abc-123", "expected hyphenated header to be sent under its wire name")
     }
@@ -116,33 +158,35 @@ final class APIClientTests: XCTestCase {
             await counter.increment()
             request.setValue("integration-test", forHTTPHeaderField: "X-Test-Source")
         })
-        _ = try await testClient.users.listUsers(page: 1, limit: 1)
+        _ = try await testClient.users.listUsers(
+            .query(page: 1, limit: 1)
+        )
         let count = await counter.value
         XCTAssertEqual(count, 1)
     }
 
     func testSearchUsersCoercedQuery() async throws {
-        let response = try await client.users.searchUsers(q: "ada", limit: 5, cursor: 0)
+        let response = try await client.users.searchUsers(
+            .query(q: "ada", limit: 5, cursor: 0)
+        )
         XCTAssertGreaterThanOrEqual(response.body.users.count, 0)
     }
 
     func testSendNotificationEmail() async throws {
-        let event = API.NotificationEvent.email(API.EmailEvent(
-            channel: "email",
-            to: "alice@example.com",
-            subject: "Hello"
-        ))
-        let result = try await client.sendNotification(event)
+        let result = try await client.sendNotification(
+            .body(
+                .email(to: "alice@example.com", subject: "Hello")
+            )
+        )
         XCTAssertTrue(result.body.accepted)
     }
 
     func testSendNotificationSms() async throws {
-        let event = API.NotificationEvent.sms(API.SmsEvent(
-            channel: "sms",
-            phone: "+1234567890",
-            text: "Hi there"
-        ))
-        let result = try await client.sendNotification(event)
+        let result = try await client.sendNotification(
+            .body(
+                .sms(phone: "+1234567890", text: "Hi there")
+            )
+        )
         XCTAssertTrue(result.body.accepted)
     }
 
@@ -151,7 +195,10 @@ final class APIClientTests: XCTestCase {
         // returns its generic HTML 404 — surfacing as decoding/unexpectedStatus, not a typed error.
         // With encoding, the handler runs and returns the contract-shaped 404.
         do {
-            _ = try await client.users.getUser(id: "a/b", xRequestIdHeader: "test-5")
+            _ = try await client.users.getUser(
+                .params(id: "a/b"),
+                .headers(xRequestId: "test-5")
+            )
             XCTFail("expected .notFound")
         } catch .notFound(let payload) {
             XCTAssertFalse(payload.detail.isEmpty)
@@ -162,7 +209,9 @@ final class APIClientTests: XCTestCase {
 
     func testListEventsDateQueryRoundTrip() async throws {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
-        let response = try await client.listEvents(since: date, kind: nil, ids: nil)
+        let response = try await client.listEvents(
+            .query(since: date)
+        )
         guard let echoed = response.body.echo.since else {
             XCTFail("server did not echo `since` — query param missing")
             return
@@ -187,32 +236,47 @@ final class APIClientTests: XCTestCase {
     }
 
     func testListEventsEnumQuerySerializesRawValue() async throws {
-        let response = try await client.listEvents(since: nil, kind: .login, ids: nil)
+        let response = try await client.listEvents(
+            .query(kind: .login)
+        )
         XCTAssertEqual(response.body.echo.kind, .login, "enum query param must round-trip via raw value, not case name")
     }
 
     func testListEventsArrayQueryRepeats() async throws {
         let ids = ["a", "b", "c"]
-        let response = try await client.listEvents(since: nil, kind: nil, ids: ids)
+        let response = try await client.listEvents(
+            .query(ids: ids)
+        )
         XCTAssertEqual(response.body.echo.ids, ids, "array query param must serialize as repeated entries, not bracketed string")
     }
 
     func testListEventsTransformQueryParam() async throws {
         // label uses z.string().transform() — the Swift client must accept String, not AnyCodable.
-        let response = try await client.listEvents(since: nil, kind: nil, ids: nil, label: "hello")
+        let response = try await client.listEvents(
+            .query(label: "hello")
+        )
         XCTAssertEqual(response.body.echo.label, "hello", "transform query param must round-trip")
     }
 
     func testListEventsUnionQueryParam() async throws {
         // tagIds uses z.union([z.array(z.string()), z.string().transform(...)]) — Swift client must
         // accept [String], not AnyCodable. Pass an array and verify the server echoes it back.
-        let response = try await client.listEvents(since: nil, kind: nil, ids: nil, label: nil, tagIds: ["tag-a", "tag-b"])
+        let response = try await client.listEvents(
+            .query(tagIds: ["tag-a", "tag-b"])
+        )
         XCTAssertEqual(response.body.echo.tagIds, ["tag-a", "tag-b"], "union query param must round-trip as array")
     }
 
     func testArchiveUserSuccessSumType() async throws {
-        let created = try await client.users.createUser(name: "Archive Target", email: "archive@example.com")
-        let firstResult = try await client.users.archiveUser(id: created.body.id)
+        let created = try await client.users.createUser(
+            .body(
+                name: "Archive Target",
+                email: "archive@example.com"
+            )
+        )
+        let firstResult = try await client.users.archiveUser(
+            .params(id: created.body.id)
+        )
         switch firstResult.body {
         case .status201(let payload):
             XCTAssertEqual(payload.userId, created.body.id)
@@ -220,7 +284,9 @@ final class APIClientTests: XCTestCase {
         case .status200:
             XCTFail("first archive should return 201, got 200")
         }
-        let secondResult = try await client.users.archiveUser(id: created.body.id)
+        let secondResult = try await client.users.archiveUser(
+            .params(id: created.body.id)
+        )
         switch secondResult.body {
         case .status200(let payload):
             XCTAssertEqual(payload.userId, created.body.id)
@@ -234,8 +300,15 @@ final class APIClientTests: XCTestCase {
         // pingUser has body: z.void() and responses: { 204: z.void() }.
         // The generated method takes no body param and returns Void — this test
         // confirms the client compiles and the server handles the request.
-        let created = try await client.users.createUser(name: "Ping Target", email: "ping@example.com")
-        try await client.users.pingUser(id: created.body.id)
+        let created = try await client.users.createUser(
+            .body(
+                name: "Ping Target",
+                email: "ping@example.com"
+            )
+        )
+        try await client.users.pingUser(
+            .params(id: created.body.id)
+        )
     }
 
     func testGetMyWorkSanitizedEnumAndVoidSuccessArm() async throws {
@@ -275,9 +348,16 @@ final class APIClientTests: XCTestCase {
     }
 
     func testHeadUserStripsBody() async throws {
-        let created = try await client.users.createUser(name: "Head Target", email: "head@example.com")
+        let created = try await client.users.createUser(
+            .body(
+                name: "Head Target",
+                email: "head@example.com"
+            )
+        )
         // checkUser is a HEAD route — the generated method returns Void, no body to decode.
-        try await client.users.checkUser(id: created.body.id)
+        try await client.users.checkUser(
+            .params(id: created.body.id)
+        )
     }
 
     func testOptionsDescribeUsers() async throws {
@@ -288,7 +368,7 @@ final class APIClientTests: XCTestCase {
     func testWebhookAnyCodableBody() async throws {
         let json = try JSONSerialization.data(withJSONObject: ["event": "test", "count": 42])
         let payload = APIClient.AnyCodable(value: json)
-        let result = try await client.webhook(payload)
+        let result = try await client.webhook(.body(payload))
         XCTAssertTrue(result.body.received)
     }
 
@@ -299,7 +379,12 @@ final class APIClientTests: XCTestCase {
         let bytes = Data(repeating: 0xAB, count: 16)
         let file = APIClient.MultipartFile(data: bytes, filename: "avatar.bin", mimeType: "application/octet-stream")
         do {
-            _ = try await client.users.uploadAvatar(file: file, userId: "1")
+            _ = try await client.users.uploadAvatar(
+                .body(
+                    file: file,
+                    userId: "1"
+                )
+            )
             XCTFail("expected .unexpectedStatus to be thrown")
         } catch let failure {
             switch failure {

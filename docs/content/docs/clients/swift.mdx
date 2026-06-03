@@ -22,16 +22,42 @@ The CLI reads the contract at runtime using `jiti` — no build step needed. Add
 
 ## Usage
 
+Request inputs are passed as components named after the contract's input groups — `.params` (path), `.body`, `.query`, and `.headers` — mirroring the [`@ts-kizuna/fetch`](/docs/clients/fetch) client:
+
 ```swift
 let client = APIClient(baseURL: URL(string: "https://api.example.com")!)
 
-let response = try await client.users.listUsers(page: 1, limit: 20)
-print(response.body.users)
+// object body
+let created = try await client.users.createUser(
+    .body(
+        name: "Ada",
+        email: "ada@example.com"
+    )
+)
+
+// path param + header
+let user = try await client.users.getUser(
+    .params(id: "42"),
+    .headers(xRequestId: "trace-1")
+)
+
+// query
+let page = try await client.users.listUsers(
+    .query(page: 1, limit: 20)
+)
+let all = try await client.users.listUsers()
+
+// discriminated-union body
+try await client.sendNotification(
+    .body(
+        .email(to: "ada@example.com", subject: "Hi")
+    )
+)
 ```
 
 ## Generated client
 
-The generated file exports a typed actor with methods for each route and sub-clients for grouped routes:
+The generated file exports a typed actor with methods for each route and sub-clients for grouped routes. Each request group is a nested struct with a group-named factory:
 
 ```swift
 import Foundation
@@ -42,8 +68,18 @@ public actor APIClient {
 
     public var users: APIUsersClient { ... }
 
-    public func listUsers(page: Int, limit: Int) async throws(APIClient.ListUsers.Failure) -> APIClient.ListUsers.Result {
+    public func listUsers(_ query: APIClient.ListUsers.Query = .query()) async throws(APIClient.ListUsers.Failure) -> APIClient.ListUsers.Result {
         // ...
+    }
+
+    public enum ListUsers {
+        public struct Query: Sendable {
+            public let page: Int?
+            public let limit: Int?
+            public init(page: Int? = nil, limit: Int? = nil) { ... }
+            public static func query(page: Int? = nil, limit: Int? = nil) -> Self { .init(page: page, limit: limit) }
+        }
+        // Response, Result, Failure ...
     }
 }
 ```
@@ -54,7 +90,7 @@ Routes and fields marked `/** @deprecated */` in the contract emit `@available(*
 
 ```swift
 @available(*, deprecated)
-public func deleteUser(id: String) async throws(APIClient.DeleteUser.Failure) {
+public func deleteUser(_ params: APIClient.DeleteUser.Params) async throws(APIClient.DeleteUser.Failure) {
     // ...
 }
 ```
