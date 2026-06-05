@@ -36,6 +36,8 @@ createClient(contract: Contract, config: ClientConfig): Client<Contract>
 
 A `Client<T>` that mirrors the contract structure. Each route becomes a function accepting `{ params?, query?, body?, headers?, fetchOptions? }` and returning a `Promise` resolving to `{ status, body, headers }`.
 
+`params` is typed from the route's `pathParams` schema output when one is declared (matching the server-side handler), otherwise from the `:param` placeholders in the path.
+
 The response is a discriminated union over the route's declared status codes. Narrow on `status` to access the correctly typed `body`.
 
 ## Example

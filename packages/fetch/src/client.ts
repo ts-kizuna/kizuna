@@ -33,7 +33,16 @@ type SubstituteUnknown<In, Out> = In extends unknown
 
 type ClientPayload<T extends z.ZodType> = SubstituteUnknown<z.input<T>, z.output<T>>;
 
-type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends true ? { params: ExtractPathParams<R['path']> } : {}) &
+/**
+ * Path params are typed from the route's `pathParams` schema output when one is declared,
+ * mirroring the server-side `HandlerArgs`. This makes refinements like `.brand()` or
+ * `z.coerce` flow to the caller. Falls back to the path template (`:param` → `string`).
+ */
+type ClientParams<R extends RouteDefinition> = R extends { pathParams: z.ZodType }
+    ? z.output<R['pathParams']>
+    : ExtractPathParams<R['path']>;
+
+type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends true ? { params: ClientParams<R> } : {}) &
     (R extends { body: z.ZodType } ? (ClientPayload<R['body']> extends void ? {} : { body: ClientPayload<R['body']> }) : {}) &
     (R extends { query: z.ZodType }
         ? {} extends ClientPayload<R['query']>
