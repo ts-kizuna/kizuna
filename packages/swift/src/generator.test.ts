@@ -473,11 +473,11 @@ describe('Swift generator — nested sub-client routing', () => {
         expect(output).toContain('func _kizunaContext()');
         // GET method (no body) uses _ for the unused encoder slot
         expect(output).toContain(
-            'let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()'
+            'let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()'
         );
         // POST method (has body) uses encoder
         expect(output).toContain(
-            'let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()'
+            'let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()'
         );
     });
 
@@ -551,7 +551,7 @@ describe('Swift generator — responseHeaders', () => {
             },
         });
         const output = generateSwiftClient(contract, baseConfig);
-        expect(output).toContain('let httpResponse = response as? HTTPURLResponse');
+        expect(output).toContain('let (data, statusCode, httpResponse) = try await Kizuna.send(&request');
         expect(output).toContain('httpResponse?.value(forHTTPHeaderField: "x-request-id")');
         expect(output).toContain('return TestAPIClient.GetUser.Result(body: body, headers: .init(xRequestId: xRequestId))');
     });
@@ -571,7 +571,7 @@ describe('Swift generator — responseHeaders', () => {
         expect(output).toContain('public let body:');
         expect(output).not.toContain('public let headers: Headers');
         expect(output).not.toContain('httpResponse');
-        expect(output).toContain('let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1');
+        expect(output).toContain('let (data, statusCode, _) = try await Kizuna.send(&request');
         expect(output).toContain('return TestAPIClient.Ping.Result(body: body)');
     });
 });
@@ -789,7 +789,7 @@ describe('Swift generator — HEAD method', () => {
         });
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('func checkUser(_ params: TestAPIClient.CheckUser.Params) async throws(TestAPIClient.CheckUser.Failure)');
-        expect(output).not.toContain('decoder.decode(');
+        expect(output).not.toContain('Kizuna.decode(');
         expect(output).not.toContain('Result(body:');
     });
 
@@ -807,7 +807,7 @@ describe('Swift generator — HEAD method', () => {
         });
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('func describeUsers() async throws(TestAPIClient.DescribeUsers.Failure)');
-        expect(output).toContain('decoder.decode(');
+        expect(output).toContain('Kizuna.decode(');
     });
 });
 
@@ -896,7 +896,7 @@ describe('Swift generator — automatic validation error', () => {
         expect(matches).toHaveLength(1);
     });
 
-    it('re-throws Failure in grouped case to prevent swallowing decoded errors', () => {
+    it('tries each candidate type in a grouped case and throws the typed Failure without swallowing it', () => {
         const contract = createContract({
             createUser: {
                 method: 'POST',
@@ -915,7 +915,14 @@ describe('Swift generator — automatic validation error', () => {
             },
         });
         const output = generateSwiftClient(contract, baseConfig);
-        expect(output).toContain('catch let error as TestAPIClient.CreateUser.Failure');
+        // The body POST adds an automatic validation 400, so 400 is a grouped case with
+        // multiple candidate types. Each is attempted with `try?`; the matching case is
+        // thrown outside any catch, so it can never be swallowed by the next attempt.
+        expect(output).toMatch(
+            /if let payload = try\? decoder\.decode\(TestAPIClient\.CreateUser\.Response400\.self, from: data\) \{\s*\n\s*throw TestAPIClient\.CreateUser\.Failure\.badRequest\(payload\)/
+        );
+        expect(output).not.toContain('catch let error as TestAPIClient.CreateUser.Failure');
+        expect(output).not.toContain('} catch {}');
     });
 });
 
@@ -989,7 +996,7 @@ describe('Swift generator — grouped request components (params/body/query/head
         // body is a Body group; the factory builds the Codable payload, encoded via body.payload
         expect(output).toContain('func createUser(_ body: TestAPIClient.CreateUser.Body)');
         expect(output).toContain('public static func body(');
-        expect(output).toContain('try encoder.encode(body.payload)');
+        expect(output).toContain('try Kizuna.encodeBody(&request, value: body.payload, using: encoder');
     });
 
     it('emits a leading-dot static factory per discriminated-union variant (no .init at call site)', () => {

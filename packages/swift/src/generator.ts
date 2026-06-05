@@ -907,7 +907,8 @@ const emitRequestGroupStructs = (writer: SwiftWriter, method: RouteMethod, conte
 const emitFailureEnum = (writer: SwiftWriter, method: RouteMethod, context: EmitContext): void => {
     writer.blank();
     const hasDecodedResponse = method.successReturnType !== 'Void' || method.errorCases.some((c) => c.type !== 'Void');
-    writer.block('public enum Failure: Swift.Error, Sendable', () => {
+    const failureProtocol = hasDecodedResponse ? 'KizunaDecodableFailure' : 'KizunaFailure';
+    writer.block(`public enum Failure: Swift.Error, Sendable, ${failureProtocol}`, () => {
         writer.line('case requestFailed(Swift.Error)');
         writer.line('case cancelled');
         if (hasDecodedResponse) {
@@ -937,6 +938,19 @@ const emitSuccessSumEnum = (writer: SwiftWriter, method: RouteMethod, context: E
                 writer.line(`case status${successResponse.status}(${resolved})`);
             }
         }
+    });
+};
+
+const emitKizunaFailureProtocols = (writer: SwiftWriter): void => {
+    writer.blank();
+    writer.block('private protocol KizunaFailure: Swift.Error', () => {
+        writer.line('static func requestFailed(_ error: Swift.Error) -> Self');
+        writer.line('static var cancelled: Self { get }');
+        writer.line('static func unexpectedStatus(_ status: Int, _ data: Foundation.Data) -> Self');
+    });
+    writer.blank();
+    writer.block('private protocol KizunaDecodableFailure: KizunaFailure', () => {
+        writer.line('static func decoding(_ error: Swift.Error, statusCode: Int, data: Foundation.Data) -> Self');
     });
 };
 
@@ -1006,6 +1020,63 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
             writer.line('    return [String(describing: value)]');
             writer.line('}');
         });
+        writer.blank();
+        writer.block('static func queryItems<Value>(name: String, value: Value?) -> [URLQueryItem]', () => {
+            writer.line('guard let value else { return [] }');
+            writer.line('return stringifyQueryValue(value).map { URLQueryItem(name: name, value: $0) }');
+        });
+        writer.blank();
+        writer.block('static func setHeader<Value>(_ request: inout URLRequest, name: String, value: Value?)', () => {
+            writer.line('guard let value else { return }');
+            writer.line('request.setValue(stringifyQueryValue(value).joined(separator: ", "), forHTTPHeaderField: name)');
+        });
+        writer.blank();
+        writer.block(
+            'static func makeURL<Failure: KizunaFailure>(baseURL: URL, path: String, queryItems: [URLQueryItem], failure: Failure.Type) throws(Failure) -> URL',
+            () => {
+                writer.line('guard var components = URLComponents(url: appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {');
+                writer.line('    throw Failure.unexpectedStatus(-1, Data())');
+                writer.line('}');
+                writer.line('if !queryItems.isEmpty { components.queryItems = queryItems }');
+                writer.line('guard let url = components.url else { throw Failure.unexpectedStatus(-1, Data()) }');
+                writer.line('return url');
+            }
+        );
+        writer.blank();
+        writer.block(
+            'static func encodeBody<Value: Encodable, Failure: KizunaFailure>(_ request: inout URLRequest, value: Value, using encoder: JSONEncoder, failure: Failure.Type) throws(Failure)',
+            () => {
+                writer.line('do { request.httpBody = try encoder.encode(value) }');
+                writer.line('catch { throw Failure.requestFailed(error) }');
+            }
+        );
+        writer.blank();
+        writer.block(
+            'static func send<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (Foundation.Data, Int, HTTPURLResponse?)',
+            () => {
+                writer.line('if let requestMiddleware {');
+                writer.line('    do { try await requestMiddleware(&request) }');
+                writer.line('    catch is CancellationError { throw Failure.cancelled }');
+                writer.line('    catch { throw Failure.requestFailed(error) }');
+                writer.line('}');
+                writer.line('let data: Foundation.Data');
+                writer.line('let response: URLResponse');
+                writer.line('do { (data, response) = try await session.data(for: request) }');
+                writer.line('catch is CancellationError { throw Failure.cancelled }');
+                writer.line('catch { throw Failure.requestFailed(error) }');
+                writer.line('if let responseMiddleware { await responseMiddleware(request, data, response) }');
+                writer.line('let typed = response as? HTTPURLResponse');
+                writer.line('return (data, typed?.statusCode ?? -1, typed)');
+            }
+        );
+        writer.blank();
+        writer.block(
+            'static func decode<Value: Decodable, Failure: KizunaDecodableFailure>(_ type: Value.Type, from data: Foundation.Data, using decoder: JSONDecoder, statusCode: Int, failure: Failure.Type) throws(Failure) -> Value',
+            () => {
+                writer.line('do { return try decoder.decode(Value.self, from: data) }');
+                writer.line('catch { throw Failure.decoding(error, statusCode: statusCode, data: data) }');
+            }
+        );
         if (options.multipart) {
             writer.blank();
             writer.block('struct MultipartBuilder', () => {
@@ -1123,7 +1194,6 @@ const failureRef = (method: RouteMethod, context: EmitContext): string =>
 const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitContext): void => {
     const failure = failureRef(method, context);
     const pathDecl = method.pathParams.length > 0 ? 'var' : 'let';
-    const componentsDecl = method.query.length > 0 ? 'var' : 'let';
     writer.line(`${pathDecl} path = ${stringLiteral(method.pathTemplate)}`);
     for (const field of pathParamFields(method)) {
         const accessor = groupMemberAccessor('params', field);
@@ -1132,33 +1202,19 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
         );
     }
 
-    writer.line(
-        `guard ${componentsDecl} components = URLComponents(url: Kizuna.appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {`
-    );
-    writer.line(`    throw ${failure}.unexpectedStatus(-1, Data())`);
-    writer.line('}');
-
+    let queryItemsExpression = '[]';
     if (method.query.length > 0) {
         writer.line('var queryItems: [URLQueryItem] = []');
         for (const field of method.query) {
-            const appendBlock = (sourceExpression: string): void => {
-                writer.block(`for stringValue in Kizuna.stringifyQueryValue(${sourceExpression})`, () => {
-                    writer.line(`queryItems.append(URLQueryItem(name: ${stringLiteral(field.wireName)}, value: stringValue))`);
-                });
-            };
             const accessor = groupMemberAccessor('query', field);
-            if (field.optional) {
-                writer.block(`if let value = ${accessor}`, () => {
-                    appendBlock('value');
-                });
-            } else {
-                appendBlock(accessor);
-            }
+            writer.line(`queryItems += Kizuna.queryItems(name: ${stringLiteral(field.wireName)}, value: ${accessor})`);
         }
-        writer.line('if !queryItems.isEmpty { components.queryItems = queryItems }');
+        queryItemsExpression = 'queryItems';
     }
 
-    writer.line(`guard let url = components.url else { throw ${failure}.unexpectedStatus(-1, Data()) }`);
+    writer.line(
+        `let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: ${queryItemsExpression}, failure: ${failure}.self)`
+    );
     writer.line('var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)');
     writer.line(`request.httpMethod = ${stringLiteral(method.method)}`);
 
@@ -1168,41 +1224,13 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
 
     for (const field of method.headers) {
         const accessor = groupMemberAccessor('headers', field);
-        const setHeader = (sourceExpression: string): void => {
-            writer.line(
-                `request.setValue(Kizuna.stringifyQueryValue(${sourceExpression}).joined(separator: ", "), forHTTPHeaderField: ${stringLiteral(field.wireName)})`
-            );
-        };
-        if (field.optional) {
-            writer.block(`if let value = ${accessor}`, () => {
-                setHeader('value');
-            });
-        } else {
-            setHeader(accessor);
-        }
+        writer.line(`Kizuna.setHeader(&request, name: ${stringLiteral(field.wireName)}, value: ${accessor})`);
     }
 
-    writer.line('if let middleware = requestMiddleware {');
-    writer.line('    do { try await middleware(&request) }');
-    writer.line(`    catch is CancellationError { throw ${failure}.cancelled }`);
-    writer.line(`    catch { throw ${failure}.requestFailed(error) }`);
-    writer.line('}');
-
-    writer.line('let data: Foundation.Data');
-    writer.line('let response: URLResponse');
-    writer.line('do {');
-    writer.line('    (data, response) = try await session.data(for: request)');
-    writer.line(`} catch is CancellationError { throw ${failure}.cancelled }`);
-    writer.line(`catch { throw ${failure}.requestFailed(error) }`);
-    writer.line('if let middleware = responseMiddleware {');
-    writer.line('    await middleware(request, data, response)');
-    writer.line('}');
-    if (method.resultHeaderFields.length > 0) {
-        writer.line('let httpResponse = response as? HTTPURLResponse');
-        writer.line('let statusCode = httpResponse?.statusCode ?? -1');
-    } else {
-        writer.line('let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1');
-    }
+    const responseBinding = method.resultHeaderFields.length > 0 ? 'httpResponse' : '_';
+    writer.line(
+        `let (data, statusCode, ${responseBinding}) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: ${failure}.self)`
+    );
 
     writer.line('switch statusCode {');
     for (const successResponse of method.successResponses) {
@@ -1229,41 +1257,37 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                         writer.line(`    return ${qualifiedResult}(body: .status${successResponse.status})`);
                     }
                 } else {
-                    writer.line('    do {');
-                    writer.line(`        let payload = try decoder.decode(${resolved}.self, from: data)`);
+                    writer.line(
+                        `    let payload = try Kizuna.decode(${resolved}.self, from: data, using: decoder, statusCode: statusCode, failure: ${failure}.self)`
+                    );
                     for (const field of successResponse.responseHeaders) {
                         writer.line(
-                            `        let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
+                            `    let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
                         );
                     }
                     if (hasHeaders) {
                         writer.line(
-                            `        return ${qualifiedResult}(body: .status${successResponse.status}(payload), headers: .init(${headersInitArgs}))`
+                            `    return ${qualifiedResult}(body: .status${successResponse.status}(payload), headers: .init(${headersInitArgs}))`
                         );
                     } else {
-                        writer.line(`        return ${qualifiedResult}(body: .status${successResponse.status}(payload))`);
+                        writer.line(`    return ${qualifiedResult}(body: .status${successResponse.status}(payload))`);
                     }
-                    writer.line('    } catch {');
-                    writer.line(`        throw ${failure}.decoding(error, statusCode: statusCode, data: data)`);
-                    writer.line('    }');
                 }
             } else {
                 const resolved = resolveType(successResponse.type, method.operationName, context);
-                writer.line('    do {');
-                writer.line(`        let body = try decoder.decode(${resolved}.self, from: data)`);
+                writer.line(
+                    `    let body = try Kizuna.decode(${resolved}.self, from: data, using: decoder, statusCode: statusCode, failure: ${failure}.self)`
+                );
                 for (const field of successResponse.responseHeaders) {
                     writer.line(
-                        `        let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
+                        `    let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
                     );
                 }
                 if (hasHeaders) {
-                    writer.line(`        return ${qualifiedResult}(body: body, headers: .init(${headersInitArgs}))`);
+                    writer.line(`    return ${qualifiedResult}(body: body, headers: .init(${headersInitArgs}))`);
                 } else {
-                    writer.line(`        return ${qualifiedResult}(body: body)`);
+                    writer.line(`    return ${qualifiedResult}(body: body)`);
                 }
-                writer.line('    } catch {');
-                writer.line(`        throw ${failure}.decoding(error, statusCode: statusCode, data: data)`);
-                writer.line('    }');
             }
         } else {
             writer.line('    return');
@@ -1286,14 +1310,10 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                 writer.line(`    throw ${failure}.${escapeKeyword(firstCase.caseName)}`);
             } else {
                 const resolved = resolveType(firstCase.type, method.operationName, context);
-                writer.line('    do {');
-                writer.line(`        let payload = try decoder.decode(${resolved}.self, from: data)`);
-                writer.line(`        throw ${failure}.${escapeKeyword(firstCase.caseName)}(payload)`);
-                writer.line(`    } catch let error as ${failure} {`);
-                writer.line('        throw error');
-                writer.line('    } catch {');
-                writer.line(`        throw ${failure}.decoding(error, statusCode: statusCode, data: data)`);
-                writer.line('    }');
+                writer.line(
+                    `    let payload = try Kizuna.decode(${resolved}.self, from: data, using: decoder, statusCode: statusCode, failure: ${failure}.self)`
+                );
+                writer.line(`    throw ${failure}.${escapeKeyword(firstCase.caseName)}(payload)`);
             }
         } else {
             for (const errorCase of cases) {
@@ -1301,12 +1321,9 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                     writer.line(`    throw ${failure}.${escapeKeyword(errorCase.caseName)}`);
                 } else {
                     const resolved = resolveType(errorCase.type, method.operationName, context);
-                    writer.line('    do {');
-                    writer.line(`        let payload = try decoder.decode(${resolved}.self, from: data)`);
+                    writer.line(`    if let payload = try? decoder.decode(${resolved}.self, from: data) {`);
                     writer.line(`        throw ${failure}.${escapeKeyword(errorCase.caseName)}(payload)`);
-                    writer.line(`    } catch let error as ${failure} {`);
-                    writer.line('        throw error');
-                    writer.line('    } catch {}');
+                    writer.line('    }');
                 }
             }
             writer.line(
@@ -1364,9 +1381,8 @@ const emitSubClientMethod = (writer: SwiftWriter, method: RouteMethod, context: 
         const needsDecoder = method.successReturnType !== 'Void' || method.errorCases.some((c) => c.type !== 'Void');
         const decoderSlot = needsDecoder ? 'decoder' : '_';
         writer.line(
-            `let (baseURL, session, ${encoderSlot}, ${decoderSlot}, requestMiddleware, responseMiddleware) = await _actor._kizunaContext()`
+            `let (baseURL, session, ${encoderSlot}, ${decoderSlot}, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()`
         );
-        writer.line('let timeout = _actor.timeout');
         emitMethodBody(writer, method, context);
     });
 };
@@ -1413,9 +1429,7 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
         return;
     }
     // Object / non-object / union bodies: the `Body` group wraps the Codable payload.
-    writer.line('do {');
-    writer.line('    request.httpBody = try encoder.encode(body.payload)');
-    writer.line(`} catch { throw ${failure}.requestFailed(error) }`);
+    writer.line(`try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: ${failure}.self)`);
 };
 
 const emitClient = (
@@ -1559,9 +1573,9 @@ const emitClient = (
         if (groups.length > 0) {
             writer.blank();
             writer.block(
-                'func _kizunaContext() -> (URL, URLSession, JSONEncoder, JSONDecoder, (@Sendable (inout URLRequest) async throws -> Void)?, (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?)',
+                'func _kizunaContext() -> (URL, URLSession, JSONEncoder, JSONDecoder, (@Sendable (inout URLRequest) async throws -> Void)?, (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, TimeInterval)',
                 () => {
-                    writer.line('return (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware)');
+                    writer.line('return (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout)');
                 }
             );
 
@@ -1678,6 +1692,8 @@ export const generateSwiftClient = (contract: Contract, config: SwiftConfig): st
     for (const group of partition.groups) {
         emitSubClientStruct(writer, group, clientName, context);
     }
+
+    emitKizunaFailureProtocols(writer);
 
     emitKizunaNamespace(writer, {
         multipart: usesMultipart,
