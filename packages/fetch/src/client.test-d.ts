@@ -506,3 +506,73 @@ test('route without body or query does not include ValidationError', async () =>
     // (it only has 200 and 404)
     expectTypeOf(result.status).toEqualTypeOf<200 | 404>();
 });
+
+const UserIdSchema = z.string().brand<'UserId'>();
+
+const pathParamsContract = createContract({
+    getUserEvents: {
+        method: 'GET',
+        path: '/users/:userId/events/:eventId',
+        pathParams: z.object({
+            userId: UserIdSchema,
+            eventId: z.string(),
+        }),
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+    listEventsByYear: {
+        method: 'GET',
+        path: '/events/:year',
+        pathParams: z.object({
+            year: z.coerce.number(),
+        }),
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+
+const pathParamsClient = createClient(pathParamsContract, {
+    baseUrl: 'http://localhost:3000',
+});
+
+test('pathParams schema types client params by its output type', async () => {
+    const userId = UserIdSchema.parse('user-1');
+    await pathParamsClient.getUserEvents({
+        params: {
+            userId,
+            eventId: 'event-1',
+        },
+    });
+    expectTypeOf<Parameters<typeof pathParamsClient.getUserEvents>[0]['params']>().toEqualTypeOf<{
+        userId: z.output<typeof UserIdSchema>;
+        eventId: string;
+    }>();
+});
+
+test('pathParams schema rejects a plain string for a branded param', () => {
+    // @ts-expect-error plain string is not a UserId
+    pathParamsClient.getUserEvents({ params: { userId: 'user-1', eventId: 'event-1' } });
+});
+
+test('coerced pathParams surface as their output type on the client', async () => {
+    await pathParamsClient.listEventsByYear({
+        params: {
+            year: 2026,
+        },
+    });
+});
+
+test('coerced pathParams reject values the output type does not accept', () => {
+    // @ts-expect-error year must be a number
+    pathParamsClient.listEventsByYear({ params: { year: '2026' } });
+});
+
+test('routes without a pathParams schema keep template-derived params', () => {
+    expectTypeOf<Parameters<typeof client.getUser>[0]['params']>().toEqualTypeOf<{ id: string }>();
+});

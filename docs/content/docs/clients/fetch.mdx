@@ -62,6 +62,17 @@ const { status, body } = await apiClient.getUser({
 
 The `params` field is only required when the route path contains `:param` placeholders. TypeScript enforces this — routes with no path parameters do not accept `params`.
 
+When the route declares a `pathParams` schema, `params` is typed by that schema's output type instead of the path template — the same typing the server-side handler receives. Refinements like `.brand()` or `z.coerce` flow to the caller:
+
+```ts
+// contract declares: pathParams: z.object({ id: z.string().brand<'UserId'>() })
+const { body } = await apiClient.getUser({
+    params: {
+        id: userId, // must be a UserId — a plain string is a type error
+    },
+});
+```
+
 ## `ClientConfig`
 
 ```ts
