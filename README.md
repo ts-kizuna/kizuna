@@ -112,17 +112,18 @@ if (result.status === 200) {
 
 ## Packages
 
-| Package               | Description                                  |
-| --------------------- | -------------------------------------------- |
-| `@ts-kizuna/core`     | Contract definition, validation, adapter API |
-| `@ts-kizuna/fetch`    | Typed fetch-based client                     |
-| `@ts-kizuna/express`  | Express adapter                              |
-| `@ts-kizuna/fastify`  | Fastify adapter                              |
-| `@ts-kizuna/hono`     | Hono adapter                                 |
-| `@ts-kizuna/next`     | Next.js App Router adapter                   |
-| `@ts-kizuna/open-api` | OpenAPI 3.1.0 spec generation                |
-| `@ts-kizuna/swift`    | Swift client generation                      |
-| `@ts-kizuna/mcp`      | MCP server generation                        |
+| Package                  | Description                                  |
+| ------------------------ | -------------------------------------------- |
+| `@ts-kizuna/core`        | Contract definition, validation, adapter API |
+| `@ts-kizuna/fetch`       | Typed fetch-based client                     |
+| `@ts-kizuna/react-query` | Typed React Query client                     |
+| `@ts-kizuna/express`     | Express adapter                              |
+| `@ts-kizuna/fastify`     | Fastify adapter                              |
+| `@ts-kizuna/hono`        | Hono adapter                                 |
+| `@ts-kizuna/next`        | Next.js App Router adapter                   |
+| `@ts-kizuna/open-api`    | OpenAPI 3.1.0 spec generation                |
+| `@ts-kizuna/swift`       | Swift client generation                      |
+| `@ts-kizuna/mcp`         | MCP server generation                        |
 
 ## License
 

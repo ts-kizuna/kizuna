@@ -5,6 +5,8 @@ description: Build a custom TypeScript client wrapper using the types and client
 
 `@ts-kizuna/fetch` exports `createClient` and the full contract type system. You can wrap these to build hooks, an SDK layer, or any other integration — no generator needed.
 
+> Want React Query hooks? Reach for [`@ts-kizuna/react-query`](/docs/clients/react-query) instead of building your own. This guide is for the cases it doesn't cover.
+
 ## Pattern
 
 ```ts
@@ -35,10 +37,12 @@ export function createMyClient() {
 
 The key types from `@ts-kizuna/fetch`:
 
-| Type               | Description                                                   |
-| ------------------ | ------------------------------------------------------------- |
-| `Client<T>`        | The full typed client shape for a contract                    |
-| `ClientPayload<R>` | Input types for a single route (params, query, body, headers) |
+| Type                | Description                                                          |
+| ------------------- | -------------------------------------------------------------------- |
+| `Client<T>`         | The full typed client shape for a contract                           |
+| `ClientArgs<R>`     | The full arguments for a single route (params, query, body, headers) |
+| `ClientResponse<R>` | The response union for a single route, discriminated by `status`     |
+| `ClientPayload<R>`  | Input types for one schema (a route's `body`, `query`, etc.)         |
 
 These are fully generic — pass `typeof contract` or `typeof contract.someRoute` to get typed arguments and responses for your wrapper.
 

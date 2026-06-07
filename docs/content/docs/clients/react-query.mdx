@@ -1,0 +1,142 @@
+---
+title: React Query
+description: Typed React Query 5 hooks and query options generated from a ts-kizuna contract.
+---
+
+`@ts-kizuna/react-query` turns a contract into typed [React Query](https://tanstack.com/query/latest) hooks. It builds on `@ts-kizuna/fetch`, so every request — URLs, headers, content types, the `onRequest` hook — works exactly as it does there. You just get `useQuery`, `useMutation`, and the matching option factories on top.
+
+<InstallTabs packageName="@ts-kizuna/react-query" />
+
+It expects `@tanstack/react-query` (v5) and `@ts-kizuna/fetch` as peer dependencies — install them alongside it.
+
+## `createClient`
+
+```ts
+import { createClient } from '@ts-kizuna/react-query';
+import { contract } from '@shared/contract';
+
+export const api = createClient(contract, {
+    baseUrl: 'http://localhost:3000',
+});
+```
+
+The config is the fetch client's [`ClientConfig`](/docs/clients/fetch#clientconfig) — nothing new to learn. The returned client mirrors the contract: `GET` and `HEAD` routes become queries, everything else becomes mutations.
+
+Wrap your app in React Query's own provider as usual:
+
+```tsx
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient();
+
+<QueryClientProvider client={queryClient}>
+    <App />
+</QueryClientProvider>;
+```
+
+## Queries
+
+`GET` and `HEAD` routes expose `useQuery`, `useSuspenseQuery`, `queryOptions`, and `queryKey`. The route's typed arguments are the first parameter; React Query options are the second.
+
+```tsx
+function UserList() {
+    const { data, error, isPending } = api.listUsers.useQuery({
+        query: {
+            page: 1,
+        },
+    });
+
+    if (isPending) return <Spinner />;
+    if (error) return <p>{error.body.detail}</p>;
+
+    return data.body.users.map((user) => <Row key={user.id} user={user} />);
+}
+```
+
+`params` is required only when the route path has `:param` placeholders, and `query`/`headers` follow the route's schemas — the same rules as the fetch client.
+
+## Mutations
+
+Every other route exposes `useMutation`, `mutationOptions`, and `mutationKey`. The route's arguments are the mutation variables.
+
+```tsx
+function CreateUser() {
+    const queryClient = useQueryClient();
+
+    const { mutate } = api.createUser.useMutation({
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: api.listUsers.queryKey(),
+            });
+        },
+    });
+
+    return (
+        <button
+            onClick={() =>
+                mutate({
+                    body: {
+                        name: 'Alice',
+                        email: 'alice@example.com',
+                    },
+                })
+            }>
+            Create
+        </button>
+    );
+}
+```
+
+## Option factories
+
+`queryOptions` and `mutationOptions` return plain option objects, so they compose with the rest of React Query — suspense, prefetching, server hydration:
+
+```ts
+// suspense
+const { data } = useSuspenseQuery(api.getUser.queryOptions({ params: { id } }));
+
+// prefetch on the server, then hydrate
+await queryClient.prefetchQuery(api.getUser.queryOptions({ params: { id } }));
+```
+
+## Query keys
+
+`queryKey` is `[...contractPath, { params, query }]`, so nested routes get hierarchical keys you can invalidate broadly:
+
+```ts
+api.users.getUser.queryKey({ params: { id } }); // ['users', 'getUser', { params: { id }, query: undefined }]
+api.users.createUser.mutationKey(); // ['users', 'createUser']
+```
+
+## `data` and `error`
+
+This is the one place the React Query client differs from the fetch client. The fetch client never throws and returns the full status union as one value. React Query splits that union: a 2xx response resolves as `data`, and anything else is thrown so it lands in `error`.
+
+```tsx
+const { data, error } = api.getUser.useQuery({ params: { id } });
+
+if (data) data.body; // the 2xx response body
+if (error) error.body; // the typed non-2xx response (e.g. a 404 Problem Details)
+```
+
+Both stay fully typed: `data` is the route's 2xx response union, `error` is its non-2xx union — including the automatic `400` validation error for routes with a `body` or `query` schema. Use [`isValidationError`](/docs/clients/fetch#isvalidationerror) to tell a validation error apart from your own `400`.
+
+Because client errors throw, React Query will retry them like any other failure. Turn that off for 4xx where it makes no sense:
+
+```ts
+api.getUser.useQuery(
+    { params: { id } },
+    {
+        retry: (count, error) => !('status' in error && error.status < 500) && count < 3,
+    }
+);
+```
+
+## AbortSignal
+
+React Query's `signal` is forwarded into the request, so cancelled queries cancel the underlying fetch. Pass your own `fetchOptions.signal` to override it.
+
+## Reference
+
+- [`createClient` (fetch)](/docs/reference/create-client) — the shared `ClientConfig`
+- [Fetch client](/docs/clients/fetch) — request building this client reuses

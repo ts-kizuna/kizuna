@@ -1,0 +1,29 @@
+{
+  "name": "@ts-kizuna-demo/react-query",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5173",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.0.0",
+    "@ts-kizuna-demo/shared": "workspace:*",
+    "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/fetch": "workspace:*",
+    "@ts-kizuna/react-query": "workspace:*",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0"
+  }
+}
