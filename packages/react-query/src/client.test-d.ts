@@ -2,7 +2,8 @@ import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { createContract, type ValidationError } from '@ts-kizuna/core';
 import { createClient } from './client.js';
-import type { MutationNode, QueryNode } from './client.js';
+import { KizunaHttpError } from './error.js';
+import type { MutationNode, QueryNode } from './types.js';
 
 const contract = createContract({
     listUsers: {
@@ -29,6 +30,15 @@ const contract = createContract({
             }),
         },
     },
+    describeUsers: {
+        method: 'OPTIONS',
+        path: '/users/describe',
+        responses: {
+            200: z.object({
+                allow: z.string(),
+            }),
+        },
+    },
     createUser: {
         method: 'POST',
         path: '/users',
@@ -47,33 +57,49 @@ const api = createClient(contract, {
     baseUrl: 'http://localhost',
 });
 
-test('GET routes are query nodes, non-GET routes are mutation nodes', () => {
+test('GET/OPTIONS routes are query nodes, mutating routes are mutation nodes', () => {
     expectTypeOf(api.listUsers).toMatchTypeOf<QueryNode<(typeof contract)['listUsers']>>();
     expectTypeOf(api.getUser).toMatchTypeOf<QueryNode<(typeof contract)['getUser']>>();
+    expectTypeOf(api.describeUsers).toMatchTypeOf<QueryNode<(typeof contract)['describeUsers']>>();
     expectTypeOf(api.createUser).toMatchTypeOf<MutationNode<(typeof contract)['createUser']>>();
 });
 
-test('useQuery data is the 2xx union; error is the non-2xx union', () => {
+test('useQuery data is the 2xx response; error is a typed KizunaHttpError', () => {
     const userQuery = api.getUser.useQuery({ params: { id: '1' } });
     expectTypeOf(userQuery.data).toEqualTypeOf<{ status: 200; body: { id: string }; headers: Record<string, string> } | undefined>();
-    expectTypeOf(userQuery.error).toEqualTypeOf<{ status: 404; body: { message: string }; headers: Record<string, string> } | null>();
+    expectTypeOf(userQuery.error).toMatchTypeOf<KizunaHttpError | null>();
+    expectTypeOf(userQuery.error?.status).toMatchTypeOf<404 | undefined>();
+    expectTypeOf(userQuery.error?.body).toMatchTypeOf<{ message: string } | undefined>();
 });
 
 test('mutation data is the 2xx response; error includes the auto 400 ValidationError', () => {
     const mutation = api.createUser.useMutation();
     expectTypeOf(mutation.data).toEqualTypeOf<{ status: 201; body: { id: string }; headers: Record<string, string> } | undefined>();
-    expectTypeOf(mutation.error).toMatchTypeOf<{ status: 400; body: ValidationError } | null>();
+    expectTypeOf(mutation.error).toMatchTypeOf<KizunaHttpError<ValidationError> | null>();
+    expectTypeOf(mutation.mutate).parameter(0).toMatchTypeOf<{ body: { name: string } }>();
 });
 
 test('params is required only for routes with :param paths', () => {
-    // getUser has :id — args (with params) required
     expectTypeOf(api.getUser.useQuery).parameter(0).toMatchTypeOf<{ params: { id: string } }>();
-    // listUsers has no path params and only optional query — args optional
     api.listUsers.useQuery();
     api.listUsers.queryKey();
 });
 
-test('mutation variables are the route ClientArgs', () => {
-    const mutation = api.createUser.useMutation();
-    expectTypeOf(mutation.mutate).parameter(0).toMatchTypeOf<{ body: { name: string } }>();
+test('the full query surface is present', () => {
+    expectTypeOf(api.listUsers.queryOptions).toBeFunction();
+    expectTypeOf(api.listUsers.infiniteQueryOptions).toBeFunction();
+    expectTypeOf(api.listUsers.useSuspenseQuery).toBeFunction();
+    expectTypeOf(api.listUsers.useInfiniteQuery).toBeFunction();
+    expectTypeOf(api.listUsers.useSuspenseInfiniteQuery).toBeFunction();
+    expectTypeOf(api.listUsers.usePrefetchQuery).toBeFunction();
+    expectTypeOf(api.listUsers.invalidate).toBeFunction();
+    expectTypeOf(api.listUsers.prefetch).toBeFunction();
+    expectTypeOf(api.listUsers.fetch).toBeFunction();
+    expectTypeOf(api.listUsers.ensureData).toBeFunction();
+    expectTypeOf(api.listUsers.getData).toBeFunction();
+    expectTypeOf(api.listUsers.setData).toBeFunction();
+    expectTypeOf(api.listUsers.refetch).toBeFunction();
+    expectTypeOf(api.listUsers.cancel).toBeFunction();
+    expectTypeOf(api.listUsers.remove).toBeFunction();
+    expectTypeOf(api.listUsers.reset).toBeFunction();
 });

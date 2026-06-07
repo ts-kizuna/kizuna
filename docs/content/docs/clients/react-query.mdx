@@ -1,9 +1,9 @@
 ---
 title: React Query
-description: Typed React Query 5 hooks and query options generated from a ts-kizuna contract.
+description: Typed React Query 5 hooks, option factories, and cache helpers generated from a ts-kizuna contract.
 ---
 
-`@ts-kizuna/react-query` turns a contract into typed [React Query](https://tanstack.com/query/latest) hooks. It builds on `@ts-kizuna/fetch`, so every request — URLs, headers, content types, the `onRequest` hook — works exactly as it does there. You just get `useQuery`, `useMutation`, and the matching option factories on top.
+`@ts-kizuna/react-query` turns a contract into a typed React Query 5 client. It builds on `@ts-kizuna/fetch`, so every request — URLs, headers, content types, the `onRequest` hook — works exactly as it does there. On top of that, each route gets the full React Query surface: hooks, the option factories, and the `QueryClient` cache methods, all typed from the contract.
 
 <InstallTabs packageName="@ts-kizuna/react-query" />
 
@@ -20,7 +20,7 @@ export const api = createClient(contract, {
 });
 ```
 
-The config is the fetch client's [`ClientConfig`](/docs/clients/fetch#clientconfig) — nothing new to learn. The returned client mirrors the contract: `GET` and `HEAD` routes become queries, everything else becomes mutations.
+The config is the fetch client's [`ClientConfig`](/docs/clients/fetch#clientconfig) — nothing new to learn. The client mirrors the contract: `GET`, `HEAD`, and `OPTIONS` routes become query nodes; everything else becomes mutation nodes.
 
 Wrap your app in React Query's own provider as usual:
 
@@ -36,7 +36,7 @@ const queryClient = new QueryClient();
 
 ## Queries
 
-`GET` and `HEAD` routes expose `useQuery`, `useSuspenseQuery`, `queryOptions`, and `queryKey`. The route's typed arguments are the first parameter; React Query options are the second.
+A query node exposes every read-side React Query hook. The route's typed arguments come first; the React Query options come second.
 
 ```tsx
 function UserList() {
@@ -53,55 +53,78 @@ function UserList() {
 }
 ```
 
-`params` is required only when the route path has `:param` placeholders, and `query`/`headers` follow the route's schemas — the same rules as the fetch client.
+`params` is required only when the route path has `:param` placeholders; `query`/`headers` follow the route's schemas — the same rules as the fetch client.
+
+Each query node has: `useQuery`, `useSuspenseQuery`, `useInfiniteQuery`, `useSuspenseInfiniteQuery`, and `usePrefetchQuery` / `usePrefetchInfiniteQuery`.
 
 ## Mutations
 
-Every other route exposes `useMutation`, `mutationOptions`, and `mutationKey`. The route's arguments are the mutation variables.
+A mutation node exposes `useMutation` (plus `mutationOptions` and `mutationKey`). The route's arguments are the mutation variables.
 
 ```tsx
 function CreateUser() {
-    const queryClient = useQueryClient();
-
     const { mutate } = api.createUser.useMutation({
         onSuccess: () => {
-            queryClient.invalidateQueries({
-                queryKey: api.listUsers.queryKey(),
-            });
+            api.listUsers.invalidate(queryClient);
         },
     });
 
-    return (
-        <button
-            onClick={() =>
-                mutate({
-                    body: {
-                        name: 'Alice',
-                        email: 'alice@example.com',
-                    },
-                })
-            }>
-            Create
-        </button>
-    );
+    return <button onClick={() => mutate({ body: { name: 'Alice', email: 'alice@example.com' } })}>Create</button>;
 }
 ```
 
 ## Option factories
 
-`queryOptions` and `mutationOptions` return plain option objects, so they compose with the rest of React Query — suspense, prefetching, server hydration:
+`queryOptions`, `infiniteQueryOptions`, and `mutationOptions` return plain option objects that compose with everything else in React Query — suspense, prefetching, `useQueries`, server hydration:
 
 ```ts
-// suspense
 const { data } = useSuspenseQuery(api.getUser.queryOptions({ params: { id } }));
 
-// prefetch on the server, then hydrate
 await queryClient.prefetchQuery(api.getUser.queryOptions({ params: { id } }));
 ```
 
+## Cache helpers
+
+Every query node also binds the `QueryClient` methods to the route, so you never assemble a key by hand. Each takes the `QueryClient` first:
+
+```ts
+await api.getUser.prefetch(queryClient, { params: { id } });
+await api.getUser.fetch(queryClient, { params: { id } });
+await api.getUser.ensureData(queryClient, { params: { id } });
+
+api.getUser.getData(queryClient, { params: { id } });
+api.getUser.setData(queryClient, { params: { id } }, { status: 200, body: nextUser, headers: {} });
+
+// omit args to match every cached instance of the route
+await api.getUser.invalidate(queryClient);
+await api.getUser.refetch(queryClient, { params: { id } });
+await api.getUser.cancel(queryClient);
+api.getUser.remove(queryClient);
+await api.getUser.reset(queryClient);
+```
+
+`queryKey(args?)` is the escape hatch for anything not bound here — pass it to any raw `QueryClient` method or to `useQueries`.
+
+## Infinite queries
+
+The infinite hooks take the key args, a function mapping the page param to request args, and the standard infinite options:
+
+```tsx
+const { data, fetchNextPage } = api.searchUsers.useInfiniteQuery(
+    { query: { q: 'ada' } },
+    (cursor: number) => ({ query: { q: 'ada', cursor } }),
+    {
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => lastPage.body.nextCursor,
+    }
+);
+```
+
+`infiniteQueryOptions`, `fetchInfinite`, and `prefetchInfinite` follow the same shape.
+
 ## Query keys
 
-`queryKey` is `[...contractPath, { params, query }]`, so nested routes get hierarchical keys you can invalidate broadly:
+`queryKey` is `[...contractPath, { params, query }]`, so nested routes get hierarchical keys, and the cache helpers can match a whole route by its path prefix:
 
 ```ts
 api.users.getUser.queryKey({ params: { id } }); // ['users', 'getUser', { params: { id }, query: undefined }]
@@ -110,16 +133,21 @@ api.users.createUser.mutationKey(); // ['users', 'createUser']
 
 ## `data` and `error`
 
-This is the one place the React Query client differs from the fetch client. The fetch client never throws and returns the full status union as one value. React Query splits that union: a 2xx response resolves as `data`, and anything else is thrown so it lands in `error`.
+This is the one place the React Query client differs from the fetch client. The fetch client never throws and returns the full status union as one value. React Query splits that union: a 2xx response resolves as `data`, and anything else is thrown as a `KizunaHttpError` so it lands in `error`.
 
 ```tsx
+import { KizunaHttpError } from '@ts-kizuna/react-query';
+
 const { data, error } = api.getUser.useQuery({ params: { id } });
 
 if (data) data.body; // the 2xx response body
-if (error) error.body; // the typed non-2xx response (e.g. a 404 Problem Details)
+if (error) {
+    error.status; // the non-2xx status
+    error.body; // the typed non-2xx response (e.g. a 404 Problem Details)
+}
 ```
 
-Both stay fully typed: `data` is the route's 2xx response union, `error` is its non-2xx union — including the automatic `400` validation error for routes with a `body` or `query` schema. Use [`isValidationError`](/docs/clients/fetch#isvalidationerror) to tell a validation error apart from your own `400`.
+`error` is a real `Error` subclass (`error instanceof KizunaHttpError`) carrying the typed `status`, `body`, and `headers`. The error type is the route's non-2xx union — including the automatic `400` validation error for routes with a `body` or `query` schema. Use [`isValidationError`](/docs/clients/fetch#isvalidationerror) on `error.body` to tell a validation error apart from your own `400`.
 
 Because client errors throw, React Query will retry them like any other failure. Turn that off for 4xx where it makes no sense:
 
@@ -127,7 +155,7 @@ Because client errors throw, React Query will retry them like any other failure.
 api.getUser.useQuery(
     { params: { id } },
     {
-        retry: (count, error) => !('status' in error && error.status < 500) && count < 3,
+        retry: (count, error) => error.status >= 500 && count < 3,
     }
 );
 ```

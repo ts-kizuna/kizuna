@@ -1,78 +1,19 @@
 import {
-    useMutation as useReactMutation,
-    useQuery as useReactQuery,
-    useSuspenseQuery as useReactSuspenseQuery,
+    useInfiniteQuery as tanstackUseInfiniteQuery,
+    useMutation as tanstackUseMutation,
+    usePrefetchInfiniteQuery as tanstackUsePrefetchInfiniteQuery,
+    usePrefetchQuery as tanstackUsePrefetchQuery,
+    useQuery as tanstackUseQuery,
+    useSuspenseInfiniteQuery as tanstackUseSuspenseInfiniteQuery,
+    useSuspenseQuery as tanstackUseSuspenseQuery,
 } from '@tanstack/react-query';
-import type {
-    DefaultError,
-    QueryFunctionContext,
-    QueryKey,
-    UseMutationOptions,
-    UseMutationResult,
-    UseQueryOptions,
-    UseQueryResult,
-    UseSuspenseQueryOptions,
-    UseSuspenseQueryResult,
-} from '@tanstack/react-query';
-import type { ClientArgs, ClientConfig, ClientResponse } from '@ts-kizuna/fetch';
+import type { QueryClient } from '@tanstack/react-query';
+import type { ClientConfig } from '@ts-kizuna/fetch';
 import { createClient as createFetchClient } from '@ts-kizuna/fetch';
-import type { Contract, RouteDefinition } from '@ts-kizuna/core';
+import type { Contract } from '@ts-kizuna/core';
 import { isRouteDefinition } from '@ts-kizuna/core';
-
-type SuccessStatus = 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 226;
-
-type DataOf<R extends RouteDefinition> = Extract<ClientResponse<R>, { status: SuccessStatus }>;
-type ErrorResponseOf<R extends RouteDefinition> = Exclude<ClientResponse<R>, { status: SuccessStatus }>;
-type ErrorOf<R extends RouteDefinition> = [ErrorResponseOf<R>] extends [never] ? DefaultError : ErrorResponseOf<R>;
-
-type WithArgs<R extends RouteDefinition, Rest extends unknown[]> =
-    {} extends ClientArgs<R> ? [args?: ClientArgs<R>, ...rest: Rest] : [args: ClientArgs<R>, ...rest: Rest];
-
-type QueryHookOptions<R extends RouteDefinition, TData> = Omit<
-    UseQueryOptions<DataOf<R>, ErrorOf<R>, TData, QueryKey>,
-    'queryKey' | 'queryFn'
->;
-
-type SuspenseQueryHookOptions<R extends RouteDefinition, TData> = Omit<
-    UseSuspenseQueryOptions<DataOf<R>, ErrorOf<R>, TData, QueryKey>,
-    'queryKey' | 'queryFn'
->;
-
-type RouteQueryOptions<R extends RouteDefinition, TData> = UseQueryOptions<DataOf<R>, ErrorOf<R>, TData, QueryKey>;
-
-type MutationHookOptions<R extends RouteDefinition, TContext> = Omit<
-    UseMutationOptions<DataOf<R>, ErrorOf<R>, ClientArgs<R>, TContext>,
-    'mutationFn'
->;
-
-type RouteMutationOptions<R extends RouteDefinition, TContext> = UseMutationOptions<DataOf<R>, ErrorOf<R>, ClientArgs<R>, TContext>;
-
-export interface QueryNode<R extends RouteDefinition> {
-    queryKey: (...args: WithArgs<R, []>) => QueryKey;
-    queryOptions: <TData = DataOf<R>>(...args: WithArgs<R, [options?: QueryHookOptions<R, TData>]>) => RouteQueryOptions<R, TData>;
-    useQuery: <TData = DataOf<R>>(...args: WithArgs<R, [options?: QueryHookOptions<R, TData>]>) => UseQueryResult<TData, ErrorOf<R>>;
-    useSuspenseQuery: <TData = DataOf<R>>(
-        ...args: WithArgs<R, [options?: SuspenseQueryHookOptions<R, TData>]>
-    ) => UseSuspenseQueryResult<TData, ErrorOf<R>>;
-}
-
-export interface MutationNode<R extends RouteDefinition> {
-    mutationKey: () => QueryKey;
-    mutationOptions: <TContext = unknown>(options?: MutationHookOptions<R, TContext>) => RouteMutationOptions<R, TContext>;
-    useMutation: <TContext = unknown>(
-        options?: MutationHookOptions<R, TContext>
-    ) => UseMutationResult<DataOf<R>, ErrorOf<R>, ClientArgs<R>, TContext>;
-}
-
-export type ReactQueryClient<T extends Contract> = {
-    [K in keyof T]: T[K] extends RouteDefinition
-        ? T[K]['method'] extends 'GET' | 'HEAD'
-            ? QueryNode<T[K]>
-            : MutationNode<T[K]>
-        : T[K] extends Contract
-          ? ReactQueryClient<T[K]>
-          : never;
-};
+import { KizunaHttpError } from './error.js';
+import type { ReactQueryClient } from './types.js';
 
 type RuntimeArgs = {
     params?: Record<string, string | number>;
@@ -92,8 +33,7 @@ type RouteFn = (args?: RuntimeArgs) => Promise<RuntimeResult>;
 
 const isSuccessStatus = (status: number): boolean => status >= 200 && status < 300;
 
-// Non-2xx responses are thrown so React Query surfaces them as `error` rather than `data`.
-const runRoute = async (routeFn: RouteFn, args: RuntimeArgs | undefined, signal?: AbortSignal): Promise<RuntimeResult> => {
+const callRoute = async (routeFn: RouteFn, args: RuntimeArgs | undefined, signal?: AbortSignal): Promise<RuntimeResult> => {
     const merged: RuntimeArgs = signal
         ? {
               ...args,
@@ -107,47 +47,153 @@ const runRoute = async (routeFn: RouteFn, args: RuntimeArgs | undefined, signal?
           };
     const result = await routeFn(merged);
     if (!isSuccessStatus(result.status)) {
-        throw result;
+        throw new KizunaHttpError(result);
     }
     return result;
 };
 
-const buildQueryNode = (routeFn: RouteFn, keyPath: readonly string[]): QueryNode<RouteDefinition> => {
-    const queryKey = (args?: RuntimeArgs): QueryKey => [
+const ARG_KEYS = ['params', 'query', 'body', 'headers', 'fetchOptions'];
+
+// The first positional argument of the query hooks can be the route args or the
+// React Query options. Args always carry one of the known keys; options never do.
+const looksLikeArgs = (value: unknown): boolean =>
+    typeof value === 'object' && value !== null && ARG_KEYS.some((key) => key in (value as Record<string, unknown>));
+
+const splitArgs = (first: unknown, second: unknown): { args: RuntimeArgs | undefined; options: object | undefined } => {
+    const hasArgs = second !== undefined || looksLikeArgs(first);
+    return {
+        args: (hasArgs ? first : undefined) as RuntimeArgs | undefined,
+        options: (hasArgs ? second : first) as object | undefined,
+    };
+};
+
+type AnyFn = (...args: never[]) => unknown;
+
+const buildQueryNode = (routeFn: RouteFn, keyPath: readonly string[]): Record<string, AnyFn> => {
+    const fullKey = (args?: RuntimeArgs) => [
         ...keyPath,
         {
             params: args?.params,
             query: args?.query,
         },
     ];
-    const buildOptions = (args?: RuntimeArgs, options?: object) =>
-        ({
-            queryKey: queryKey(args),
-            queryFn: ({ signal }: QueryFunctionContext) => runRoute(routeFn, args, signal),
-            ...options,
-        }) as UseQueryOptions & UseSuspenseQueryOptions;
+    const matchKey = (args: RuntimeArgs | undefined) => (args !== undefined ? fullKey(args) : [...keyPath]);
+
+    const queryFnFor =
+        (args?: RuntimeArgs) =>
+        ({ signal }: { signal: AbortSignal }) =>
+            callRoute(routeFn, args, signal);
+    const infiniteQueryFnFor =
+        (argsFromPageParam: (pageParam: unknown) => RuntimeArgs) =>
+        ({ pageParam, signal }: { pageParam: unknown; signal: AbortSignal }) =>
+            callRoute(routeFn, argsFromPageParam(pageParam), signal);
+
+    const buildOptions = (args: RuntimeArgs | undefined, options: object | undefined) => ({
+        ...(options ?? {}),
+        queryKey: fullKey(args),
+        queryFn: queryFnFor(args),
+    });
+    const buildInfiniteOptions = (args: RuntimeArgs, argsFromPageParam: (pageParam: unknown) => RuntimeArgs, options: object) => ({
+        ...options,
+        queryKey: fullKey(args),
+        queryFn: infiniteQueryFnFor(argsFromPageParam),
+    });
+
     return {
-        queryKey,
-        queryOptions: (args?: RuntimeArgs, options?: object) => buildOptions(args, options),
-        useQuery: (args?: RuntimeArgs, options?: object) => useReactQuery(buildOptions(args, options)),
-        useSuspenseQuery: (args?: RuntimeArgs, options?: object) => useReactSuspenseQuery(buildOptions(args, options)),
-    } as unknown as QueryNode<RouteDefinition>;
+        queryKey: (args?: RuntimeArgs) => fullKey(args) as never,
+
+        queryOptions: (first?: unknown, second?: unknown) => {
+            const { args, options } = splitArgs(first, second);
+            return buildOptions(args, options) as never;
+        },
+        infiniteQueryOptions: (args: RuntimeArgs, argsFromPageParam: (pageParam: unknown) => RuntimeArgs, options: object) =>
+            buildInfiniteOptions(args, argsFromPageParam, options) as never,
+
+        useQuery: (first?: unknown, second?: unknown) => {
+            const { args, options } = splitArgs(first, second);
+            return tanstackUseQuery(buildOptions(args, options) as never) as never;
+        },
+        useSuspenseQuery: (first?: unknown, second?: unknown) => {
+            const { args, options } = splitArgs(first, second);
+            return tanstackUseSuspenseQuery(buildOptions(args, options) as never) as never;
+        },
+        usePrefetchQuery: (first?: unknown, second?: unknown) => {
+            const { args, options } = splitArgs(first, second);
+            return tanstackUsePrefetchQuery(buildOptions(args, options) as never) as never;
+        },
+
+        useInfiniteQuery: (args: RuntimeArgs, argsFromPageParam: (pageParam: unknown) => RuntimeArgs, options: object) =>
+            tanstackUseInfiniteQuery(buildInfiniteOptions(args, argsFromPageParam, options) as never) as never,
+        useSuspenseInfiniteQuery: (args: RuntimeArgs, argsFromPageParam: (pageParam: unknown) => RuntimeArgs, options: object) =>
+            tanstackUseSuspenseInfiniteQuery(buildInfiniteOptions(args, argsFromPageParam, options) as never) as never,
+        usePrefetchInfiniteQuery: (args: RuntimeArgs, argsFromPageParam: (pageParam: unknown) => RuntimeArgs, options: object) =>
+            tanstackUsePrefetchInfiniteQuery(buildInfiniteOptions(args, argsFromPageParam, options) as never) as never,
+
+        fetch: (queryClient: QueryClient, first?: unknown, second?: unknown) => {
+            const { args, options } = splitArgs(first, second);
+            return queryClient.fetchQuery(buildOptions(args, options) as never) as never;
+        },
+        prefetch: (queryClient: QueryClient, first?: unknown, second?: unknown) => {
+            const { args, options } = splitArgs(first, second);
+            return queryClient.prefetchQuery(buildOptions(args, options) as never) as never;
+        },
+        ensureData: (queryClient: QueryClient, first?: unknown, second?: unknown) => {
+            const { args, options } = splitArgs(first, second);
+            return queryClient.ensureQueryData(buildOptions(args, options) as never) as never;
+        },
+        fetchInfinite: (
+            queryClient: QueryClient,
+            args: RuntimeArgs,
+            argsFromPageParam: (pageParam: unknown) => RuntimeArgs,
+            options: object
+        ) => queryClient.fetchInfiniteQuery(buildInfiniteOptions(args, argsFromPageParam, options) as never) as never,
+        prefetchInfinite: (
+            queryClient: QueryClient,
+            args: RuntimeArgs,
+            argsFromPageParam: (pageParam: unknown) => RuntimeArgs,
+            options: object
+        ) => queryClient.prefetchInfiniteQuery(buildInfiniteOptions(args, argsFromPageParam, options) as never) as never,
+
+        getData: (queryClient: QueryClient, args?: RuntimeArgs) => queryClient.getQueryData(fullKey(args)) as never,
+        setData: (queryClient: QueryClient, args: RuntimeArgs, updater: unknown, options?: unknown) =>
+            queryClient.setQueryData(fullKey(args), updater as never, options as never) as never,
+        getState: (queryClient: QueryClient, args?: RuntimeArgs) => queryClient.getQueryState(fullKey(args)) as never,
+
+        invalidate: (queryClient: QueryClient, first?: unknown, second?: unknown) => {
+            const { args, options } = splitArgs(first, second);
+            return queryClient.invalidateQueries({ queryKey: matchKey(args) }, options as never) as never;
+        },
+        refetch: (queryClient: QueryClient, first?: unknown, second?: unknown) => {
+            const { args, options } = splitArgs(first, second);
+            return queryClient.refetchQueries({ queryKey: matchKey(args) }, options as never) as never;
+        },
+        cancel: (queryClient: QueryClient, first?: unknown, second?: unknown) => {
+            const { args, options } = splitArgs(first, second);
+            return queryClient.cancelQueries({ queryKey: matchKey(args) }, options as never) as never;
+        },
+        remove: (queryClient: QueryClient, args?: RuntimeArgs) => queryClient.removeQueries({ queryKey: matchKey(args) }) as never,
+        reset: (queryClient: QueryClient, first?: unknown, second?: unknown) => {
+            const { args, options } = splitArgs(first, second);
+            return queryClient.resetQueries({ queryKey: matchKey(args) }, options as never) as never;
+        },
+    };
 };
 
-const buildMutationNode = (routeFn: RouteFn, keyPath: readonly string[]): MutationNode<RouteDefinition> => {
-    const mutationKey = (): QueryKey => [...keyPath];
-    const buildOptions = (options?: object) =>
-        ({
-            mutationKey: mutationKey(),
-            mutationFn: (variables: RuntimeArgs) => runRoute(routeFn, variables),
-            ...options,
-        }) as UseMutationOptions<RuntimeResult, DefaultError, RuntimeArgs>;
+const buildMutationNode = (routeFn: RouteFn, keyPath: readonly string[]): Record<string, AnyFn> => {
+    const mutationKey = () => [...keyPath];
+    const buildOptions = (options: object | undefined) => ({
+        ...(options ?? {}),
+        mutationKey: mutationKey(),
+        mutationFn: (variables: RuntimeArgs) => callRoute(routeFn, variables),
+    });
     return {
-        mutationKey,
-        mutationOptions: (options?: object) => buildOptions(options),
-        useMutation: (options?: object) => useReactMutation(buildOptions(options)),
-    } as unknown as MutationNode<RouteDefinition>;
+        mutationKey: () => mutationKey() as never,
+        mutationOptions: (options?: object) => buildOptions(options) as never,
+        useMutation: (options?: object) => tanstackUseMutation(buildOptions(options) as never) as never,
+    };
 };
+
+const isQueryMethod = (method: string): boolean => method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
 
 const buildTree = (contract: Contract, fetchClient: Record<string, unknown>, keyPath: readonly string[]): Record<string, unknown> => {
     const result: Record<string, unknown> = {};
@@ -156,10 +202,9 @@ const buildTree = (contract: Contract, fetchClient: Record<string, unknown>, key
         const fetchNode = fetchClient[key];
         if (isRouteDefinition(node)) {
             const routeFn = fetchNode as RouteFn;
-            result[key] =
-                node.method === 'GET' || node.method === 'HEAD'
-                    ? buildQueryNode(routeFn, [...keyPath, key])
-                    : buildMutationNode(routeFn, [...keyPath, key]);
+            result[key] = isQueryMethod(node.method)
+                ? buildQueryNode(routeFn, [...keyPath, key])
+                : buildMutationNode(routeFn, [...keyPath, key]);
         } else if (node && typeof node === 'object') {
             result[key] = buildTree(node as Contract, fetchNode as Record<string, unknown>, [...keyPath, key]);
         }
@@ -191,5 +236,3 @@ export const createClient = <T extends Contract>(contract: T, config: ClientConf
     const fetchClient = createFetchClient(contract, config) as unknown as Record<string, unknown>;
     return buildTree(contract, fetchClient, []) as ReactQueryClient<T>;
 };
-
-export type { ClientConfig, RequestContext } from '@ts-kizuna/fetch';

@@ -15,11 +15,13 @@ export function App() {
             <UserList selectedId={selectedId} onSelect={setSelectedId} />
             {selectedId && <UserDetail id={selectedId} />}
             <CreateUser />
+            <SearchUsers />
         </main>
     );
 }
 
 function UserList({ selectedId, onSelect }: { selectedId: string | null; onSelect: (id: string) => void }) {
+    const queryClient = useQueryClient();
     const { data, error, isPending } = api.users.listUsers.useQuery({
         query: {
             page: 1,
@@ -36,7 +38,16 @@ function UserList({ selectedId, onSelect }: { selectedId: string | null; onSelec
             <ul>
                 {data.body.users.map((user) => (
                     <li key={user.id}>
-                        <button onClick={() => onSelect(user.id)} disabled={user.id === selectedId}>
+                        <button
+                            onClick={() => onSelect(user.id)}
+                            // warm the detail cache before the click resolves
+                            onMouseEnter={() =>
+                                api.users.getUser.prefetch(queryClient, {
+                                    params: { id: user.id },
+                                    headers: { 'x-request-id': crypto.randomUUID() },
+                                })
+                            }
+                            disabled={user.id === selectedId}>
                             {user.name}
                         </button>
                     </li>
@@ -74,9 +85,7 @@ function CreateUser() {
 
     const { mutate, data, error, isPending } = api.users.createUser.useMutation({
         onSuccess: () => {
-            queryClient.invalidateQueries({
-                queryKey: api.users.listUsers.queryKey(),
-            });
+            api.users.listUsers.invalidate(queryClient);
         },
     });
 
@@ -101,6 +110,52 @@ function CreateUser() {
             </form>
             {data?.status === 201 && <p>Created {data.body.name}.</p>}
             {error && error.status === 400 && <p>Validation failed: {error.body.detail}</p>}
+        </section>
+    );
+}
+
+function SearchUsers() {
+    const [term, setTerm] = useState('a');
+
+    const { data, error, isPending, fetchNextPage, hasNextPage, isFetchingNextPage } = api.users.searchUsers.useInfiniteQuery(
+        {
+            query: {
+                q: term,
+                limit: 5,
+                cursor: 0,
+            },
+        },
+        (cursor: number) => ({
+            query: {
+                q: term,
+                limit: 5,
+                cursor,
+            },
+        }),
+        {
+            initialPageParam: 0,
+            getNextPageParam: (lastPage) => lastPage.body.nextCursor ?? undefined,
+        }
+    );
+
+    return (
+        <section>
+            <h2>Search (infinite)</h2>
+            <input value={term} placeholder="Search term" onChange={(event) => setTerm(event.target.value)} />
+            {isPending && <p>Searching…</p>}
+            {error && <p>Search failed.</p>}
+            <ul>
+                {data?.pages
+                    .flatMap((page) => page.body.users)
+                    .map((user) => (
+                        <li key={user.id}>{user.name}</li>
+                    ))}
+            </ul>
+            {hasNextPage && (
+                <button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                    {isFetchingNextPage ? 'Loading…' : 'Load more'}
+                </button>
+            )}
         </section>
     );
 }

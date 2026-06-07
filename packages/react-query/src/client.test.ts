@@ -3,6 +3,7 @@ import { MutationObserver, QueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { createContract } from '@ts-kizuna/core';
 import { createClient } from './client.js';
+import { KizunaHttpError } from './error.js';
 
 const contract = createContract({
     listUsers: {
@@ -81,68 +82,109 @@ const makeQueryClient = () =>
         },
     });
 
-describe('createClient', () => {
-    it('maps GET/HEAD routes to query nodes and others to mutation nodes', () => {
-        const { fetchFn } = stubFetch(200, {});
-        const api = createClient(contract, { baseUrl: 'http://localhost', fetch: fetchFn });
+const makeApi = (status: number, body: unknown) => {
+    const { fetchFn, calls } = stubFetch(status, body);
+    const api = createClient(contract, { baseUrl: 'http://localhost', fetch: fetchFn });
+    return { api, calls };
+};
 
-        expect(typeof api.listUsers.useQuery).toBe('function');
-        expect(typeof api.listUsers.queryOptions).toBe('function');
-        expect(typeof api.listUsers.queryKey).toBe('function');
+describe('createClient', () => {
+    it('exposes the full query surface on GET routes and the mutation surface on others', () => {
+        const { api } = makeApi(200, {});
+
+        for (const method of [
+            'queryKey',
+            'queryOptions',
+            'infiniteQueryOptions',
+            'useQuery',
+            'useSuspenseQuery',
+            'usePrefetchQuery',
+            'useInfiniteQuery',
+            'fetch',
+            'prefetch',
+            'ensureData',
+            'getData',
+            'setData',
+            'invalidate',
+            'refetch',
+            'cancel',
+            'remove',
+            'reset',
+        ] as const) {
+            expect(typeof api.listUsers[method]).toBe('function');
+        }
         expect(typeof api.createUser.useMutation).toBe('function');
         expect(typeof api.createUser.mutationOptions).toBe('function');
         expect(typeof api.workspace.getInfo.useQuery).toBe('function');
     });
 
-    it('builds hierarchical query keys including params and query', () => {
-        const { fetchFn } = stubFetch(200, {});
-        const api = createClient(contract, { baseUrl: 'http://localhost', fetch: fetchFn });
+    it('builds hierarchical query keys and contract-path mutation keys', () => {
+        const { api } = makeApi(200, {});
 
         expect(api.listUsers.queryKey({ query: { page: 2 } })).toEqual(['listUsers', { params: undefined, query: { page: 2 } }]);
-        expect(api.getUser.queryKey({ params: { id: '1' } })).toEqual(['getUser', { params: { id: '1' }, query: undefined }]);
         expect(api.workspace.getInfo.queryKey()).toEqual(['workspace', 'getInfo', { params: undefined, query: undefined }]);
-    });
-
-    it('mutation keys are the contract path', () => {
-        const { fetchFn } = stubFetch(201, {});
-        const api = createClient(contract, { baseUrl: 'http://localhost', fetch: fetchFn });
-
         expect(api.createUser.mutationKey()).toEqual(['createUser']);
     });
 
-    it('resolves the 2xx response as data via the underlying fetch client', async () => {
-        const { fetchFn, calls } = stubFetch(200, { id: 'usr_1' });
-        const api = createClient(contract, { baseUrl: 'http://localhost', fetch: fetchFn });
+    it('fetch resolves the 2xx response via the underlying fetch client', async () => {
+        const { api, calls } = makeApi(200, { id: 'usr_1' });
 
-        const data = await makeQueryClient().fetchQuery(api.getUser.queryOptions({ params: { id: 'usr_1' } }));
+        const data = await api.getUser.fetch(makeQueryClient(), { params: { id: 'usr_1' } });
 
         expect(calls[0]?.url).toBe('http://localhost/users/usr_1');
         expect(data).toEqual({ status: 200, body: { id: 'usr_1' }, headers: {} });
     });
 
-    it('throws the response on a non-2xx status so it lands in error', async () => {
-        const { fetchFn } = stubFetch(404, { detail: 'not found' });
-        const api = createClient(contract, { baseUrl: 'http://localhost', fetch: fetchFn });
+    it('throws a KizunaHttpError carrying the response on a non-2xx status', async () => {
+        const { api } = makeApi(404, { detail: 'not found' });
 
-        await expect(makeQueryClient().fetchQuery(api.getUser.queryOptions({ params: { id: 'missing' } }))).rejects.toEqual({
-            status: 404,
-            body: { detail: 'not found' },
-            headers: {},
-        });
+        const error = await api.getUser.fetch(makeQueryClient(), { params: { id: 'missing' } }).catch((caught) => caught);
+
+        expect(error).toBeInstanceOf(KizunaHttpError);
+        expect(error.status).toBe(404);
+        expect(error.body).toEqual({ detail: 'not found' });
+        expect(error.message).toBe('HTTP 404');
     });
 
     it('forwards an AbortSignal into the fetch call', async () => {
-        const { fetchFn, calls } = stubFetch(200, { users: [] });
-        const api = createClient(contract, { baseUrl: 'http://localhost', fetch: fetchFn });
+        const { api, calls } = makeApi(200, { users: [] });
 
-        await makeQueryClient().fetchQuery(api.listUsers.queryOptions());
+        await api.listUsers.fetch(makeQueryClient());
 
         expect(calls[0]?.init?.signal).toBeInstanceOf(AbortSignal);
     });
 
-    it('runs mutations through the underlying fetch client with the variables as the request', async () => {
-        const { fetchFn, calls } = stubFetch(201, { id: 'usr_2' });
-        const api = createClient(contract, { baseUrl: 'http://localhost', fetch: fetchFn });
+    it('disambiguates options from args on no-arg query routes', async () => {
+        const { api, calls } = makeApi(200, { id: 'ws_1' });
+        const queryClient = makeQueryClient();
+
+        // passing options (not args) as the first argument must not be treated as args
+        await api.workspace.getInfo.fetch(queryClient, { staleTime: 1000 } as never);
+
+        expect(calls[0]?.url).toBe('http://localhost/workspace');
+    });
+
+    it('getData/setData round-trip against the keyed cache', () => {
+        const { api } = makeApi(200, {});
+        const queryClient = makeQueryClient();
+
+        expect(api.getUser.getData(queryClient, { params: { id: '1' } })).toBeUndefined();
+        api.getUser.setData(queryClient, { params: { id: '1' } }, { status: 200, body: { id: '1' }, headers: {} });
+        expect(api.getUser.getData(queryClient, { params: { id: '1' } })).toEqual({ status: 200, body: { id: '1' }, headers: {} });
+    });
+
+    it('invalidate without args matches every instance of the route', async () => {
+        const { api } = makeApi(200, {});
+        const queryClient = makeQueryClient();
+        const spy = vi.spyOn(queryClient, 'invalidateQueries');
+
+        await api.getUser.invalidate(queryClient);
+
+        expect(spy).toHaveBeenCalledWith({ queryKey: ['getUser'] }, undefined);
+    });
+
+    it('runs mutations through the fetch client with the variables as the request', async () => {
+        const { api, calls } = makeApi(201, { id: 'usr_2' });
 
         const observer = new MutationObserver(makeQueryClient(), api.createUser.mutationOptions());
         const data = await observer.mutate({ body: { name: 'Alice' } });
