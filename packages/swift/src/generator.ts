@@ -2,6 +2,9 @@ import type { z } from 'zod';
 import {
     resolveDeprecationMap,
     createGenerator,
+    isVoidSchema,
+    isObjectSchema,
+    isDiscriminatedUnionSchema,
     parsePath,
     resolveResponseBody,
     resolveResponseHeaders,
@@ -14,8 +17,6 @@ import {
     TypeRegistry,
     mapType,
     collectObjectFields,
-    isObjectSchema,
-    isDiscriminatedUnionSchema,
     objectFieldCount,
     objectShapeKeys,
     readMetaId,
@@ -157,11 +158,8 @@ const buildRouteMethod = (
         ? collectObjectFields(route.headers as z.ZodType, registry, `${baseHint}Headers`, fieldPaths, 'headers', deprecationSchemas)
         : [];
 
-    const bodyDefType =
-        (route.body as unknown as { _def?: { type?: string }; def?: { type?: string } } | undefined)?._def?.type ??
-        (route.body as unknown as { _def?: { type?: string }; def?: { type?: string } } | undefined)?.def?.type;
     let bodyDescriptor: BodyDescriptor | undefined;
-    if (route.body && bodyDefType !== 'void') {
+    if (route.body && !isVoidSchema(route.body)) {
         const bodyHint = readMetaId(route.body as never) ?? `${baseHint}Input`;
         const isMultipart = route.contentType === 'multipart/form-data';
         const isUnion = isDiscriminatedUnionSchema(route.body as z.ZodType);
