@@ -1,11 +1,6 @@
 import { z } from 'zod';
-import { parsePath } from '@ts-kizuna/core';
+import { parsePath, isVoidSchema, readObjectShape } from '@ts-kizuna/core';
 import type { RouteDefinition } from '@ts-kizuna/core';
-
-const isVoidSchema = (schema: z.ZodType): boolean => {
-    const def = schema as unknown as { _def?: { type?: string }; def?: { type?: string } };
-    return def._def?.type === 'void' || def.def?.type === 'void';
-};
 
 export interface ToolInputSchema {
     shape: Record<string, z.ZodType> | undefined;
@@ -24,7 +19,7 @@ export const buildToolInputSchema = (route: RouteDefinition): ToolInputSchema =>
     if (paramNames.length > 0) {
         hasParams = true;
         const paramShape: Record<string, z.ZodType> = {};
-        const explicitShape = (route.pathParams as unknown as { shape?: Record<string, z.ZodType> })?.shape;
+        const explicitShape = (route.pathParams ? readObjectShape(route.pathParams) : undefined) as Record<string, z.ZodType> | undefined;
         for (const name of paramNames) {
             paramShape[name] = explicitShape?.[name] ?? z.string();
         }

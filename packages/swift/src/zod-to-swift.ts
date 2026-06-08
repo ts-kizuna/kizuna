@@ -1,11 +1,19 @@
 import type { z } from 'zod';
 import {
-    isFileSchema as coreIsFileSchema,
+    isFileSchema,
+    isIntegerSchema,
+    readDef,
+    readDefType,
+    readDiscriminatedUnion,
     readDiscriminatorLiteral as coreReadDiscriminatorLiteral,
-    readMetaDescription as coreReadMetaDescription,
-    readMetaId as coreReadMetaId,
+    readMetaDescription,
+    readMetaId,
+    readObjectShape,
+    unwrapOptionalWrappers,
 } from '@ts-kizuna/core/generator';
 import { pascalCase } from './emit.js';
+
+export { isFileSchema, readMetaId };
 
 export interface SwiftField {
     name: string;
@@ -114,88 +122,21 @@ export class TypeRegistry {
     }
 }
 
-interface ZodDef {
-    type?: string;
-    innerType?: ZodSchema;
-    element?: ZodSchema;
-    shape?: Record<string, ZodSchema>;
-    entries?: Record<string, string>;
-    values?: unknown[];
-    options?: ZodSchema[];
-    discriminator?: string;
-    checks?: Array<{ def?: { format?: string; check?: string } }>;
-    format?: string;
-    defaultValue?: unknown;
-    valueType?: ZodSchema;
-}
-
-interface ZodSchema {
-    def: ZodDef;
-    _def?: ZodDef;
-    shape?: Record<string, ZodSchema>;
-    safeParse?: (value: unknown) => { success: boolean };
-    meta?: () => Record<string, unknown> | undefined;
-}
-
-const accessDef = (schema: ZodSchema): ZodDef => schema.def ?? schema._def ?? {};
-
-export const isFileSchema = (schema: ZodSchema): boolean => coreIsFileSchema(schema as unknown as z.ZodType);
-
-export const readMetaId = (schema: ZodSchema): string | undefined => coreReadMetaId(schema as unknown as z.ZodType);
-
-const readMetaDescription = (schema: ZodSchema): string | undefined => coreReadMetaDescription(schema as unknown as z.ZodType);
-
-const INTEGER_FORMATS = ['safeint', 'int32', 'int64', 'int'];
-
-const isIntegerNumber = (def: ZodDef): boolean => {
-    if (INTEGER_FORMATS.includes(def.format as string)) return true;
-    if (!def.checks) return false;
-    return def.checks.some((check) => INTEGER_FORMATS.includes(check.def?.format as string));
-};
-
-const unwrapOptional = (schema: ZodSchema): { inner: ZodSchema; optional: boolean } => {
-    let current = schema;
-    let optional = false;
-    while (true) {
-        const def = accessDef(current);
-        if (def.type !== 'optional' && def.type !== 'nullable' && def.type !== 'default' && def.type !== 'nullish') break;
-        optional = true;
-        const next = def.innerType;
-        if (!next) break;
-        current = next;
-    }
-    return {
-        inner: current,
-        optional,
-    };
-};
-
 const sanitizeIdentifier = (input: string): string => {
     const cleaned = input.replace(/[^a-zA-Z0-9_]/g, '_');
     return /^[0-9]/.test(cleaned) ? `_${cleaned}` : cleaned;
 };
 
-interface DiscriminatedDef {
-    discriminator: string;
-    options: ZodSchema[];
-}
-
-const readDiscriminatedUnion = (schema: ZodSchema): DiscriminatedDef | undefined => {
-    const def = accessDef(schema);
-    if (def.type !== 'union' || typeof def.discriminator !== 'string' || !Array.isArray(def.options)) return undefined;
-    return {
-        discriminator: def.discriminator,
-        options: def.options,
-    };
-};
-
-const readDiscriminatorLiteral = (variant: ZodSchema, propertyName: string): string | undefined => {
-    const literal = coreReadDiscriminatorLiteral(variant as unknown as z.ZodType, propertyName);
+/**
+ * Discriminator literal narrowed to a string (Swift enum cases require one).
+ */
+const readDiscriminatorLiteral = (variant: z.core.$ZodType, propertyName: string): string | undefined => {
+    const literal = coreReadDiscriminatorLiteral(variant, propertyName);
     return typeof literal === 'string' ? literal : undefined;
 };
 
 const objectFields = (
-    schema: ZodSchema,
+    schema: z.core.$ZodType,
     registry: TypeRegistry,
     hint: string,
     deprecatedPaths?: ReadonlyMap<string, string>,
@@ -203,7 +144,7 @@ const objectFields = (
     deprecationSchemas?: ReadonlyMap<string, Map<string, string>>,
     schemaDeprecations?: ReadonlyMap<string, string>
 ): SwiftField[] => {
-    const shape = accessDef(schema).shape ?? schema.shape ?? {};
+    const shape = readObjectShape(schema) ?? {};
     const fields: SwiftField[] = [];
     const seen = new Map<string, string>();
     for (const [key, value] of Object.entries(shape)) {
@@ -235,15 +176,13 @@ const objectFields = (
 const stringify = (value: string): string => JSON.stringify(value);
 
 export const mapType = (
-    rawSchema: z.ZodType | ZodSchema,
+    schema: z.core.$ZodType,
     registry: TypeRegistry,
     hint: string,
     deprecatedPaths?: ReadonlyMap<string, string>,
     pathPrefix?: string,
     deprecationSchemas?: ReadonlyMap<string, Map<string, string>>
 ): MapResult => {
-    const schema = rawSchema as ZodSchema;
-
     if (isFileSchema(schema)) {
         return {
             expression: 'MultipartFile',
@@ -253,7 +192,7 @@ export const mapType = (
     }
 
     const id = readMetaId(schema);
-    const def = accessDef(schema);
+    const def = readDef(schema);
 
     // Discriminated union
     const discriminated = readDiscriminatedUnion(schema);
@@ -320,7 +259,7 @@ export const mapType = (
         };
     }
 
-    const { inner, optional } = unwrapOptional(schema);
+    const { inner, optional } = unwrapOptionalWrappers(schema);
     if (optional) {
         const innerResult = mapType(inner, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
         return {
@@ -338,13 +277,11 @@ export const mapType = (
                 optional: false,
             };
         case 'pipe': {
-            const pipeDef = def as unknown as { in?: ZodSchema; out?: ZodSchema };
-            const outDef = pipeDef.out as unknown as { _def?: { type?: string }; def?: { type?: string } } | undefined;
-            const outType = outDef?._def?.type ?? outDef?.def?.type;
-            if (pipeDef.out && outType !== 'transform') {
-                return mapType(pipeDef.out, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+            const outType = def.out ? readDefType(def.out) : undefined;
+            if (def.out && outType !== 'transform') {
+                return mapType(def.out, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
             }
-            if (pipeDef.in) return mapType(pipeDef.in, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+            if (def.in) return mapType(def.in, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
             registry.warnAnyCodable(hint, 'pipe schema missing resolvable type');
             return {
                 expression: 'AnyCodable',
@@ -362,7 +299,7 @@ export const mapType = (
         }
         case 'number':
             return {
-                expression: isIntegerNumber(def) ? 'Int' : 'Double',
+                expression: isIntegerSchema(schema) ? 'Int' : 'Double',
                 optional: false,
             };
         case 'bigint':
@@ -463,7 +400,7 @@ export const mapType = (
         case 'union': {
             const options = def.options ?? [];
             const allStringLiterals = options.every((option) => {
-                const optionDef = accessDef(option);
+                const optionDef = readDef(option);
                 return optionDef.type === 'literal' && (optionDef.values ?? []).every((value) => typeof value === 'string');
             });
             if (allStringLiterals) {
@@ -473,7 +410,7 @@ export const mapType = (
                 };
             }
             const resolved = options
-                .map((option) => mapType(option as ZodSchema, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas))
+                .map((option) => mapType(option, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas))
                 .filter((result): result is MapResult => result !== undefined && result.expression !== 'AnyCodable');
             if (resolved.length === 0) {
                 registry.warnAnyCodable(hint, 'non-discriminated union');
@@ -540,34 +477,24 @@ const sanitizeCaseName = (literal: string): string => {
 };
 
 export const collectObjectFields = (
-    schema: z.ZodType | ZodSchema,
+    schema: z.core.$ZodType,
     registry: TypeRegistry,
     hint: string,
     deprecatedPaths?: ReadonlyMap<string, string>,
     pathPrefix?: string,
     deprecationSchemas?: ReadonlyMap<string, Map<string, string>>
 ): SwiftField[] => {
-    return objectFields(schema as ZodSchema, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+    return objectFields(schema, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
 };
 
-export const isObjectSchema = (schema: z.ZodType | ZodSchema): boolean => {
-    return accessDef(schema as ZodSchema).type === 'object';
+export const objectFieldCount = (schema: z.core.$ZodType): number => {
+    return Object.keys(readObjectShape(schema) ?? {}).length;
 };
 
-export const isDiscriminatedUnionSchema = (schema: z.ZodType | ZodSchema): boolean => {
-    return readDiscriminatedUnion(schema as ZodSchema) !== undefined;
-};
-
-export const objectFieldCount = (schema: z.ZodType | ZodSchema): number => {
-    const shape = accessDef(schema as ZodSchema).shape ?? (schema as ZodSchema).shape ?? {};
-    return Object.keys(shape).length;
-};
-
-export const objectShapeKeys = (schema: z.ZodType | ZodSchema): Array<{ name: string; wireName: string; isFile: boolean }> => {
-    const shape = accessDef(schema as ZodSchema).shape ?? (schema as ZodSchema).shape ?? {};
-    return Object.entries(shape).map(([key, value]) => ({
+export const objectShapeKeys = (schema: z.core.$ZodType): Array<{ name: string; wireName: string; isFile: boolean }> => {
+    return Object.entries(readObjectShape(schema) ?? {}).map(([key, value]) => ({
         name: sanitizeFieldName(key),
         wireName: key,
-        isFile: isFileSchema(value as ZodSchema),
+        isFile: isFileSchema(value),
     }));
 };
