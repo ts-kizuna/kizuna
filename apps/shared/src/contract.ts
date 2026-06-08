@@ -1,5 +1,5 @@
 import { createContract, createModel, createTag } from '@ts-kizuna/core';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema, BinarySchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
 
 export const UserSchema = createModel({
@@ -156,6 +156,29 @@ const usersContract = createContract(Users, {
             }),
         },
         summary: 'List users with pagination',
+    },
+    exportUsers: {
+        method: 'GET',
+        path: '/users/export',
+        responses: {
+            200: {
+                body: z.string(),
+                contentType: 'text/csv',
+            },
+        },
+        summary: 'Export users as CSV — exercises a non-JSON (text/csv) raw response body',
+    },
+    userBadge: {
+        method: 'GET',
+        path: '/users/:id/badge',
+        responses: {
+            200: {
+                body: BinarySchema,
+                contentType: 'application/octet-stream',
+            },
+            404: ProblemDetailsSchema,
+        },
+        summary: 'Download a user badge — exercises a binary (BinarySchema) response body',
     },
     searchUsers: {
         method: 'GET',

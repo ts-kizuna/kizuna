@@ -151,6 +151,22 @@ export const isFileSchema = (schema: z.core.$ZodType): boolean => {
 };
 
 /**
+ * A `Uint8Array` instance used to probe schemas.
+ */
+export const BINARY_PROBE: Uint8Array = new Uint8Array();
+
+/**
+ * True for `z.instanceof(Uint8Array)`-style custom schemas (the `BinarySchema`
+ * helper). Probes with a real `Uint8Array` and a string so other `custom`
+ * schemas — including `z.instanceof(File)` — are not matched.
+ */
+export const isBinarySchema = (schema: z.core.$ZodType): boolean => {
+    if (readDefType(schema) !== 'custom') return false;
+    if (isFileSchema(schema)) return false;
+    return z.core.safeParse(schema, BINARY_PROBE).success && !z.core.safeParse(schema, 'not-a-uint8array').success;
+};
+
+/**
  * Returns a schema's metadata (set via `.meta()`), or undefined.
  */
 export const readMeta = (schema: z.core.$ZodType): Record<string, unknown> | undefined =>

@@ -365,6 +365,22 @@ final class APIClientTests: XCTestCase {
         XCTAssertFalse(result.body.allow.isEmpty)
     }
 
+    func testExportUsersReturnsRawCsv() async throws {
+        // exportUsers declares `contentType: 'text/csv'` with a `z.string()` body, so the
+        // client decodes the response as a raw UTF-8 string rather than JSON.
+        let result = try await client.users.exportUsers()
+        XCTAssertTrue(result.body.hasPrefix("id,name,email"), "expected CSV header; got \(result.body)")
+        XCTAssertTrue(result.body.contains("Ada Lovelace"), "expected a seeded user row; got \(result.body)")
+    }
+
+    func testUserBadgeReturnsBinaryData() async throws {
+        // userBadge declares `body: BinarySchema` with `application/octet-stream`, so the
+        // client decodes the response as raw `Data` rather than JSON.
+        let result = try await client.users.userBadge(.params(id: "1"))
+        let text = String(decoding: result.body, as: UTF8.self)
+        XCTAssertEqual(text, "BADGE:1:Ada Lovelace")
+    }
+
     func testWebhookAnyCodableBody() async throws {
         let json = try JSONSerialization.data(withJSONObject: ["event": "test", "count": 42])
         let payload = APIClient.AnyCodable(value: json)

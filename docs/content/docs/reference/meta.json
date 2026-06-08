@@ -8,6 +8,7 @@
         "create-middleware",
         "create-guard",
         "problem-details-schema",
+        "binary-and-file-schemas",
         "create-api",
         "create-client",
         "is-validation-error",

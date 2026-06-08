@@ -3,6 +3,7 @@ import { stringify as stringifyYaml } from 'yaml';
 import {
     createGenerator,
     isFileSchema,
+    isBinarySchema,
     isVoidSchema,
     parsePath,
     readDiscriminatedUnion,
@@ -12,6 +13,7 @@ import {
     globalRegistrySchemas,
     resolveResponseBody,
     resolveResponseHeaders,
+    resolveResponseContentType,
     type Contract,
     type DeprecationWarnings,
     type RouteDefinition,
@@ -409,7 +411,9 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                           ).map(([name, schema]) => [name, { schema, required: false }])
                       )
                     : undefined;
-                const mediaType = Number(statusKey) >= 400 ? 'application/problem+json' : 'application/json';
+                const mediaType =
+                    resolveResponseContentType(responseValue) ??
+                    (Number(statusKey) >= 400 ? 'application/problem+json' : 'application/json');
                 operation.responses[statusKey] = {
                     description,
                     ...(headersObject ? { headers: headersObject } : {}),
@@ -417,7 +421,9 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                         ? {
                               content: {
                                   [mediaType]: {
-                                      schema: toJsonSchema(bodySchema, 'output'),
+                                      schema: isBinarySchema(bodySchema)
+                                          ? { type: 'string', format: 'binary' }
+                                          : toJsonSchema(bodySchema, 'output'),
                                   },
                               },
                           }

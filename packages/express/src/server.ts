@@ -166,6 +166,10 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
         }
         if (rendered.body === undefined) {
             res.status(rendered.status).end();
+        } else if (rendered.raw) {
+            const body = rendered.body;
+            // Strings go out as-is; binary (Uint8Array/Buffer) is sent as bytes — never JSON-serialized.
+            res.status(rendered.status).send(typeof body === 'string' || Buffer.isBuffer(body) ? body : Buffer.from(body as Uint8Array));
         } else {
             res.status(rendered.status).json(rendered.body);
         }

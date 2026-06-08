@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import {
     isFileSchema,
+    isBinarySchema,
     isIntegerSchema,
     readDef,
     readDefType,
@@ -13,7 +14,7 @@ import {
 } from '@ts-kizuna/core/generator';
 import { pascalCase } from './emit.js';
 
-export { isFileSchema, readMetaId };
+export { isFileSchema, isBinarySchema, readMetaId };
 
 export interface SwiftField {
     name: string;
@@ -188,6 +189,13 @@ export const mapType = (
             expression: 'MultipartFile',
             optional: false,
             isFile: true,
+        };
+    }
+
+    if (isBinarySchema(schema)) {
+        return {
+            expression: 'Foundation.Data',
+            optional: false,
         };
     }
 

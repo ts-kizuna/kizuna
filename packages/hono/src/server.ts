@@ -130,6 +130,10 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
         if (rendered.body === undefined) {
             return c.body(null, rendered.status as ContentfulStatusCode, rendered.headers);
         }
+        if (rendered.raw) {
+            // Strings and binary (Uint8Array/ArrayBuffer) bodies are sent as-is, never JSON-serialized.
+            return c.body(rendered.body as ArrayBuffer | string, rendered.status as ContentfulStatusCode, rendered.headers);
+        }
         return c.json(rendered.body as object, rendered.status as ContentfulStatusCode, rendered.headers);
     },
 });

@@ -108,6 +108,30 @@ responses: {
 },
 ```
 
+Non-JSON responses — set `contentType` to send the body as-is instead of JSON. Responses default to `application/json` (errors to `application/problem+json`); declare a non-JSON body as `z.string()`:
+
+```ts
+responses: {
+    200: {
+        body: z.string(),
+        contentType: 'text/csv',
+    },
+},
+```
+
+Binary responses — use [`BinarySchema`](/docs/reference/binary-and-file-schemas) for a body of raw bytes (`Uint8Array`/`Buffer`), e.g. a PDF download:
+
+```ts
+import { BinarySchema } from '@ts-kizuna/core/schemas';
+
+responses: {
+    200: {
+        body: BinarySchema,
+        contentType: 'application/pdf',
+    },
+},
+```
+
 ## Models
 
 Use [`createModel`](/docs/reference/create-model) to give a Zod schema a name that the OpenAPI and Swift generators pick up.

@@ -1189,3 +1189,63 @@ describe('error response media type (RFC 9457)', () => {
         expect(errorSchema?.properties?.['detail']?.deprecated).toBe(true);
     });
 });
+
+describe('declared response contentType', () => {
+    const contractWithContentType = createContract({
+        exportUsers: {
+            method: 'GET',
+            path: '/users/export',
+            responses: {
+                200: {
+                    body: z.string(),
+                    contentType: 'text/csv',
+                },
+            },
+        },
+        getUser: {
+            method: 'GET',
+            path: '/users/{id}',
+            params: z.object({ id: z.string() }),
+            responses: {
+                200: {
+                    body: z.object({ id: z.string() }),
+                },
+            },
+        },
+    });
+    const spec = generateJson(contractWithContentType, baseConfig);
+
+    it('uses the declared media type for the response', () => {
+        const response = spec.paths['/users/export']?.get?.responses?.['200'];
+        expect(response?.content?.['text/csv']?.schema).toBeDefined();
+        expect(response?.content?.['application/json']).toBeUndefined();
+    });
+
+    it('defaults to application/json when contentType is omitted on the object form', () => {
+        const response = spec.paths['/users/{id}']?.get?.responses?.['200'];
+        expect(response?.content?.['application/json']?.schema).toBeDefined();
+    });
+});
+
+describe('binary response bodies', () => {
+    const binaryContract = createContract({
+        downloadBadge: {
+            method: 'GET',
+            path: '/badge',
+            responses: {
+                200: {
+                    body: z.instanceof(Uint8Array),
+                    contentType: 'application/pdf',
+                },
+            },
+        },
+    });
+    const spec = generateJson(binaryContract, baseConfig);
+
+    it('emits type: string, format: binary under the declared media type', () => {
+        const schema = spec.paths['/badge']?.get?.responses?.['200']?.content?.['application/pdf']?.schema as
+            | Record<string, unknown>
+            | undefined;
+        expect(schema).toEqual({ type: 'string', format: 'binary' });
+    });
+});
