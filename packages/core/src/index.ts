@@ -11,3 +11,4 @@ export { isProblemDetails } from './error-response.js';
 export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export { STATUS_TITLES, getStatusText } from './status-titles.js';
+export { isVoidSchema, readObjectShape } from './zod-internals.js';

@@ -1,42 +1,29 @@
 import type { z } from 'zod';
 import { CONTRACT_TAG, type RouteDefinition, type Contract, type Method } from './types.js';
 import type { ExtractPathParams } from './path-params.js';
+import { readDef, readObjectShape, WRAPPER_TYPES } from './zod-internals.js';
 
-interface SchemaInternals {
-    _zod: {
-        def: {
-            type: string;
-            innerType?: { _zod: SchemaInternals['_zod'] };
-            element?: { _zod: SchemaInternals['_zod'] };
-            in?: { _zod: SchemaInternals['_zod'] };
-            shape?: Record<string, { _zod: SchemaInternals['_zod'] }>;
-        };
-    };
-}
-
-const WRAPPER_TYPES = new Set(['optional', 'nullable', 'default', 'prefault', 'catch', 'nonoptional', 'success', 'readonly']);
-
-const resolveBaseType = (internals: SchemaInternals['_zod']): string => {
-    const def = internals.def;
-    if (WRAPPER_TYPES.has(def.type) && def.innerType) {
-        return resolveBaseType(def.innerType._zod);
+const resolveBaseType = (schema: z.core.$ZodType): string => {
+    const def = readDef(schema);
+    if (def.type && WRAPPER_TYPES.has(def.type) && def.innerType) {
+        return resolveBaseType(def.innerType);
     }
     if (def.type === 'pipe' && def.in) {
-        return resolveBaseType(def.in._zod);
+        return resolveBaseType(def.in);
     }
-    return def.type;
+    return def.type ?? '';
 };
 
-const resolveArrayElement = (internals: SchemaInternals['_zod']): SchemaInternals['_zod'] | undefined => {
-    const def = internals.def;
+const resolveArrayElement = (schema: z.core.$ZodType): z.core.$ZodType | undefined => {
+    const def = readDef(schema);
     if (def.type === 'array' && def.element) {
-        return def.element._zod;
+        return def.element;
     }
-    if (WRAPPER_TYPES.has(def.type) && def.innerType) {
-        return resolveArrayElement(def.innerType._zod);
+    if (def.type && WRAPPER_TYPES.has(def.type) && def.innerType) {
+        return resolveArrayElement(def.innerType);
     }
     if (def.type === 'pipe' && def.in) {
-        return resolveArrayElement(def.in._zod);
+        return resolveArrayElement(def.in);
     }
     return undefined;
 };
@@ -56,24 +43,22 @@ const coerceValue = (value: unknown, baseType: string): unknown => {
 
 const coerceStringValues = (input: unknown, schema: z.ZodType): unknown => {
     if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
-    const internals = schema as unknown as SchemaInternals;
-    const def = internals._zod?.def;
-    if (!def?.shape) return input;
+    const shape = readObjectShape(schema);
+    if (!shape) return input;
     const record = input as Record<string, unknown>;
     const result: Record<string, unknown> = {};
     let changed = false;
     for (const key of Object.keys(record)) {
-        const fieldSchema = def.shape[key];
+        const fieldSchema = shape[key];
         if (!fieldSchema) {
             result[key] = record[key];
             continue;
         }
-        const fieldInternals = fieldSchema._zod;
-        const baseType = resolveBaseType(fieldInternals);
+        const baseType = resolveBaseType(fieldSchema);
         if (baseType === 'array') {
-            const elementInternals = resolveArrayElement(fieldInternals);
-            if (elementInternals && Array.isArray(record[key])) {
-                const elementType = resolveBaseType(elementInternals);
+            const elementSchema = resolveArrayElement(fieldSchema);
+            if (elementSchema && Array.isArray(record[key])) {
+                const elementType = resolveBaseType(elementSchema);
                 const coerced = (record[key] as unknown[]).map((item) => coerceValue(item, elementType));
                 result[key] = coerced;
                 changed = true;

@@ -15,6 +15,7 @@ import { parsePath } from './path-params.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
+import { isVoidSchema } from './zod-internals.js';
 
 export type { RouteDefinition, Contract, Method } from './types.js';
 export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
@@ -280,11 +281,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         };
     }
 
-    const bodySchemaType =
-        (route.body as unknown as { _def?: { type?: string }; def?: { type?: string } } | undefined)?._def?.type ??
-        (route.body as unknown as { _def?: { type?: string }; def?: { type?: string } } | undefined)?.def?.type;
-
-    if (route.body && bodySchemaType !== 'void') {
+    if (route.body && !isVoidSchema(route.body)) {
         const expected = route.contentType ?? 'application/json';
         const contentTypeHeader = (raw.headers as Record<string, string | undefined>)['content-type'] ?? '';
         const [mediaType = ''] = contentTypeHeader.split(';');

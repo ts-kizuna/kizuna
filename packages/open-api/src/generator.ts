@@ -3,9 +3,13 @@ import { stringify as stringifyYaml } from 'yaml';
 import {
     createGenerator,
     isFileSchema,
+    isVoidSchema,
     parsePath,
+    readDiscriminatedUnion,
     readDiscriminatorLiteral,
     readMetaId,
+    readObjectShape,
+    globalRegistrySchemas,
     resolveResponseBody,
     resolveResponseHeaders,
     type Contract,
@@ -142,9 +146,9 @@ const rewriteRefs = (value: unknown): unknown => {
     return value;
 };
 
-const applyFileBinary = (zodSchema: z.ZodType, jsonSchema: unknown): void => {
+const applyFileBinary = (zodSchema: z.core.$ZodType, jsonSchema: unknown): void => {
     if (!jsonSchema || typeof jsonSchema !== 'object') return;
-    const shape = (zodSchema as unknown as { shape?: Record<string, z.ZodType> }).shape;
+    const shape = readObjectShape(zodSchema);
     if (!shape) return;
     const properties = (jsonSchema as { properties?: Record<string, unknown> }).properties;
     if (!properties) return;
@@ -160,21 +164,9 @@ const applyFileBinary = (zodSchema: z.ZodType, jsonSchema: unknown): void => {
     }
 };
 
-interface DiscriminatedUnionDef {
-    type: 'union';
-    discriminator: string;
-    options: z.ZodType[];
-}
-
-const readDiscriminatedUnionDef = (schema: z.ZodType): DiscriminatedUnionDef | undefined => {
-    const def = (schema as unknown as { _def?: { type?: string; discriminator?: unknown; options?: unknown } })._def;
-    if (!def || def.type !== 'union' || typeof def.discriminator !== 'string' || !Array.isArray(def.options)) return undefined;
-    return def as DiscriminatedUnionDef;
-};
-
 const buildDiscriminatorBlock = (
     propertyName: string,
-    options: z.ZodType[]
+    options: z.core.$ZodType[]
 ): { propertyName: string; mapping?: Record<string, string> } => {
     const mapping: Record<string, string> = {};
     let mappingComplete = true;
@@ -204,7 +196,7 @@ const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Rec
             $ref: COMPONENT_REF_BASE + id,
         };
     }
-    const discriminated = readDiscriminatedUnionDef(schema);
+    const discriminated = readDiscriminatedUnion(schema);
     if (discriminated) {
         const raw = rewriteRefs(
             omit(z.toJSONSchema(schema, { unrepresentable: 'any', io }) as Record<string, unknown>, ['$defs', '$schema'])
@@ -222,9 +214,8 @@ const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Rec
 
 const buildComponentSchemas = (): Record<string, unknown> | undefined => {
     const discriminators = new Map<string, { propertyName: string; mapping?: Record<string, string> }>();
-    const idmap = (z.globalRegistry as unknown as { _idmap: Map<string, z.ZodType> })._idmap;
-    for (const [id, schema] of idmap.entries()) {
-        const def = readDiscriminatedUnionDef(schema);
+    for (const [id, schema] of globalRegistrySchemas().entries()) {
+        const def = readDiscriminatedUnion(schema);
         if (def) {
             discriminators.set(id, buildDiscriminatorBlock(def.discriminator, def.options));
         }
@@ -395,10 +386,7 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
 
             if (parameters.length > 0) operation.parameters = parameters;
 
-            const bodyType =
-                (route.body as unknown as { _def?: { type?: string }; def?: { type?: string } } | undefined)?._def?.type ??
-                (route.body as unknown as { _def?: { type?: string }; def?: { type?: string } } | undefined)?.def?.type;
-            if (route.body && bodyType !== 'void') {
+            if (route.body && !isVoidSchema(route.body)) {
                 const contentType = route.contentType ?? 'application/json';
                 operation.requestBody = {
                     required: true,
@@ -414,9 +402,6 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                 const bodySchema = resolveResponseBody(responseValue);
                 const headersSchema = resolveResponseHeaders(responseValue);
                 const description = getStatusText(Number(statusKey));
-                const responseBodyType =
-                    (bodySchema as unknown as { _def?: { type?: string }; def?: { type?: string } })?._def?.type ??
-                    (bodySchema as unknown as { _def?: { type?: string }; def?: { type?: string } })?.def?.type;
                 const headersObject: Record<string, unknown> | undefined = headersSchema
                     ? Object.fromEntries(
                           Object.entries(
@@ -427,7 +412,7 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                 operation.responses[statusKey] = {
                     description,
                     ...(headersObject ? { headers: headersObject } : {}),
-                    ...(responseBodyType !== 'void' && route.method !== 'HEAD'
+                    ...(!isVoidSchema(bodySchema) && route.method !== 'HEAD'
                         ? {
                               content: {
                                   'application/json': {
