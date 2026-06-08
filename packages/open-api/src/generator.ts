@@ -7,7 +7,6 @@ import {
     parsePath,
     readDiscriminatedUnion,
     readDiscriminatorLiteral,
-    readMetaDescription,
     readMetaId,
     readObjectShape,
     globalRegistrySchemas,
@@ -17,7 +16,7 @@ import {
     type DeprecationWarnings,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
-import { CONTRACT_TAG, CONTRACT_DESCRIPTION } from '@ts-kizuna/core';
+import { CONTRACT_TAG, CONTRACT_DESCRIPTION, getStatusText } from '@ts-kizuna/core';
 
 export interface OpenApiInfo {
     title: string;
@@ -118,31 +117,6 @@ export interface GenerateOpenApiOptions {
 const convertPath = (path: string): string => {
     const { segments } = parsePath(path);
     return segments.map((segment) => (segment.kind === 'literal' ? segment.value : `{${segment.value}}`)).join('');
-};
-
-const defaultStatusText = (status: number): string => {
-    const known: Record<number, string> = {
-        200: 'OK',
-        201: 'Created',
-        202: 'Accepted',
-        204: 'No Content',
-        301: 'Moved Permanently',
-        302: 'Found',
-        304: 'Not Modified',
-        400: 'Bad Request',
-        401: 'Unauthorized',
-        403: 'Forbidden',
-        404: 'Not Found',
-        405: 'Method Not Allowed',
-        409: 'Conflict',
-        410: 'Gone',
-        422: 'Unprocessable Entity',
-        429: 'Too Many Requests',
-        500: 'Internal Server Error',
-        502: 'Bad Gateway',
-        503: 'Service Unavailable',
-    };
-    return known[status] ?? `${status} Response`;
 };
 
 const COMPONENT_REF_BASE = '#/components/schemas/';
@@ -427,7 +401,7 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
             for (const [statusKey, responseValue] of Object.entries(route.responses)) {
                 const bodySchema = resolveResponseBody(responseValue);
                 const headersSchema = resolveResponseHeaders(responseValue);
-                const description = readMetaDescription(bodySchema) ?? defaultStatusText(Number(statusKey));
+                const description = getStatusText(Number(statusKey));
                 const headersObject: Record<string, unknown> | undefined = headersSchema
                     ? Object.fromEntries(
                           Object.entries(
@@ -481,7 +455,7 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                 if (existing) {
                     const existingSchema = existing.content?.['application/json']?.schema;
                     operation.responses['400'] = {
-                        description: existing.description ?? 'Bad Request',
+                        description: getStatusText(400),
                         content: {
                             'application/json': {
                                 schema: {
@@ -492,7 +466,7 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                     };
                 } else {
                     operation.responses['400'] = {
-                        description: 'Validation Error',
+                        description: getStatusText(400),
                         content: {
                             'application/json': {
                                 schema: validationSchema,

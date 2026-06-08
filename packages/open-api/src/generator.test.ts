@@ -1094,7 +1094,7 @@ describe('automatic validation error response', () => {
     it('adds 400 validation error to routes with body', () => {
         const response = spec.paths['/users']?.post?.responses?.['400'];
         expect(response).toBeDefined();
-        expect(response?.description).toBe('Validation Error');
+        expect(response?.description).toBe('Bad Request');
         const schema = response?.content?.['application/json']?.schema as Record<string, unknown> | undefined;
         expect(schema?.required).toContain('detail');
         expect(schema?.required).toContain('errors');
@@ -1105,7 +1105,7 @@ describe('automatic validation error response', () => {
     it('adds 400 validation error to routes with query', () => {
         const response = spec.paths['/users']?.get?.responses?.['400'];
         expect(response).toBeDefined();
-        expect(response?.description).toBe('Validation Error');
+        expect(response?.description).toBe('Bad Request');
     });
 
     it('does not add 400 to routes without body or query', () => {
