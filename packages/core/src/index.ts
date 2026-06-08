@@ -10,4 +10,4 @@ export { isValidationError, type ValidationError, type ValidationIssueCode } fro
 export { isProblemDetails } from './error-response.js';
 export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
-export { STATUS_TITLES } from './status-titles.js';
+export { STATUS_TITLES, getStatusText } from './status-titles.js';
