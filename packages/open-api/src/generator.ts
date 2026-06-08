@@ -298,9 +298,9 @@ const applyDeprecatedToOperation = (
         if (status === undefined) return;
         const responseRest = rest.slice(1);
         const response = operation.responses[status];
-        const json = response?.content?.['application/json'];
-        if (!json) return;
-        applyDeprecatedToSchema(json.schema, responseRest, components);
+        const responseContent = response?.content?.['application/json'] ?? response?.content?.['application/problem+json'];
+        if (!responseContent) return;
+        applyDeprecatedToSchema(responseContent.schema, responseRest, components);
     }
 };
 
@@ -409,13 +409,14 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                           ).map(([name, schema]) => [name, { schema, required: false }])
                       )
                     : undefined;
+                const mediaType = Number(statusKey) >= 400 ? 'application/problem+json' : 'application/json';
                 operation.responses[statusKey] = {
                     description,
                     ...(headersObject ? { headers: headersObject } : {}),
                     ...(!isVoidSchema(bodySchema) && route.method !== 'HEAD'
                         ? {
                               content: {
-                                  'application/json': {
+                                  [mediaType]: {
                                       schema: toJsonSchema(bodySchema, 'output'),
                                   },
                               },
@@ -453,11 +454,11 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                 };
                 const existing = operation.responses['400'];
                 if (existing) {
-                    const existingSchema = existing.content?.['application/json']?.schema;
+                    const existingSchema = existing.content?.['application/problem+json']?.schema;
                     operation.responses['400'] = {
                         description: getStatusText(400),
                         content: {
-                            'application/json': {
+                            'application/problem+json': {
                                 schema: {
                                     oneOf: [existingSchema, validationSchema].filter(Boolean),
                                 },
@@ -468,7 +469,7 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
                     operation.responses['400'] = {
                         description: getStatusText(400),
                         content: {
-                            'application/json': {
+                            'application/problem+json': {
                                 schema: validationSchema,
                             },
                         },

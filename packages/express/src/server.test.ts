@@ -467,7 +467,7 @@ describe('Express integration — requestValidationErrorHandler', () => {
         expect(Array.isArray(response.body.errors)).toBe(true);
     });
 
-    it('returns application/json content type for validation errors', async () => {
+    it('returns application/problem+json content type for validation errors', async () => {
         const app = express();
         app.use(express.json());
 

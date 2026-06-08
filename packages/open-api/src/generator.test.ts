@@ -1095,7 +1095,7 @@ describe('automatic validation error response', () => {
         const response = spec.paths['/users']?.post?.responses?.['400'];
         expect(response).toBeDefined();
         expect(response?.description).toBe('Bad Request');
-        const schema = response?.content?.['application/json']?.schema as Record<string, unknown> | undefined;
+        const schema = response?.content?.['application/problem+json']?.schema as Record<string, unknown> | undefined;
         expect(schema?.required).toContain('detail');
         expect(schema?.required).toContain('errors');
         const properties = schema?.properties as Record<string, Record<string, unknown>> | undefined;
@@ -1127,9 +1127,65 @@ describe('automatic validation error response', () => {
         });
         const spec = generateJson(contractWith400, baseConfig);
         const response = spec.paths['/items']?.post?.responses?.['400'];
-        const schema = response?.content?.['application/json']?.schema as Record<string, unknown> | undefined;
+        const schema = response?.content?.['application/problem+json']?.schema as Record<string, unknown> | undefined;
         const oneOf = schema?.oneOf as Array<Record<string, unknown>> | undefined;
         expect(oneOf).toHaveLength(2);
         expect(oneOf?.[1]?.required).toContain('errors');
+    });
+});
+
+describe('error response media type (RFC 9457)', () => {
+    const contractWithErrors = createContract({
+        getUser: {
+            method: 'GET',
+            path: '/users/{id}',
+            params: z.object({ id: z.string() }),
+            responses: {
+                200: z.object({ id: z.string() }),
+                404: z.object({
+                    type: z.string(),
+                    title: z.string(),
+                    status: z.number().int(),
+                    detail: z.string(),
+                }),
+                500: z.object({
+                    type: z.string(),
+                    title: z.string(),
+                    status: z.number().int(),
+                    detail: z.string(),
+                }),
+            },
+        },
+    });
+    const spec = generateJson(contractWithErrors, baseConfig);
+    const responses = spec.paths['/users/{id}']?.get?.responses;
+
+    it('keeps success responses on application/json', () => {
+        expect(responses?.['200']?.content?.['application/json']).toBeDefined();
+        expect(responses?.['200']?.content?.['application/problem+json']).toBeUndefined();
+    });
+
+    it('emits 4xx responses as application/problem+json', () => {
+        expect(responses?.['404']?.content?.['application/problem+json']?.schema).toBeDefined();
+        expect(responses?.['404']?.content?.['application/json']).toBeUndefined();
+    });
+
+    it('emits 5xx responses as application/problem+json', () => {
+        expect(responses?.['500']?.content?.['application/problem+json']?.schema).toBeDefined();
+        expect(responses?.['500']?.content?.['application/json']).toBeUndefined();
+    });
+
+    it('still applies field-level deprecation to an error response under application/problem+json', () => {
+        const deprecatedSpec = generateJson(contractWithErrors, {
+            ...baseConfig,
+            deprecationWarnings: {
+                routes: new Map(),
+                fields: new Map([['getUser', new Map([['responses.404.detail', '']])]]),
+            },
+        });
+        const errorSchema = deprecatedSpec.paths['/users/{id}']?.get?.responses?.['404']?.content?.['application/problem+json']?.schema as
+            | Record<string, Record<string, Record<string, unknown>>>
+            | undefined;
+        expect(errorSchema?.properties?.['detail']?.deprecated).toBe(true);
     });
 });
