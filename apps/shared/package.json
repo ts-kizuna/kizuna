@@ -7,6 +7,10 @@
     ".": {
       "types": "./src/contract.ts",
       "default": "./src/contract.ts"
+    },
+    "./csv": {
+      "types": "./src/csv.ts",
+      "default": "./src/csv.ts"
     }
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createRouter } from '@ts-kizuna/hono';
 import { contract } from '@ts-kizuna-demo/shared';
+import { toCsv } from '@ts-kizuna-demo/shared/csv';
 
 interface User {
     id: string;
@@ -38,10 +39,10 @@ export const router = createRouter(contract, {
             };
         },
         exportUsers: () => {
-            const rows = Array.from(users.values()).map((user) => `${user.id},${user.name},${user.email}`);
+            const rows = Array.from(users.values()).map((user) => [user.id, user.name, user.email]);
             return {
                 status: 200,
-                body: ['id,name,email', ...rows].join('\n'),
+                body: toCsv(['id', 'name', 'email'], rows),
             };
         },
         userBadge: ({ params }) => {

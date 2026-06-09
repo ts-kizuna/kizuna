@@ -461,6 +461,12 @@ const defaultErrorFormatter: ErrorFormatter = (problem) => ({
     body: problem,
 });
 
+const describeBodyType = (body: unknown): string => {
+    if (body === null) return 'null';
+    if (Array.isArray(body)) return 'an array';
+    return `a value of type ${typeof body}`;
+};
+
 /**
  * Maps an `AdapterResult` to `{ status, headers, body }` using ts-kizuna's default
  * JSON conventions (e.g. 405 with an `Allow` header, 400 with `{ detail, errors }`
@@ -517,6 +523,12 @@ export const renderJsonResult = (
             const responseSpec = result.route.responses[result.status];
             const isBinary = responseSpec !== undefined && isBinarySchema(resolveResponseBody(responseSpec));
             const contentType = resolveResponseContentType(responseSpec) ?? (isBinary ? 'application/octet-stream' : 'application/json');
+            const raw = isBinary || !isJsonMediaType(contentType);
+            if (raw && typeof result.body !== 'string' && !(result.body instanceof Uint8Array)) {
+                throw new Error(
+                    `${result.routeKey} (status ${result.status}) is declared with content type "${contentType}", so its body must be a string or Uint8Array, but the handler returned ${describeBodyType(result.body)}.`
+                );
+            }
             return {
                 status: result.status,
                 headers: {
@@ -524,7 +536,7 @@ export const renderJsonResult = (
                     ...(result.headers ?? {}),
                 },
                 body: result.body,
-                raw: isBinary || !isJsonMediaType(contentType),
+                raw,
             };
         }
         case 'not-found':
