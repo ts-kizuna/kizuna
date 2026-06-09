@@ -2,6 +2,19 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createDeprecationMap } from './deprecation.js';
 import { serializeDeprecationMap } from './deprecation.js';
+import { collectDeprecatedFieldNames, injectDeprecatedTags } from './inject-deprecations.js';
+
+type BundleFile =
+    | {
+          type: 'chunk';
+          fileName: string;
+          code: string;
+      }
+    | {
+          type: 'asset';
+          fileName: string;
+          source: string | Uint8Array;
+      };
 
 interface KizunaDeprecationsOptions {
     /**
@@ -42,6 +55,28 @@ interface KizunaDeprecationsOptions {
 export const kizunaDeprecations = (options: KizunaDeprecationsOptions) => {
     return {
         name: 'kizuna-deprecations',
+        generateBundle(_outputOptions: unknown, bundle: Record<string, BundleFile>) {
+            const deprecatedFields = new Map<string, string>();
+            for (const contractPath of options.contracts) {
+                const map = createDeprecationMap(path.resolve(contractPath));
+                for (const [fieldName, message] of collectDeprecatedFieldNames(map)) {
+                    const existing = deprecatedFields.get(fieldName);
+                    if (existing === undefined || (existing === '' && message !== '')) {
+                        deprecatedFields.set(fieldName, message);
+                    }
+                }
+            }
+            if (deprecatedFields.size === 0) return;
+
+            for (const file of Object.values(bundle)) {
+                if (!/\.d\.(m|c)?ts$/.test(file.fileName)) continue;
+                const code = file.type === 'chunk' ? file.code : String(file.source);
+                const next = injectDeprecatedTags(code, deprecatedFields);
+                if (next === code) continue;
+                if (file.type === 'chunk') file.code = next;
+                else file.source = next;
+            }
+        },
         writeBundle(outputOptions: { dir?: string; file?: string }) {
             const outDir = outputOptions.dir ?? (outputOptions.file ? path.dirname(outputOptions.file) : undefined);
             if (!outDir) return;

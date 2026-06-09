@@ -61,4 +61,51 @@ describe('kizunaDeprecations', () => {
             recursive: true,
         });
     });
+
+    test('generateBundle injects @deprecated into .d.ts chunks using the fixture map', () => {
+        const plugin = kizunaDeprecations({
+            contracts: [fixturePath],
+        });
+
+        const bundle = {
+            'index.d.ts': {
+                type: 'chunk',
+                fileName: 'index.d.ts',
+                code: [
+                    'declare const c: {',
+                    '  readonly newRoute: {',
+                    '    readonly body: z.ZodObject<{',
+                    '      name: z.ZodString;',
+                    '      fullName: z.ZodString;',
+                    '    }, z.core.$strip>;',
+                    '  };',
+                    '};',
+                    '',
+                ].join('\n'),
+            },
+        };
+
+        (plugin as any).generateBundle({}, bundle);
+
+        expect(bundle['index.d.ts'].code).toMatch(/@deprecated\n\s+\*\/\n\s+name: z\.ZodString;/);
+        expect(bundle['index.d.ts'].code).not.toMatch(/\*\/\n\s+fullName: z\.ZodString/);
+    });
+
+    test('generateBundle leaves non-.d.ts chunks untouched', () => {
+        const plugin = kizunaDeprecations({
+            contracts: [fixturePath],
+        });
+        const original = 'const name = 1;\n';
+        const bundle = {
+            'index.js': {
+                type: 'chunk',
+                fileName: 'index.js',
+                code: original,
+            },
+        };
+
+        (plugin as any).generateBundle({}, bundle);
+
+        expect(bundle['index.js'].code).toBe(original);
+    });
 });
