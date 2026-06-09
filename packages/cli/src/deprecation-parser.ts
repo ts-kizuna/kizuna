@@ -136,6 +136,10 @@ const firstObjectLiteralIn = (node: ts.Node, resolve: IdentifierResolver, visite
             if (routesArg) return firstObjectLiteralIn(routesArg, resolve, visited);
             return undefined;
         }
+        if (ts.isIdentifier(node.expression) && node.expression.text === 'createModel') {
+            const modelSchema = extractCreateModelSchema(node);
+            return modelSchema ? firstObjectLiteralIn(modelSchema, resolve, visited) : undefined;
+        }
     }
     let found: ts.ObjectLiteralExpression | undefined;
     ts.forEachChild(node, (child) => {

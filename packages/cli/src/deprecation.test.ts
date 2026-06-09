@@ -67,6 +67,40 @@ describe('createDeprecationMap', () => {
         expect(map.fields.get('listUsersPaginated')?.has('responses.200.items.email')).toBe(true);
         expect(map.fields.get('listUsersPaginated')?.has('responses.200.email')).toBe(false);
     });
+
+    test('unwraps a createModel reached through a wrapper, with no spurious `.schema.` segment', () => {
+        // A `createModel` referenced via `z.array(...)`/`.optional()` must dive into its
+        // `schema`, not treat the `{ title, schema }` argument's `schema` key as a field.
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-cm-'));
+        const file = path.join(dir, 'contract.ts');
+        fs.writeFileSync(
+            file,
+            `import { createContract, createModel } from '@ts-kizuna/core';
+import { z } from 'zod';
+const InnerModel = createModel({
+    title: 'InnerModel',
+    schema: z.object({
+        id: z.string(),
+        /** @deprecated */
+        legacy: z.string(),
+    }),
+});
+const OuterModel = createModel({
+    title: 'OuterModel',
+    schema: z.object({
+        items: z.array(InnerModel),
+    }),
+});
+export const contract = createContract({
+    list: { method: 'GET', path: '/items', responses: { 200: OuterModel } },
+});
+`
+        );
+        const outer = createDeprecationMap(file).schemas?.get('OuterModel');
+        expect(outer?.has('items.legacy')).toBe(true);
+        expect([...(outer?.keys() ?? [])].some((key) => key.includes('.schema.'))).toBe(false);
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
 });
 
 describe('createDeprecationMap with createApi', () => {

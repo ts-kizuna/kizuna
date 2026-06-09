@@ -217,22 +217,22 @@ export const UserSchema = z.object({
             dir,
             'schemas.ts',
             `import { z } from "zod";
-export const Image = z.object({
-    /** @deprecated use image_id */
-    media_id: z.string(),
+export const UserSchema = z.object({
+    /** @deprecated use email_address */
+    email: z.string(),
 });
 `
         );
         const entry = writeModule(
             dir,
             'index.ts',
-            `import { Image } from './schemas.js';
+            `import { UserSchema } from './schemas.js';
 import { z } from "zod";
-export const Wrapper = z.object({ image: Image });
+export const Wrapper = z.object({ user: UserSchema });
 `
         );
         const docs = collectExportedSchemaDocs(entry);
-        expect(docs.get('Image')?.get('media_id')).toContain('@deprecated');
+        expect(docs.get('UserSchema')?.get('email')).toContain('@deprecated');
     });
 
     test('follows re-export aliases and keys by both names', () => {

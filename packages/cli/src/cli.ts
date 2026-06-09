@@ -68,7 +68,7 @@ const main = async (): Promise<void> => {
     }
 
     const written = writeKizunaDeprecations(contracts, outDir);
-    process.stdout.write(`Wrote ${written}\n`);
+    process.stderr.write(`Wrote ${written}\n`);
 
     if (values.dts !== undefined) {
         const dtsDir = resolve(process.cwd(), values.dts);
@@ -77,7 +77,7 @@ const main = async (): Promise<void> => {
             for (const [name, map] of collectExportedSchemaDocs(contractPath)) fields.set(name, map);
         }
         const result = patchDeclarationDocs(dtsDir, fields);
-        process.stdout.write(
+        process.stderr.write(
             `Patched JSDoc on ${result.injections} field(s) across ${result.filesChanged} of ${result.filesScanned} .d.ts file(s) in ${dtsDir}\n`
         );
     }
