@@ -3,9 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "next dev -p 3030",
-    "build": "next build",
-    "start": "next start -p 3030",
+    "dev": "kizuna deprecations ../shared/src/contract.ts && next dev -p 3030",
+    "build": "kizuna deprecations ../shared/src/contract.ts && next build",
+    "start": "kizuna deprecations ../shared/src/contract.ts && next start -p 3030",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -21,6 +21,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@ts-kizuna/cli": "workspace:*",
     "@types/node": "^22.9.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

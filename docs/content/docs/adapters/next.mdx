@@ -11,7 +11,20 @@ description: Mount a ts-kizuna contract on a Next.js App Router catch-all route.
 
 ## Setup
 
-Create a catch-all route at `src/app/api/[...ts-kizuna]/route.ts`. The adapter exports handlers for every HTTP method, which Next.js dispatches automatically.
+Wrap your `next.config.ts` with `withKizuna`:
+
+```ts title="next.config.ts"
+import type { NextConfig } from 'next';
+import { withKizuna } from '@ts-kizuna/next/config';
+
+const nextConfig: NextConfig = {
+    // your config
+};
+
+export default withKizuna(nextConfig);
+```
+
+Then create a catch-all route at `src/app/api/[...ts-kizuna]/route.ts`. The adapter exports handlers for every HTTP method, which Next.js dispatches automatically.
 
 ```ts
 // src/lib/router.ts

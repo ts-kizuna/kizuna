@@ -15,6 +15,16 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
+    },
+    "./config": {
+      "import": {
+        "types": "./dist/config.d.mts",
+        "default": "./dist/config.mjs"
+      },
+      "require": {
+        "types": "./dist/config.d.cts",
+        "default": "./dist/config.cjs"
+      }
     }
   },
   "files": [
@@ -24,7 +34,7 @@
     "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod",
+    "build": "tsdown src/index.ts src/config.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

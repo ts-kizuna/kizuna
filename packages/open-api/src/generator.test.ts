@@ -1,11 +1,14 @@
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import * as os from 'node:os';
+import * as fs from 'node:fs';
+import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { createContract, createTag, type Contract } from '@ts-kizuna/core';
-import { createDeprecationMap, serializeDeprecationMap } from '@ts-kizuna/core/generator';
+import { contractFingerprint } from '@ts-kizuna/core/generator';
+import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateOpenApi, type GenerateOpenApiOptions } from './generator.js';
-import { contract as deprecatedContract } from '../../core/src/deprecation.fixture.js';
+import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
 const generateJson = (contract: Contract, options: GenerateOpenApiOptions) => generateOpenApi(contract, options)('json');
 
@@ -248,47 +251,6 @@ describe('Zod meta() in OpenAPI output', () => {
         expect(properties['id']?.example).toBe('usr_123');
         expect(properties['name']?.description).toBe('Display name');
     });
-
-    it('applies field-level deprecation from the contract source onto the component schema via $ref resolution', () => {
-        const spec = generateJson(deprecatedContract, {
-            ...baseConfig,
-            deprecationWarnings: {
-                contractPath: path.resolve(import.meta.dirname, '../../core/src/deprecation.fixture.ts'),
-            },
-        });
-        const userSchema = spec.components?.schemas?.User as Record<string, unknown> | undefined;
-        const properties = (userSchema?.properties ?? {}) as Record<string, Record<string, unknown>>;
-        expect(properties['email']?.deprecated).toBe(true);
-    });
-
-    it('applies deprecation from a pre-computed DeprecationMap', () => {
-        const deprecationMap = createDeprecationMap(path.resolve(import.meta.dirname, '../../core/src/deprecation.fixture.ts'));
-        const spec = generateJson(deprecatedContract, {
-            ...baseConfig,
-            deprecationWarnings: deprecationMap,
-        });
-        const userSchema = spec.components?.schemas?.User as Record<string, unknown> | undefined;
-        const properties = (userSchema?.properties ?? {}) as Record<string, Record<string, unknown>>;
-        expect(properties['email']?.deprecated).toBe(true);
-
-        const operation = spec.paths['/users/by-id/{id}']?.get;
-        expect(operation?.deprecated).toBe(true);
-    });
-
-    it('applies deprecation from a SerializedDeprecationMap (JSON import)', () => {
-        const deprecationMap = createDeprecationMap(path.resolve(import.meta.dirname, '../../core/src/deprecation.fixture.ts'));
-        const serialized = JSON.parse(JSON.stringify(serializeDeprecationMap(deprecationMap)));
-        const spec = generateJson(deprecatedContract, {
-            ...baseConfig,
-            deprecationWarnings: serialized,
-        });
-        const userSchema = spec.components?.schemas?.User as Record<string, unknown> | undefined;
-        const properties = (userSchema?.properties ?? {}) as Record<string, Record<string, unknown>>;
-        expect(properties['email']?.deprecated).toBe(true);
-
-        const operation = spec.paths['/users/by-id/{id}']?.get;
-        expect(operation?.deprecated).toBe(true);
-    });
 });
 
 describe('operation metadata passthrough', () => {
@@ -319,15 +281,9 @@ describe('operation metadata passthrough', () => {
         await expect(spec).toBeAValidOpenAPIDefinition();
     });
 
-    it('emits route-level deprecated, tags, security, externalDocs on the operation', () => {
-        const spec = generateJson(deprecatedContract, {
-            ...baseConfig,
-            deprecationWarnings: {
-                contractPath: path.resolve(import.meta.dirname, '../../core/src/deprecation.fixture.ts'),
-            },
-        });
+    it('emits route-level tags, security, externalDocs on the operation', () => {
+        const spec = generateJson(deprecatedContract, baseConfig);
         const operation = spec.paths['/users/by-id/{id}']?.get;
-        expect(operation?.deprecated).toBe(true);
         expect(operation?.tags).toEqual(['Users']);
         expect(operation?.security).toEqual([
             {
@@ -1134,6 +1090,35 @@ describe('automatic validation error response', () => {
     });
 });
 
+describe('deprecation from .kizuna', () => {
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-openapi-'));
+    const previousCwd = process.cwd();
+
+    beforeAll(() => {
+        writeKizunaDeprecations(
+            [{ contract: deprecatedContract, contractPath: path.resolve(import.meta.dirname, '../../cli/src/deprecation.fixture.ts') }],
+            path.join(workDir, '.kizuna')
+        );
+        process.chdir(workDir);
+    });
+
+    afterAll(() => {
+        process.chdir(previousCwd);
+    });
+
+    it('marks a deprecated field on its component schema', () => {
+        const spec = generateJson(deprecatedContract, baseConfig);
+        const userSchema = spec.components?.schemas?.User as Record<string, unknown> | undefined;
+        const properties = (userSchema?.properties ?? {}) as Record<string, Record<string, unknown>>;
+        expect(properties['email']?.deprecated).toBe(true);
+    });
+
+    it('marks a deprecated route operation', () => {
+        const spec = generateJson(deprecatedContract, baseConfig);
+        expect(spec.paths['/users/by-id/{id}']?.get?.deprecated).toBe(true);
+    });
+});
+
 describe('error response media type (RFC 9457)', () => {
     const contractWithErrors = createContract({
         getUser: {
@@ -1176,17 +1161,28 @@ describe('error response media type (RFC 9457)', () => {
     });
 
     it('still applies field-level deprecation to an error response under application/problem+json', () => {
-        const deprecatedSpec = generateJson(contractWithErrors, {
-            ...baseConfig,
-            deprecationWarnings: {
-                routes: new Map(),
-                fields: new Map([['getUser', new Map([['responses.404.detail', '']])]]),
-            },
-        });
-        const errorSchema = deprecatedSpec.paths['/users/{id}']?.get?.responses?.['404']?.content?.['application/problem+json']?.schema as
-            | Record<string, Record<string, Record<string, unknown>>>
-            | undefined;
-        expect(errorSchema?.properties?.['detail']?.deprecated).toBe(true);
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-openapi-err-'));
+        fs.mkdirSync(path.join(dir, '.kizuna'), { recursive: true });
+        fs.writeFileSync(
+            path.join(dir, '.kizuna', 'deprecations.json'),
+            JSON.stringify({
+                [contractFingerprint(contractWithErrors)]: {
+                    routes: {},
+                    fields: { getUser: { 'responses.404.detail': '' } },
+                },
+            })
+        );
+        const previousCwd = process.cwd();
+        process.chdir(dir);
+        try {
+            const deprecatedSpec = generateJson(contractWithErrors, baseConfig);
+            const errorSchema = deprecatedSpec.paths['/users/{id}']?.get?.responses?.['404']?.content?.['application/problem+json']
+                ?.schema as Record<string, Record<string, Record<string, unknown>>> | undefined;
+            expect(errorSchema?.properties?.['detail']?.deprecated).toBe(true);
+        } finally {
+            process.chdir(previousCwd);
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
     });
 });
 

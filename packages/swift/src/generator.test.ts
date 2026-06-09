@@ -1,9 +1,12 @@
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import * as os from 'node:os';
+import * as fs from 'node:fs';
+import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { createContract, type Contract } from '@ts-kizuna/core';
+import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateSwiftClient } from './generator.js';
-import { contract as deprecatedContract } from '../../core/src/deprecation.fixture.js';
+import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
 const baseConfig = {
     namespaceName: 'TestAPI',
@@ -734,39 +737,53 @@ describe('Swift generator — owned type nesting', () => {
 });
 
 describe('Swift generator — @available(*, deprecated)', () => {
-    const fixturePath = path.resolve(import.meta.dirname, '../../core/src/deprecation.fixture.ts');
-    const config = { ...baseConfig, deprecationWarnings: { contractPath: fixturePath } };
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-swift-'));
+    const previousCwd = process.cwd();
+    const fixturePath = path.resolve(import.meta.dirname, '../../cli/src/deprecation.fixture.ts');
+
+    beforeAll(() => {
+        process.chdir(workDir);
+    });
+
+    afterAll(() => {
+        process.chdir(previousCwd);
+    });
+
+    const generate = (contract: Contract): string => {
+        writeKizunaDeprecations([{ contract, contractPath: fixturePath }], path.join(workDir, '.kizuna'));
+        return generateSwiftClient(contract, baseConfig);
+    };
 
     it('emits @available(*, deprecated) on a deprecated route method', () => {
-        const output = generateSwiftClient({ getUserById: deprecatedContract.getUserById }, config);
+        const output = generate({ getUserById: deprecatedContract.getUserById });
         expect(output).toContain('@available(*, deprecated)');
         expect(output).toContain('func getUserById');
     });
 
     it('does not include message: on a bare @deprecated route', () => {
-        const output = generateSwiftClient({ getUserById: deprecatedContract.getUserById }, config);
+        const output = generate({ getUserById: deprecatedContract.getUserById });
         expect(output).not.toContain('@available(*, deprecated, message:');
     });
 
     it('emits @available(*, deprecated, message:) on a deprecated route with a message', () => {
-        const output = generateSwiftClient({ oldRoute: deprecatedContract.oldRoute }, config);
+        const output = generate({ oldRoute: deprecatedContract.oldRoute });
         expect(output).toContain('@available(*, deprecated, message: "use newRoute instead")');
         expect(output).toContain('func oldRoute');
     });
 
     it('emits @available(*, deprecated) on a deprecated field in a response struct', () => {
-        const output = generateSwiftClient({ getUser: deprecatedContract.getUser }, config);
+        const output = generate({ getUser: deprecatedContract.getUser });
         expect(output).toContain('@available(*, deprecated)');
         expect(output).toContain('let email: String');
     });
 
     it('does not include message: on a bare @deprecated field', () => {
-        const output = generateSwiftClient({ getUser: deprecatedContract.getUser }, config);
+        const output = generate({ getUser: deprecatedContract.getUser });
         expect(output).not.toContain('@available(*, deprecated, message:');
     });
 
     it('emits @available(*, deprecated, message:) on a deprecated field with a message', () => {
-        const output = generateSwiftClient({ getUserByIdV2: deprecatedContract.getUserByIdV2 }, config);
+        const output = generate({ getUserByIdV2: deprecatedContract.getUserByIdV2 });
         expect(output).toContain('@available(*, deprecated, message: "use email_address instead")');
         expect(output).toContain('let email: String');
     });

@@ -1,7 +1,5 @@
 import { z } from 'zod';
-import { createContract } from './contract.js';
-import { createTag } from './tag.js';
-import { createApi } from './adapter.js';
+import { createContract, createTag, createApi } from '@ts-kizuna/core';
 import { createClient } from '../../fetch/src/client.js';
 
 const Paginated = <T extends z.ZodType>(itemSchema: T) =>

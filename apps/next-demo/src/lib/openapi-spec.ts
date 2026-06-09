@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import { generateOpenApi } from '@ts-kizuna/open-api';
 import { contract } from '@ts-kizuna-demo/shared';
 
@@ -29,7 +28,4 @@ export const openApiSpec = generateOpenApi(contract, {
         },
     },
     setOperationId: true,
-    deprecationWarnings: {
-        contractPath: path.resolve(process.cwd(), '../shared/src/contract.ts'),
-    },
 });

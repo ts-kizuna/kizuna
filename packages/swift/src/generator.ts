@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import {
-    resolveDeprecationMap,
+    loadDeprecations,
+    contractFingerprint,
     createGenerator,
     isVoidSchema,
     isObjectSchema,
@@ -12,7 +13,6 @@ import {
     isJsonMediaType,
     isBinarySchema,
     type Contract,
-    type DeprecationWarnings,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
 import { SwiftWriter, camelCase, pascalCase, stringLiteral } from './emit.js';
@@ -29,14 +29,6 @@ import {
 
 export interface SwiftConfig {
     namespaceName: string;
-    /**
-     * Surface `@deprecated` JSDoc tags from the contract source as
-     * `@available(*, deprecated)` in the Swift output.
-     *
-     * Pass `{ contractPath }` to parse from source, a `DeprecationMap`,
-     * or a `SerializedDeprecationMap` (JSON import from the tsdown plugin).
-     */
-    deprecationWarnings?: DeprecationWarnings;
 }
 
 const statusName = (status: number): string => {
@@ -328,10 +320,10 @@ const buildRouteMethod = (
     };
 };
 
-const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }) => {
+const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }, contract: Contract) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
-    const deprecationSchemas = resolveDeprecationMap(options.deprecationWarnings)?.schemas;
+    const deprecationSchemas = loadDeprecations(contractFingerprint(contract))?.schemas;
 
     return {
         processRoute({ routeKey, route, deprecated, deprecationMessage, fieldDeprecations }) {
@@ -1651,12 +1643,11 @@ const emitClient = (
  *   - `clientName` — the actor class. Defaults to `APIClient`.
  */
 export const generateSwiftClient = (contract: Contract, config: SwiftConfig): string => {
-    const { namespaceName, deprecationWarnings } = config;
+    const { namespaceName } = config;
 
     const registry = new TypeRegistry();
     const partition = swiftGenerator(contract, {
         namespaceName,
-        deprecationWarnings,
         registry,
     });
     const allMethods = [...partition.flatMethods, ...partition.groups.flatMap((group: RouteGroup) => group.methods)];

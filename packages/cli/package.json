@@ -1,5 +1,5 @@
 {
-  "name": "@ts-kizuna/swift",
+  "name": "@ts-kizuna/cli",
   "version": "1.20.0",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -18,7 +18,7 @@
     }
   },
   "bin": {
-    "ts-kizuna-swift": "./dist/cli.mjs"
+    "kizuna": "./dist/cli.mjs"
   },
   "files": [
     "dist"
@@ -27,21 +27,22 @@
     "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external @ts-kizuna/cli --external zod",
+    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external typescript --external jiti",
+    "prepare": "pnpm run build",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jiti": "^2.7.0",
+    "typescript": "^5.6.3"
   },
   "peerDependencies": {
     "@ts-kizuna/core": "workspace:*",
     "zod": "^4.0.0"
   },
-  "dependencies": {
-    "@ts-kizuna/cli": "workspace:*"
-  },
   "devDependencies": {
     "@ts-kizuna/core": "workspace:*",
-    "@types/node": "^22.9.0",
+    "@types/node": "^22.19.17",
     "tsdown": "^0.21.0",
-    "typescript": "^5.6.3",
     "zod": "^4.0.0"
   }
 }

@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { apiReference } from '@scalar/hono-api-reference';
@@ -43,9 +42,6 @@ const openApiSpec = generateOpenApi(contract, {
         },
     },
     setOperationId: true,
-    deprecationWarnings: {
-        contractPath: path.resolve(process.cwd(), '../shared/src/contract.ts'),
-    },
 });
 
 app.get('/openapi.json', (c) => {

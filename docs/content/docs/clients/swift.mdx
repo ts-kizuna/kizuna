@@ -10,13 +10,14 @@ description: Generate a native Swift client from your contract with the ts-kizun
 ## Generate
 
 ```sh
-ts-kizuna-swift generate --contract src/contract.ts --output ios/MyApp/Generated/APIClient.swift
+ts-kizuna-swift generate --contract src/contract.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name MyAPI
 ```
 
-| Flag         | Description                                           |
-| ------------ | ----------------------------------------------------- |
-| `--contract` | Path to the TypeScript file that exports the contract |
-| `--output`   | Output path for the generated `.swift` file           |
+| Flag               | Description                                               |
+| ------------------ | --------------------------------------------------------- |
+| `--contract`       | Path to the TypeScript file that exports the contract     |
+| `--output`         | Output path for the generated `.swift` file               |
+| `--namespace-name` | Public enum that wraps all generated types (e.g. `MyAPI`) |
 
 The CLI reads the contract at runtime using `jiti` — no build step needed. Add the generated file to your Xcode project or Swift package as a regular source file.
 
@@ -102,7 +103,7 @@ You can add a script to your `package.json` to regenerate the client whenever th
 ```json
 {
     "scripts": {
-        "generate:swift": "ts-kizuna-swift generate --contract src/contract.ts --output ../ios/MyApp/Generated/APIClient.swift"
+        "generate:swift": "ts-kizuna-swift generate --contract src/contract.ts --output ../ios/MyApp/Generated/APIClient.swift --namespace-name MyAPI"
     }
 }
 ```

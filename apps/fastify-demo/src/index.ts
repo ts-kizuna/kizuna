@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import Fastify from 'fastify';
 import { createApi, fastifyKizuna } from '@ts-kizuna/fastify';
 import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
@@ -42,9 +41,6 @@ const openApiSpec = generateOpenApi(contract, {
         },
     },
     setOperationId: true,
-    deprecationWarnings: {
-        contractPath: path.resolve(process.cwd(), '../shared/src/contract.ts'),
-    },
 });
 
 app.get('/openapi.json', async (_request, reply) => {

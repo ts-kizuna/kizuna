@@ -1,5 +1,4 @@
 export {
-    type DeprecationWarnings,
     type DeprecationMap,
     type SerializedDeprecationMap,
     serializeDeprecationMap,

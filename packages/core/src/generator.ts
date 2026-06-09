@@ -1,19 +1,19 @@
 import type { z } from 'zod';
 import {
-    createDeprecationMap,
-    resolveDeprecationMap,
+    contractFingerprint,
     serializeDeprecationMap,
     deserializeDeprecationMap,
     type DeprecationMap,
     type SerializedDeprecationMap,
 } from './deprecation.js';
+import { loadDeprecations } from './load-deprecations.js';
 import { flattenContract } from './handler-pipeline.js';
 import { parsePath } from './path-params.js';
 import type { Contract, ResponseDefinition, RouteDefinition } from './types.js';
 
 export {
-    createDeprecationMap,
-    resolveDeprecationMap,
+    loadDeprecations,
+    contractFingerprint,
     serializeDeprecationMap,
     deserializeDeprecationMap,
     type DeprecationMap,
@@ -63,30 +63,6 @@ export const isJsonMediaType = (contentType: string): boolean => {
     return essence === 'application/json' || essence.endsWith('+json');
 };
 
-/**
- * Controls how `@deprecated` JSDoc tags in the contract source are surfaced
- * in generated output (OpenAPI `deprecated: true`, Swift `@available`).
- *
- * Three forms:
- * - `{ contractPath: string }` — parse live from the `.ts` source file.
- * - `DeprecationMap` — pre-computed Maps (from `createDeprecationMap`).
- * - `SerializedDeprecationMap` — plain JSON import (from the tsdown plugin).
- *
- * ```ts
- * // From source (dev / build):
- * deprecationWarnings: { contractPath: path.resolve(import.meta.dirname, './contract.ts') }
- *
- * // From JSON (production):
- * import deprecations from './deprecations.json';
- * deprecationWarnings: deprecations
- * ```
- */
-export type DeprecationWarnings = { contractPath: string } | DeprecationMap | SerializedDeprecationMap;
-
-export interface GeneratorOptions {
-    deprecationWarnings?: DeprecationWarnings;
-}
-
 export interface GeneratorRouteContext {
     routeKey: string;
     route: RouteDefinition;
@@ -129,15 +105,18 @@ export interface GeneratorRouteContext {
  * ```
  */
 export const createGenerator =
-    <Options extends GeneratorOptions, Output>(
-        factory: (options: Options) => {
+    <Options, Output>(
+        factory: (
+            options: Options,
+            contract: Contract
+        ) => {
             processRoute: (context: GeneratorRouteContext) => void;
             finalize: () => Output;
         }
     ): ((contract: Contract, options: Options) => Output) =>
     (contract, options) => {
-        const { processRoute, finalize } = factory(options);
-        const deprecation = resolveDeprecationMap(options.deprecationWarnings);
+        const { processRoute, finalize } = factory(options, contract);
+        const deprecation = loadDeprecations(contractFingerprint(contract));
         for (const { routeKey, route, contractTags } of flattenContract(contract)) {
             const rawMessage = deprecation?.routes.get(routeKey);
             processRoute({
