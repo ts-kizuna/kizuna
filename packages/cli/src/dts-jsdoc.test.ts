@@ -211,6 +211,30 @@ export const UserSchema = z.object({
         expect(docs.get('UserSchema')?.has('id')).toBe(false);
     });
 
+    test('collects a schema that is imported (not re-exported) by the entry', () => {
+        const dir = makeTempDir();
+        writeModule(
+            dir,
+            'schemas.ts',
+            `import { z } from "zod";
+export const Image = z.object({
+    /** @deprecated use image_id */
+    media_id: z.string(),
+});
+`
+        );
+        const entry = writeModule(
+            dir,
+            'index.ts',
+            `import { Image } from './schemas.js';
+import { z } from "zod";
+export const Wrapper = z.object({ image: Image });
+`
+        );
+        const docs = collectExportedSchemaDocs(entry);
+        expect(docs.get('Image')?.get('media_id')).toContain('@deprecated');
+    });
+
     test('follows re-export aliases and keys by both names', () => {
         const dir = makeTempDir();
         writeModule(
