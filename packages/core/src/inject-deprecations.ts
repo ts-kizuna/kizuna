@@ -36,6 +36,25 @@ const propertyNameText = (name: ts.PropertyName): string | undefined => {
     return undefined;
 };
 
+const entityNameText = (name: ts.EntityName): string =>
+    ts.isIdentifier(name) ? name.text : `${entityNameText(name.left)}.${name.right.text}`;
+
+/**
+ * True when the property is a member of a `z.ZodObject<{…}>` type literal — i.e.
+ * its parent is the first type argument of a `ZodObject` type reference. Wrapper
+ * types (`ZodOptional`, `ZodArray`, …) don't matter: we only check the immediate
+ * `ZodObject` that owns the member, so wrapped objects are still matched.
+ */
+const isZodObjectMember = (property: ts.PropertySignature): boolean => {
+    const typeLiteral = property.parent;
+    if (!ts.isTypeLiteralNode(typeLiteral)) return false;
+    const reference = typeLiteral.parent;
+    if (!ts.isTypeReferenceNode(reference)) return false;
+    if (reference.typeArguments?.[0] !== typeLiteral) return false;
+    const referenceName = entityNameText(reference.typeName);
+    return referenceName === 'ZodObject' || referenceName.endsWith('.ZodObject');
+};
+
 /**
  * Inject `@deprecated` JSDoc into a single `.d.ts` source string.
  *
@@ -52,7 +71,7 @@ export const injectDeprecatedTags = (declarationSource: string, deprecatedFields
     const visit = (node: ts.Node): void => {
         if (ts.isPropertySignature(node)) {
             const fieldName = propertyNameText(node.name);
-            if (fieldName !== undefined && deprecatedFields.has(fieldName)) {
+            if (fieldName !== undefined && deprecatedFields.has(fieldName) && isZodObjectMember(node)) {
                 const start = node.getStart(sourceFile);
                 const lineStart = declarationSource.lastIndexOf('\n', start - 1) + 1;
                 const indent = declarationSource.slice(lineStart, start);

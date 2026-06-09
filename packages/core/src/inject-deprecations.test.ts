@@ -79,4 +79,28 @@ describe('injectDeprecatedTags', () => {
         const source = 'declare const c: z.ZodObject<{ email: z.ZodString; }, z.core.$strip>;\n';
         expect(injectDeprecatedTags(source, new Map())).toBe(source);
     });
+
+    test('does not annotate a matching name outside a z.ZodObject literal', () => {
+        const source = ['interface Options {', '  email: string;', '}', ''].join('\n');
+        expect(injectDeprecatedTags(source, names)).toBe(source);
+    });
+
+    test('annotates members inside ZodOptional/ZodArray-wrapped ZodObjects', () => {
+        const source = [
+            'declare const c: {',
+            '  readonly landscape: z.ZodOptional<z.ZodObject<{',
+            '    media_id_unused: z.ZodString;',
+            '    mediaId: z.ZodString;',
+            '  }, z.core.$strip>>;',
+            '  readonly gallery: z.ZodArray<z.ZodObject<{',
+            '    mediaId: z.ZodString;',
+            '  }, z.core.$strip>>;',
+            '};',
+            '',
+        ].join('\n');
+
+        const result = injectDeprecatedTags(source, names);
+
+        expect(result.match(/@deprecated Use `image_id` instead\./g)?.length).toBe(2);
+    });
 });
