@@ -55,6 +55,9 @@ const isZodObjectMember = (property: ts.PropertySignature): boolean => {
     return referenceName === 'ZodObject' || referenceName.endsWith('.ZodObject');
 };
 
+const hasDeprecatedTag = (node: ts.Node): boolean =>
+    ts.getJSDocTags(node).some((tag) => tag.tagName.text === 'deprecated');
+
 /**
  * Inject `@deprecated` JSDoc into a single `.d.ts` source string.
  *
@@ -71,7 +74,12 @@ export const injectDeprecatedTags = (declarationSource: string, deprecatedFields
     const visit = (node: ts.Node): void => {
         if (ts.isPropertySignature(node)) {
             const fieldName = propertyNameText(node.name);
-            if (fieldName !== undefined && deprecatedFields.has(fieldName) && isZodObjectMember(node)) {
+            if (
+                fieldName !== undefined &&
+                deprecatedFields.has(fieldName) &&
+                isZodObjectMember(node) &&
+                !hasDeprecatedTag(node)
+            ) {
                 const start = node.getStart(sourceFile);
                 const lineStart = declarationSource.lastIndexOf('\n', start - 1) + 1;
                 const indent = declarationSource.slice(lineStart, start);

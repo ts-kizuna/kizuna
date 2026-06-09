@@ -103,4 +103,30 @@ describe('injectDeprecatedTags', () => {
 
         expect(result.match(/@deprecated Use `image_id` instead\./g)?.length).toBe(2);
     });
+
+    test('does not double-annotate a property that already has @deprecated', () => {
+        const source = [
+            'declare const c: z.ZodObject<{',
+            '  /**',
+            '   * @deprecated already here',
+            '   */',
+            '  mediaId: z.ZodString;',
+            '}, z.core.$strip>;',
+            '',
+        ].join('\n');
+
+        const result = injectDeprecatedTags(source, names);
+
+        expect(result).toBe(source);
+        expect(result.match(/@deprecated/g)?.length).toBe(1);
+    });
+
+    test('is idempotent across repeated runs', () => {
+        const source = ['declare const c: z.ZodObject<{', '  mediaId: z.ZodString;', '}, z.core.$strip>;', ''].join('\n');
+
+        const once = injectDeprecatedTags(source, names);
+        const twice = injectDeprecatedTags(once, names);
+
+        expect(twice).toBe(once);
+    });
 });
