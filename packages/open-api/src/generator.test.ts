@@ -1090,6 +1090,56 @@ describe('automatic validation error response', () => {
     });
 });
 
+describe('deprecation on a component reached via the schemas map', () => {
+    const UserSchema = z
+        .object({
+            id: z.string(),
+            email: z.string(),
+        })
+        .meta({ id: 'User' });
+    const AccountSchema = z
+        .object({
+            owner: z.object({
+                user: UserSchema,
+            }),
+        })
+        .meta({ id: 'Account' });
+    const contractWithRef = createContract({
+        getAccount: {
+            method: 'GET',
+            path: '/account',
+            responses: {
+                200: AccountSchema,
+            },
+        },
+    });
+
+    it('deprecates a field on a component only reachable through the schemas map', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-openapi-ref-'));
+        fs.mkdirSync(path.join(dir, '.kizuna'), { recursive: true });
+        fs.writeFileSync(
+            path.join(dir, '.kizuna', 'deprecations.json'),
+            JSON.stringify({
+                [contractFingerprint(contractWithRef)]: {
+                    routes: {},
+                    fields: {},
+                    schemas: { User: { email: 'use `email_address`' } },
+                },
+            })
+        );
+        const previousCwd = process.cwd();
+        process.chdir(dir);
+        try {
+            const spec = generateJson(contractWithRef, baseConfig);
+            const userSchema = spec.components?.schemas?.User as Record<string, Record<string, Record<string, unknown>>> | undefined;
+            expect(userSchema?.properties?.['email']?.deprecated).toBe(true);
+        } finally {
+            process.chdir(previousCwd);
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+});
+
 describe('deprecation from .kizuna', () => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-openapi-'));
     const previousCwd = process.cwd();

@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { stringify as stringifyYaml } from 'yaml';
 import {
     createGenerator,
+    contractFingerprint,
+    loadDeprecations,
     isFileSchema,
     isBinarySchema,
     isVoidSchema,
@@ -293,9 +295,10 @@ export interface OpenApiRenderer {
     (format: 'yaml'): string;
 }
 
-const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
+const openApiGenerator = createGenerator((options: GenerateOpenApiOptions, contract: Contract) => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
     const pendingFieldDeprecations: Array<{ operation: OpenApiOperation; fieldDeprecations: Map<string, string> }> = [];
+    const schemaDeprecations = loadDeprecations(contractFingerprint(contract))?.schemas;
 
     return {
         processRoute({ routeKey, route, contractTags, deprecated, fieldDeprecations }) {
@@ -504,6 +507,16 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions) => {
             for (const { operation, fieldDeprecations: deprecatedPaths } of pendingFieldDeprecations) {
                 for (const fieldPath of deprecatedPaths.keys()) {
                     applyDeprecatedToOperation(operation, fieldPath, componentSchemasForLookup);
+                }
+            }
+
+            if (schemaDeprecations && componentSchemasForLookup) {
+                for (const [metaId, fields] of schemaDeprecations) {
+                    const component = componentSchemasForLookup[metaId];
+                    if (!component) continue;
+                    for (const fieldPath of fields.keys()) {
+                        applyDeprecatedToSchema(component, fieldPath.split('.'), componentSchemasForLookup);
+                    }
                 }
             }
 
