@@ -105,11 +105,31 @@ Whether you need this depends on what consumers resolve: if they read your built
 
 ## Deployment
 
-The spec is built wherever you call `generateOpenApi`, which reads `.kizuna/deprecations.json` from the working directory. The file just needs to be there.
+When your app starts, `generateOpenApi` reads the `.kizuna/` folder from wherever the app runs. Your build's `kizuna deprecations` step created it — it just has to still be there at runtime.
 
-### Servers and containers
+On most hosts it already is: a VM, a single container, `next start`, or Railway/Render (Nixpacks) all run from the same files the build produced, so `.kizuna/` comes along with no extra work.
 
-Express, Hono, Fastify, `next start` on a VM, Docker, Nixpacks (Railway, Render) — the app reads `.kizuna/` from its working directory, and your build's `kizuna deprecations` step already put it there. Nothing to do.
+### Docker (multi-stage)
+
+If your Dockerfile builds in one stage and then copies the result into a smaller final image, `.kizuna/` gets left behind — just like `dist/` would. Copy it across too:
+
+```dockerfile
+COPY --from=builder /app/.kizuna ./.kizuna
+```
+
+### Turborepo
+
+If you cache builds with Turborepo, add `.kizuna/**` to the build task's `outputs` — otherwise a cached build leaves it out:
+
+```json title="turbo.json"
+{
+    "tasks": {
+        "build": {
+            "outputs": ["dist/**", ".kizuna/**"]
+        }
+    }
+}
+```
 
 ### Vercel and serverless
 
