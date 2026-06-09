@@ -6,8 +6,11 @@ import { buildFileScope, collectFieldDocs, makeResolverWithCache, resolveImportP
 /**
  * Maps every exported schema reachable from `entryPath` to the verbatim JSDoc
  * block on each of its fields, keyed by the exported const name (and, for
- * aliased re-exports, by the original declared name too). Follows relative
- * imports and re-exports.
+ * aliased re-exports, by the original declared name too).
+ *
+ * Walks the whole reachable graph — both the entry's re-exports and every file
+ * it imports — so a schema defined in its own module and used via `import`
+ * (rather than re-exported from the contract entry) is still collected.
  *
  * Used to patch emitted `.d.ts` files, where a `z.ZodObject<{...}>` shape is
  * keyed by the `declare const` name rather than a route or schema `meta.id`.
@@ -67,5 +70,9 @@ export const collectExportedSchemaDocs = (entryPath: string): Map<string, Map<st
     };
 
     collectFromFile(entryPath);
+    // Also record exported consts from every import-reachable file, so schemas
+    // imported (not re-exported through the entry) are still collected. The
+    // resolver cache holds the full import graph after the entry walk above.
+    for (const filePath of [...cache.keys()]) collectFromFile(filePath);
     return result;
 };
