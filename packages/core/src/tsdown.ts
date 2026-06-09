@@ -1,8 +1,20 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createDeprecationMap } from './deprecation.js';
-import { serializeDeprecationMap } from './deprecation.js';
+import { createDeprecationMap, serializeDeprecationMap } from './deprecation.js';
 import { collectDeprecatedFieldNames, injectDeprecatedTags } from './inject-deprecations.js';
+
+/**
+ * Merge a `fieldName -> message` map into `target`, applying the same
+ * "non-empty message wins" rule used by `collectDeprecatedFieldNames`.
+ */
+const mergeFieldNames = (target: Map<string, string>, source: Map<string, string>): void => {
+    for (const [fieldName, message] of source) {
+        const existing = target.get(fieldName);
+        if (existing === undefined || (existing === '' && message !== '')) {
+            target.set(fieldName, message);
+        }
+    }
+};
 
 type BundleFile =
     | {
@@ -59,12 +71,7 @@ export const kizunaDeprecations = (options: KizunaDeprecationsOptions) => {
             const deprecatedFields = new Map<string, string>();
             for (const contractPath of options.contracts) {
                 const map = createDeprecationMap(path.resolve(contractPath));
-                for (const [fieldName, message] of collectDeprecatedFieldNames(map)) {
-                    const existing = deprecatedFields.get(fieldName);
-                    if (existing === undefined || (existing === '' && message !== '')) {
-                        deprecatedFields.set(fieldName, message);
-                    }
-                }
+                mergeFieldNames(deprecatedFields, collectDeprecatedFieldNames(map));
             }
             if (deprecatedFields.size === 0) return;
 
