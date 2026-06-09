@@ -129,4 +129,9 @@ describe('injectDeprecatedTags', () => {
 
         expect(twice).toBe(once);
     });
+
+    test('does not inject when the property is not on its own line (whitespace-only indent guard)', () => {
+        const source = 'declare const c: z.ZodObject<{ mediaId: z.ZodString; }, z.core.$strip>;\n';
+        expect(injectDeprecatedTags(source, names)).toBe(source);
+    });
 });

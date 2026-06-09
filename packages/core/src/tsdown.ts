@@ -51,6 +51,11 @@ interface KizunaDeprecationsOptions {
  * can be imported and passed directly to `generateOpenApi` or
  * `generateSwiftClient` as `deprecationWarnings`.
  *
+ * It also injects `@deprecated` JSDoc into the emitted `.d.ts` declaration
+ * chunks (in-memory, via `generateBundle`) so that published TypeScript
+ * consumers see field-level deprecations that TypeScript's declaration emit
+ * would otherwise strip. This is on by default.
+ *
  * ```ts
  * // tsdown.config.ts
  * import { kizunaDeprecations } from '@ts-kizuna/core/tsdown';

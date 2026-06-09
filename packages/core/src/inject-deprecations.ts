@@ -83,6 +83,14 @@ export const injectDeprecatedTags = (declarationSource: string, deprecatedFields
                 const start = node.getStart(sourceFile);
                 const lineStart = declarationSource.lastIndexOf('\n', start - 1) + 1;
                 const indent = declarationSource.slice(lineStart, start);
+                // Only inject when the property sits on its own line (indent is
+                // whitespace). tsdown always emits ZodObject members multi-line;
+                // this guards the degenerate single-line form from producing
+                // malformed output.
+                if (/\S/.test(indent)) {
+                    ts.forEachChild(node, visit);
+                    return;
+                }
                 const message = deprecatedFields.get(fieldName)!;
                 const tagLine = message === '' ? `${indent} * @deprecated\n` : `${indent} * @deprecated ${message}\n`;
                 insertions.push({
