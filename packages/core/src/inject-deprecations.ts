@@ -1,3 +1,4 @@
+import ts from 'typescript';
 import type { DeprecationMap } from './deprecation.js';
 
 /**
@@ -28,4 +29,50 @@ export const collectDeprecatedFieldNames = (map: DeprecationMap): Map<string, st
         }
     }
     return names;
+};
+
+const propertyNameText = (name: ts.PropertyName): string | undefined => {
+    if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text;
+    return undefined;
+};
+
+/**
+ * Inject `@deprecated` JSDoc into a single `.d.ts` source string.
+ *
+ * Pure: takes the declaration text plus a `fieldName -> message` map and returns
+ * the rewritten text. Any property signature whose name is in the map gets a
+ * multi-line `@deprecated` JSDoc inserted above it.
+ */
+export const injectDeprecatedTags = (declarationSource: string, deprecatedFields: Map<string, string>): string => {
+    if (deprecatedFields.size === 0) return declarationSource;
+
+    const sourceFile = ts.createSourceFile('module.d.ts', declarationSource, ts.ScriptTarget.Latest, true);
+    const insertions: { position: number; text: string }[] = [];
+
+    const visit = (node: ts.Node): void => {
+        if (ts.isPropertySignature(node)) {
+            const fieldName = propertyNameText(node.name);
+            if (fieldName !== undefined && deprecatedFields.has(fieldName)) {
+                const start = node.getStart(sourceFile);
+                const lineStart = declarationSource.lastIndexOf('\n', start - 1) + 1;
+                const indent = declarationSource.slice(lineStart, start);
+                const message = deprecatedFields.get(fieldName)!;
+                const tagLine = message === '' ? `${indent} * @deprecated\n` : `${indent} * @deprecated ${message}\n`;
+                insertions.push({
+                    position: lineStart,
+                    text: `${indent}/**\n${tagLine}${indent} */\n`,
+                });
+            }
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+
+    if (insertions.length === 0) return declarationSource;
+    insertions.sort((first, second) => second.position - first.position);
+    let result = declarationSource;
+    for (const insertion of insertions) {
+        result = result.slice(0, insertion.position) + insertion.text + result.slice(insertion.position);
+    }
+    return result;
 };

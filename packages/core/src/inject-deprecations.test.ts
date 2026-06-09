@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { collectDeprecatedFieldNames } from './inject-deprecations.js';
+import { collectDeprecatedFieldNames, injectDeprecatedTags } from './inject-deprecations.js';
 import type { DeprecationMap } from './deprecation.js';
 
 describe('collectDeprecatedFieldNames', () => {
@@ -38,5 +38,45 @@ describe('collectDeprecatedFieldNames', () => {
         const names = collectDeprecatedFieldNames(map);
 
         expect(names.get('email')).toBe('Use email_address instead.');
+    });
+});
+
+describe('injectDeprecatedTags', () => {
+    const names = new Map<string, string>([
+        ['mediaId', 'Use `image_id` instead.'],
+        ['email', ''],
+    ]);
+
+    test('annotates a matching member of a z.ZodObject literal', () => {
+        const source = [
+            'declare const c: {',
+            '  readonly responses: {',
+            '    readonly 201: z.ZodObject<{',
+            '      image_id: z.ZodString;',
+            '      mediaId: z.ZodString;',
+            '    }, z.core.$strip>;',
+            '  };',
+            '};',
+            '',
+        ].join('\n');
+
+        const result = injectDeprecatedTags(source, names);
+
+        expect(result).toContain('@deprecated Use `image_id` instead.');
+        expect(result).toMatch(/@deprecated Use `image_id` instead\.\n\s+\*\/\n\s+mediaId: z\.ZodString;/);
+        expect(result).not.toMatch(/@deprecated[\s\S]*image_id: z\.ZodString/);
+    });
+
+    test('emits a bare @deprecated when the message is empty', () => {
+        const source = ['declare const c: z.ZodObject<{', '  email: z.ZodString;', '}, z.core.$strip>;', ''].join('\n');
+
+        const result = injectDeprecatedTags(source, names);
+
+        expect(result).toMatch(/\/\*\*\n\s+\* @deprecated\n\s+\*\/\n\s+email: z\.ZodString;/);
+    });
+
+    test('returns the source unchanged when there are no deprecated names', () => {
+        const source = 'declare const c: z.ZodObject<{ email: z.ZodString; }, z.core.$strip>;\n';
+        expect(injectDeprecatedTags(source, new Map())).toBe(source);
     });
 });
