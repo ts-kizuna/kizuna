@@ -37,6 +37,28 @@ export const router = createRouter(contract, {
                 },
             };
         },
+        exportUsers: () => {
+            const rows = Array.from(users.values()).map((user) => `${user.id},${user.name},${user.email}`);
+            return {
+                status: 200,
+                body: ['id,name,email', ...rows].join('\n'),
+            };
+        },
+        userBadge: ({ params }) => {
+            const user = users.get(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: Buffer.from(`BADGE:${user.id}:${user.name}`, 'utf-8'),
+            };
+        },
         searchUsers: ({ query }) => {
             const all = Array.from(users.values()).filter((user) => user.name.toLowerCase().includes(query.q.toLowerCase()));
             const slice = all.slice(query.cursor, query.cursor + query.limit);

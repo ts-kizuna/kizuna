@@ -563,6 +563,47 @@ public actor APIClient {
         }
     }
 
+    public enum UsersExportUsers {
+
+        public struct Result: Sendable {
+            public let body: String
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+        }
+    }
+
+    public enum UsersUserBadge {
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Foundation.Data
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case notFound(API.ProblemDetails)
+        }
+    }
+
     public enum UsersSearchUsers {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -1153,6 +1194,44 @@ public struct APIUsersClient: Sendable {
             throw APIClient.UsersListUsers.Failure.badRequest(payload)
         default:
             throw APIClient.UsersListUsers.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Export users as CSV — exercises a non-JSON (text/csv) raw response body
+    public func exportUsers() async throws(APIClient.UsersExportUsers.Failure) -> APIClient.UsersExportUsers.Result {
+        let (baseURL, session, _, _, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/users/export"
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersExportUsers.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersExportUsers.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = String(decoding: data, as: UTF8.self)
+            return APIClient.UsersExportUsers.Result(body: body)
+        default:
+            throw APIClient.UsersExportUsers.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Download a user badge — exercises a binary (BinarySchema) response body
+    public func userBadge(_ params: APIClient.UsersUserBadge.Params) async throws(APIClient.UsersUserBadge.Failure) -> APIClient.UsersUserBadge.Result {
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        var path = "/users/:id/badge"
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersUserBadge.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersUserBadge.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = data
+            return APIClient.UsersUserBadge.Result(body: body)
+        case 404:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersUserBadge.Failure.self)
+            throw APIClient.UsersUserBadge.Failure.notFound(payload)
+        default:
+            throw APIClient.UsersUserBadge.Failure.unexpectedStatus(statusCode, data)
         }
     }
 

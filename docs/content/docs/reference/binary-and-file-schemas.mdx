@@ -1,0 +1,76 @@
+---
+title: BinarySchema & FileSchema
+description: Helper schemas for binary response bodies (BinarySchema) and multipart upload fields (FileSchema).
+---
+
+Two helper schemas for non-JSON bodies, both from `@ts-kizuna/core/schemas`.
+
+```ts
+import { BinarySchema, FileSchema } from '@ts-kizuna/core/schemas';
+```
+
+| Helper         | Is                         | Use                                                       | Swift type      |
+| -------------- | -------------------------- | --------------------------------------------------------- | --------------- |
+| `BinarySchema` | `z.instanceof(Uint8Array)` | Binary response bodies (PDF, images) and raw binary input | `Data`          |
+| `FileSchema`   | `z.instanceof(File)`       | `multipart/form-data` upload fields                       | `MultipartFile` |
+
+Rule of thumb: **returning/sending a blob of bytes → `BinarySchema`; uploading a file in a form → `FileSchema`.** A `File` carries a filename and MIME type (needed to build a multipart part); a `Uint8Array` is just bytes (a Node `Buffer` satisfies it).
+
+## BinarySchema
+
+Use it as a response `body` and pair it with a `contentType`. It defaults to `application/octet-stream`. The body goes to the wire as raw bytes (never JSON-serialized); the OpenAPI generator emits `type: string, format: binary`, and the Swift client decodes it to `Data`.
+
+```ts
+import { BinarySchema } from '@ts-kizuna/core/schemas';
+
+export const contract = createContract({
+    downloadReport: {
+        method: 'GET',
+        path: '/reports/:id.pdf',
+        responses: {
+            200: {
+                body: BinarySchema,
+                contentType: 'application/pdf',
+            },
+        },
+    },
+});
+```
+
+The handler returns the bytes (a `Buffer` or `Uint8Array`); set `Content-Disposition` as a normal response header if you want a download:
+
+```ts
+downloadReport: async ({ params }) => {
+    const pdf = await renderReport(params.id);
+    return {
+        status: 200,
+        body: pdf,
+        headers: {
+            'content-disposition': `inline; filename="report-${params.id}.pdf"`,
+        },
+    };
+},
+```
+
+## FileSchema
+
+Use it inside a `multipart/form-data` request body for uploaded files:
+
+```ts
+import { FileSchema } from '@ts-kizuna/core/schemas';
+
+uploadAvatar: {
+    method: 'POST',
+    path: '/avatar',
+    contentType: 'multipart/form-data',
+    body: z.object({
+        file: FileSchema,
+        userId: z.string(),
+    }),
+    responses: {
+        200: z.object({
+            size: z.number(),
+        }),
+    },
+},
+```

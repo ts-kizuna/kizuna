@@ -8,6 +8,9 @@ import {
     parsePath,
     resolveResponseBody,
     resolveResponseHeaders,
+    resolveResponseContentType,
+    isJsonMediaType,
+    isBinarySchema,
     type Contract,
     type DeprecationWarnings,
     type RouteDefinition,
@@ -92,6 +95,8 @@ interface RouteMethod {
         status: number;
         type: string;
         responseHeaders: SwiftField[];
+        isRaw: boolean;
+        isBinary: boolean;
     }>;
     successReturnType: string;
     successSumEnumName?: string;
@@ -100,6 +105,8 @@ interface RouteMethod {
         caseName: string;
         status: number;
         type: string;
+        isRaw: boolean;
+        isBinary: boolean;
     }>;
 }
 
@@ -234,6 +241,9 @@ const buildRouteMethod = (
         const status = Number(statusKey);
         const responseHint = `${baseHint}Response${status === 200 ? '' : status}`;
         const bodySchema = resolveResponseBody(responseValue);
+        const responseContentType = resolveResponseContentType(responseValue);
+        const isBinary = isBinarySchema(bodySchema as z.core.$ZodType);
+        const isRaw = isBinary || (responseContentType !== undefined && !isJsonMediaType(responseContentType));
         const result = mapType(bodySchema as z.ZodType, registry, responseHint, fieldPaths, `responses.${statusKey}`, deprecationSchemas);
         const typeExpression = result.expression;
         if (isSuccessStatus(status)) {
@@ -252,12 +262,16 @@ const buildRouteMethod = (
                 status,
                 type: typeExpression,
                 responseHeaders: perStatusHeaderFields,
+                isRaw,
+                isBinary,
             });
         } else {
             errorCases.push({
                 caseName: statusName(status),
                 status,
                 type: typeExpression,
+                isRaw,
+                isBinary,
             });
         }
     }
@@ -268,6 +282,8 @@ const buildRouteMethod = (
             caseName: has400 ? 'validationError' : statusName(400),
             status: 400,
             type: 'ValidationError',
+            isRaw: false,
+            isBinary: false,
         });
     }
 
@@ -718,7 +734,7 @@ const localTypeName = (fullName: string, operationName: string): string => {
     return stripped || fullName;
 };
 
-const SWIFT_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Bool', 'Date', 'Void']);
+const SWIFT_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Bool', 'Date', 'Void', 'Foundation.Data']);
 
 // Resolve a registry type name to the Swift reference expression appropriate for the given context.
 // scope 'operation-enum': inside the operation's nested enum — same-op types use unqualified short name.
@@ -1189,6 +1205,30 @@ const deprecatedAttribute = (message: string | undefined): string => {
 const failureRef = (method: RouteMethod, context: EmitContext): string =>
     `${context.clientName}.${method.operationName}.${method.failureEnumName}`;
 
+/**
+ * Statement that binds `name` to the decoded response body. JSON responses go
+ * through `Kizuna.decode`; binary responses are the raw `Data`; other raw
+ * (non-JSON) responses are read as a UTF-8 string.
+ */
+const decodeBodyStatement = (
+    name: string,
+    resolvedType: string,
+    response: { isRaw: boolean; isBinary: boolean },
+    failure: string
+): string => {
+    if (response.isBinary) return `    let ${name} = data`;
+    if (response.isRaw) return `    let ${name} = String(decoding: data, as: UTF8.self)`;
+    return `    let ${name} = try Kizuna.decode(${resolvedType}.self, from: data, using: decoder, statusCode: statusCode, failure: ${failure}.self)`;
+};
+
+/**
+ * Whether the method body references the `JSONDecoder`. Only non-raw decoded
+ * responses go through it; raw (non-JSON) bodies are read as UTF-8 strings.
+ */
+const methodUsesDecoder = (method: RouteMethod): boolean =>
+    method.successResponses.some((response) => response.type !== 'Void' && !response.isRaw) ||
+    method.errorCases.some((errorCase) => errorCase.type !== 'Void' && !errorCase.isRaw);
+
 const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitContext): void => {
     const failure = failureRef(method, context);
     const pathDecl = method.pathParams.length > 0 ? 'var' : 'let';
@@ -1255,9 +1295,7 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                         writer.line(`    return ${qualifiedResult}(body: .status${successResponse.status})`);
                     }
                 } else {
-                    writer.line(
-                        `    let payload = try Kizuna.decode(${resolved}.self, from: data, using: decoder, statusCode: statusCode, failure: ${failure}.self)`
-                    );
+                    writer.line(decodeBodyStatement('payload', resolved, successResponse, failure));
                     for (const field of successResponse.responseHeaders) {
                         writer.line(
                             `    let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
@@ -1273,9 +1311,7 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                 }
             } else {
                 const resolved = resolveType(successResponse.type, method.operationName, context);
-                writer.line(
-                    `    let body = try Kizuna.decode(${resolved}.self, from: data, using: decoder, statusCode: statusCode, failure: ${failure}.self)`
-                );
+                writer.line(decodeBodyStatement('body', resolved, successResponse, failure));
                 for (const field of successResponse.responseHeaders) {
                     writer.line(
                         `    let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
@@ -1308,15 +1344,17 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                 writer.line(`    throw ${failure}.${escapeKeyword(firstCase.caseName)}`);
             } else {
                 const resolved = resolveType(firstCase.type, method.operationName, context);
-                writer.line(
-                    `    let payload = try Kizuna.decode(${resolved}.self, from: data, using: decoder, statusCode: statusCode, failure: ${failure}.self)`
-                );
+                writer.line(decodeBodyStatement('payload', resolved, firstCase, failure));
                 writer.line(`    throw ${failure}.${escapeKeyword(firstCase.caseName)}(payload)`);
             }
         } else {
             for (const errorCase of cases) {
                 if (errorCase.type === 'Void') {
                     writer.line(`    throw ${failure}.${escapeKeyword(errorCase.caseName)}`);
+                } else if (errorCase.isBinary) {
+                    writer.line(`    throw ${failure}.${escapeKeyword(errorCase.caseName)}(data)`);
+                } else if (errorCase.isRaw) {
+                    writer.line('    throw ' + `${failure}.${escapeKeyword(errorCase.caseName)}(String(decoding: data, as: UTF8.self))`);
                 } else {
                     const resolved = resolveType(errorCase.type, method.operationName, context);
                     writer.line(`    if let payload = try? decoder.decode(${resolved}.self, from: data) {`);
@@ -1376,8 +1414,7 @@ const emitSubClientMethod = (writer: SwiftWriter, method: RouteMethod, context: 
             method.body && (method.body.kind === 'json-flat' || method.body.kind === 'json-struct' || method.body.kind === 'union')
                 ? 'encoder'
                 : '_';
-        const needsDecoder = method.successReturnType !== 'Void' || method.errorCases.some((c) => c.type !== 'Void');
-        const decoderSlot = needsDecoder ? 'decoder' : '_';
+        const decoderSlot = methodUsesDecoder(method) ? 'decoder' : '_';
         writer.line(
             `let (baseURL, session, ${encoderSlot}, ${decoderSlot}, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()`
         );

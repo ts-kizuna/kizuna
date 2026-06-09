@@ -15,7 +15,8 @@ import { parsePath } from './path-params.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
-import { isVoidSchema } from './zod-internals.js';
+import { isVoidSchema, isBinarySchema } from './zod-internals.js';
+import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator.js';
 
 export type { RouteDefinition, Contract, Method } from './types.js';
 export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
@@ -477,7 +478,7 @@ export const renderJsonResult = (
     result: Exclude<AdapterResult, { kind: 'raw-response' }>,
     formatError: ErrorFormatter = defaultErrorFormatter,
     request: unknown = undefined
-): { status: number; headers: Record<string, string>; body: unknown } => {
+): { status: number; headers: Record<string, string>; body: unknown; raw?: boolean } => {
     const renderError = (
         status: number,
         detail: string,
@@ -504,13 +505,26 @@ export const renderJsonResult = (
                 const detail = typeof extensions.detail === 'string' ? extensions.detail : (STATUS_TITLES[result.status] ?? 'Error');
                 return renderError(result.status, detail, extensions, result.headers);
             }
+            if (result.body === undefined) {
+                return {
+                    status: result.status,
+                    headers: {
+                        ...(result.headers ?? {}),
+                    },
+                    body: result.body,
+                };
+            }
+            const responseSpec = result.route.responses[result.status];
+            const isBinary = responseSpec !== undefined && isBinarySchema(resolveResponseBody(responseSpec));
+            const contentType = resolveResponseContentType(responseSpec) ?? (isBinary ? 'application/octet-stream' : 'application/json');
             return {
                 status: result.status,
                 headers: {
-                    ...(result.body !== undefined ? { 'content-type': 'application/json' } : {}),
+                    'content-type': contentType,
                     ...(result.headers ?? {}),
                 },
                 body: result.body,
+                raw: isBinary || !isJsonMediaType(contentType),
             };
         }
         case 'not-found':

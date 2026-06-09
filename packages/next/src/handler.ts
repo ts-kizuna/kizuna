@@ -126,8 +126,9 @@ export interface NextHandlerOptions {
     responseValidation?: boolean;
 }
 
-const jsonResponse = (status: number, body: unknown, headers: Record<string, string>): NextResponse =>
-    new NextResponse(body === null || body === undefined ? null : JSON.stringify(body), {
+const jsonResponse = (status: number, body: unknown, headers: Record<string, string>, raw = false): NextResponse =>
+    // Raw bodies (strings or binary Uint8Array) are passed through as `BodyInit`; only JSON is stringified.
+    new NextResponse(body === null || body === undefined ? null : raw ? (body as BodyInit) : JSON.stringify(body), {
         status,
         headers,
     });
@@ -148,7 +149,7 @@ export const handleNextRequest = async <T extends Contract>(
         respond: (result) => {
             if (result.kind === 'raw-response') return result.response as NextResponse;
             const rendered = renderJsonResult(result, options?.formatError as ErrorFormatter, request);
-            return jsonResponse(rendered.status, rendered.body, rendered.headers);
+            return jsonResponse(rendered.status, rendered.body, rendered.headers, rendered.raw);
         },
         onError: async (error): Promise<AdapterResult | void> => {
             if (!options?.onError) {

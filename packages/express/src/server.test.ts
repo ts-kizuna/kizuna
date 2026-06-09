@@ -493,6 +493,79 @@ describe('Express integration — requestValidationErrorHandler', () => {
     });
 });
 
+describe('declared response contentType', () => {
+    const csvContract = createContract({
+        exportItems: {
+            method: 'GET',
+            path: '/items.csv',
+            responses: {
+                200: {
+                    body: z.string(),
+                    contentType: 'text/csv',
+                },
+            },
+        },
+    });
+
+    it('sends a non-JSON body raw with the declared content type', async () => {
+        const app = express();
+        const api = createApi({
+            contract: csvContract,
+            router: {
+                exportItems: () => ({
+                    status: 200,
+                    body: 'id,name\n1,Ada',
+                }),
+            },
+        });
+        createExpressEndpoints(api, app);
+
+        const response = await request(app).get('/items.csv');
+        expect(response.status).toBe(200);
+        expect(response.headers['content-type']).toContain('text/csv');
+        // Raw — not JSON-quoted/escaped.
+        expect(response.text).toBe('id,name\n1,Ada');
+    });
+
+    it('sends a binary body as raw bytes', async () => {
+        const binaryContract = createContract({
+            downloadBadge: {
+                method: 'GET',
+                path: '/badge',
+                responses: {
+                    200: {
+                        body: z.instanceof(Uint8Array),
+                        contentType: 'application/octet-stream',
+                    },
+                },
+            },
+        });
+        const app = express();
+        const api = createApi({
+            contract: binaryContract,
+            router: {
+                downloadBadge: () => ({
+                    status: 200,
+                    body: Buffer.from([0x25, 0x50, 0x44, 0x46]),
+                }),
+            },
+        });
+        createExpressEndpoints(api, app);
+
+        const response = await request(app)
+            .get('/badge')
+            .buffer(true)
+            .parse((res, callback) => {
+                const chunks: Buffer[] = [];
+                res.on('data', (chunk) => chunks.push(chunk as Buffer));
+                res.on('end', () => callback(null, Buffer.concat(chunks)));
+            });
+        expect(response.status).toBe(200);
+        expect(response.headers['content-type']).toContain('application/octet-stream');
+        expect(Buffer.from(response.body).equals(Buffer.from([0x25, 0x50, 0x44, 0x46]))).toBe(true);
+    });
+});
+
 describe('Express integration — void / noBody responses', () => {
     const voidContract = createContract({
         deleteItem: {

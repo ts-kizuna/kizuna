@@ -27,17 +27,17 @@ createContract(tag: Tag, routes: Contract): Contract
 
 ### Route definition fields
 
-| Field         | Required | Type                                                                                           |
-| ------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `method`      | Yes      | `'GET'` `'POST'` `'PUT'` `'PATCH'` `'DELETE'` `'HEAD'` `'OPTIONS'`                             |
-| `path`        | Yes      | URL path — use `:name` for path parameters                                                     |
-| `body`        | —        | Zod schema for the request body                                                                |
-| `query`       | —        | Zod schema for the query string                                                                |
-| `headers`     | —        | Zod schema for request headers                                                                 |
-| `responses`   | Yes      | Response schemas keyed by status code                                                          |
-| `contentType` | —        | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
-| `summary`     | —        | Short description shown in OpenAPI                                                             |
-| `tags`        | —        | OpenAPI tags                                                                                   |
+| Field         | Required | Type                                                                                                                                    |
+| ------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `method`      | Yes      | `'GET'` `'POST'` `'PUT'` `'PATCH'` `'DELETE'` `'HEAD'` `'OPTIONS'`                                                                      |
+| `path`        | Yes      | URL path — use `:name` for path parameters                                                                                              |
+| `body`        | —        | Zod schema for the request body                                                                                                         |
+| `query`       | —        | Zod schema for the query string                                                                                                         |
+| `headers`     | —        | Zod schema for request headers                                                                                                          |
+| `responses`   | Yes      | Response schemas keyed by status code (use the `{ body, headers?, contentType? }` form for response headers or a non-JSON content type) |
+| `contentType` | —        | Request body media type: `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'`                 |
+| `summary`     | —        | Short description shown in OpenAPI                                                                                                      |
+| `tags`        | —        | OpenAPI tags                                                                                                                            |
 
 ## Returns
 
