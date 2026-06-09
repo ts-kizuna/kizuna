@@ -313,3 +313,71 @@ describe('eachRoute', () => {
         expect(keys).toEqual(['getMine', 'getById']);
     });
 });
+
+describe('renderJsonResult — non-JSON and binary bodies', () => {
+    const rawContract = createContract({
+        exportCsv: {
+            method: 'GET',
+            path: '/export',
+            responses: {
+                200: {
+                    body: z.string(),
+                    contentType: 'text/csv',
+                },
+            },
+        },
+        downloadBadge: {
+            method: 'GET',
+            path: '/badge',
+            responses: {
+                200: {
+                    body: z.instanceof(Uint8Array),
+                    contentType: 'application/pdf',
+                },
+            },
+        },
+    });
+
+    it('sends a string body raw under the declared content type', () => {
+        const rendered = renderJsonResult({
+            kind: 'success',
+            routeKey: 'exportCsv',
+            route: rawContract.exportCsv,
+            status: 200,
+            body: 'id,name\n1,Ada',
+            headers: {},
+        });
+        expect(rendered.raw).toBe(true);
+        expect(rendered.headers['content-type']).toBe('text/csv');
+        expect(rendered.body).toBe('id,name\n1,Ada');
+    });
+
+    it('sends a binary body raw, defaulting BinarySchema content type', () => {
+        const rendered = renderJsonResult({
+            kind: 'success',
+            routeKey: 'downloadBadge',
+            route: rawContract.downloadBadge,
+            status: 200,
+            body: Buffer.from([1, 2, 3]),
+            headers: {},
+        });
+        expect(rendered.raw).toBe(true);
+        expect(rendered.headers['content-type']).toBe('application/pdf');
+        expect(rendered.body).toBeInstanceOf(Uint8Array);
+    });
+
+    it('throws a clear error when a raw route returns a non-string, non-binary body', () => {
+        expect(() =>
+            renderJsonResult({
+                kind: 'success',
+                routeKey: 'exportCsv',
+                route: rawContract.exportCsv,
+                status: 200,
+                body: {
+                    rows: [],
+                },
+                headers: {},
+            })
+        ).toThrow(/must be a string or Uint8Array/);
+    });
+});
