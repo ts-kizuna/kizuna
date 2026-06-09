@@ -9,3 +9,6 @@ package.json
 **/package.json
 tsconfig.json
 **/tsconfig*.json
+
+# kizuna generated output
+.kizuna/

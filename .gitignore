@@ -14,3 +14,6 @@ tsconfig.tsbuildinfo
 .swiftpm/
 Package.resolved
 DerivedData/
+
+# kizuna generated output
+.kizuna/

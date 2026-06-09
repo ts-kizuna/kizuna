@@ -123,6 +123,7 @@ if (result.status === 200) {
 | `@ts-kizuna/open-api` | OpenAPI 3.1.0 spec generation                |
 | `@ts-kizuna/swift`    | Swift client generation                      |
 | `@ts-kizuna/mcp`      | MCP server generation                        |
+| `@ts-kizuna/cli`      | Shared CLI and build tooling                 |
 
 ## License
 

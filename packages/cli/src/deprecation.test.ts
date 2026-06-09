@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import * as path from 'node:path';
+import * as os from 'node:os';
+import * as fs from 'node:fs';
 import * as url from 'node:url';
-import {
-    createDeprecationMap,
-    resolveDeprecationMap,
-    serializeDeprecationMap,
-    deserializeDeprecationMap,
-    type DeprecationMap,
-} from './deprecation.js';
+import { z } from 'zod';
+import { createContract } from '@ts-kizuna/core';
+import { loadDeprecations, contractFingerprint, serializeDeprecationMap, deserializeDeprecationMap } from '@ts-kizuna/core/generator';
+import { createDeprecationMap, writeKizunaDeprecations } from './deprecation-parser.js';
+import { contract } from './deprecation.fixture.js';
 
 const fixtureDir = path.dirname(url.fileURLToPath(import.meta.url));
 const fixturePath = path.join(fixtureDir, 'deprecation.fixture.ts');
@@ -127,37 +127,26 @@ describe('serializeDeprecationMap / deserializeDeprecationMap', () => {
     });
 });
 
-describe('resolveDeprecationMap', () => {
-    test('returns undefined when given undefined', () => {
-        expect(resolveDeprecationMap(undefined)).toBeUndefined();
+describe('loadDeprecations', () => {
+    test('reads the entry for a contract by its fingerprint', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-'));
+        writeKizunaDeprecations([{ contract, contractPath: fixturePath }], dir);
+        const map = loadDeprecations(contractFingerprint(contract), dir);
+        expect(map?.routes.get('oldRoute')).toBe('use newRoute instead');
+        expect(map?.fields.get('getUser')?.has('responses.200.email')).toBe(true);
+        expect(map?.schemas?.get('User')?.has('email')).toBe(true);
     });
 
-    test('parses from source when given a contractPath', () => {
-        const result = resolveDeprecationMap({
-            contractPath: fixturePath,
+    test('returns undefined for a contract not in the file', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-'));
+        writeKizunaDeprecations([{ contract, contractPath: fixturePath }], dir);
+        const other = createContract({
+            ping: { method: 'GET', path: '/ping', responses: { 200: z.object({ ok: z.boolean() }) } },
         });
-        expect(result).toBeDefined();
-        expect(result!.routes.has('oldRoute')).toBe(true);
+        expect(loadDeprecations(contractFingerprint(other), dir)).toBeUndefined();
     });
 
-    test('returns a DeprecationMap as-is', () => {
-        const map: DeprecationMap = {
-            routes: new Map([['oldRoute', 'use newRoute instead']]),
-            fields: new Map([['getUser', new Map([['responses.200.email', '']])]]),
-        };
-        const result = resolveDeprecationMap(map);
-        expect(result).toBe(map);
-    });
-
-    test('deserializes a SerializedDeprecationMap from a JSON import', () => {
-        const original = createDeprecationMap(fixturePath);
-        const serialized = serializeDeprecationMap(original);
-        const json = JSON.parse(JSON.stringify(serialized));
-
-        const result = resolveDeprecationMap(json);
-        expect(result).toBeDefined();
-        expect(result!.routes).toBeInstanceOf(Map);
-        expect(result!.routes.get('oldRoute')).toBe('use newRoute instead');
-        expect(result!.fields.get('getUser')?.get('responses.200.email')).toBe('');
+    test('returns undefined when the file does not exist', () => {
+        expect(loadDeprecations(contractFingerprint(contract), path.join(os.tmpdir(), 'kizuna-does-not-exist'))).toBeUndefined();
     });
 });

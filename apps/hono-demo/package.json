@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n server,client -c cyan,magenta \"tsx watch src/index.ts\" \"sleep 1.5 && tsx src/scripts/run-client.ts\"",
-    "server": "tsx watch src/index.ts",
-    "server:once": "tsx src/index.ts",
+    "dev": "kizuna deprecations ../shared/src/contract.ts && concurrently -n server,client -c cyan,magenta \"tsx watch src/index.ts\" \"sleep 1.5 && tsx src/scripts/run-client.ts\"",
+    "server": "kizuna deprecations ../shared/src/contract.ts && tsx watch src/index.ts",
+    "server:once": "kizuna deprecations ../shared/src/contract.ts && tsx src/index.ts",
     "client": "tsx src/scripts/run-client.ts",
     "typecheck": "tsc --noEmit"
   },
@@ -23,6 +23,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@ts-kizuna/cli": "workspace:*",
     "@types/node": "^22.9.0",
     "concurrently": "^9.1.0",
     "tsx": "^4.19.2",

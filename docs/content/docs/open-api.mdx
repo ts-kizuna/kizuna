@@ -12,7 +12,6 @@ description: Generate an OpenAPI 3.1.0 document from your contract and serve it 
 `generateOpenApi` returns a renderer — call it with `'json'` for the document object or `'yaml'` for a YAML string.
 
 ```ts
-import path from 'path';
 import { generateOpenApi } from '@ts-kizuna/open-api';
 import { contract } from '@shared/contract';
 
@@ -20,9 +19,6 @@ const spec = generateOpenApi(contract, {
     info: {
         title: 'My API',
         version: '1.0.0',
-    },
-    deprecationWarnings: {
-        contractPath: path.resolve(import.meta.dirname, './contract.ts'),
     },
 });
 
@@ -32,9 +28,7 @@ spec('yaml'); // YAML string
 
 ## Deprecation
 
-Pass `deprecationWarnings.contractPath` pointing to your contract `.ts` source file. Routes and Zod fields marked `/** @deprecated */` will have `deprecated: true` in the generated spec.
-
-The path must be the `.ts` source file — not a compiled `.js`. The generator reads it lexically; no TypeScript compiler or tsconfig required.
+Routes and fields marked `/** @deprecated */` get `deprecated: true` in the generated spec — no extra options here. `generateOpenApi(contract)` reads them straight off the contract, once you've added the one-time build step. See [Deprecations](/docs/deprecations) for setup.
 
 ## Options
 
@@ -57,29 +51,24 @@ generateOpenApi(contract, {
     ],
     setOperationId: true,
     setTagsFromContractKeys: true,
-    deprecationWarnings: {
-        contractPath: path.resolve(import.meta.dirname, './contract.ts'),
-    },
 });
 ```
 
-| Option                             | Default  | Description                                                                                                |
-| ---------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
-| `info`                             | required | OpenAPI `info` object                                                                                      |
-| `servers`                          | —        | Server URLs                                                                                                |
-| `setOperationId`                   | `false`  | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys.                    |
-| `setTagsFromContractKeys`          | `false`  | Use contract sub-object keys as OpenAPI tags                                                               |
-| `tags`                             | —        | Top-level tag definitions                                                                                  |
-| `security`                         | —        | Global security requirements                                                                               |
-| `components.securitySchemes`       | —        | Security scheme definitions                                                                                |
-| `operationMapper`                  | —        | Callback to transform each operation before it is added to the spec                                        |
-| `deprecationWarnings.contractPath` | —        | Absolute path to the contract `.ts` source file. Required to emit `deprecated: true` on routes and fields. |
+| Option                       | Default  | Description                                                                             |
+| ---------------------------- | -------- | --------------------------------------------------------------------------------------- |
+| `info`                       | required | OpenAPI `info` object                                                                   |
+| `servers`                    | —        | Server URLs                                                                             |
+| `setOperationId`             | `false`  | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys. |
+| `setTagsFromContractKeys`    | `false`  | Use contract sub-object keys as OpenAPI tags                                            |
+| `tags`                       | —        | Top-level tag definitions                                                               |
+| `security`                   | —        | Global security requirements                                                            |
+| `components.securitySchemes` | —        | Security scheme definitions                                                             |
+| `operationMapper`            | —        | Callback to transform each operation before it is added to the spec                     |
 
 ## Serving with Scalar (Express)
 
 ```ts
 // src/index.ts
-import path from 'path';
 import express from 'express';
 import { apiReference } from '@scalar/express-api-reference';
 import { generateOpenApi } from '@ts-kizuna/open-api';
@@ -94,9 +83,6 @@ const spec = generateOpenApi(contract, {
     info: {
         title: 'My API',
         version: '1.0.0',
-    },
-    deprecationWarnings: {
-        contractPath: path.resolve(import.meta.dirname, './contract.ts'),
     },
 });
 
@@ -119,7 +105,6 @@ app.listen(3000);
 
 ```ts
 // src/app/reference/route.ts
-import path from 'path';
 import { ApiReference } from '@scalar/nextjs-api-reference';
 import { generateOpenApi } from '@ts-kizuna/open-api';
 import { contract } from '@shared/contract';
@@ -134,9 +119,6 @@ const spec = generateOpenApi(contract, {
             url: '/api',
         },
     ],
-    deprecationWarnings: {
-        contractPath: path.resolve(import.meta.dirname, './contract.ts'),
-    },
 });
 
 export const GET = ApiReference({
@@ -150,7 +132,6 @@ export const GET = ApiReference({
 
 ```ts
 // scripts/generate-openapi.ts
-import path from 'path';
 import { writeFileSync } from 'fs';
 import { generateOpenApi } from '@ts-kizuna/open-api';
 import { contract } from '../src/contract';
@@ -159,9 +140,6 @@ const spec = generateOpenApi(contract, {
     info: {
         title: 'My API',
         version: '1.0.0',
-    },
-    deprecationWarnings: {
-        contractPath: path.resolve(import.meta.dirname, '../src/contract.ts'),
     },
 });
 

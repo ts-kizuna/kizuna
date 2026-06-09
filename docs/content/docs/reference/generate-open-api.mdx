@@ -24,17 +24,16 @@ generateOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRen
 
 ## Options
 
-| Option                             | Type                                  | Default  | Description                                                                                                |
-| ---------------------------------- | ------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
-| `info`                             | `{ title, version, description? }`    | required | OpenAPI `info` object                                                                                      |
-| `servers`                          | `{ url, description? }[]`             | —        | Server URLs                                                                                                |
-| `setOperationId`                   | `boolean \| 'concatenated-path'`      | `false`  | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys.                    |
-| `setTagsFromContractKeys`          | `boolean`                             | `false`  | Use contract sub-object keys as OpenAPI tags                                                               |
-| `tags`                             | `OpenApiTag[]`                        | —        | Top-level tag definitions                                                                                  |
-| `security`                         | `SecurityRequirement[]`               | —        | Global security requirements                                                                               |
-| `components.securitySchemes`       | `Record<string, unknown>`             | —        | Security scheme definitions                                                                                |
-| `operationMapper`                  | `(operation, route, id) => operation` | —        | Callback to transform each operation before it is added to the spec                                        |
-| `deprecationWarnings.contractPath` | `string`                              | —        | Absolute path to the contract `.ts` source file. Required to emit `deprecated: true` on routes and fields. |
+| Option                       | Type                                  | Default  | Description                                                                             |
+| ---------------------------- | ------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
+| `info`                       | `{ title, version, description? }`    | required | OpenAPI `info` object                                                                   |
+| `servers`                    | `{ url, description? }[]`             | —        | Server URLs                                                                             |
+| `setOperationId`             | `boolean \| 'concatenated-path'`      | `false`  | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys. |
+| `setTagsFromContractKeys`    | `boolean`                             | `false`  | Use contract sub-object keys as OpenAPI tags                                            |
+| `tags`                       | `OpenApiTag[]`                        | —        | Top-level tag definitions                                                               |
+| `security`                   | `SecurityRequirement[]`               | —        | Global security requirements                                                            |
+| `components.securitySchemes` | `Record<string, unknown>`             | —        | Security scheme definitions                                                             |
+| `operationMapper`            | `(operation, route, id) => operation` | —        | Callback to transform each operation before it is added to the spec                     |
 
 ## Returns
 
@@ -48,7 +47,6 @@ renderer('yaml'); // YAML string
 ## Example
 
 ```ts
-import path from 'path';
 import { generateOpenApi } from '@ts-kizuna/open-api';
 import { contract } from '@shared/contract';
 
@@ -63,9 +61,6 @@ const spec = generateOpenApi(contract, {
             description: 'Production',
         },
     ],
-    deprecationWarnings: {
-        contractPath: path.resolve(import.meta.dirname, './contract.ts'),
-    },
 });
 
 // Serve as JSON endpoint
