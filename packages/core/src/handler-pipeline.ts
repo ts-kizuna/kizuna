@@ -38,6 +38,18 @@ const coerceValue = (value: unknown, baseType: string): unknown => {
         if (value === 'true') return true;
         if (value === 'false') return false;
     }
+    if (baseType === 'bigint') {
+        try {
+            return BigInt(value);
+        } catch {
+            // Invalid bigint — leave it for Zod to reject.
+            return value;
+        }
+    }
+    if (baseType === 'date') {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? value : date;
+    }
     return value;
 };
 

@@ -49,11 +49,13 @@ const contract = createContract({
             }),
         },
     },
-    coercedQuery: {
+    typedQuery: {
         method: 'GET',
-        path: '/coerced',
+        path: '/typed',
         query: z.object({
-            page: z.coerce.number().int().min(1).default(1),
+            page: z.number().int().min(1).default(1),
+            from: z.date(),
+            cursor: z.bigint(),
             search: z.string(),
             transformed: z.string().transform((value) => value.length),
         }),
@@ -63,21 +65,22 @@ const contract = createContract({
             }),
         },
     },
-    nestedCoerced: {
+    nestedTyped: {
         method: 'POST',
         path: '/nested',
         body: z.object({
             filters: z.object({
-                price: z.coerce.number(),
+                price: z.number(),
+                createdAt: z.date(),
                 tags: z.array(
                     z.object({
-                        weight: z.coerce.number(),
+                        weight: z.number(),
                         name: z.string(),
                     })
                 ),
             }),
-            scores: z.array(z.coerce.number()),
-            pair: z.tuple([z.coerce.number(), z.string()]),
+            scores: z.array(z.number()),
+            pair: z.tuple([z.number(), z.string()]),
         }),
         responses: {
             200: z.object({
@@ -85,13 +88,13 @@ const contract = createContract({
             }),
         },
     },
-    discriminatedCoerced: {
+    discriminatedTyped: {
         method: 'POST',
         path: '/discriminated',
         body: z.discriminatedUnion('kind', [
             z.object({
                 kind: z.literal('count'),
-                count: z.coerce.number(),
+                count: z.number(),
             }),
             z.object({
                 kind: z.literal('name'),
@@ -104,7 +107,7 @@ const contract = createContract({
             }),
         },
     },
-    arrayOfDiscriminatedCoerced: {
+    arrayOfDiscriminatedTyped: {
         method: 'POST',
         path: '/array-of-discriminated',
         body: z.object({
@@ -112,11 +115,11 @@ const contract = createContract({
                 z.discriminatedUnion('kind', [
                     z.object({
                         kind: z.literal('view'),
-                        viewedAt: z.coerce.number(),
+                        viewedAt: z.number(),
                     }),
                     z.object({
                         kind: z.literal('purchase'),
-                        amount: z.coerce.number(),
+                        amount: z.number(),
                         currency: z.string(),
                     }),
                 ])
@@ -128,7 +131,7 @@ const contract = createContract({
             }),
         },
     },
-    nestedDiscriminatedCoerced: {
+    nestedDiscriminatedTyped: {
         method: 'POST',
         path: '/nested-discriminated',
         body: z.object({
@@ -136,11 +139,11 @@ const contract = createContract({
                 strategy: z.discriminatedUnion('kind', [
                     z.object({
                         kind: z.literal('linear'),
-                        slope: z.coerce.number(),
+                        slope: z.number(),
                     }),
                     z.object({
                         kind: z.literal('exponential'),
-                        base: z.coerce.number(),
+                        base: z.number(),
                     }),
                 ]),
             }),
@@ -297,25 +300,30 @@ test('rejects body on a route that does not accept one', () => {
     client.getUser({ params: { id: '1' }, body: { foo: 'bar' } });
 });
 
-test('z.coerce fields surface as their output type, not unknown', async () => {
-    await client.coercedQuery({
+test('plain and transform query fields surface as their input types', async () => {
+    await client.typedQuery({
         query: {
             search: 'hello',
             transformed: 'world',
             page: 1,
+            from: new Date(),
+            cursor: 1n,
         },
     });
-    type Query = Parameters<typeof client.coercedQuery>[0]['query'];
+    type Query = Parameters<typeof client.typedQuery>[0]['query'];
     expectTypeOf<Query['page']>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<Query['from']>().toEqualTypeOf<Date>();
+    expectTypeOf<Query['cursor']>().toEqualTypeOf<bigint>();
     expectTypeOf<Query['search']>().toEqualTypeOf<string>();
     expectTypeOf<Query['transformed']>().toEqualTypeOf<string>();
 });
 
-test('z.coerce inside nested objects and arrays surfaces as the output type', async () => {
-    await client.nestedCoerced({
+test('nested object, array, and date/bigint fields surface as their input types', async () => {
+    await client.nestedTyped({
         body: {
             filters: {
                 price: 99,
+                createdAt: new Date(),
                 tags: [
                     {
                         weight: 1,
@@ -327,20 +335,22 @@ test('z.coerce inside nested objects and arrays surfaces as the output type', as
             pair: [1, 'two'],
         },
     });
-    type Body = Parameters<typeof client.nestedCoerced>[0]['body'];
+    type Body = Parameters<typeof client.nestedTyped>[0]['body'];
     expectTypeOf<Body['filters']['price']>().toEqualTypeOf<number>();
+    expectTypeOf<Body['filters']['createdAt']>().toEqualTypeOf<Date>();
     expectTypeOf<Body['filters']['tags'][number]['weight']>().toEqualTypeOf<number>();
     expectTypeOf<Body['filters']['tags'][number]['name']>().toEqualTypeOf<string>();
     expectTypeOf<Body['scores']>().toEqualTypeOf<number[]>();
     expectTypeOf<Body['pair']>().toEqualTypeOf<[number, string]>();
 });
 
-test('nested z.coerce field rejects wrong-typed values', () => {
-    client.nestedCoerced({
+test('nested number field rejects wrong-typed values', () => {
+    client.nestedTyped({
         body: {
             filters: {
                 // @ts-expect-error price must be a number
                 price: '99',
+                createdAt: new Date(),
                 tags: [],
             },
             scores: [],
@@ -349,8 +359,8 @@ test('nested z.coerce field rejects wrong-typed values', () => {
     });
 });
 
-test('z.coerce inside a discriminated union inside an array resolves per branch per element', async () => {
-    await client.arrayOfDiscriminatedCoerced({
+test('number inside a discriminated union inside an array resolves per branch per element', async () => {
+    await client.arrayOfDiscriminatedTyped({
         body: {
             events: [
                 {
@@ -365,7 +375,7 @@ test('z.coerce inside a discriminated union inside an array resolves per branch 
             ],
         },
     });
-    type Body = Parameters<typeof client.arrayOfDiscriminatedCoerced>[0]['body'];
+    type Body = Parameters<typeof client.arrayOfDiscriminatedTyped>[0]['body'];
     type Event = Body['events'][number];
     type ViewEvent = Extract<Event, { kind: 'view' }>;
     type PurchaseEvent = Extract<Event, { kind: 'purchase' }>;
@@ -374,8 +384,8 @@ test('z.coerce inside a discriminated union inside an array resolves per branch 
     expectTypeOf<PurchaseEvent['currency']>().toEqualTypeOf<string>();
 });
 
-test('z.coerce inside a discriminated union inside an array rejects wrong-typed branch values', () => {
-    client.arrayOfDiscriminatedCoerced({
+test('number inside a discriminated union inside an array rejects wrong-typed branch values', () => {
+    client.arrayOfDiscriminatedTyped({
         body: {
             events: [
                 {
@@ -389,8 +399,8 @@ test('z.coerce inside a discriminated union inside an array rejects wrong-typed 
     });
 });
 
-test('z.coerce inside a discriminated union nested in an object resolves per branch', async () => {
-    await client.nestedDiscriminatedCoerced({
+test('number inside a discriminated union nested in an object resolves per branch', async () => {
+    await client.nestedDiscriminatedTyped({
         body: {
             wrapper: {
                 strategy: {
@@ -400,7 +410,7 @@ test('z.coerce inside a discriminated union nested in an object resolves per bra
             },
         },
     });
-    type Body = Parameters<typeof client.nestedDiscriminatedCoerced>[0]['body'];
+    type Body = Parameters<typeof client.nestedDiscriminatedTyped>[0]['body'];
     type Strategy = Body['wrapper']['strategy'];
     type LinearBranch = Extract<Strategy, { kind: 'linear' }>;
     type ExponentialBranch = Extract<Strategy, { kind: 'exponential' }>;
@@ -408,31 +418,33 @@ test('z.coerce inside a discriminated union nested in an object resolves per bra
     expectTypeOf<ExponentialBranch['base']>().toEqualTypeOf<number>();
 });
 
-test('z.coerce inside a discriminated union resolves per branch', async () => {
-    await client.discriminatedCoerced({
+test('number inside a discriminated union resolves per branch', async () => {
+    await client.discriminatedTyped({
         body: {
             kind: 'count',
             count: 7,
         },
     });
-    await client.discriminatedCoerced({
+    await client.discriminatedTyped({
         body: {
             kind: 'name',
             name: 'alice',
         },
     });
-    type Body = Parameters<typeof client.discriminatedCoerced>[0]['body'];
+    type Body = Parameters<typeof client.discriminatedTyped>[0]['body'];
     type CountBranch = Extract<Body, { kind: 'count' }>;
     type NameBranch = Extract<Body, { kind: 'name' }>;
     expectTypeOf<CountBranch['count']>().toEqualTypeOf<number>();
     expectTypeOf<NameBranch['name']>().toEqualTypeOf<string>();
 });
 
-test('z.coerce field rejects values that the output type does not accept', () => {
-    client.coercedQuery({
+test('number query field rejects values of the wrong type', () => {
+    client.typedQuery({
         query: {
             search: 'hello',
             transformed: 'world',
+            from: new Date(),
+            cursor: 1n,
             // @ts-expect-error page must be a number, not a string
             page: '1',
         },

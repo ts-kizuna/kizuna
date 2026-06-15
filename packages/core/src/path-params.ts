@@ -43,7 +43,7 @@ export const parsePath = (path: string): { segments: PathSegment[]; paramNames: 
     };
 };
 
-export const buildPath = (path: string, params?: Record<string, string | number>): string => {
+export const buildPath = (path: string, params?: Record<string, string | number | bigint | Date>): string => {
     const { segments } = parsePath(path);
     let out = '';
     for (const segment of segments) {
@@ -53,7 +53,8 @@ export const buildPath = (path: string, params?: Record<string, string | number>
         }
         const value = params?.[segment.value];
         if (value === undefined) throw new Error(`Missing path parameter: ${segment.value}`);
-        out += encodeURIComponent(String(value));
+        // Dates go on the wire as ISO 8601; everything else stringifies.
+        out += encodeURIComponent(value instanceof Date ? value.toISOString() : String(value));
     }
     return out;
 };

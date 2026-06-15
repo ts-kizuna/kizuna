@@ -15,28 +15,16 @@ type ResponseUnion<R extends RouteDefinition> = {
     };
 }[keyof R['responses']];
 
-type SubstituteUnknownInBranch<In, Out> = [In] extends [readonly unknown[]]
-    ? [Out] extends [readonly unknown[]]
-        ? { [K in keyof In]: K extends keyof Out ? (unknown extends In[K] ? Out[K] : SubstituteUnknown<In[K], Out[K]>) : In[K] }
-        : In
-    : [In] extends [Record<string, unknown>]
-      ? [Out] extends [Record<string, unknown>]
-          ? { [K in keyof In]: K extends keyof Out ? (unknown extends In[K] ? Out[K] : SubstituteUnknown<In[K], Out[K]>) : In[K] }
-          : In
-      : unknown extends In
-        ? Out
-        : In;
-
-type SubstituteUnknown<In, Out> = In extends unknown
-    ? SubstituteUnknownInBranch<In, Extract<Out, In> extends never ? Out : Extract<Out, In>>
-    : never;
-
-type ClientPayload<T extends z.ZodType> = SubstituteUnknown<z.input<T>, z.output<T>>;
+/**
+ * The type a caller passes for a body, query, or headers argument — the schema's
+ * input type.
+ */
+type ClientPayload<T extends z.ZodType> = z.input<T>;
 
 /**
  * Path params are typed from the route's `pathParams` schema output when one is declared,
- * mirroring the server-side `HandlerArgs`. This makes refinements like `.brand()` or
- * `z.coerce` flow to the caller. Falls back to the path template (`:param` → `string`).
+ * mirroring the server-side `HandlerArgs`. This makes refinements like `.brand()` flow to
+ * the caller. Falls back to the path template (`:param` → `string`).
  */
 type ClientParams<R extends RouteDefinition> = R extends { pathParams: z.ZodType }
     ? z.output<R['pathParams']>
@@ -101,14 +89,20 @@ const buildFormData = (body: Record<string, unknown>): FormData => {
     return formData;
 };
 
+/**
+ * Serializes a query or path value for the URL. Dates use ISO 8601; everything
+ * else uses `String`.
+ */
+const serializeValue = (value: unknown): string => (value instanceof Date ? value.toISOString() : String(value));
+
 const buildQueryString = (query: Record<string, unknown>): string => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(query)) {
         if (value === undefined || value === null) continue;
         if (Array.isArray(value)) {
-            for (const item of value) params.append(key, String(item));
+            for (const item of value) params.append(key, serializeValue(item));
         } else {
-            params.append(key, String(value));
+            params.append(key, serializeValue(value));
         }
     }
     const result = params.toString();
@@ -118,7 +112,7 @@ const buildQueryString = (query: Record<string, unknown>): string => {
 const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
     return async (
         args: {
-            params?: Record<string, string | number>;
+            params?: Record<string, string | number | bigint | Date>;
             query?: Record<string, unknown>;
             body?: unknown;
             headers?: Record<string, string>;

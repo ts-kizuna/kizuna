@@ -42,8 +42,8 @@ const contract = createContract({
         method: 'GET',
         path: '/users',
         query: z.object({
-            page: z.coerce.number().int().min(1).default(1),
-            limit: z.coerce.number().int().min(1).default(10),
+            page: z.number().int().min(1).default(1),
+            limit: z.number().int().min(1).default(10),
         }),
         responses: {
             200: z.object({

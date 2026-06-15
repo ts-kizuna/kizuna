@@ -55,11 +55,11 @@ export const CreateUserSchema = createModel({
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 
 const PaginationQuery = z.object({
-    page: z.coerce.number().int().min(1).default(1).meta({
+    page: z.number().int().min(1).default(1).meta({
         description: 'Page number, starting at 1',
         example: 1,
     }),
-    limit: z.coerce.number().int().min(1).max(100).default(10).meta({
+    limit: z.number().int().min(1).max(100).default(10).meta({
         description: 'Page size (1–100)',
         example: 10,
     }),
@@ -185,8 +185,8 @@ const usersContract = createContract(Users, {
         path: '/users/search',
         query: z.object({
             q: z.string(),
-            limit: z.coerce.number().int().min(1).max(100),
-            cursor: z.coerce.number().int().min(0),
+            limit: z.number().int().min(1).max(100),
+            cursor: z.number().int().min(0),
         }),
         responses: {
             200: z.object({
@@ -379,7 +379,7 @@ export const contract = createContract({
         method: 'GET',
         path: '/events',
         query: z.object({
-            since: z.coerce.date().optional().meta({
+            since: z.date().optional().meta({
                 description: 'Lower bound for occurredAt — wire format is ISO-8601',
             }),
             kind: EventKind.optional(),

@@ -27,8 +27,8 @@ export const contract = createContract({
         method: 'GET',
         path: '/users',
         query: z.object({
-            page: z.coerce.number().int().min(1).default(1),
-            limit: z.coerce.number().int().min(1).max(100).default(10),
+            page: z.number().int().min(1).default(1),
+            limit: z.number().int().min(1).max(100).default(10),
         }),
         responses: {
             200: z.object({
@@ -73,6 +73,21 @@ export const contract = createContract({
 | `contentType` | —        | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
 | `summary`     | —        | Short description shown in OpenAPI                                                             |
 | `tags`        | —        | OpenAPI tags                                                                                   |
+
+## Query, path, and header coercion
+
+Values in the URL and in headers always arrive as strings. ts-kizuna coerces them to the types you declare, so you write the schema you actually mean and get the parsed value on both the client and the server:
+
+| Declare                  | Accepts on the wire  | You get             |
+| ------------------------ | -------------------- | ------------------- |
+| `z.number()` / `z.int()` | `"42"`               | `42`                |
+| `z.boolean()`            | `"true"` / `"false"` | `true` / `false`    |
+| `z.bigint()`             | `"9007199254740993"` | `9007199254740993n` |
+| `z.date()`               | an ISO 8601 string   | `Date`              |
+
+Arrays of these coerce too (`z.array(z.number())`). The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without any manual formatting. Request bodies are sent as JSON and keep their types, so they are never coerced.
+
+Because coercion is built in, **`z.coerce` is not supported** — `createContract` throws if any schema uses it. Use the plain schema (`z.number()`, `z.date()`, `z.bigint()`) instead. When you genuinely want to receive a different type than you send, `z.string().transform(...)` is the explicit, type-safe way to do it.
 
 ## Response schemas
 

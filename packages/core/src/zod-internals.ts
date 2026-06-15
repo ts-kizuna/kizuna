@@ -5,6 +5,7 @@ import { z } from 'zod';
  */
 export interface ZodDef {
     type?: string;
+    coerce?: boolean;
     innerType?: z.core.$ZodType;
     element?: z.core.$ZodType;
     in?: z.core.$ZodType;
@@ -95,6 +96,38 @@ export const unwrapOptionalWrappers = (schema: z.core.$ZodType): { inner: z.core
         inner: current,
         optional,
     };
+};
+
+/**
+ * Returns the dotted path to the first `z.coerce` schema in the tree (`''` if the
+ * root itself is coerced), or `undefined` if there is none. Descends fields,
+ * elements, wrappers, pipes, and unions; the `WeakSet` guards against `z.lazy`
+ * cycles.
+ */
+export const findCoercedSchemaPath = (schema: z.core.$ZodType, path = '', seen: WeakSet<object> = new WeakSet()): string | undefined => {
+    if (seen.has(schema)) return undefined;
+    seen.add(schema);
+    const def = readDef(schema);
+    if (def.coerce === true) return path;
+    if (def.shape) {
+        for (const [key, field] of Object.entries(def.shape)) {
+            const found = findCoercedSchemaPath(field, path ? `${path}.${key}` : key, seen);
+            if (found !== undefined) return found;
+        }
+    }
+    const children: Array<z.core.$ZodType | undefined> = [def.innerType, def.element, def.in, def.out, def.valueType];
+    for (const child of children) {
+        if (!child) continue;
+        const found = findCoercedSchemaPath(child, path, seen);
+        if (found !== undefined) return found;
+    }
+    if (Array.isArray(def.options)) {
+        for (const option of def.options) {
+            const found = findCoercedSchemaPath(option, path, seen);
+            if (found !== undefined) return found;
+        }
+    }
+    return undefined;
 };
 
 export interface DiscriminatedUnion {
