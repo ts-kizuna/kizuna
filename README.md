@@ -1,19 +1,28 @@
 # ts-kizuna
 
-![ts-kizuna](docs/public/readme.png)
+![ts-kizuna](docs/public/readme-beta.png)
 
 Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, powered by Zod 4.
 
+![npm](https://img.shields.io/badge/npm-v1.23.0-blue)
+![license](https://img.shields.io/badge/license-MIT-blue)
+
 [Documentation](https://ts-kizuna.com)
+
+> [!NOTE]
+> **BETA.** ts-kizuna is stable and used in production. We're refining the API ahead of v2, so upgrades can include code changes. Pin your version and open an issue if anything breaks.
+>
+> [See the release notes](https://github.com/ts-kizuna/kizuna/releases)
 
 ## Features
 
 - **Contract-first** — define request/response schemas once, share between server and client
 - **Type-safe everywhere** — full inference on both sides, no casting
 - **RPC-like client** — call your API like a function, get fully typed responses back
+- **Adapters** — mount your API on Express, Fastify, Hono, or Next.js
 - **HTTP/REST** — follows HTTP and REST standards. RFC 9110 semantics, RFC 9457 Problem Details
 - **Built-in coercion** — query, path, and header params are coerced to their declared types (`z.number()`, `z.boolean()`, `z.date()`, `z.bigint()`) — no manual parsing or `z.coerce` needed
-- **OpenAPI 3.1.0 generation** — from the same contract, no annotations needed
+- **OpenAPI generation** — from the same contract, no annotations needed
 - **Swift client generation** — typed API client for iOS/macOS
 - **MCP server generation** — expose your API as MCP tools so AI assistants can call your endpoints
 - **Deprecation support** — mark endpoints and fields as deprecated with a JSDoc `@deprecated` tag — IDEs show strikethroughs, OpenAPI and Swift pick it up automatically
