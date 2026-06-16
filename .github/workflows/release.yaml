@@ -79,7 +79,7 @@ jobs:
                       const unique = people.filter((person) => !seen.has(person.login) && seen.add(person.login));
                       if (!unique.length) return;
 
-                      const list = unique.map((person) => `${person.name} (@${person.login})`).join('\n');
+                      const list = unique.map((person) => `* ${person.name} (@${person.login})`).join('\n');
                       await github.rest.repos.updateRelease({
                           owner,
                           repo,
