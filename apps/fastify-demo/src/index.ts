@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { createApi, fastifyKizuna } from '@ts-kizuna/fastify';
 import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
-import { generateOpenApi } from '@ts-kizuna/open-api';
+import { generateOpenApi } from '@ts-kizuna/openapi';
 import fastifyApiReference from '@scalar/fastify-api-reference';
 import { contract } from '@ts-kizuna-demo/shared';
 

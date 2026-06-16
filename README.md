@@ -130,7 +130,7 @@ if (result.status === 200) {
 | `@ts-kizuna/fastify`       | Fastify adapter                              |
 | `@ts-kizuna/hono`          | Hono adapter                                 |
 | `@ts-kizuna/next`          | Next.js App Router adapter                   |
-| `@ts-kizuna/open-api`      | OpenAPI 3.1.0 spec generation                |
+| `@ts-kizuna/openapi`       | OpenAPI generation                           |
 | `@ts-kizuna/swift`         | Swift client generation                      |
 | `@ts-kizuna/mcp`           | MCP server generation                        |
 | `@ts-kizuna/eslint-plugin` | ESLint rules                                 |

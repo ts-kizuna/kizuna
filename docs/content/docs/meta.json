@@ -6,7 +6,7 @@
         "building",
         "adapters",
         "clients",
-        "open-api",
+        "openapi",
         "deprecations",
         "mcp",
         "eslint",

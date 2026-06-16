@@ -3,16 +3,16 @@ title: OpenAPI
 description: Generate an OpenAPI 3.1.0 document from your contract and serve it with Scalar.
 ---
 
-`@ts-kizuna/open-api` generates an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from your contract.
+`@ts-kizuna/openapi` generates an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from your contract.
 
-<InstallTabs packageName="@ts-kizuna/open-api" />
+<InstallTabs packageName="@ts-kizuna/openapi" />
 
 ## `generateOpenApi`
 
 `generateOpenApi` returns a renderer — call it with `'json'` for the document object or `'yaml'` for a YAML string.
 
 ```ts
-import { generateOpenApi } from '@ts-kizuna/open-api';
+import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '@shared/contract';
 
 const spec = generateOpenApi(contract, {
@@ -71,7 +71,7 @@ generateOpenApi(contract, {
 // src/index.ts
 import express from 'express';
 import { apiReference } from '@scalar/express-api-reference';
-import { generateOpenApi } from '@ts-kizuna/open-api';
+import { generateOpenApi } from '@ts-kizuna/openapi';
 import { createExpressEndpoints } from '@ts-kizuna/express';
 import { api } from './lib/server';
 import { contract } from '@shared/contract';
@@ -106,7 +106,7 @@ app.listen(3000);
 ```ts
 // src/app/reference/route.ts
 import { ApiReference } from '@scalar/nextjs-api-reference';
-import { generateOpenApi } from '@ts-kizuna/open-api';
+import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '@shared/contract';
 
 const spec = generateOpenApi(contract, {
@@ -133,7 +133,7 @@ export const GET = ApiReference({
 ```ts
 // scripts/generate-openapi.ts
 import { writeFileSync } from 'fs';
-import { generateOpenApi } from '@ts-kizuna/open-api';
+import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '../src/contract';
 
 const spec = generateOpenApi(contract, {
@@ -158,7 +158,7 @@ If your contract already declares a `400` response for a route, the automatic va
 
 ## Reference
 
-- [`generateOpenApi`](/docs/reference/generate-open-api)
+- [`generateOpenApi`](/docs/reference/generate-openapi)
 
 ## Breaking changes
 

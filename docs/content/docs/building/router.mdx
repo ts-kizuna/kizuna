@@ -179,7 +179,7 @@ The `message` and `path` fields come directly from your Zod schemas. If you use 
 
 You don't need to handle this yourself — kizuna validates against the contract and rejects invalid requests automatically.
 
-This `400` response is reflected in the [fetch client](/docs/clients/fetch#validation-errors) return type and the [OpenAPI spec](/docs/open-api) for any route that declares a `body` or `query` schema.
+This `400` response is reflected in the [fetch client](/docs/clients/fetch#validation-errors) return type and the [OpenAPI spec](/docs/openapi) for any route that declares a `body` or `query` schema.
 
 If you declare your own `400` response in the contract, the client will see a union of both your type and kizuna's `ValidationError`. Use [`isValidationError`](/docs/clients/fetch#isvalidationerror) on the client to distinguish them.
 

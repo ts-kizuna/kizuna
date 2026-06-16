@@ -1,7 +1,7 @@
 import express from 'express';
 import { apiReference } from '@scalar/express-api-reference';
 import { createApi, createExpressEndpoints } from '@ts-kizuna/express';
-import { generateOpenApi } from '@ts-kizuna/open-api';
+import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '@ts-kizuna-demo/shared';
 
 import { router } from './lib/server';

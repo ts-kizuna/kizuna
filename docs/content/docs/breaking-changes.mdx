@@ -12,7 +12,7 @@ Create a script that prints your OpenAPI spec as YAML to stdout — this is the 
 ```ts
 // scripts/print-openapi.ts
 import path from 'path';
-import { generateOpenApi } from '@ts-kizuna/open-api';
+import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '../src/contract';
 
 const spec = generateOpenApi(contract, {

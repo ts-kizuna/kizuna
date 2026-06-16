@@ -13,7 +13,7 @@
         "create-client",
         "is-validation-error",
         "add-coded-issue",
-        "generate-open-api",
+        "generate-openapi",
         "generate-swift-client",
         "create-mcp-endpoint",
         "fastify-kizuna-mcp",

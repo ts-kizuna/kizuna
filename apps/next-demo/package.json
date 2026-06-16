@@ -14,7 +14,7 @@
     "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/core": "workspace:*",
     "@ts-kizuna/next": "workspace:*",
-    "@ts-kizuna/open-api": "workspace:*",
+    "@ts-kizuna/openapi": "workspace:*",
     "next": "^16.2.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
