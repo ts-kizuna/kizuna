@@ -29,6 +29,8 @@ Install the `@ts-kizuna/core` package — the core package that provides the typ
 
 <InstallTabs packageName="@ts-kizuna/core zod" />
 
+ts-kizuna requires Zod 4. It leans on Zod 4 internals directly, so older versions won't work.
+
 Enable `strict` in your `tsconfig.json` — this is required for ts-kizuna's type inference to work correctly.
 
 ```json title="tsconfig.json"
@@ -43,8 +45,7 @@ Enable `strict` in your `tsconfig.json` — this is required for ts-kizuna's typ
 
 The contract is the shared source of truth. It lives in a package (or file) that both your server and client import.
 
-```ts
-// packages/shared/src/contract.ts
+```ts title="packages/shared/src/contract.ts"
 import { createContract } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
@@ -97,8 +98,7 @@ export const contract = createContract({
 
 <InstallTabs packageName="@ts-kizuna/express" />
 
-```ts
-// src/lib/router.ts
+```ts title="src/lib/router.ts"
 import { createRouter } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 
@@ -152,8 +152,7 @@ export const router = createRouter(contract, {
 });
 ```
 
-```ts
-// src/lib/server.ts
+```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 import { router } from './router';
@@ -164,8 +163,7 @@ export const api = createApi({
 });
 ```
 
-```ts
-// src/index.ts
+```ts title="src/index.ts"
 import express from 'express';
 import { createExpressEndpoints } from '@ts-kizuna/express';
 import { api } from './lib/server';
@@ -182,8 +180,7 @@ app.listen(3000);
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
-```ts
-// src/lib/api-client.ts
+```ts title="src/lib/api-client.ts"
 import { createClient } from '@ts-kizuna/fetch';
 import { contract } from '@shared/contract';
 

@@ -7,8 +7,7 @@ Once you have a contract and a router, combine them into an API object that an a
 
 ## `createApi`
 
-```ts
-// src/lib/server.ts
+```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
 import { contract } from './contract';
 import { router } from './router';
@@ -25,8 +24,7 @@ Once you have an `api` object, pass it to the adapter's endpoint function:
 
 **Express:**
 
-```ts
-// src/index.ts
+```ts title="src/index.ts"
 import express from 'express';
 import { createExpressEndpoints } from '@ts-kizuna/express';
 import { api } from './lib/server';
@@ -39,8 +37,7 @@ app.listen(3000);
 
 **Fastify:**
 
-```ts
-// src/index.ts
+```ts title="src/index.ts"
 import Fastify from 'fastify';
 import { fastifyKizuna } from '@ts-kizuna/fastify';
 import { api } from './lib/server';
@@ -56,8 +53,7 @@ app.listen({
 
 **Hono:**
 
-```ts
-// src/index.ts
+```ts title="src/index.ts"
 import { Hono } from 'hono';
 import { createHonoEndpoints } from '@ts-kizuna/hono';
 import { api } from './lib/server';
@@ -70,8 +66,7 @@ export default app;
 
 **Next.js:**
 
-```ts
-// src/app/api/[...ts-kizuna]/route.ts
+```ts title="src/app/api/[...ts-kizuna]/route.ts"
 import { createNextEndpoints } from '@ts-kizuna/next';
 import { api } from '../../../lib/server';
 

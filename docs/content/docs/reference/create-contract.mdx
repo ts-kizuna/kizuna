@@ -45,7 +45,7 @@ The typed contract object. TypeScript infers the exact shape, giving you full ty
 
 ## Example
 
-```ts
+```ts title="src/contract.ts"
 import { createContract } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
@@ -102,7 +102,7 @@ export const contract = createContract({
 
 Split large contracts across files by nesting sub-contracts. Use [`createTag`](/docs/reference/create-tag) to name each group:
 
-```ts
+```ts title="contract.ts"
 import { createContract } from '@ts-kizuna/core';
 import { usersContract } from './users';
 import { healthContract } from './health';

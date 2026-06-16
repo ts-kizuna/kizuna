@@ -26,8 +26,7 @@ export default withKizuna(nextConfig);
 
 Then create a catch-all route at `src/app/api/[...ts-kizuna]/route.ts`. The adapter exports handlers for every HTTP method, which Next.js dispatches automatically.
 
-```ts
-// src/lib/router.ts
+```ts title="src/lib/router.ts"
 import { createRouter } from '@ts-kizuna/next';
 import { contract } from '@shared/contract';
 
@@ -70,8 +69,7 @@ export const router = createRouter(contract, {
 });
 ```
 
-```ts
-// src/lib/server.ts
+```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/next';
 import { contract } from '@shared/contract';
 import { router } from './router';
@@ -82,8 +80,7 @@ export const api = createApi({
 });
 ```
 
-```ts
-// src/app/api/[...ts-kizuna]/route.ts
+```ts title="src/app/api/[...ts-kizuna]/route.ts"
 import { createNextEndpoints } from '@ts-kizuna/next';
 import { api } from '../../../lib/server';
 
@@ -117,8 +114,7 @@ Use `createGuard` to define access checks and `createMiddleware` to wire them to
 
 `createGuard` creates a middleware that checks access before the handler runs. Call `deny` to reject, return normally to allow. No manual `new Response()` boilerplate.
 
-```ts
-// src/lib/guards.ts
+```ts title="src/lib/guards.ts"
 import { createGuard } from '@ts-kizuna/next';
 
 export const authenticate = createGuard(async (request, route, deny) => {
@@ -158,8 +154,7 @@ export const requireMembership = createGuard(async (request, route, deny) => {
 
 ### Wiring guards to routes
 
-```ts
-// src/lib/middleware.ts
+```ts title="src/lib/middleware.ts"
 import { createMiddleware } from '@ts-kizuna/next';
 import { contract } from '@shared/contract';
 import { authenticate, requireAdmin, requireMembership } from './guards';
@@ -183,7 +178,7 @@ export const middleware = createMiddleware(contract, {
 
 ### Plugging into the API
 
-```ts
+```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/next';
 
 export const api = createApi({
@@ -217,8 +212,7 @@ createNextEndpoints(api, {
 
 Return an `AdapterResult` from `onError` to send a custom response instead of the default 500:
 
-```ts
-// src/lib/server.ts
+```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/next';
 import { contract } from '@shared/contract';
 import { router } from './router';
@@ -259,8 +253,7 @@ Returning `undefined` lets the default 500 flow run.
 
 If your middleware sets custom properties on the request, use module augmentation to extend `NextRequest` so handlers can access them without casts:
 
-```ts
-// types/next.d.ts
+```ts title="types/next.d.ts"
 import 'next/server';
 
 declare module 'next/server' {

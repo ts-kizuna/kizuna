@@ -7,7 +7,7 @@ The contract is a plain TypeScript object that describes every route in your API
 
 ## `createContract`
 
-```ts
+```ts title="src/contract.ts"
 import { createContract } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
@@ -151,7 +151,7 @@ responses: {
 
 Use [`createModel`](/docs/reference/create-model) to give a Zod schema a name that the OpenAPI and Swift generators pick up.
 
-```ts
+```ts title="src/contract.ts"
 import { createModel } from '@ts-kizuna/core';
 
 export const UserSchema = createModel({
@@ -175,8 +175,7 @@ Without a title, the generators inline the schema everywhere it appears. With `c
 
 Split your contract across files using sub-contracts. Use [`createTag`](/docs/reference/create-tag) to name and describe each group:
 
-```ts
-// contracts/tags.ts
+```ts title="contracts/tags.ts"
 import { createTag } from '@ts-kizuna/core';
 
 export const Users = createTag({
@@ -190,8 +189,7 @@ export const Health = createTag({
 });
 ```
 
-```ts
-// contracts/users.ts
+```ts title="contracts/users.ts"
 import { createContract } from '@ts-kizuna/core';
 import { Users } from './tags';
 
@@ -201,8 +199,7 @@ export const usersContract = createContract(Users, {
 });
 ```
 
-```ts
-// contract.ts
+```ts title="contract.ts"
 export const contract = createContract({
     users: usersContract,
     health: healthContract,
@@ -270,8 +267,7 @@ IDEs show a strikethrough on deprecated routes and fields right away. To carry t
 
 Create a separate `types.ts` file that imports your schemas and exports inferred types. This keeps schemas and types cleanly separated:
 
-```ts
-// packages/contract/src/types.ts
+```ts title="packages/contract/src/types.ts"
 import type { z } from 'zod';
 import { UserSchema, CreateUserSchema } from './contract';
 

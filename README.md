@@ -2,7 +2,7 @@
 
 ![ts-kizuna](docs/public/readme-beta.png)
 
-Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, powered by Zod 4.
+Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, powered by Zod.
 
 ![npm](https://img.shields.io/badge/npm-v1.23.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-blue)
@@ -10,7 +10,9 @@ Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, pow
 [Documentation](https://ts-kizuna.com)
 
 > [!NOTE]
-> **BETA.** ts-kizuna is stable and used in production. We're refining the API ahead of v2, so upgrades can include code changes. Pin your version and open an issue if anything breaks.
+> **Why is it already 1.0 if it's in beta?** We built ts-kizuna for our own apps and have been battle-testing it in production since before we open-sourced it. It's labeled beta because the syntax for how you write contracts, routers, and clients may still change before v2.
+>
+> We recommend pinning your version, then upgrading whenever it suits you.
 >
 > [See the release notes](https://github.com/ts-kizuna/kizuna/releases)
 
