@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/cli",
-  "version": "1.22.0",
+  "version": "1.23.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
