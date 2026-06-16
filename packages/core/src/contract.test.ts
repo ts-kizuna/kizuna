@@ -147,3 +147,99 @@ describe('createContract', () => {
         expect((routes as Contract)[CONTRACT_DESCRIPTION]).toBeUndefined();
     });
 });
+
+describe('createContract z.coerce ban', () => {
+    it('throws when a top-level query schema is coerced', () => {
+        expect(() =>
+            createContract({
+                listItems: {
+                    method: 'GET',
+                    path: '/items',
+                    query: z.coerce.number(),
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            })
+        ).toThrowError('Route "listItems" uses z.coerce at "query". z.coerce is not allowed in ts-kizuna contracts.');
+    });
+
+    it('throws and points at the nested field path that uses z.coerce', () => {
+        expect(() =>
+            createContract({
+                listItems: {
+                    method: 'GET',
+                    path: '/items',
+                    query: z.object({
+                        page: z.coerce.number(),
+                    }),
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            })
+        ).toThrowError('Route "listItems" uses z.coerce at "query.page". z.coerce is not allowed in ts-kizuna contracts.');
+    });
+
+    it('finds z.coerce hidden inside arrays, wrappers, and unions', () => {
+        expect(() =>
+            createContract({
+                createItem: {
+                    method: 'POST',
+                    path: '/items',
+                    body: z.object({
+                        prices: z.array(z.coerce.number()).optional(),
+                    }),
+                    responses: {
+                        201: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            })
+        ).toThrowError('Route "createItem" uses z.coerce at "body.prices". z.coerce is not allowed in ts-kizuna contracts.');
+    });
+
+    it('rejects z.coerce in a response schema', () => {
+        expect(() =>
+            createContract({
+                getItem: {
+                    method: 'GET',
+                    path: '/items/:id',
+                    responses: {
+                        200: z.object({
+                            count: z.coerce.number(),
+                        }),
+                    },
+                },
+            })
+        ).toThrowError('Route "getItem" uses z.coerce at "responses.200.count". z.coerce is not allowed in ts-kizuna contracts.');
+    });
+
+    it('accepts plain z.number()/z.date()/z.bigint() and z.any()/z.unknown()', () => {
+        expect(() =>
+            createContract({
+                listItems: {
+                    method: 'GET',
+                    path: '/items',
+                    query: z.object({
+                        page: z.number(),
+                        from: z.date(),
+                        cursor: z.bigint(),
+                        anything: z.any(),
+                        whatever: z.unknown(),
+                    }),
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            })
+        ).not.toThrow();
+    });
+});

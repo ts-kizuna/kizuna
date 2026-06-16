@@ -134,13 +134,16 @@ describe('Swift generator — z.iso.datetime()', () => {
 });
 
 describe('Swift generator — z.pipe() and z.string().transform()', () => {
-    it('resolves z.string().pipe(z.coerce.number()) to Double', () => {
+    it('resolves a string→number pipe (transform().pipe(z.number())) to Double', () => {
         const contract = createContract({
             search: {
                 method: 'GET',
                 path: '/search',
                 query: z.object({
-                    limit: z.string().pipe(z.coerce.number()),
+                    limit: z
+                        .string()
+                        .transform((value) => Number(value))
+                        .pipe(z.number()),
                 }),
                 responses: {
                     200: z.object({

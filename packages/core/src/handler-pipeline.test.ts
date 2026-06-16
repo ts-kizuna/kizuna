@@ -292,6 +292,109 @@ describe('query coercion', () => {
         expect(result.ok).toBe(true);
     });
 
+    it('coerces ISO string to date', () => {
+        const route = makeRoute({
+            query: z.object({
+                from: z.date(),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {
+                from: '2026-01-02T03:04:05.000Z',
+            },
+            body: undefined,
+            headers: {},
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.parsed.query).toEqual({
+                from: new Date('2026-01-02T03:04:05.000Z'),
+            });
+        }
+    });
+
+    it('does not coerce invalid date strings', () => {
+        const route = makeRoute({
+            query: z.object({
+                from: z.date(),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {
+                from: 'not-a-date',
+            },
+            body: undefined,
+            headers: {},
+        });
+        expect(result.ok).toBe(false);
+    });
+
+    it('coerces string to bigint', () => {
+        const route = makeRoute({
+            query: z.object({
+                cursor: z.bigint(),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {
+                cursor: '90071992547409929',
+            },
+            body: undefined,
+            headers: {},
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.parsed.query).toEqual({
+                cursor: 90071992547409929n,
+            });
+        }
+    });
+
+    it('does not coerce invalid bigint strings', () => {
+        const route = makeRoute({
+            query: z.object({
+                cursor: z.bigint(),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {
+                cursor: '1.5',
+            },
+            body: undefined,
+            headers: {},
+        });
+        expect(result.ok).toBe(false);
+    });
+
+    it('coerces array of date and bigint strings', () => {
+        const route = makeRoute({
+            query: z.object({
+                dates: z.array(z.date()),
+                ids: z.array(z.bigint()),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {
+                dates: ['2026-01-01T00:00:00.000Z', '2026-02-01T00:00:00.000Z'],
+                ids: ['1', '2'],
+            },
+            body: undefined,
+            headers: {},
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.parsed.query).toEqual({
+                dates: [new Date('2026-01-01T00:00:00.000Z'), new Date('2026-02-01T00:00:00.000Z')],
+                ids: [1n, 2n],
+            });
+        }
+    });
+
     it('is backward-compatible with z.coerce.number()', () => {
         const route = makeRoute({
             query: z.object({
