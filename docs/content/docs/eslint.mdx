@@ -1,0 +1,64 @@
+---
+title: ESLint
+description: Catch ts-kizuna mistakes in your editor with the official ESLint plugin.
+---
+
+`@ts-kizuna/eslint-plugin` catches ts-kizuna mistakes in your editor — things the type system can't express on its own, surfaced as you type instead of at runtime.
+
+<InstallTabs packageName="@ts-kizuna/eslint-plugin" />
+
+## Setup
+
+Add the recommended config to your `eslint.config.js`, alongside whatever else you already run:
+
+```js
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import kizuna from '@ts-kizuna/eslint-plugin';
+
+export default [js.configs.recommended, ...tseslint.configs.recommended, kizuna.configs.recommended];
+```
+
+That's it — every rule below is now active.
+
+## Turning a rule off
+
+Override it after the recommended config:
+
+```js
+import kizuna from '@ts-kizuna/eslint-plugin';
+
+export default [
+    kizuna.configs.recommended,
+    {
+        rules: {
+            '@ts-kizuna/no-z-coerce': 'off',
+        },
+    },
+];
+```
+
+Or silence a single line inline:
+
+```ts
+// eslint-disable-next-line @ts-kizuna/no-z-coerce
+page: z.coerce.number(),
+```
+
+## Rules
+
+### `no-z-coerce`
+
+Flags `z.coerce` in your schemas. kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/building/contract#query-path-and-header-coercion)), so `z.coerce` is redundant — and `createContract` throws on it. Use the plain schema instead:
+
+```ts
+// flagged
+query: z.object({
+    page: z.coerce.number(),
+});
+
+// good — kizuna coerces the string for you
+query: z.object({
+    page: z.number(),
+});
+```

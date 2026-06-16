@@ -15,14 +15,15 @@
     "swift:build": "pnpm --filter @ts-kizuna-demo/swift build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "pnpm --filter @ts-kizuna/eslint-plugin build && eslint .",
+    "lint:fix": "pnpm --filter @ts-kizuna/eslint-plugin build && eslint . --fix",
     "docs": "pnpm --filter docs dev",
     "release": "release-it"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@release-it/conventional-changelog": "^11.0.0",
+    "@ts-kizuna/eslint-plugin": "workspace:*",
     "@types/supertest": "^6.0.2",
     "concurrently": "^9.1.0",
     "eslint": "^9.39.4",

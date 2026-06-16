@@ -539,6 +539,7 @@ const pathParamsContract = createContract({
         method: 'GET',
         path: '/events/:year',
         pathParams: z.object({
+            // eslint-disable-next-line @ts-kizuna/no-z-coerce -- this test checks how a coerced path param is typed
             year: z.coerce.number(),
         }),
         responses: {
