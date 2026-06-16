@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/express",
-  "version": "1.23.0",
+  "version": "1.23.1",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
