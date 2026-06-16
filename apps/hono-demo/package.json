@@ -18,7 +18,7 @@
     "@ts-kizuna/core": "workspace:*",
     "@ts-kizuna/hono": "workspace:*",
     "@ts-kizuna/mcp": "workspace:*",
-    "@ts-kizuna/open-api": "workspace:*",
+    "@ts-kizuna/openapi": "workspace:*",
     "hono": "^4.7.0",
     "zod": "^4.0.0"
   },

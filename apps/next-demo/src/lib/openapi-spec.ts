@@ -1,4 +1,4 @@
-import { generateOpenApi } from '@ts-kizuna/open-api';
+import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '@ts-kizuna-demo/shared';
 
 export const openApiSpec = generateOpenApi(contract, {

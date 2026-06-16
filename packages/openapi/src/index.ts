@@ -14,4 +14,5 @@ export {
     type OpenApiParameter,
     type OpenApiResponseObject,
     type OpenApiServer,
+    type OpenApiVersion,
 } from './generator.js';

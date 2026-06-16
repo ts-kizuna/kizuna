@@ -74,9 +74,9 @@ importers:
       '@ts-kizuna/fetch':
         specifier: workspace:*
         version: link:../../packages/fetch
-      '@ts-kizuna/open-api':
+      '@ts-kizuna/openapi':
         specifier: workspace:*
-        version: link:../../packages/open-api
+        version: link:../../packages/openapi
       express:
         specifier: ^5.0.0
         version: 5.2.1
@@ -123,9 +123,9 @@ importers:
       '@ts-kizuna/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
-      '@ts-kizuna/open-api':
+      '@ts-kizuna/openapi':
         specifier: workspace:*
-        version: link:../../packages/open-api
+        version: link:../../packages/openapi
       fastify:
         specifier: ^5.0.0
         version: 5.8.5
@@ -172,9 +172,9 @@ importers:
       '@ts-kizuna/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
-      '@ts-kizuna/open-api':
+      '@ts-kizuna/openapi':
         specifier: workspace:*
-        version: link:../../packages/open-api
+        version: link:../../packages/openapi
       hono:
         specifier: ^4.7.0
         version: 4.12.19
@@ -215,9 +215,9 @@ importers:
       '@ts-kizuna/next':
         specifier: workspace:*
         version: link:../../packages/next
-      '@ts-kizuna/open-api':
+      '@ts-kizuna/openapi':
         specifier: workspace:*
-        version: link:../../packages/open-api
+        version: link:../../packages/openapi
       next:
         specifier: ^16.2.4
         version: 16.2.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -513,7 +513,7 @@ importers:
         specifier: ^4.0.0
         version: 4.3.6
 
-  packages/open-api:
+  packages/openapi:
     dependencies:
       yaml:
         specifier: ^2.8.4

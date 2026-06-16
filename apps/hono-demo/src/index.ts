@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { apiReference } from '@scalar/hono-api-reference';
 import { createApi, createHonoEndpoints } from '@ts-kizuna/hono';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/hono';
-import { generateOpenApi } from '@ts-kizuna/open-api';
+import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '@ts-kizuna-demo/shared';
 
 import { router } from './lib/server';

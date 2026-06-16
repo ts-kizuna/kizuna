@@ -21,6 +21,11 @@ import {
 } from '@ts-kizuna/core/generator';
 import { CONTRACT_TAG, CONTRACT_DESCRIPTION, getStatusText } from '@ts-kizuna/core';
 
+/**
+ * The OpenAPI Specification version declared in the document's `openapi` field.
+ */
+export type OpenApiVersion = '3.1.0';
+
 export interface OpenApiInfo {
     title: string;
     version: string;
@@ -87,6 +92,12 @@ export interface OpenApiDocument {
 }
 
 export interface GenerateOpenApiOptions {
+    /**
+     * The OpenAPI Specification version to declare in the document's `openapi` field.
+     *
+     * Defaults to `'3.1.0'`.
+     */
+    openApiVersion?: OpenApiVersion;
     info: OpenApiInfo;
     servers?: OpenApiServer[];
     tags?: OpenApiTag[];
@@ -485,7 +496,7 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions, contr
 
         finalize() {
             const document: OpenApiDocument = {
-                openapi: '3.1.0',
+                openapi: options.openApiVersion ?? '3.1.0',
                 info: options.info,
                 paths,
             };

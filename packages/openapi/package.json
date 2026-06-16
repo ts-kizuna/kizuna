@@ -1,5 +1,5 @@
 {
-  "name": "@ts-kizuna/open-api",
+  "name": "@ts-kizuna/openapi",
   "version": "1.23.1",
   "type": "module",
   "main": "./dist/index.cjs",
