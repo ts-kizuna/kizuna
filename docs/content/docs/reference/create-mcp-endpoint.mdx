@@ -33,7 +33,7 @@ createMcpEndpoint(api: Api, app: Express, options?: McpEndpointOptions): void
 
 Mounts the MCP protocol handler at `/mcp` by default.
 
-```ts
+```ts title="src/index.ts"
 import express from 'express';
 import { createExpressEndpoints } from '@ts-kizuna/express';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
@@ -62,7 +62,7 @@ createMcpEndpoint(api: Api, app: Hono, options?: McpEndpointOptions): void
 
 Mounts the MCP protocol handler at `/mcp` by default.
 
-```ts
+```ts title="src/index.ts"
 import { Hono } from 'hono';
 import { createHonoEndpoints } from '@ts-kizuna/hono';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/hono';
@@ -89,8 +89,7 @@ createMcpEndpoint(api: Api, options?: McpEndpointOptions): { GET, POST, DELETE }
 
 Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HTTP transport requires.
 
-```ts
-// app/mcp/route.ts
+```ts title="app/mcp/route.ts"
 import { createMcpEndpoint } from '@ts-kizuna/mcp/next';
 import { api } from '../../lib/api';
 

@@ -33,7 +33,7 @@ The middleware map, type-checked against the contract.
 
 ## Example
 
-```ts
+```ts title="src/lib/middleware.ts"
 import { createMiddleware } from '@ts-kizuna/hono';
 import { contract } from './contract';
 
@@ -112,7 +112,7 @@ export const api = createApi({
 
 Use [`createGuard`](/docs/reference/create-guard) to create guards without boilerplate, then assign them to routes with `createMiddleware`:
 
-```ts
+```ts title="src/lib/middleware.ts"
 import { createMiddleware, createGuard } from '@ts-kizuna/hono';
 import { contract } from './contract';
 

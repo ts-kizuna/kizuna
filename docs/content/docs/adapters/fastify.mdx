@@ -17,8 +17,7 @@ The standard setup uses three functions:
 - `createApi` — combine a contract and its handlers into an API object
 - `fastifyKizuna` — Fastify plugin that mounts the API
 
-```ts
-// src/lib/router.ts
+```ts title="src/lib/router.ts"
 import { createRouter } from '@ts-kizuna/fastify';
 import { contract } from '@shared/contract';
 
@@ -61,8 +60,7 @@ export const router = createRouter(contract, {
 });
 ```
 
-```ts
-// src/lib/server.ts
+```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/fastify';
 import { contract } from '@shared/contract';
 import { router } from './router';
@@ -73,8 +71,7 @@ export const api = createApi({
 });
 ```
 
-```ts
-// src/index.ts
+```ts title="src/index.ts"
 import Fastify from 'fastify';
 import { fastifyKizuna } from '@ts-kizuna/fastify';
 import { api } from './lib/server';
@@ -112,8 +109,7 @@ Use `createGuard` to define access checks and `createMiddleware` to wire them to
 
 `createGuard` creates a middleware that checks access before the handler runs. Call `deny` to reject the request, or return normally to allow it through.
 
-```ts
-// src/lib/guards.ts
+```ts title="src/lib/guards.ts"
 import { createGuard } from '@ts-kizuna/fastify';
 
 export const auth = createGuard(async (request, reply, deny) => {
@@ -140,8 +136,7 @@ export const requireAdmin = createGuard(async (request, reply, deny) => {
 
 `createMiddleware` maps guards to contract routes. TypeScript autocompletes contract keys and rejects keys that don't exist.
 
-```ts
-// src/lib/middleware.ts
+```ts title="src/lib/middleware.ts"
 import { createMiddleware } from '@ts-kizuna/fastify';
 import { contract } from '@shared/contract';
 import { auth, requireAdmin } from './guards';
@@ -163,8 +158,7 @@ export const middleware = createMiddleware(contract, {
 
 ### Plugging into the API
 
-```ts
-// src/lib/server.ts
+```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/fastify';
 import { contract } from '@shared/contract';
 import { router } from './router';
@@ -194,8 +188,7 @@ createFastifyEndpoints(api, app, {
 
 If your middleware or guards set custom properties on `request`, use Fastify's [declaration merging](https://fastify.dev/docs/latest/Reference/TypeScript/#creating-a-typescript-fastify-plugin) to extend the `FastifyRequest` interface:
 
-```ts
-// types/fastify.d.ts
+```ts title="types/fastify.d.ts"
 declare module 'fastify' {
     interface FastifyRequest {
         userId: string;

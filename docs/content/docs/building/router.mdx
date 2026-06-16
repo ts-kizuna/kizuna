@@ -7,7 +7,7 @@ A router implements each route in your contract.
 
 ## `createRouter`
 
-```ts
+```ts title="src/lib/router.ts"
 import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
 import { contract } from './contract';
 
@@ -101,7 +101,7 @@ return {
 
 Error responses (status `>= 400`) are [RFC 9457 Problem Details](/docs/reference/problem-details-schema). Declare them in your contract with [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` — the same shape produced by [`deny()`](/docs/reference/create-guard#deny-and-problemdetailsschema) in guards and all built-in kizuna errors. Handlers supply only `detail` (plus any extension members); `type`, `title`, and `status` are auto-filled.
 
-```ts
+```ts title="src/contract.ts"
 import { createContract } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 

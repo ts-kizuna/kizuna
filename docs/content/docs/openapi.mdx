@@ -67,8 +67,7 @@ generateOpenApi(contract, {
 
 ## Serving with Scalar (Express)
 
-```ts
-// src/index.ts
+```ts title="src/index.ts"
 import express from 'express';
 import { apiReference } from '@scalar/express-api-reference';
 import { generateOpenApi } from '@ts-kizuna/openapi';
@@ -103,8 +102,7 @@ app.listen(3000);
 
 ## Serving with Scalar (Next.js)
 
-```ts
-// src/app/reference/route.ts
+```ts title="src/app/reference/route.ts"
 import { ApiReference } from '@scalar/nextjs-api-reference';
 import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '@shared/contract';
@@ -130,8 +128,7 @@ export const GET = ApiReference({
 
 ## Writing the spec to disk
 
-```ts
-// scripts/generate-openapi.ts
+```ts title="scripts/generate-openapi.ts"
 import { writeFileSync } from 'fs';
 import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '../src/contract';

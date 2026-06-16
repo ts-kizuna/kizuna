@@ -11,7 +11,7 @@ description: Catch ts-kizuna mistakes in your editor with the official ESLint pl
 
 Add the recommended config to your `eslint.config.js`, alongside whatever else you already run:
 
-```js
+```js title="eslint.config.js"
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import kizuna from '@ts-kizuna/eslint-plugin';
@@ -25,7 +25,7 @@ That's it — every rule below is now active.
 
 Override it after the recommended config:
 
-```js
+```js title="eslint.config.js"
 import kizuna from '@ts-kizuna/eslint-plugin';
 
 export default [

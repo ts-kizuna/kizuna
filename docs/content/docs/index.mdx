@@ -1,15 +1,17 @@
 ---
 title: Introduction
-description: Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, powered by Zod 4.
+description: Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, powered by Zod.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
 <BetaNotice>
-    ts-kizuna is stable and used in production. We're refining the API ahead of v2, so upgrades can include code changes. Pin your version
-    and open an issue if anything breaks.
 
-    [See the release notes](https://github.com/ts-kizuna/kizuna/releases) · [Read the FAQ](/docs/faq)
+**Why is it already 1.0 if it's in beta?** We built ts-kizuna for our own apps and have been battle-testing it in production since before we open-sourced it. It's labeled beta because the syntax for how you write contracts, routers, and clients may still change before v2.
+
+We recommend pinning your version, then upgrading whenever it suits you.
+
+[See the release notes](https://github.com/ts-kizuna/kizuna/releases) · [Read the FAQ](/docs/faq)
 
 </BetaNotice>
 
@@ -54,8 +56,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 The contract is a plain TypeScript object. It lives in a shared package that both your server and client import.
 
-```ts
-// packages/contract/src/index.ts
+```ts title="src/contract.ts"
 import { createContract } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
@@ -98,8 +99,7 @@ export const contract = createContract({
 
 ## Fulfill the contract on your server
 
-```ts
-// src/lib/router.ts
+```ts title="src/lib/router.ts"
 import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
 import { contract } from '@shared/contract';
 
@@ -147,8 +147,7 @@ export const router = createRouter(contract, {
 
 ## Use the API on the client
 
-```ts
-// src/api.ts
+```ts title="src/api.ts"
 import { createClient } from '@ts-kizuna/fetch';
 import { contract } from '@shared/contract';
 

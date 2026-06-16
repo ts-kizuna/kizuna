@@ -5,7 +5,7 @@ description: Move an existing API onto kizuna without breaking deployed clients 
 
 You have an API already running, and you want to move it onto kizuna. Most of it ports as-is — routes, schemas, and success responses. The one area worth understanding first is errors, and the good news is the migration is almost always **additive**: you keep your existing error fields and just gain the standard envelope around them. This page walks you through it.
 
-kizuna gives every error one shape: [RFC 9457 Problem Details](/docs/reference/problem-details-schema) — `type`, `title`, `status`, `detail`, plus any extra fields you add. That one shared shape is what lets guards, validation, the [`isProblemDetails`](/docs/reference/problem-details-schema#checking-for-a-problem-details-body) / [`isValidationError`](/docs/reference/is-validation-error) guards, generated clients, and the OpenAPI spec all describe errors the same way.
+ts-kizuna gives every error one shape: [RFC 9457 Problem Details](/docs/reference/problem-details-schema) — `type`, `title`, `status`, `detail`, plus any extra fields you add. That one shared shape is what lets guards, validation, the [`isProblemDetails`](/docs/reference/problem-details-schema#checking-for-a-problem-details-body) / [`isValidationError`](/docs/reference/is-validation-error) guards, generated clients, and the OpenAPI spec all describe errors the same way.
 
 ## Do you need a new API version?
 

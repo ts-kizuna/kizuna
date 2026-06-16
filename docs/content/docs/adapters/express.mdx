@@ -17,8 +17,7 @@ The standard setup uses three functions:
 - `createApi` — combine a contract and its handlers into an API object
 - `createExpressEndpoints` — mount the API on an Express app
 
-```ts
-// src/lib/router.ts
+```ts title="src/lib/router.ts"
 import { createRouter } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 
@@ -61,8 +60,7 @@ export const router = createRouter(contract, {
 });
 ```
 
-```ts
-// src/lib/server.ts
+```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 import { router } from './router';
@@ -73,8 +71,7 @@ export const api = createApi({
 });
 ```
 
-```ts
-// src/index.ts
+```ts title="src/index.ts"
 import express from 'express';
 import { createExpressEndpoints } from '@ts-kizuna/express';
 import { api } from './lib/server';
@@ -111,8 +108,7 @@ Use `createGuard` to define access checks and `createMiddleware` to wire them to
 
 `createGuard` creates a middleware that checks access before the handler runs. Call `deny` to reject, return normally to allow. No `next()`, no `res.json()` boilerplate.
 
-```ts
-// src/lib/guards.ts
+```ts title="src/lib/guards.ts"
 import { createGuard } from '@ts-kizuna/express';
 
 export const authenticate = createGuard(async (req, res, deny) => {
@@ -152,8 +148,7 @@ export const requireMembership = createGuard(async (req, res, deny) => {
 
 ### Wiring guards to routes
 
-```ts
-// src/lib/middleware.ts
+```ts title="src/lib/middleware.ts"
 import { createMiddleware } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 import { authenticate, requireAdmin, requireMembership } from './guards';
@@ -177,7 +172,7 @@ export const middleware = createMiddleware(contract, {
 
 ### Plugging into the API
 
-```ts
+```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/express';
 
 export const api = createApi({
@@ -205,8 +200,7 @@ createExpressEndpoints(api, app, {
 
 If your middleware sets custom properties on `req`, use declaration merging to extend the Express `Request` interface:
 
-```ts
-// types/express.d.ts
+```ts title="types/express.d.ts"
 declare global {
     namespace Express {
         interface Request {

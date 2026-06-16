@@ -23,11 +23,15 @@ The CLI reads the contract at runtime using `jiti` — no build step needed. Add
 
 ## Usage
 
-Request inputs are passed as components named after the contract's input groups — `.params` (path), `.body`, `.query`, and `.headers` — mirroring the [`@ts-kizuna/fetch`](/docs/clients/fetch) client:
+Create the client once and share it across your app:
 
-```swift
+```swift title="APISetup.swift"
 let client = APIClient(baseURL: URL(string: "https://api.example.com")!)
+```
 
+Request inputs are passed as components named after the contract's input groups — `.params` (path), `.body`, `.query`, and `.headers`:
+
+```swift title="UserService.swift"
 // object body
 let created = try await client.users.createUser(
     .body(
@@ -60,7 +64,7 @@ try await client.sendNotification(
 
 The generated file exports a typed actor with methods for each route and sub-clients for grouped routes. Each request group is a nested struct with a group-named factory:
 
-```swift
+```swift title="APIClient.swift"
 import Foundation
 
 public actor APIClient {
@@ -100,7 +104,7 @@ public func deleteUser(_ params: APIClient.DeleteUser.Params) async throws(APICl
 
 You can add a script to your `package.json` to regenerate the client whenever the contract changes:
 
-```json
+```json title="package.json"
 {
     "scripts": {
         "generate:swift": "ts-kizuna-swift generate --contract src/contract.ts --output ../ios/MyApp/Generated/APIClient.swift --namespace-name MyAPI"

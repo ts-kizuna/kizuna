@@ -1,13 +1,15 @@
 ---
 title: Create a TypeScript Client Wrapper
-description: Build a custom TypeScript client wrapper using the types and client from @ts-kizuna/fetch.
+description: Build and ship your own TypeScript client wrapper using the types and client from @ts-kizuna/fetch.
 ---
 
 `@ts-kizuna/fetch` exports `createClient` and the full contract type system. You can wrap these to build hooks, an SDK layer, or any other integration — no generator needed.
 
+New first-party client PRs will be declined — we can't maintain what we don't know well. The client API is public so you can build your own.
+
 ## Pattern
 
-```ts
+```ts title="src/lib/api-client.ts"
 import { createClient, type Client, type ClientPayload } from '@ts-kizuna/fetch';
 import { contract } from '@shared/contract';
 
@@ -44,4 +46,4 @@ These are fully generic — pass `typeof contract` or `typeof contract.someRoute
 
 ## Publishing
 
-ts-kizuna does not maintain third-party client libraries. Build yours, publish it as its own package, and own it. See [Third-Party Clients](/docs/clients/third-party) to list it.
+ts-kizuna does not maintain third-party client libraries. Build yours and publish it as its own package.

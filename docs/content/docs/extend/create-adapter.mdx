@@ -1,11 +1,11 @@
 ---
 title: Create an Adapter
-description: Build a ts-kizuna adapter for any HTTP runtime using createAdapter from @ts-kizuna/core/adapter.
+description: Build and ship your own ts-kizuna adapter for any HTTP runtime using createAdapter from @ts-kizuna/core/adapter.
 ---
 
 `@ts-kizuna/core/adapter` exposes `createAdapter` so third parties can build and ship their own adapters independently. ts-kizuna ships Express, Fastify, Hono, and Next.js — everything else is up to the community.
 
-New first-party adapter PRs will be declined — we can't maintain what we don't know well. The adapter API is public so you can build your own and own it.
+New first-party adapter PRs will be declined — we can't maintain what we don't know well. The adapter API is public so you can build your own.
 
 ## Overview
 
@@ -25,8 +25,7 @@ import { createAdapter, renderJsonResult, parseFetchBody, headersToObject, type 
 
 This example targets any runtime that uses the standard `Request`/`Response` APIs — Bun, Cloudflare Workers, Deno, etc.
 
-```ts
-// adapter.ts
+```ts title="adapter.ts"
 import {
     createAdapter,
     renderJsonResult,

@@ -17,8 +17,7 @@ The standard setup uses three functions:
 - `createApi` — combine a contract and its handlers into an API object
 - `createHonoEndpoints` — mount the API on a Hono app
 
-```ts
-// src/lib/router.ts
+```ts title="src/lib/router.ts"
 import { createRouter } from '@ts-kizuna/hono';
 import { contract } from '@shared/contract';
 
@@ -61,8 +60,7 @@ export const router = createRouter(contract, {
 });
 ```
 
-```ts
-// src/lib/server.ts
+```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/hono';
 import { contract } from '@shared/contract';
 import { router } from './router';
@@ -73,8 +71,7 @@ export const api = createApi({
 });
 ```
 
-```ts
-// src/index.ts
+```ts title="src/index.ts"
 import { Hono } from 'hono';
 import { createHonoEndpoints } from '@ts-kizuna/hono';
 import { api } from './lib/server';
@@ -104,7 +101,7 @@ getUser: async ({ params, c }) => {
 
 The `createRouter` and `Router` types accept a Hono `Env` type parameter for typed environment bindings. This is useful on runtimes like Cloudflare Workers where bindings are accessed via `c.env`.
 
-```ts
+```ts title="src/lib/router.ts"
 import { createRouter } from '@ts-kizuna/hono';
 import { contract } from '@shared/contract';
 
@@ -134,8 +131,7 @@ Use `createGuard` to define access checks and `createMiddleware` to wire them to
 
 `createGuard` creates a middleware that checks access before the handler runs. Call `deny` to reject the request, or return normally to allow it through. No `next()`, no `c.json()` boilerplate.
 
-```ts
-// src/lib/guards.ts
+```ts title="src/lib/guards.ts"
 import { createGuard } from '@ts-kizuna/hono';
 
 type AuthEnv = {
@@ -190,8 +186,7 @@ export const requireMembership = createGuard<AuthEnv>(async (c, deny) => {
 
 `createMiddleware` maps guards to contract routes. TypeScript autocompletes contract keys and rejects keys that don't exist.
 
-```ts
-// src/lib/middleware.ts
+```ts title="src/lib/middleware.ts"
 import { createMiddleware } from '@ts-kizuna/hono';
 import { contract } from '@shared/contract';
 import { auth, requireAdmin, requireMembership } from './guards';
@@ -216,8 +211,7 @@ export const middleware = createMiddleware(contract, {
 
 ### Plugging into the API
 
-```ts
-// src/lib/server.ts
+```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/hono';
 import { contract } from '@shared/contract';
 import { router } from './router';

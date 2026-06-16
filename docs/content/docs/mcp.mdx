@@ -9,8 +9,7 @@ description: Mount an MCP endpoint on your Express, Fastify, Hono, or Next.js ap
 
 ## Express
 
-```ts
-// src/index.ts
+```ts title="src/index.ts"
 import express from 'express';
 import { createExpressEndpoints } from '@ts-kizuna/express';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
@@ -29,8 +28,7 @@ app.listen(3000);
 
 ## Fastify
 
-```ts
-// src/index.ts
+```ts title="src/index.ts"
 import Fastify from 'fastify';
 import { fastifyKizuna } from '@ts-kizuna/fastify';
 import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
@@ -54,8 +52,7 @@ Mounts at `/mcp` by default, configurable with the `path` option.
 
 ## Hono
 
-```ts
-// src/index.ts
+```ts title="src/index.ts"
 import { Hono } from 'hono';
 import { createHonoEndpoints } from '@ts-kizuna/hono';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/hono';
@@ -73,8 +70,7 @@ Same as Express — mounts at `/mcp` by default, configurable with the `path` op
 
 ## Next.js
 
-```ts
-// app/mcp/route.ts
+```ts title="app/mcp/route.ts"
 import { createMcpEndpoint } from '@ts-kizuna/mcp/next';
 import { api } from '../../lib/api';
 
@@ -184,7 +180,7 @@ Responses with status >= 400 set `isError: true` on the MCP result so the AI kno
 
 If you don't want to mount on an existing app, [`createMcpServer`](/docs/reference/create-mcp-server) returns a raw `McpServer` you can connect to any transport (stdio, SSE, etc.).
 
-```ts
+```ts title="src/index.ts"
 import { createMcpServer } from '@ts-kizuna/mcp';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { api } from './api';

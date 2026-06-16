@@ -9,8 +9,7 @@ We recommend using [oasdiff](https://github.com/oasdiff/oasdiff) to detect break
 
 Create a script that prints your OpenAPI spec as YAML to stdout — this is the interface oasdiff and CI workflows consume.
 
-```ts
-// scripts/print-openapi.ts
+```ts title="scripts/print-openapi.ts"
 import path from 'path';
 import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '../src/contract';
@@ -30,7 +29,7 @@ console.log(spec('yaml'));
 
 Add a script to your `package.json`:
 
-```json
+```json title="package.json"
 {
     "scripts": {
         "print:openapi": "tsx scripts/print-openapi.ts"
@@ -42,7 +41,7 @@ Add a script to your `package.json`:
 
 Add a workflow that runs oasdiff on every pull request. This generates the OpenAPI spec from both the base branch and the PR branch, then checks for breaking changes.
 
-```yaml
+```yaml title=".github/workflows/breaking-changes.yml"
 # .github/workflows/breaking-changes.yml
 name: Breaking Changes
 

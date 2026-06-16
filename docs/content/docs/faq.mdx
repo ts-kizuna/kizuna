@@ -17,13 +17,13 @@ Our mission is simple: define your API once, and keep every client in sync with 
 
 ## Is it ready to use?
 
-It runs in production in our own apps, so the runtime is solid. The authoring API is still settling, so ts-kizuna is in beta and moving toward a stable v2. Pin a version for production and follow the [release notes](https://github.com/ts-kizuna/kizuna/releases) when you upgrade.
+It runs in production in our own apps, so it's battle-tested. The way you define and call your API is still settling, so ts-kizuna is in beta and moving toward a stable v2. Pin a version for production and follow the [release notes](https://github.com/ts-kizuna/kizuna/releases) when you upgrade.
 
 ## What's on the roadmap?
 
 We're just getting started. Here's where ts-kizuna is headed:
 
-- A stable v2, with the authoring API locked in
+- A stable v2, with the way you define and call your API locked in
 - Kotlin client generation for Android, joining the Swift client
 - Ongoing docs polish and refinement
 - Whatever the future brings
@@ -44,7 +44,7 @@ ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and keeps the public API
 
 [tRPC](https://trpc.io) is a great choice for a pure TypeScript stack, and you don't give up the RPC-like client by choosing ts-kizuna. You still call your endpoints like functions and get fully typed results back:
 
-```ts
+```ts title="src/api-client.ts"
 import { createClient } from '@ts-kizuna/fetch';
 import { contract } from '@shared/contract';
 
@@ -65,7 +65,7 @@ The difference is that ts-kizuna is the better fit when your API also has consum
 
 We'd love your help. Bug reports, small reproductions, and doc fixes are always welcome, and an issue or a PR for any of those is a great place to start.
 
-Everything we merge into the core is something we commit to maintaining for the long haul, so we don't take additions lightly. We keep it small and stick to the packages we actually use, which is why new first-party adapters and clients won't be merged. The better news: the adapter and client APIs are public, so you can build exactly what you need and own it (see the [extend guide](/docs/extend/create-adapter)).
+Everything we merge into the core is something we commit to maintaining for the long haul, so we don't take additions lightly. We keep it small and stick to the packages we actually use, which is why new first-party adapters and clients won't be merged. The better news: the adapter and client APIs are public, so you can build exactly what you need (see the [extend guide](/docs/extend/create-adapter)).
 
 For anything beyond a bug fix or docs, like a new feature or an API change, open an issue first so we can check it fits before you build it.
 
