@@ -37,6 +37,18 @@ pnpm -r typecheck    # tsc --noEmit, all packages
 pnpm format:check    # pnpm format to fix
 ```
 
+## PR titles
+
+We squash-merge, so the PR title becomes the changelog entry and the commit on `main`. Use Conventional Commits:
+
+```
+type(scope): summary
+```
+
+- **Types:** `feat`, `fix`, `docs`, `chore`, `refactor`, `perf`, `test`, `build`, `ci`, `style`, `revert`
+- **Scope** is required for `feat`, `fix`, `perf`, and `refactor`, and must be a package (`core`, `fetch`, `express`, …). Other types may omit it. (Adding a new package? A maintainer applies the `new scope` label.)
+- A check validates this on every PR.
+
 ## Commit messages
 
 No `Co-Authored-By` trailers for AI agents. AI is a tool, not an author.
