@@ -41,3 +41,46 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   GITHUB_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: pnpm exec release-it --ci
+
+            - name: Add contributors to release
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const { owner, repo } = context.repo;
+                      const releases = await github.paginate(github.rest.repos.listReleases, { owner, repo, per_page: 100 });
+                      const current = releases[0];
+                      if (!current || (current.body || '').includes('### Contributors')) return;
+
+                      // Collect contributors (name + GitHub handle) from the commits in this release.
+                      let people = [];
+                      const previous = releases[1];
+                      if (previous) {
+                          const compare = await github.rest.repos.compareCommitsWithBasehead({
+                              owner,
+                              repo,
+                              basehead: `${previous.tag_name}...${current.tag_name}`,
+                          });
+                          people = compare.data.commits
+                              .filter((commit) => commit.author && !commit.author.login.endsWith('[bot]'))
+                              .map((commit) => ({
+                                  login: commit.author.login,
+                                  name: (commit.commit.author && commit.commit.author.name) || commit.author.login,
+                              }));
+                      } else {
+                          const contributors = await github.paginate(github.rest.repos.listContributors, { owner, repo, per_page: 100 });
+                          people = contributors
+                              .filter((contributor) => !contributor.login.endsWith('[bot]'))
+                              .map((contributor) => ({ login: contributor.login, name: contributor.login }));
+                      }
+
+                      const seen = new Set();
+                      const unique = people.filter((person) => !seen.has(person.login) && seen.add(person.login));
+                      if (!unique.length) return;
+
+                      const list = unique.map((person) => `${person.name} (@${person.login})`).join('\n');
+                      await github.rest.repos.updateRelease({
+                          owner,
+                          repo,
+                          release_id: current.id,
+                          body: `${current.body || ''}\n\n### Contributors\n\n${list}`,
+                      });
