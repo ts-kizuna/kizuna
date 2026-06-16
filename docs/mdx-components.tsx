@@ -4,6 +4,7 @@ import { Card, Cards } from 'fumadocs-ui/components/card';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { AdapterTabs } from '@/lib/AdapterTabs';
+import { BetaNotice } from '@/lib/BetaNotice';
 import { InstallTabs } from '@/lib/InstallTabs';
 
 export function getMDXComponents(components: MDXComponents): MDXComponents {
@@ -19,6 +20,7 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         Tab,
         Tabs,
         AdapterTabs,
+        BetaNotice,
         InstallTabs,
     };
 }
