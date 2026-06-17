@@ -1,5 +1,7 @@
 import type { ESLint, Linter } from 'eslint';
 import packageJson from '../package.json';
+import { noDuplicateDeprecated } from './rules/no-duplicate-deprecated.js';
+import { noJsdocTagsInDeprecations } from './rules/no-jsdoc-tags-in-deprecations.js';
 import { noZCoerce } from './rules/no-z-coerce.js';
 
 const plugin: ESLint.Plugin = {
@@ -9,6 +11,8 @@ const plugin: ESLint.Plugin = {
         namespace: '@ts-kizuna',
     },
     rules: {
+        'no-duplicate-deprecated': noDuplicateDeprecated,
+        'no-jsdoc-tags-in-deprecations': noJsdocTagsInDeprecations,
         'no-z-coerce': noZCoerce,
     },
 };
@@ -28,6 +32,8 @@ const recommended: Linter.Config = {
         '@ts-kizuna': plugin,
     },
     rules: {
+        '@ts-kizuna/no-duplicate-deprecated': 'error',
+        '@ts-kizuna/no-jsdoc-tags-in-deprecations': 'error',
         '@ts-kizuna/no-z-coerce': 'error',
     },
 };
