@@ -1,8 +1,7 @@
-import type { ESLint, Linter } from 'eslint';
+import type { ESLint, Linter, Rule } from 'eslint';
+import parser from '@typescript-eslint/parser';
 import packageJson from '../package.json';
-import { noDuplicateDeprecated } from './rules/no-duplicate-deprecated.js';
-import { noJsdocTagsInDeprecations } from './rules/no-jsdoc-tags-in-deprecations.js';
-import { noZCoerce } from './rules/no-z-coerce.js';
+import { noUnsupportedSchema } from './rules/no-unsupported-schema.js';
 
 const plugin: ESLint.Plugin = {
     meta: {
@@ -11,14 +10,12 @@ const plugin: ESLint.Plugin = {
         namespace: '@ts-kizuna',
     },
     rules: {
-        'no-duplicate-deprecated': noDuplicateDeprecated,
-        'no-jsdoc-tags-in-deprecations': noJsdocTagsInDeprecations,
-        'no-z-coerce': noZCoerce,
+        'no-unsupported-schema': noUnsupportedSchema as unknown as Rule.RuleModule,
     },
 };
 
 /**
- * Flat config enabling every ts-kizuna rule. Add it to your `eslint.config.js`:
+ * Flat config enabling every ts-kizuna rule.
  *
  * ```js
  * import kizuna from '@ts-kizuna/eslint-plugin';
@@ -28,13 +25,18 @@ const plugin: ESLint.Plugin = {
  */
 const recommended: Linter.Config = {
     name: '@ts-kizuna/recommended',
+    files: ['**/*.ts', '**/*.cts', '**/*.mts', '**/*.tsx'],
     plugins: {
         '@ts-kizuna': plugin,
     },
+    languageOptions: {
+        parser: parser as Linter.Parser,
+        parserOptions: {
+            projectService: true,
+        },
+    },
     rules: {
-        '@ts-kizuna/no-duplicate-deprecated': 'error',
-        '@ts-kizuna/no-jsdoc-tags-in-deprecations': 'error',
-        '@ts-kizuna/no-z-coerce': 'error',
+        '@ts-kizuna/no-unsupported-schema': 'error',
     },
 };
 

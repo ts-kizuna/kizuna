@@ -155,6 +155,7 @@ describe('createContract z.coerce ban', () => {
                 listItems: {
                     method: 'GET',
                     path: '/items',
+                    // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- intentional, asserts createContract throws on z.coerce
                     query: z.coerce.number(),
                     responses: {
                         200: z.object({
@@ -173,6 +174,7 @@ describe('createContract z.coerce ban', () => {
                     method: 'GET',
                     path: '/items',
                     query: z.object({
+                        // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- intentional, asserts createContract throws on z.coerce
                         page: z.coerce.number(),
                     }),
                     responses: {
@@ -192,6 +194,7 @@ describe('createContract z.coerce ban', () => {
                     method: 'POST',
                     path: '/items',
                     body: z.object({
+                        // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- intentional, asserts createContract throws on z.coerce
                         prices: z.array(z.coerce.number()).optional(),
                     }),
                     responses: {
@@ -212,6 +215,7 @@ describe('createContract z.coerce ban', () => {
                     path: '/items/:id',
                     responses: {
                         200: z.object({
+                            // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- intentional, asserts createContract throws on z.coerce
                             count: z.coerce.number(),
                         }),
                     },
