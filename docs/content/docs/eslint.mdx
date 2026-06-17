@@ -62,3 +62,36 @@ query: z.object({
     page: z.number(),
 });
 ```
+
+### `no-jsdoc-tags-in-deprecations`
+
+Flags JSDoc inline tags — `{@link}`, `{@linkcode}`, `{@tutorial}`, and any other `{@…}` tag — inside `@deprecated` messages. kizuna serializes the text after `@deprecated` verbatim into `.kizuna/deprecations.json` and surfaces it to every generated client. Native and mobile clients can't parse JSDoc tags, so they'd show the raw `{@…}` markup. Write the message as plain text — backticks are fine:
+
+```ts
+// flagged
+/**
+ * @deprecated Use {@link createUser} instead.
+ */
+
+// good — plain text the clients can render
+/**
+ * @deprecated Use `createUser` instead.
+ */
+```
+
+### `no-duplicate-deprecated`
+
+Flags JSDoc blocks with more than one `@deprecated` tag. kizuna serializes only the **first** `@deprecated` message into `.kizuna/deprecations.json` — any later one is silently dropped and never reaches a generated client. Collapse them into a single message:
+
+```ts
+// flagged — clients only get "Use `createUser` instead."; the id warning is dropped
+/**
+ * @deprecated Use `createUser` instead.
+ * @deprecated Numeric ids are no longer accepted.
+ */
+
+// good — one message, nothing lost
+/**
+ * @deprecated Use `createUser` instead. Numeric ids are no longer accepted.
+ */
+```
