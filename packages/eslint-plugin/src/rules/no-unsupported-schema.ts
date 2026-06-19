@@ -1,8 +1,86 @@
+import * as path from 'node:path';
 import { ESLintUtils, type TSESTree } from '@typescript-eslint/utils';
 import ts from 'typescript';
 import { collectSchemaIssues, type SchemaIssue, type SchemaResolver } from '../schema-violations.js';
 
 const SCHEMA_KEYS: ReadonlySet<string> = new Set(['body', 'query', 'pathParams', 'headers']);
+
+const createCheckerResolver =
+    (checker: ts.TypeChecker): SchemaResolver =>
+    (identifier) => {
+        const symbol = checker.getSymbolAtLocation(identifier);
+        if (!symbol) return undefined;
+        const resolved = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+        return resolved.declarations?.find(ts.isVariableDeclaration)?.initializer;
+    };
+
+const createSourceResolver = (): SchemaResolver => {
+    const sourceFileCache = new Map<string, ts.SourceFile | undefined>();
+    const optionsCache = new Map<string, ts.CompilerOptions>();
+
+    const readSourceFile = (fileName: string): ts.SourceFile | undefined => {
+        if (sourceFileCache.has(fileName)) return sourceFileCache.get(fileName);
+        const text = ts.sys.readFile(fileName);
+        const sourceFile = text === undefined ? undefined : ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true);
+        sourceFileCache.set(fileName, sourceFile);
+        return sourceFile;
+    };
+
+    const compilerOptionsFor = (containingFile: string): ts.CompilerOptions => {
+        const configPath = ts.findConfigFile(path.dirname(containingFile), ts.sys.fileExists);
+        const key = configPath ?? '';
+        const cached = optionsCache.get(key);
+        if (cached) return cached;
+        const options: ts.CompilerOptions = configPath
+            ? ts.parseJsonConfigFileContent(ts.readConfigFile(configPath, ts.sys.readFile).config, ts.sys, path.dirname(configPath)).options
+            : { allowJs: true, moduleResolution: ts.ModuleResolutionKind.Bundler };
+        optionsCache.set(key, options);
+        return options;
+    };
+
+    const constNamed = (sourceFile: ts.SourceFile, name: string): ts.Expression | undefined => {
+        for (const statement of sourceFile.statements) {
+            if (!ts.isVariableStatement(statement)) continue;
+            for (const declaration of statement.declarationList.declarations) {
+                if (ts.isIdentifier(declaration.name) && declaration.name.text === name && declaration.initializer)
+                    return declaration.initializer;
+            }
+        }
+        return undefined;
+    };
+
+    const importedFrom = (sourceFile: ts.SourceFile, name: string): { specifier: string; exportedName: string } | undefined => {
+        for (const statement of sourceFile.statements) {
+            if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+            const named = statement.importClause?.namedBindings;
+            if (!named || !ts.isNamedImports(named)) continue;
+            for (const element of named.elements) {
+                if (element.name.text === name)
+                    return {
+                        specifier: statement.moduleSpecifier.text,
+                        exportedName: (element.propertyName ?? element.name).text,
+                    };
+            }
+        }
+        return undefined;
+    };
+
+    return (identifier) => {
+        const sourceFile = identifier.getSourceFile();
+        const local = constNamed(sourceFile, identifier.text);
+        if (local) return local;
+
+        const imported = importedFrom(sourceFile, identifier.text);
+        if (!imported) return undefined;
+
+        const resolved = ts.resolveModuleName(imported.specifier, sourceFile.fileName, compilerOptionsFor(sourceFile.fileName), ts.sys)
+            .resolvedModule?.resolvedFileName;
+        if (!resolved) return undefined;
+
+        const target = readSourceFile(resolved);
+        return target ? constNamed(target, imported.exportedName) : undefined;
+    };
+};
 
 const MESSAGE_IDS = {
     coerce: ['coerce', 'coerceReference'],
@@ -73,15 +151,9 @@ export const noUnsupportedSchema = ESLintUtils.RuleCreator.withoutDocs({
     defaultOptions: [],
     create(context) {
         const services = ESLintUtils.getParserServices(context, true);
-        if (!services.program) return {};
-
-        const checker = services.program.getTypeChecker();
-        const resolve: SchemaResolver = (identifier) => {
-            const symbol = checker.getSymbolAtLocation(identifier);
-            if (!symbol) return undefined;
-            const resolved = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
-            return resolved.declarations?.find(ts.isVariableDeclaration)?.initializer;
-        };
+        const resolve: SchemaResolver = services.program
+            ? createCheckerResolver(services.program.getTypeChecker())
+            : createSourceResolver();
 
         const reported = new Set<string>();
 
