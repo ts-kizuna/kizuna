@@ -1,6 +1,7 @@
 import { createContract, createModel, createTag } from '@ts-kizuna/core';
 import { ProblemDetailsSchema, BinarySchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
+import { PaginationQuery } from './pagination.js';
 
 export const UserSchema = createModel({
     title: 'User',
@@ -53,17 +54,6 @@ export const CreateUserSchema = createModel({
 });
 
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
-
-const PaginationQuery = z.object({
-    page: z.number().int().min(1).default(1).meta({
-        description: 'Page number, starting at 1',
-        example: 1,
-    }),
-    limit: z.number().int().min(1).max(100).default(10).meta({
-        description: 'Page size (1–100)',
-        example: 10,
-    }),
-});
 
 export const EmailEvent = createModel({
     title: 'EmailEvent',

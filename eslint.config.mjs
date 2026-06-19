@@ -9,7 +9,7 @@ import kizuna from '@ts-kizuna/eslint-plugin';
 export default [
     ...tseslint.config(
         {
-            ignores: ['node_modules', '**/dist', '**/build', '**/.turbo', '**/.source'],
+            ignores: ['node_modules', '**/dist', '**/build', '**/.turbo', '**/.source', '**/__fixtures__/**'],
         },
         eslint.configs.recommended,
         ...tseslint.configs.recommended,

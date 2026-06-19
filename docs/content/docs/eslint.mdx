@@ -32,7 +32,7 @@ export default [
     kizuna.configs.recommended,
     {
         rules: {
-            '@ts-kizuna/no-z-coerce': 'off',
+            '@ts-kizuna/no-unsupported-schema': 'off',
         },
     },
 ];
@@ -41,15 +41,19 @@ export default [
 Or silence a single line inline:
 
 ```ts
-// eslint-disable-next-line @ts-kizuna/no-z-coerce
-page: z.coerce.number(),
+query: z.object({
+    // eslint-disable-next-line @ts-kizuna/no-unsupported-schema
+    page: z.coerce.number(),
+}),
 ```
 
-## Rules
+## `no-unsupported-schema`
 
-### `no-z-coerce`
+Flags `body`, `query`, `pathParams`, `headers`, and response schemas in your routes — plus `createModel` schemas, inline or imported — that use something ts-kizuna can't support. It follows imports, so the error lands on the offending field when it's local, or on the reference when the schema comes from another file.
 
-Flags `z.coerce` in your schemas. kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/building/contract#query-path-and-header-coercion)), so `z.coerce` is redundant — and `createContract` throws on it. Use the plain schema instead:
+### `z.coerce`
+
+kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/building/contract#query-path-and-header-coercion)), so `z.coerce` is redundant — and `createContract` throws on it. Use the plain schema:
 
 ```ts
 // flagged
@@ -63,9 +67,9 @@ query: z.object({
 });
 ```
 
-### `no-jsdoc-tags-in-deprecations`
+### JSDoc tags in `@deprecated`
 
-Flags JSDoc inline tags — `{@link}`, `{@linkcode}`, `{@tutorial}`, and any other `{@…}` tag — inside `@deprecated` messages. kizuna serializes the text after `@deprecated` verbatim into `.kizuna/deprecations.json` and surfaces it to every generated client. Native and mobile clients can't parse JSDoc tags, so they'd show the raw `{@…}` markup. Write the message as plain text — backticks are fine:
+kizuna serializes the text after `@deprecated` verbatim and surfaces it to every generated client. Native and mobile clients can't parse JSDoc inline tags (`{@link}`, `{@linkcode}`, any `{@…}`), so they'd show the raw markup. Write plain text — backticks are fine:
 
 ```ts
 // flagged
@@ -73,25 +77,52 @@ Flags JSDoc inline tags — `{@link}`, `{@linkcode}`, `{@tutorial}`, and any oth
  * @deprecated Use {@link createUser} instead.
  */
 
-// good — plain text the clients can render
+// good
 /**
  * @deprecated Use `createUser` instead.
  */
 ```
 
-### `no-duplicate-deprecated`
+### Duplicate `@deprecated`
 
-Flags JSDoc blocks with more than one `@deprecated` tag. kizuna serializes only the **first** `@deprecated` message into `.kizuna/deprecations.json` — any later one is silently dropped and never reaches a generated client. Collapse them into a single message:
+kizuna serializes only the **first** `@deprecated` message — any later one is silently dropped and never reaches a client. Collapse them into one:
 
 ```ts
-// flagged — clients only get "Use `createUser` instead."; the id warning is dropped
+// flagged — clients never see the second line
 /**
  * @deprecated Use `createUser` instead.
  * @deprecated Numeric ids are no longer accepted.
  */
 
-// good — one message, nothing lost
+// good
 /**
  * @deprecated Use `createUser` instead. Numeric ids are no longer accepted.
  */
+```
+
+### Across files
+
+A schema is often defined elsewhere — a shared `PaginationQuery` in its own `zod`-only module that no per-file linter would ever connect to your contract. Because the rule resolves what your contract references, it catches it anyway and reports on the reference:
+
+```ts title="pagination.ts"
+import { z } from 'zod';
+
+export const PaginationQuery = z.object({
+    page: z.coerce.number(),
+});
+```
+
+```ts title="contract.ts"
+import { PaginationQuery } from './pagination.js';
+
+export const contract = createContract({
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        query: PaginationQuery, // flagged here — PaginationQuery uses z.coerce
+        responses: {
+            200: UserListSchema,
+        },
+    },
+});
 ```
