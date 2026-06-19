@@ -2,3 +2,22 @@ packages:
     - 'packages/*'
     - 'apps/*'
     - 'docs'
+
+catalog:
+    '@hono/node-server': ^1.14.0
+    '@types/express': ^5.0.0
+    '@types/node': ^24
+    '@types/react': ^19.2.0
+    '@types/react-dom': ^19.2.0
+    concurrently: ^9.1.0
+    eslint: ^9.39.4
+    express: ^5.0.0
+    fastify: ^5.0.0
+    hono: ^4.7.0
+    next: ^16.2.4
+    react: ^19.2.5
+    react-dom: ^19.2.5
+    tsdown: ^0.21.0
+    tsx: ^4.19.2
+    typescript: ^5.6.3
+    zod: ^4.0.0

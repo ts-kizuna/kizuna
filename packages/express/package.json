@@ -35,10 +35,10 @@
   "devDependencies": {
     "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/core": "workspace:*",
-    "@types/express": "^5.0.0",
-    "express": "^5.0.0",
-    "tsdown": "^0.21.0",
-    "typescript": "^5.6.3",
-    "zod": "^4.0.0"
+    "@types/express": "catalog:",
+    "express": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
   }
 }

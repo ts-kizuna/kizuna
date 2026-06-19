@@ -34,10 +34,10 @@
   },
   "devDependencies": {
     "@ts-kizuna/core": "workspace:*",
-    "fastify": "^5.0.0",
-    "tsdown": "^0.21.0",
-    "typescript": "^5.6.3",
-    "zod": "^4.0.0"
+    "fastify": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
   },
   "dependencies": {
     "fastify-plugin": "^5.1.0"
