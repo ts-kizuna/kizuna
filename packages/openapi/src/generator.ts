@@ -18,7 +18,7 @@ import {
     resolveResponseContentType,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
-import { type Contract, type TagOptions, getStatusText } from '@ts-kizuna/core';
+import { type Contract, type TagOptions, getStatusText, PROBLEM_DETAILS_META } from '@ts-kizuna/core';
 
 /**
  * The OpenAPI Specification version declared in the document's `openapi` field.
@@ -316,6 +316,12 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
     const pendingFieldDeprecations: Array<{ operation: OpenApiOperation; fieldDeprecations: Map<string, string> }> = [];
     const schemaDeprecations = loadDeprecations(contractFingerprint(contract))?.schemas;
+    // When the contract opted out of Problem Details, handler-authored error responses are
+    // plain JSON. Framework errors (e.g. the validation 400 below) still emit Problem Details.
+    const errorContentType =
+        (contract.routes as { [PROBLEM_DETAILS_META]?: boolean })[PROBLEM_DETAILS_META] === false
+            ? 'application/json'
+            : 'application/problem+json';
 
     return {
         processRoute({ routeKey, route, routeTags, deprecated, fieldDeprecations }) {
@@ -411,8 +417,7 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                       )
                     : undefined;
                 const mediaType =
-                    resolveResponseContentType(responseValue) ??
-                    (Number(statusKey) >= 400 ? 'application/problem+json' : 'application/json');
+                    resolveResponseContentType(responseValue) ?? (Number(statusKey) >= 400 ? errorContentType : 'application/json');
                 operation.responses[statusKey] = {
                     description,
                     ...(headersObject ? { headers: headersObject } : {}),
@@ -457,29 +462,21 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                         },
                     },
                 };
-                const existing = operation.responses['400'];
-                if (existing) {
-                    const existingSchema = existing.content?.['application/problem+json']?.schema;
-                    operation.responses['400'] = {
-                        description: getStatusText(400),
-                        content: {
-                            'application/problem+json': {
-                                schema: {
-                                    oneOf: [existingSchema, validationSchema].filter(Boolean),
-                                },
-                            },
+                // The validation 400 is a framework error and always Problem Details, even when
+                // the contract opted out. Preserve any handler-declared 400 (which may be plain
+                // JSON in custom mode) under its own media type and merge the validation schema
+                // into the `application/problem+json` entry.
+                const existingContent = operation.responses['400']?.content ?? {};
+                const existingProblem = existingContent['application/problem+json']?.schema;
+                operation.responses['400'] = {
+                    description: getStatusText(400),
+                    content: {
+                        ...existingContent,
+                        'application/problem+json': {
+                            schema: existingProblem ? { oneOf: [existingProblem, validationSchema] } : validationSchema,
                         },
-                    };
-                } else {
-                    operation.responses['400'] = {
-                        description: getStatusText(400),
-                        content: {
-                            'application/problem+json': {
-                                schema: validationSchema,
-                            },
-                        },
-                    };
-                }
+                    },
+                };
             }
 
             if (options.operationMapper) {

@@ -37,6 +37,8 @@ responses: {
 }
 ```
 
+This page is about adopting Problem Details, which is the right move for most migrations — it's additive (below) and you gain a standard, tooled error format. But if you'd rather keep your existing error shape exactly as-is, opt out with [`kizuna({ problemDetails: false })`](/docs/reference/kizuna#defining-your-own-error-shapes): the bespoke `404` schema above then typechecks and goes on the wire verbatim. The rest of this page assumes the default (Problem Details on).
+
 ## The additive pattern — keep your old fields (start here)
 
 This is the path for nearly every migration. If your errors carry fields beyond a message — an application code, a request ID — you keep them as RFC 9457 **extension members** with `.extend()`:

@@ -89,6 +89,16 @@ const coerceStringValues = (input: unknown, schema: z.ZodType): unknown => {
 type ProblemDetailsEnvelope = { type: string; title: string; status: number; detail: string };
 
 /**
+ * How a contract renders error (4xx/5xx) responses.
+ *
+ * - `'problem-details'` (default) — error bodies are RFC 9457 Problem Details; the adapter
+ *   auto-fills `type`/`title`/`status` and the handler supplies `detail` plus extensions.
+ * - `'custom'` — error bodies are the literal declared schema, sent verbatim. Opt in with
+ *   `kizuna({ problemDetails: false })`.
+ */
+export type ErrorMode = 'problem-details' | 'custom';
+
+/**
  * Strips the RFC 9457 envelope fields the adapter auto-fills (`type`/`title`/`status`),
  * leaving the author to supply `detail` plus any extension members. `type` stays optional
  * (authors may point it at their own problem-type URI); `title`/`status` are forbidden.
@@ -104,28 +114,48 @@ type StripProblemEnvelope<T extends ProblemDetailsEnvelope> = Omit<T, 'type' | '
 type IsErrorStatus<Status> = `${Status & number}` extends `4${string}` | `5${string}` ? true : false;
 
 /**
- * Error responses (4xx/5xx) must be RFC 9457 Problem Details — a schema assignable to the
- * envelope. Anything else resolves to `never`, surfacing as a compile error at the handler
- * return / `error()` site. Success responses pass through unchanged.
+ * In `'problem-details'` mode, error responses (4xx/5xx) must be RFC 9457 Problem Details — a
+ * schema assignable to the envelope. Anything else resolves to `never`, surfacing as a compile
+ * error at the handler return / `error()` site. Success responses pass through unchanged.
+ *
+ * In `'custom'` mode the contract has opted out, so every response — error or not — is the
+ * literal declared body with no envelope.
  */
-type ApplyErrorEnvelope<Input, Status> =
-    IsErrorStatus<Status> extends true ? (Input extends ProblemDetailsEnvelope ? StripProblemEnvelope<Input> : never) : Input;
+type ApplyErrorEnvelope<Input, Status, Mode extends ErrorMode> = Mode extends 'custom'
+    ? Input
+    : IsErrorStatus<Status> extends true
+      ? Input extends ProblemDetailsEnvelope
+          ? StripProblemEnvelope<Input>
+          : never
+      : Input;
 
-type HandlerBody<S, Status> = S extends z.ZodType
-    ? ApplyErrorEnvelope<z.input<S>, Status>
+type HandlerBody<S, Status, Mode extends ErrorMode> = S extends z.ZodType
+    ? ApplyErrorEnvelope<z.input<S>, Status, Mode>
     : S extends { body: z.ZodType }
-      ? ApplyErrorEnvelope<z.input<S['body']>, Status>
+      ? ApplyErrorEnvelope<z.input<S['body']>, Status, Mode>
       : never;
 
-export type HandlerReturn<R extends RouteDefinition> = {
+/**
+ * The body type for a guard's `deny(status, body)`, derived from the contract's
+ * `guardErrorSchema`. A guard denial is always an error, so the envelope rules apply as for
+ * a 4xx handler body: in `'problem-details'` mode the schema must extend the RFC 9457
+ * envelope and the auto-filled `type`/`title`/`status` are stripped (supply `detail` plus
+ * extensions — e.g. `ProblemDetailsSchema.extend({ code })`); in `'custom'` mode the schema's
+ * input is used verbatim. `unknown` when no guard schema is declared.
+ */
+export type GuardErrorBody<GuardError, Mode extends ErrorMode> = GuardError extends z.ZodType
+    ? ApplyErrorEnvelope<z.input<GuardError>, 400, Mode>
+    : unknown;
+
+export type HandlerReturn<R extends RouteDefinition, Mode extends ErrorMode = 'problem-details'> = {
     [Status in keyof R['responses']]: {
         status: Status extends number ? Status : never;
-        body: HandlerBody<R['responses'][Status], Status>;
+        body: HandlerBody<R['responses'][Status], Status, Mode>;
         headers?: Record<string, string>;
     };
 }[keyof R['responses']];
 
-export type HandlerArgs<R extends RouteDefinition> = {
+export type HandlerArgs<R extends RouteDefinition, Mode extends ErrorMode = 'problem-details'> = {
     params: R extends { pathParams: z.ZodType } ? z.output<R['pathParams']> : ExtractPathParams<R['path']>;
     query: R extends { query: z.ZodType } ? z.output<R['query']> : undefined;
     body: R extends { body: z.ZodType } ? z.output<R['body']> : undefined;
@@ -135,18 +165,18 @@ export type HandlerArgs<R extends RouteDefinition> = {
      *
      * This function throws internally and never returns.
      */
-    error: (response: HandlerReturn<R>) => never;
+    error: (response: HandlerReturn<R, Mode>) => never;
 };
 
-export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = (
-    args: HandlerArgs<R> & HandlerContext
-) => Promise<HandlerReturn<R>> | HandlerReturn<R>;
+export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown, Mode extends ErrorMode = 'problem-details'> = (
+    args: HandlerArgs<R, Mode> & HandlerContext
+) => Promise<HandlerReturn<R, Mode>> | HandlerReturn<R, Mode>;
 
-export type Router<T extends Routes, HandlerContext = unknown> = {
+export type Router<T extends Routes, HandlerContext = unknown, Mode extends ErrorMode = 'problem-details'> = {
     [Key in keyof T as Key extends symbol ? never : Key]: T[Key] extends RouteDefinition
-        ? RouteHandler<T[Key], HandlerContext>
+        ? RouteHandler<T[Key], HandlerContext, Mode>
         : T[Key] extends Routes
-          ? Router<T[Key], HandlerContext>
+          ? Router<T[Key], HandlerContext, Mode>
           : never;
 };
 

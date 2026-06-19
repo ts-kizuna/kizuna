@@ -1,14 +1,28 @@
+import type { z } from 'zod';
 import type { Routes, Contract, TagOptions } from '@ts-kizuna/core';
 import {
     createApi as coreApi,
     type ApiWithRouter,
     type MiddlewareMap,
     type Router as CoreRouter,
+    type ErrorMode,
     ROUTER_META,
     MIDDLEWARE_META,
 } from '@ts-kizuna/core/adapter';
 import { handleNextRequest, type Router, type NextHandlerOptions, type NextHandlerContext, type NextMiddlewareHandler } from './handler.js';
 import { type NextRequest, NextResponse } from 'next/server';
+
+/**
+ * A contract with its routes `R`, error `Mode`, and guard-error schema captured for
+ * inference; tags and issue codes are widened (they don't affect handler typing).
+ */
+type ContractOf<R extends Routes, Mode extends ErrorMode> = Contract<R, Record<string, TagOptions>, string, Mode, z.ZodType | undefined>;
+
+/**
+ * Constraint that accepts any contract regardless of error mode or guard schema. The bare
+ * `Contract` default (Problem Details, no guard schema) would reject opted-out contracts.
+ */
+type AnyContract = Contract<Routes, Record<string, TagOptions>, string, ErrorMode, z.ZodType | undefined>;
 
 export type {
     RouteHandler,
@@ -55,10 +69,7 @@ export type NextApi<R extends Routes = Routes> = R &
  *     createUser: ({ body }) => ({ status: 201, body: { id: '1', ...body } }),
  * });
  */
-export const createRouter = <const R extends Routes>(
-    _contract: Contract<R, Record<string, TagOptions>, string>,
-    router: Router<Contract<R>>
-): Router<Contract<R>> => router;
+export const createRouter = <const C extends AnyContract>(_contract: C, router: Router<C>): Router<C> => router;
 
 /**
  * Create endpoints for a Next.js App Router catch-all route.
@@ -99,12 +110,19 @@ export function createNextEndpoints(api: NextApiWithRouter, options?: NextHandle
  *     middleware,
  * });
  */
-export const createApi = <const R extends Routes>(options: {
-    contract: Contract<R, Record<string, TagOptions>, string>;
-    router: Router<Contract<R>>;
+export function createApi<const R extends Routes>(options: {
+    contract: ContractOf<R, 'problem-details'>;
+    router: Router<ContractOf<R, 'problem-details'>>;
     middleware?: MiddlewareMap<R, NextMiddlewareHandler>;
     onError?: NextHandlerOptions['onError'];
-}): NextApi<R> => {
+}): NextApi<R>;
+export function createApi<const R extends Routes>(options: {
+    contract: ContractOf<R, 'custom'>;
+    router: Router<ContractOf<R, 'custom'>>;
+    middleware?: MiddlewareMap<R, NextMiddlewareHandler>;
+    onError?: NextHandlerOptions['onError'];
+}): NextApi<R>;
+export function createApi(options: any): NextApi {
     const { contract, router, middleware, onError } = options;
     const spec = coreApi(contract.routes);
     return Object.assign(spec, {
@@ -114,5 +132,5 @@ export const createApi = <const R extends Routes>(options: {
         mount(mountOptions?: NextHandlerOptions) {
             return createNextEndpoints(this as unknown as NextApiWithRouter, mountOptions);
         },
-    }) as unknown as NextApi<R>;
-};
+    }) as unknown as NextApi;
+}

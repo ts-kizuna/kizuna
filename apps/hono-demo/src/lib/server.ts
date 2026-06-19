@@ -348,7 +348,7 @@ const workspaceHandlers: Router<typeof contract, DemoEnv>['workspace'] = {
     },
 };
 
-export const api = createApi<typeof contract.routes, DemoEnv>({
+export const api = createApi({
     contract,
     router: {
         users: usersHandlers,

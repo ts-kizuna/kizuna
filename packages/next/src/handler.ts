@@ -1,3 +1,4 @@
+import type { z } from 'zod';
 import {
     type AdapterRequest,
     type AdapterResult,
@@ -7,16 +8,40 @@ import {
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
     type ErrorFormatter,
+    type GuardDenial,
+    type GuardErrorBody,
+    type ErrorMode,
     createAdapter,
     resolveMiddleware,
     headersToObject,
     matchRoute,
     parseFetchBody,
     renderJsonResult,
-    problemDetails,
+    renderGuardDenial,
+    guardDenial,
+    isGuardDenial,
+    usesProblemDetails,
 } from '@ts-kizuna/core/adapter';
 import type { Contract, TagOptions } from '@ts-kizuna/core';
 import { type NextRequest, NextResponse } from 'next/server';
+
+/**
+ * The routes type carried by a contract `C`.
+ */
+export type ContractRoutes<C> = C extends Contract<infer R, infer _Tags, infer _Codes, infer _Mode, infer _GuardError> ? R : never;
+
+/**
+ * The `deny(status, body)` body type for a guard bound to contract `C`, from its
+ * `guardErrorSchema` and error mode. See {@link GuardErrorBody}.
+ */
+type DenyBody<C> =
+    C extends Contract<infer _R, infer _Tags, infer _Codes, infer Mode, infer GuardError> ? GuardErrorBody<GuardError, Mode> : unknown;
+
+/**
+ * Constraint that accepts any contract regardless of error mode or guard schema. The bare
+ * `Contract` default (Problem Details, no guard schema) would reject opted-out contracts.
+ */
+type AnyContract = Contract<Routes, Record<string, TagOptions>, string, ErrorMode, z.ZodType | undefined>;
 
 export interface NextHandlerContext {
     request: NextRequest;
@@ -31,8 +56,8 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, NextHa
  * The handler tree for a contract, typed against it.
  */
 export type Router<C> =
-    C extends Contract<infer R, infer _Tags, infer _Codes>
-        ? CoreRouter<R, NextHandlerContext>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Mode, infer _GuardError>
+        ? CoreRouter<R, NextHandlerContext, Mode>
         : C extends Routes
           ? CoreRouter<C, NextHandlerContext>
           : never;
@@ -56,35 +81,56 @@ export type NextMiddlewareHandler = (request: NextRequest, route: NextMiddleware
  *     createUser: [authenticate, adminOnly],
  * });
  */
-export const createMiddleware = <const R extends Routes>(
-    _contract: Contract<R, Record<string, TagOptions>, string>,
-    map: MiddlewareMap<R, NextMiddlewareHandler>
-): MiddlewareMap<R, NextMiddlewareHandler> => map;
+export const createMiddleware = <const C extends AnyContract>(
+    _contract: C,
+    map: MiddlewareMap<ContractRoutes<C>, NextMiddlewareHandler>
+): MiddlewareMap<ContractRoutes<C>, NextMiddlewareHandler> => map;
 
-type Deny = (status: number, detail: string) => Response;
+/**
+ * Rejects a request from inside a guard. `deny(status, detail)` is shorthand for a
+ * Problem Details body; `deny(status, body)` sends a custom body (typed from the
+ * contract's `guardErrorSchema`).
+ */
+interface Deny<Body = unknown> {
+    (status: number, detail: string): GuardDenial;
+    (status: number, body: Body): GuardDenial;
+}
 
-const deny: Deny = (status, detail) =>
-    new Response(JSON.stringify(problemDetails(status, detail)), {
-        status,
-        headers: {
-            'content-type': 'application/problem+json',
-        },
-    });
+type GuardFn<Body> = (args: {
+    request: NextRequest;
+    route: NextMiddlewareRoute;
+    deny: Deny<Body>;
+}) => Promise<GuardDenial | Response | void> | GuardDenial | Response | void;
 
 /**
  * Create a guard — a middleware that checks access before the handler runs. Call
- * `deny(status, detail)` to reject the request; return without calling it to allow.
+ * `deny(...)` to reject the request; return without calling it to allow.
+ *
+ * Pass the contract first (`createGuard(contract, fn)`) to type `deny`'s body against the
+ * contract's `guardErrorSchema` and render denials in the contract's error mode.
  *
  * @example
- * const requireAdmin = createGuard(async ({ request, deny }) => {
+ * const requireAdmin = createGuard(contract, async ({ request, deny }) => {
  *     if (request.headers.get('x-role') !== 'admin') return deny(403, 'Forbidden');
  * });
  */
-export function createGuard(
-    guard: (args: { request: NextRequest; route: NextMiddlewareRoute; deny: Deny }) => Promise<Response | void> | Response | void
-): NextMiddlewareHandler {
+export function createGuard(guard: GuardFn<unknown>): NextMiddlewareHandler;
+export function createGuard<const C extends AnyContract>(contract: C, guard: GuardFn<DenyBody<C>>): NextMiddlewareHandler;
+export function createGuard(contractOrGuard: Contract | GuardFn<unknown>, maybeGuard?: GuardFn<unknown>): NextMiddlewareHandler {
+    const contract = typeof contractOrGuard === 'function' ? undefined : contractOrGuard;
+    const guard = (typeof contractOrGuard === 'function' ? contractOrGuard : maybeGuard) as GuardFn<unknown>;
+    const useProblemDetails = contract ? usesProblemDetails(contract.routes) : true;
+    const deny = ((status: number, bodyOrDetail: unknown) => guardDenial(status, bodyOrDetail)) as Deny<unknown>;
     return async (request, route) => {
         const result = await guard({ request, route, deny });
+        if (isGuardDenial(result)) {
+            const rendered = renderGuardDenial(result, useProblemDetails);
+            const body = rendered.raw ? (rendered.body as BodyInit) : JSON.stringify(rendered.body);
+            return new Response(body, {
+                status: rendered.status,
+                headers: rendered.headers,
+            });
+        }
         if (result instanceof Response) {
             return result;
         }

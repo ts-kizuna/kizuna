@@ -17,13 +17,17 @@ import { kizuna } from '@ts-kizuna/core';
 kizuna(config?: {
     tags?: TagSet;
     validation?: { issueCodes?: readonly string[] };
+    problemDetails?: boolean;
+    guardErrorSchema?: ZodType;
 }): { k: K }
 ```
 
-| Field                   | Type                | Description                                                                                                            |
-| ----------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `tags`                  | `TagSet`            | Optional. A tag set from [`createTags`](/docs/reference/create-tags). Its keys become the allowed group tags.          |
-| `validation.issueCodes` | `readonly string[]` | Optional. Custom validation issue codes this API's handlers may emit via `addCodedIssue`. Captured as a literal union. |
+| Field                   | Type                | Description                                                                                                                           |
+| ----------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `tags`                  | `TagSet`            | Optional. A tag set from [`createTags`](/docs/reference/create-tags). Its keys become the allowed group tags.                         |
+| `validation.issueCodes` | `readonly string[]` | Optional. Custom validation issue codes this API's handlers may emit via `addCodedIssue`. Captured as a literal union.                |
+| `problemDetails`        | `boolean`           | Optional, default `true`. Set to `false` to define your own error shapes instead of RFC 9457 Problem Details — see below.             |
+| `guardErrorSchema`      | `ZodType`           | Optional. The shared schema for guard denials, typing the `deny(status, body)` body in [`createGuard`](/docs/reference/create-guard). |
 
 ## Returns
 
@@ -132,3 +136,46 @@ export const contract = k.contract({
 The declared `issueCodes` widen `errors[].code` on `400` responses to `ValidationIssueCode | <your codes>`, so the client suggests them in autocomplete. Emit them at runtime with [`addCodedIssue`](/docs/reference/add-coded-issue). Because the factory is per API, codes and tags stay scoped to their API rather than leaking across the multiple kizuna APIs a project may define.
 
 See the [Contract guide](/docs/building/contract) for response schemas, deprecation, typed response headers, and nesting.
+
+## Defining your own error shapes
+
+By default every error response is [RFC 9457 Problem Details](/docs/reference/problem-details-schema) — a well-specified, interoperable error format kizuna fills in for you. Most APIs are happy here, and extension members cover domain fields without giving up the standard shape.
+
+If your API already speaks a different error shape — or you simply want full control — set `problemDetails: false`. Now the error schema you declare on a route _is_ the wire shape: the handler returns it as-is, sent as `application/json` with no envelope.
+
+```ts
+const ApiErrorSchema = z.object({
+    code: z.string(),
+    message: z.string(),
+});
+
+export const { k } = kizuna({
+    problemDetails: false,
+    guardErrorSchema: ApiErrorSchema,
+});
+```
+
+```ts
+getUser: ({ params, error }) => {
+    const user = users.get(params.id);
+    if (!user) {
+        return error({
+            status: 404,
+            // The literal body you declared for 404 — no `type`/`title`/`status` envelope.
+            body: {
+                code: 'user_not_found',
+                message: 'No user with that id',
+            },
+        });
+    }
+    return { status: 200, body: user };
+};
+```
+
+`guardErrorSchema` is the one shared shape for guard denials, so `deny(status, body)` is typed against it — see [`createGuard`](/docs/reference/create-guard).
+
+### What still uses Problem Details
+
+The framework keeps emitting Problem Details for the errors _it_ generates on your behalf — request validation (`400` with an `errors` array), content negotiation (`406`, `415`), and unhandled handler errors (`500`). These are protocol-level outcomes you never write a body for, so there's a single consistent shape for them. The opt-out applies to the errors **you** author: handler returns, `error(...)`, and guard `deny(...)`.
+
+Want those framework errors reshaped too? Pass an adapter `formatError` to rewrite their bytes for older clients — see the [migration guide](/docs/migration/existing-api).

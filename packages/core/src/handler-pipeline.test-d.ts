@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { kizuna } from './kizuna.js';
 import { createTags } from './tags.js';
 import { ProblemDetailsSchema } from './error-response.js';
-import type { RouteHandler, HandlerArgs, HandlerReturn, Router } from './handler-pipeline.js';
+import type { RouteHandler, HandlerArgs, HandlerReturn, Router, GuardErrorBody } from './handler-pipeline.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -152,4 +152,54 @@ test('ProblemDetailsSchema body rejects title and status from handler input', ()
 
     expectTypeOf<{ title: string; detail: string }>().not.toMatchTypeOf<ErrorBody>();
     expectTypeOf<{ status: number; detail: string }>().not.toMatchTypeOf<ErrorBody>();
+});
+
+const customErrorRoutes = k.routes('api', {
+    getThing: {
+        method: 'GET',
+        path: '/things/:id',
+        responses: {
+            200: z.object({
+                id: z.string(),
+            }),
+            404: z.object({
+                code: z.string(),
+                message: z.string(),
+            }),
+        },
+    },
+});
+
+type CustomThingRoute = (typeof customErrorRoutes)['getThing'];
+
+test("'custom' mode passes error bodies through verbatim — no envelope strip, no never", () => {
+    type Return = HandlerReturn<CustomThingRoute, 'custom'>;
+    // Success bodies are unchanged in both modes.
+    expectTypeOf<Extract<Return, { status: 200 }>['body']>().toEqualTypeOf<{ id: string }>();
+    // The 404 body is the literal declared schema — no Problem Details envelope required.
+    expectTypeOf<Extract<Return, { status: 404 }>['body']>().toEqualTypeOf<{ code: string; message: string }>();
+});
+
+test("'problem-details' mode still rejects the same non-envelope error schema", () => {
+    type Return = HandlerReturn<CustomThingRoute, 'problem-details'>;
+    expectTypeOf<Extract<Return, { status: 404 }>['body']>().toEqualTypeOf<never>();
+});
+
+const ApiErrorSchema = z.object({
+    code: z.string(),
+    message: z.string(),
+});
+
+test("GuardErrorBody is the schema input verbatim in 'custom' mode", () => {
+    expectTypeOf<GuardErrorBody<typeof ApiErrorSchema, 'custom'>>().toEqualTypeOf<{ code: string; message: string }>();
+});
+
+test("GuardErrorBody strips the envelope in 'problem-details' mode", () => {
+    type Body = GuardErrorBody<typeof ProblemDetailsSchema, 'problem-details'>;
+    expectTypeOf<{ detail: string }>().toMatchTypeOf<Body>();
+    expectTypeOf<{ title: string; detail: string }>().not.toMatchTypeOf<Body>();
+});
+
+test('GuardErrorBody is unknown when no guard schema is declared', () => {
+    expectTypeOf<GuardErrorBody<undefined, 'custom'>>().toEqualTypeOf<unknown>();
 });

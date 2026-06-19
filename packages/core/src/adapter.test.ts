@@ -2,7 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { kizuna, createTags } from './index.js';
 import { ProblemDetailsSchema } from './schemas.js';
-import { createAdapter, renderJsonResult, ResponseValidationError, type AdapterRequest, type AdapterResult } from './adapter.js';
+import {
+    createAdapter,
+    renderJsonResult,
+    renderGuardDenial,
+    guardDenial,
+    usesProblemDetails,
+    ResponseValidationError,
+    type AdapterRequest,
+    type AdapterResult,
+    type Router,
+} from './adapter.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -385,5 +395,165 @@ describe('renderJsonResult — non-JSON and binary bodies', () => {
                 headers: {},
             })
         ).toThrow(/must be a string or Uint8Array/);
+    });
+});
+
+describe('Problem Details opt-out (custom error handling)', () => {
+    const ApiErrorSchema = z.object({
+        code: z.string(),
+        message: z.string(),
+    });
+
+    const { k: customK } = kizuna({
+        problemDetails: false,
+        guardErrorSchema: ApiErrorSchema,
+    });
+
+    const customContract = customK.contract({
+        routes: customK.routes({
+            getThing: {
+                method: 'GET',
+                path: '/things/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                    404: ApiErrorSchema,
+                },
+            },
+            createThing: {
+                method: 'POST',
+                path: '/things',
+                body: z.object({
+                    name: z.string().min(1),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        }),
+    });
+
+    const customRoutes = customContract.routes;
+
+    it('marks an opted-out contract via usesProblemDetails', () => {
+        expect(usesProblemDetails(customRoutes)).toBe(false);
+        expect(usesProblemDetails(contract)).toBe(true);
+    });
+
+    it('renders a handler error body verbatim as application/json, no envelope', () => {
+        const rendered = renderJsonResult({
+            kind: 'success',
+            routeKey: 'getThing',
+            route: customRoutes.getThing,
+            status: 404,
+            body: {
+                code: 'not_found',
+                message: 'No such thing',
+            },
+            headers: {},
+            problemDetails: false,
+        });
+        expect(rendered.status).toBe(404);
+        expect(rendered.headers['content-type']).toBe('application/json');
+        expect(rendered.body).toEqual({
+            code: 'not_found',
+            message: 'No such thing',
+        });
+    });
+
+    it('still emits Problem Details for framework errors in an opted-out contract', () => {
+        const notFound = renderJsonResult({
+            kind: 'not-found',
+        });
+        expect(notFound.headers['content-type']).toBe('application/problem+json');
+        expect(notFound.body).toMatchObject({
+            type: 'about:blank',
+            title: 'Not Found',
+            status: 404,
+        });
+
+        const validation = renderJsonResult({
+            kind: 'validation-failed',
+            stage: 'body',
+            detail: 'Invalid request body',
+            issues: [],
+        });
+        expect(validation.headers['content-type']).toBe('application/problem+json');
+        expect(validation.body).toMatchObject({
+            status: 400,
+            detail: 'Invalid request body',
+        });
+    });
+
+    it('handler returns a custom error body end-to-end', async () => {
+        const { adapter, results } = makeAdapter();
+        await adapter.handle({
+            routes: customRoutes,
+            // The low-level engine types the router in Problem Details mode; the contract's
+            // custom-mode typing is enforced at the adapter `createApi`/`createRouter` layer.
+            router: {
+                getThing: () => ({
+                    status: 404,
+                    body: {
+                        code: 'not_found',
+                        message: 'No such thing',
+                    },
+                }),
+                createThing: () => ({
+                    status: 201,
+                    body: {
+                        id: '1',
+                    },
+                }),
+            } as unknown as Router<typeof customRoutes, Record<string, never>>,
+            request: {
+                request: null,
+                method: 'GET',
+                resolution: {
+                    kind: 'core-match',
+                    path: '/things/1',
+                },
+                query: {},
+                headers: {},
+                readBody: () => undefined,
+            },
+            responseContext: {},
+            responseValidation: true,
+        });
+        const result = results[0] as Extract<AdapterResult, { kind: 'success' }>;
+        expect(result.kind).toBe('success');
+        expect(result.status).toBe(404);
+        expect(result.problemDetails).toBe(false);
+        const rendered = renderJsonResult(result);
+        expect(rendered.headers['content-type']).toBe('application/json');
+        expect(rendered.body).toEqual({
+            code: 'not_found',
+            message: 'No such thing',
+        });
+    });
+
+    it('renders a guard denial verbatim when opted out, enveloped otherwise', () => {
+        const denial = guardDenial(403, {
+            code: 'forbidden',
+            message: 'Nope',
+        });
+
+        const custom = renderGuardDenial(denial, false);
+        expect(custom.headers['content-type']).toBe('application/json');
+        expect(custom.body).toEqual({
+            code: 'forbidden',
+            message: 'Nope',
+        });
+
+        const problem = renderGuardDenial(guardDenial(403, 'Nope'), true);
+        expect(problem.headers['content-type']).toBe('application/problem+json');
+        expect(problem.body).toMatchObject({
+            status: 403,
+            title: 'Forbidden',
+            detail: 'Nope',
+        });
     });
 });

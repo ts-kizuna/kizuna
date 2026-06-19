@@ -105,6 +105,16 @@ export interface RouteDefinition<TagKeys extends string = string> {
  */
 export const ROUTES_TAG: unique symbol = Symbol('ts-kizuna.routes.tag');
 
+/**
+ * Key under which a contract's routes carry the Problem Details opt-out marker.
+ * Stamped (as `false`) by `k.contract` when the API is created with
+ * `kizuna({ problemDetails: false })`. Absent or `true` means error responses use
+ * RFC 9457 Problem Details; `false` means handler-authored error bodies (and guard
+ * denials) are sent as the literal declared shape. The runtime renderer and the
+ * OpenAPI generator read it. A symbol key, so it never appears in route iteration.
+ */
+export const PROBLEM_DETAILS_META: unique symbol = Symbol('ts-kizuna.problem-details');
+
 export interface Routes<TagKeys extends string = string> {
     [ROUTES_TAG]?: string;
     [key: string]: RouteDefinition<TagKeys> | Routes<TagKeys>;

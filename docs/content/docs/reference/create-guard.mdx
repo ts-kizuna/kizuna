@@ -156,3 +156,24 @@ const usersRoutes = k.routes('users', {
 ```
 
 The routes, the guards, and kizuna's built-in errors all produce the same shape.
+
+## Custom error shapes
+
+If your API [opts out of Problem Details](/docs/reference/kizuna#defining-your-own-error-shapes) with `problemDetails: false`, pass the contract as the first argument — `createGuard(contract, fn)` — and `deny` gains a body form typed against the contract's `guardErrorSchema`:
+
+```ts
+import { createGuard } from '@ts-kizuna/express';
+import { contract } from './contract';
+
+const requireUser = createGuard(contract, ({ req, deny }) => {
+    if (!sessions.has(bearerToken(req) ?? '')) {
+        // Typed against `guardErrorSchema` — sent verbatim as application/json.
+        return deny(401, {
+            code: 'unauthorized',
+            message: 'Sign in to continue',
+        });
+    }
+});
+```
+
+`deny(status, detail)` still works as a shorthand. Passing the contract is what gives `deny` its typed body and renders denials in the contract's error mode — without it, a guard always emits Problem Details.

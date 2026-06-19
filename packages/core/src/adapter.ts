@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { RouteDefinition, Routes, Method } from './types.js';
+import { type RouteDefinition, type Routes, type Method, PROBLEM_DETAILS_META } from './types.js';
 import {
     type RouteHandler,
     type Router,
@@ -63,7 +63,16 @@ export const createApi = <const R extends Routes>(routes: R): R & ApiDefinition 
     result[API_META] = true;
     return result as unknown as R & ApiDefinition;
 };
-export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
+export type {
+    FlattenedRoute,
+    RouteHandler,
+    Router,
+    RawInputs,
+    ValidationFailure,
+    ValidationStage,
+    ErrorMode,
+    GuardErrorBody,
+} from './handler-pipeline.js';
 export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
 export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
@@ -142,6 +151,12 @@ export type AdapterResult =
           status: number;
           body: unknown;
           headers?: Record<string, string>;
+          /**
+           * `false` when the contract opted out of Problem Details
+           * (`kizuna({ problemDetails: false })`), so an error-status (>= 400) body
+           * is rendered verbatim instead of wrapped in the RFC 9457 envelope.
+           */
+          problemDetails?: boolean;
       }
     | {
           kind: 'not-acceptable';
@@ -268,6 +283,8 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     if (!resolution.ok) return resolution.result;
     const { routeKey, route, params } = resolution.resolved;
 
+    const useProblemDetails = usesProblemDetails(routes);
+
     const raw: RawInputs = {
         params,
         query: request.query,
@@ -343,12 +360,16 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             const responseSpec = route.responses[handlerResult.status];
             if (responseSpec !== undefined) {
                 const bodySchema = 'safeParse' in responseSpec ? responseSpec : responseSpec.body;
-                // Error responses (status >= 400) auto-fill the Problem Details envelope
-                // (`type`/`title`/`status`) at render time, so the handler only supplies
-                // `detail` plus extensions. Validate the final wire shape, not the partial
-                // body — otherwise every valid error handler would fail validation.
+                // In Problem Details mode, error responses (status >= 400) auto-fill the
+                // envelope (`type`/`title`/`status`) at render time, so the handler only
+                // supplies `detail` plus extensions. Validate the final wire shape, not the
+                // partial body — otherwise every valid error handler would fail validation.
+                // When the contract opted out, the body is sent verbatim, so validate it as-is.
                 const bodyToValidate =
-                    handlerResult.status >= 400 && handlerResult.body !== null && typeof handlerResult.body === 'object'
+                    useProblemDetails &&
+                    handlerResult.status >= 400 &&
+                    handlerResult.body !== null &&
+                    typeof handlerResult.body === 'object'
                         ? {
                               type: 'about:blank',
                               title: STATUS_TITLES[handlerResult.status] ?? 'Unknown Error',
@@ -376,6 +397,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             status: handlerResult.status,
             body: route.method === 'HEAD' ? undefined : handlerResult.body,
             headers: successHeaders,
+            problemDetails: useProblemDetails,
         };
     } catch (error) {
         if (error instanceof ResponseError) {
@@ -386,6 +408,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 status: error.status,
                 body: error.body,
                 headers: error.headers ?? {},
+                problemDetails: useProblemDetails,
             };
         }
         if (definition.onError) {
@@ -506,7 +529,10 @@ export const renderJsonResult = (
 
     switch (result.kind) {
         case 'success': {
-            if (result.status >= 400) {
+            // Error-status bodies are wrapped in the RFC 9457 envelope unless the contract
+            // opted out (`problemDetails === false`), in which case they fall through to the
+            // verbatim path below and are sent as the literal declared shape.
+            if (result.status >= 400 && result.problemDetails !== false) {
                 const body = result.body;
                 const extensions = body !== null && typeof body === 'object' ? (body as Record<string, unknown>) : {};
                 const detail = typeof extensions.detail === 'string' ? extensions.detail : (STATUS_TITLES[result.status] ?? 'Error');
@@ -573,6 +599,63 @@ export const renderJsonResult = (
             return renderError(500, 'Internal Server Error');
     }
 };
+
+/**
+ * Whether a contract's routes use RFC 9457 Problem Details for error responses.
+ * `false` only when created with `kizuna({ problemDetails: false })`.
+ */
+export const usesProblemDetails = (routes: Routes): boolean =>
+    (routes as Record<typeof PROBLEM_DETAILS_META, boolean | undefined>)[PROBLEM_DETAILS_META] !== false;
+
+/**
+ * Marker on the value `deny` returns, so adapters can tell a guard denial apart from a
+ * framework-native response (e.g. a redirect a guard returns directly).
+ */
+export const GUARD_DENIAL: unique symbol = Symbol('ts-kizuna.guard-denial');
+
+/**
+ * A guard rejection produced by `deny`. Adapters render it with {@link renderGuardDenial}.
+ */
+export interface GuardDenial {
+    readonly [GUARD_DENIAL]: true;
+    status: number;
+    body: unknown;
+}
+
+export const isGuardDenial = (value: unknown): value is GuardDenial =>
+    typeof value === 'object' && value !== null && (value as Record<PropertyKey, unknown>)[GUARD_DENIAL] === true;
+
+/**
+ * Build a guard denial. `createGuard` passes a typed wrapper of this as `deny`. A string
+ * argument is shorthand for `{ detail }`; an object is used as the body verbatim.
+ */
+export const guardDenial = (status: number, bodyOrDetail: unknown): GuardDenial => ({
+    [GUARD_DENIAL]: true,
+    status,
+    body: typeof bodyOrDetail === 'string' ? { detail: bodyOrDetail } : bodyOrDetail,
+});
+
+/**
+ * Render a guard denial to `{ status, headers, body }`, honoring the contract's error mode.
+ * In Problem Details mode the body is wrapped in the RFC 9457 envelope; when the contract
+ * opted out (`useProblemDetails === false`) it is sent verbatim as `application/json`.
+ *
+ * Routes through {@link renderJsonResult} so denials render exactly like handler error
+ * responses. The denial isn't tied to a declared route response, so the content type
+ * defaults to `application/json`.
+ */
+export const renderGuardDenial = (
+    denial: GuardDenial,
+    useProblemDetails: boolean
+): { status: number; headers: Record<string, string>; body: unknown; raw?: boolean } =>
+    renderJsonResult({
+        kind: 'success',
+        routeKey: '',
+        route: { responses: {} } as RouteDefinition,
+        status: denial.status,
+        body: denial.body,
+        problemDetails: useProblemDetails,
+    });
 
 const formDataToObject = (form: FormData): Record<string, unknown> => {
     const result: Record<string, unknown> = {};

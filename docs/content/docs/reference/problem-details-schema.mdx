@@ -163,9 +163,11 @@ if (isProblemDetails(response.body)) {
 }
 ```
 
-## Why Problem Details only
+## Why Problem Details by default
 
-Error responses (status `>= 400`) must be Problem Details — handlers cannot return an arbitrary error shape, and the type system enforces it. This is deliberate: a single shared error schema is what lets guards, validation, the type guards above, generated clients, and the OpenAPI spec all compose against one shape. Need extra fields? Use extension members. Need a non-JSON error (proxying, an HTML error page)? Use the adapter's `raw-response` escape hatch.
+Error responses (status `>= 400`) are Problem Details by default, and the type system enforces it — handlers supply `detail` plus extensions, not an arbitrary error shape. This is a deliberate default: a single shared error schema is what lets guards, validation, the type guards above, generated clients, and the OpenAPI spec all compose against one shape. Need extra fields? Use extension members. Need a non-JSON error (proxying, an HTML error page)? Use the adapter's `raw-response` escape hatch.
+
+Already committed to a different error shape, or want full control? Opt out per API with [`kizuna({ problemDetails: false })`](/docs/reference/kizuna#defining-your-own-error-shapes) — your declared error schema becomes the literal wire shape. Framework-generated errors (validation, content negotiation, `500`) stay Problem Details either way.
 
 ## Migrating to a legacy wire shape
 

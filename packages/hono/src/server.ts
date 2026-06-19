@@ -1,5 +1,6 @@
 import type { Context, Env, Hono, MiddlewareHandler } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import type { z } from 'zod';
 import {
     type AdapterRequest,
     type RouteDefinition,
@@ -9,17 +10,47 @@ import {
     type Router as CoreRouter,
     type ApiWithRouter,
     type ErrorFormatter,
+    type GuardDenial,
+    type GuardErrorBody,
+    type ErrorMode,
     ROUTER_META,
     MIDDLEWARE_META,
     createAdapter,
     createApi as coreApi,
     resolveMiddleware,
     renderJsonResult,
+    renderGuardDenial,
+    guardDenial,
+    isGuardDenial,
+    usesProblemDetails,
     parseFetchBody,
     headersToObject,
-    problemDetails,
 } from '@ts-kizuna/core/adapter';
 import type { Contract, TagOptions } from '@ts-kizuna/core';
+
+/**
+ * The routes type carried by a contract `C`.
+ */
+type ContractRoutes<C> = C extends Contract<infer R, infer _Tags, infer _Codes, infer _Mode, infer _GuardError> ? R : never;
+
+/**
+ * A contract with its routes `R`, error `Mode`, and guard-error schema captured for
+ * inference; tags and issue codes are widened (they don't affect handler/guard typing).
+ */
+type ContractOf<R extends Routes, Mode extends ErrorMode> = Contract<R, Record<string, TagOptions>, string, Mode, z.ZodType | undefined>;
+
+/**
+ * Constraint that accepts any contract regardless of error mode or guard schema. The bare
+ * `Contract` default (Problem Details, no guard schema) would reject opted-out contracts.
+ */
+type AnyContract = Contract<Routes, Record<string, TagOptions>, string, ErrorMode, z.ZodType | undefined>;
+
+/**
+ * The `deny(status, body)` body type for a guard bound to contract `C`, from its
+ * `guardErrorSchema` and error mode. See {@link GuardErrorBody}.
+ */
+type DenyBody<C> =
+    C extends Contract<infer _R, infer _Tags, infer _Codes, infer Mode, infer GuardError> ? GuardErrorBody<GuardError, Mode> : unknown;
 
 export type HonoApi<R extends Routes = Routes> = R & ApiWithRouter & { readonly [MIDDLEWARE_META]?: unknown };
 
@@ -37,8 +68,8 @@ export type RouteHandler<R extends RouteDefinition, E extends Env = Env> = CoreR
  * generic for the handler context.
  */
 export type Router<C, E extends Env = Env> =
-    C extends Contract<infer R, infer _Tags, infer _Codes>
-        ? CoreRouter<R, HonoHandlerContext<E>>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Mode, infer _GuardError>
+        ? CoreRouter<R, HonoHandlerContext<E>, Mode>
         : C extends Routes
           ? CoreRouter<C, HonoHandlerContext<E>>
           : never;
@@ -68,10 +99,7 @@ export interface HonoOptions {
  *     createUser: ({ body }) => ({ status: 201, body: { id: '1', ...body } }),
  * });
  */
-export const createRouter = <const R extends Routes, E extends Env = Env>(
-    _contract: Contract<R, Record<string, TagOptions>, string>,
-    router: Router<Contract<R>, E>
-): Router<Contract<R>, E> => router;
+export const createRouter = <const C extends AnyContract, E extends Env = Env>(_contract: C, router: Router<C, E>): Router<C, E> => router;
 
 /**
  * Declare per-route middleware in the same shape as the contract's routes.
@@ -82,35 +110,61 @@ export const createRouter = <const R extends Routes, E extends Env = Env>(
  *     createUser: [auth, adminOnly],
  * });
  */
-export const createMiddleware = <const R extends Routes, E extends Env = Env>(
-    _contract: Contract<R, Record<string, TagOptions>, string>,
-    map: MiddlewareMap<R, MiddlewareHandler<E>>
-): MiddlewareMap<R, MiddlewareHandler<E>> => map;
+export const createMiddleware = <const C extends AnyContract, E extends Env = Env>(
+    _contract: C,
+    map: MiddlewareMap<ContractRoutes<C>, MiddlewareHandler<E>>
+): MiddlewareMap<ContractRoutes<C>, MiddlewareHandler<E>> => map;
 
-type Deny = (status: number, detail: string) => Response;
+/**
+ * Rejects a request from inside a guard. `deny(status, detail)` is shorthand for a
+ * Problem Details body; `deny(status, body)` sends a custom body (typed from the
+ * contract's `guardErrorSchema`).
+ */
+interface Deny<Body = unknown> {
+    (status: number, detail: string): GuardDenial;
+    (status: number, body: Body): GuardDenial;
+}
 
-const deny: Deny = (status, detail) =>
-    new Response(JSON.stringify(problemDetails(status, detail)), {
-        status,
-        headers: {
-            'content-type': 'application/problem+json',
-        },
-    });
+type GuardFn<E extends Env, Body> = (args: {
+    c: Context<E>;
+    deny: Deny<Body>;
+}) => Promise<GuardDenial | Response | void> | GuardDenial | Response | void;
 
 /**
  * Create a guard — a middleware that checks access before the handler runs. Call
- * `deny(status, detail)` to reject the request; return without calling it to allow.
+ * `deny(...)` to reject the request; return without calling it to allow.
+ *
+ * Pass the contract first (`createGuard(contract, fn)`) to type `deny`'s body against the
+ * contract's `guardErrorSchema` and render denials in the contract's error mode.
  *
  * @example
- * const requireAdmin = createGuard<AuthEnv>(async ({ c, deny }) => {
+ * const requireAdmin = createGuard(contract, async ({ c, deny }) => {
  *     if (c.get('user').role !== 'admin') return deny(403, 'Forbidden');
  * });
  */
+export function createGuard<E extends Env = Env>(guard: GuardFn<E, unknown>): MiddlewareHandler<E>;
+export function createGuard<const C extends AnyContract, E extends Env = Env>(
+    contract: C,
+    guard: GuardFn<E, DenyBody<C>>
+): MiddlewareHandler<E>;
 export function createGuard<E extends Env = Env>(
-    guard: (args: { c: Context<E>; deny: Deny }) => Promise<Response | void> | Response | void
+    contractOrGuard: Contract | GuardFn<E, unknown>,
+    maybeGuard?: GuardFn<E, unknown>
 ): MiddlewareHandler<E> {
+    const contract = typeof contractOrGuard === 'function' ? undefined : contractOrGuard;
+    const guard = (typeof contractOrGuard === 'function' ? contractOrGuard : maybeGuard) as GuardFn<E, unknown>;
+    const useProblemDetails = contract ? usesProblemDetails(contract.routes) : true;
+    const deny = ((status: number, bodyOrDetail: unknown) => guardDenial(status, bodyOrDetail)) as Deny<unknown>;
     return async (context, next) => {
         const result = await guard({ c: context, deny });
+        if (isGuardDenial(result)) {
+            const rendered = renderGuardDenial(result, useProblemDetails);
+            const body = rendered.raw ? (rendered.body as BodyInit) : JSON.stringify(rendered.body);
+            return new Response(body, {
+                status: rendered.status,
+                headers: rendered.headers,
+            });
+        }
         if (result instanceof Response) {
             return result;
         }
@@ -150,16 +204,22 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
  * });
  */
 export function createApi<const R extends Routes, E extends Env = Env>(options: {
-    contract: Contract<R, Record<string, TagOptions>, string>;
-    router: Router<Contract<R>, E>;
+    contract: ContractOf<R, 'problem-details'>;
+    router: Router<ContractOf<R, 'problem-details'>, E>;
     middleware?: MiddlewareMap<R, MiddlewareHandler<E>>;
-}): HonoApi<R> {
+}): HonoApi<R>;
+export function createApi<const R extends Routes, E extends Env = Env>(options: {
+    contract: ContractOf<R, 'custom'>;
+    router: Router<ContractOf<R, 'custom'>, E>;
+    middleware?: MiddlewareMap<R, MiddlewareHandler<E>>;
+}): HonoApi<R>;
+export function createApi(options: any): HonoApi {
     const { contract, router, middleware } = options;
     const spec = coreApi(contract.routes);
     return Object.assign(spec, {
         [ROUTER_META]: router,
         [MIDDLEWARE_META]: middleware,
-    }) as unknown as HonoApi<R>;
+    }) as unknown as HonoApi;
 }
 
 /**
