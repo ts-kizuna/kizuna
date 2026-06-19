@@ -32,7 +32,7 @@ const recommended: Linter.Config = {
     languageOptions: {
         parser: parser as Linter.Parser,
         parserOptions: {
-            projectService: true,
+            jsDocParsingMode: 'all',
         },
     },
     rules: {
