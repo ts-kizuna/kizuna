@@ -128,6 +128,7 @@ if (result.status === 200) {
 | -------------------------- | -------------------------------------------- |
 | `@ts-kizuna/core`          | Contract definition, validation, adapter API |
 | `@ts-kizuna/fetch`         | Typed fetch-based client                     |
+| `@ts-kizuna/react-query`   | React Query client                           |
 | `@ts-kizuna/express`       | Express adapter                              |
 | `@ts-kizuna/fastify`       | Fastify adapter                              |
 | `@ts-kizuna/hono`          | Hono adapter                                 |

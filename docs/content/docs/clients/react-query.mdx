@@ -1,0 +1,209 @@
+---
+title: React Query
+description: Type-safe TanStack Query factories for ts-kizuna contracts — queryOptions, mutationOptions, and query keys, generated from your contract.
+---
+
+`@ts-kizuna/react-query` turns a contract into a typed proxy whose every operation produces TanStack Query option objects. You write `api.users.getUser.queryOptions(...)` and hand the result straight to `useQuery` — no hand-written keys, no untyped fetchers, no glue between your contract and the cache.
+
+It builds on the [Fetch client](/docs/clients/fetch): the proxy calls into a `createClient` instance to run requests, and follows the same contract-first response model.
+
+<InstallTabs packageName="@ts-kizuna/react-query @ts-kizuna/fetch @tanstack/react-query" />
+
+## Two ways to set it up
+
+Pick based on where your app runs:
+
+- **Context** ([`createKizunaContext`](/docs/reference/create-kizuna-context)) — the proxy comes from a React provider, so each request can use its own `QueryClient`. This is what you want for SSR and frameworks like Next.js.
+- **Singleton** ([`createKizunaProxy`](/docs/reference/create-kizuna-proxy)) — a module-level proxy with no provider. Simplest for client-only apps like a Vite SPA.
+
+### Context
+
+```ts title="src/lib/api.ts"
+import { createClient } from '@ts-kizuna/fetch';
+import { createKizunaContext } from '@ts-kizuna/react-query';
+import { contract } from '@shared/contract';
+
+export const client = createClient(contract, {
+    baseUrl: '/api',
+});
+
+export const { KizunaProvider, useKizuna } = createKizunaContext<typeof contract>();
+```
+
+Render `KizunaProvider` inside your `QueryClientProvider`:
+
+```tsx title="src/main.tsx"
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { client, KizunaProvider } from './lib/api';
+
+const queryClient = new QueryClient();
+
+<QueryClientProvider client={queryClient}>
+    <KizunaProvider client={client} queryClient={queryClient}>
+        <App />
+    </KizunaProvider>
+</QueryClientProvider>;
+```
+
+Read the proxy from the hook — typically wrapped in your own domain hook:
+
+```ts title="src/hooks/use-users-list.ts"
+import { useQuery } from '@tanstack/react-query';
+import { useKizuna } from '../lib/api';
+
+export function useUsersList() {
+    const api = useKizuna();
+    return useQuery(api.users.listUsers.queryOptions({ query: { page: 1, limit: 20 } }));
+}
+```
+
+### Singleton
+
+```ts title="src/lib/api.ts"
+import { QueryClient } from '@tanstack/react-query';
+import { createClient } from '@ts-kizuna/fetch';
+import { createKizunaProxy } from '@ts-kizuna/react-query';
+import { contract } from '@shared/contract';
+
+export const queryClient = new QueryClient();
+
+const client = createClient(contract, {
+    baseUrl: '/api',
+});
+
+export const api = createKizunaProxy<typeof contract>({ client });
+```
+
+```ts title="src/hooks/use-user.ts"
+import { useQuery } from '@tanstack/react-query';
+import { api } from './lib/api';
+
+export function useUser(userId: string) {
+    return useQuery(api.users.getUser.queryOptions({ params: { id: userId } }));
+}
+```
+
+## Queries
+
+Every `GET` and `HEAD` operation exposes `queryOptions`. The first argument is the operation's input — the same `{ params, query, headers }` shape the fetch client takes — and the second is any native TanStack option:
+
+```ts
+api.users.listUsers.queryOptions(
+    {
+        query: { page: 1, limit: 50 },
+    },
+    {
+        staleTime: 60_000,
+    }
+);
+```
+
+### Accessing data, refetching, and the rest
+
+There's no special result type to learn. `queryOptions` returns a plain TanStack options object, so `useQuery` hands back the standard `UseQueryResult` — `data`, `error`, `isPending`, `refetch`, and everything else behave exactly as the [TanStack Query docs](https://tanstack.com/query/latest/docs/framework/react/reference/useQuery) describe.
+
+```tsx title="src/components/user-list.tsx"
+import { useUsersList } from '../hooks/use-users-list';
+
+export function UserList() {
+    const { data, isPending, isError, refetch } = useUsersList();
+
+    if (isPending) return <p>Loading…</p>;
+    if (isError) return <p>Could not reach the server.</p>;
+
+    return (
+        <>
+            <button onClick={() => refetch()}>Refresh</button>
+            {data.status === 200 ? (
+                <ul>
+                    {data.body.users.map((user) => (
+                        <li key={user.id}>{user.name}</li>
+                    ))}
+                </ul>
+            ) : (
+                <p>Failed to load users.</p>
+            )}
+        </>
+    );
+}
+```
+
+### `data` is the full response
+
+`data` is the operation's full `{ status, body, headers }` union. ts-kizuna models every outcome — including `404` and `400` — as a typed response in your contract, so the query **resolves** with it instead of throwing. You handle every case in one place, with the body narrowed by status:
+
+```tsx
+if (data.status === 200) {
+    // data.body is { users: User[]; total: number }
+}
+if (data.status === 404) {
+    // data.body is your Problem Details type
+}
+```
+
+`error` stays reserved for what it should mean: the request never completed — a network failure or an aborted fetch. A `404` is data, not an error, and the types keep it that way.
+
+### Disabling a query
+
+Pass `skipToken` as the input to disable a query until its arguments are ready, keeping everything type-safe:
+
+```tsx
+import { skipToken } from '@tanstack/react-query';
+
+const userQuery = useQuery(api.users.getUser.queryOptions(selectedId ? { params: { id: selectedId } } : skipToken));
+```
+
+## Mutations
+
+Every `POST`, `PUT`, `PATCH`, and `DELETE` operation exposes `mutationOptions`, which you pass to `useMutation`. `mutate` takes the operation's input; the result is the same status-discriminated union.
+
+```ts title="src/hooks/use-create-user.ts"
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useKizuna } from '../lib/api';
+
+export function useCreateUser() {
+    const api = useKizuna();
+    const queryClient = useQueryClient();
+    return useMutation(
+        api.users.createUser.mutationOptions({
+            onSuccess: () => queryClient.invalidateQueries(api.users.pathFilter()),
+        })
+    );
+}
+```
+
+```tsx title="src/components/create-user-form.tsx"
+import { useCreateUser } from '../hooks/use-create-user';
+
+export function CreateUserForm() {
+    const createUser = useCreateUser();
+
+    return (
+        <button disabled={createUser.isPending} onClick={() => createUser.mutate({ body: { name: 'Ada', email: 'ada@example.com' } })}>
+            Create user
+        </button>
+    );
+}
+```
+
+## Keys, filters, and invalidation
+
+Each operation gives you its `queryKey` and a `queryFilter`, and every router node gives you a `pathKey`/`pathFilter` that matches everything beneath it. Use them with any `QueryClient` method instead of writing key arrays by hand:
+
+```tsx
+// One operation
+queryClient.invalidateQueries(api.users.getUser.queryFilter({ params: { id } }));
+
+// A whole router — every query under `users.*`
+queryClient.invalidateQueries(api.users.pathFilter());
+
+// Read or write the cache directly
+const cached = queryClient.getQueryData(api.users.getUser.queryKey({ params: { id } }));
+```
+
+Keys mirror the operation's path through the contract, so fuzzy matching works the way TanStack expects.
+
+## Reference
+
+- [`createKizunaProxy`](/docs/reference/create-kizuna-proxy)
+- [`createKizunaContext`](/docs/reference/create-kizuna-context)

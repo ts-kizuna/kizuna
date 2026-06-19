@@ -1,0 +1,64 @@
+---
+title: createKizunaContext
+description: Create a React-context TanStack Query integration from a ts-kizuna contract type.
+---
+
+Create a provider and hooks that expose the TanStack Query proxy through React context. Because the proxy is read from context, each request can use its own `QueryClient` — what you want for SSR and frameworks like Next.js. For client-only apps, [`createKizunaProxy`](/docs/reference/create-kizuna-proxy) is simpler.
+
+<InstallTabs packageName="@ts-kizuna/react-query @ts-kizuna/fetch @tanstack/react-query" />
+
+```ts
+import { createKizunaContext } from '@ts-kizuna/react-query';
+```
+
+## Parameters
+
+```ts
+createKizunaContext<T extends Contract>(): KizunaContext<T>
+```
+
+The contract is supplied as a type parameter only — the client and `QueryClient` are passed to the provider at runtime.
+
+## Returns
+
+| Member            | Type                                                      | Description                                                   |
+| ----------------- | --------------------------------------------------------- | ------------------------------------------------------------- |
+| `KizunaProvider`  | `(props: { client, queryClient, children }) => ReactNode` | Render inside your `QueryClientProvider`                      |
+| `useKizuna`       | `() => KizunaProxy<T>`                                    | The query/mutation proxy. Throws if used outside the provider |
+| `useKizunaClient` | `() => Client<T>`                                         | The underlying fetch client, for imperative calls             |
+
+## Example
+
+```ts title="src/lib/api.ts"
+import { createClient } from '@ts-kizuna/fetch';
+import { createKizunaContext } from '@ts-kizuna/react-query';
+import { contract } from '@shared/contract';
+
+export const client = createClient(contract, { baseUrl: '/api' });
+export const { KizunaProvider, useKizuna } = createKizunaContext<typeof contract>();
+```
+
+```tsx title="src/main.tsx"
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { client, KizunaProvider } from './lib/api';
+
+const queryClient = new QueryClient();
+
+<QueryClientProvider client={queryClient}>
+    <KizunaProvider client={client} queryClient={queryClient}>
+        <App />
+    </KizunaProvider>
+</QueryClientProvider>;
+```
+
+```ts title="src/hooks/use-users-list.ts"
+import { useQuery } from '@tanstack/react-query';
+import { useKizuna } from '../lib/api';
+
+export function useUsersList() {
+    const api = useKizuna();
+    return useQuery(api.users.listUsers.queryOptions({ query: { page: 1, limit: 20 } }));
+}
+```
+
+See the [React Query guide](/docs/clients/react-query) for queries, mutations, and invalidation.

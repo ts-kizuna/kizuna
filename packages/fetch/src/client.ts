@@ -30,7 +30,7 @@ type ClientParams<R extends RouteDefinition> = R extends { pathParams: z.ZodType
     ? z.output<R['pathParams']>
     : ExtractPathParams<R['path']>;
 
-type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends true ? { params: ClientParams<R> } : {}) &
+export type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends true ? { params: ClientParams<R> } : {}) &
     (R extends { body: z.ZodType } ? (ClientPayload<R['body']> extends void ? {} : { body: ClientPayload<R['body']> }) : {}) &
     (R extends { query: z.ZodType }
         ? {} extends ClientPayload<R['query']>
@@ -49,7 +49,7 @@ type ValidationErrorResult = {
 
 type HasValidation<R extends RouteDefinition> = R extends { body: z.ZodType } ? true : R extends { query: z.ZodType } ? true : false;
 
-type ClientResponse<R extends RouteDefinition> =
+export type ClientResponse<R extends RouteDefinition> =
     HasValidation<R> extends true ? ResponseUnion<R> | ValidationErrorResult : ResponseUnion<R>;
 
 type ClientFn<R extends RouteDefinition> =

@@ -11,6 +11,8 @@
         "binary-and-file-schemas",
         "create-api",
         "create-client",
+        "create-kizuna-proxy",
+        "create-kizuna-context",
         "is-validation-error",
         "add-coded-issue",
         "generate-openapi",

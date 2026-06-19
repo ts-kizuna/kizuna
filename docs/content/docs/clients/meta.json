@@ -1,4 +1,4 @@
 {
     "title": "Clients",
-    "pages": ["fetch", "swift"]
+    "pages": ["fetch", "react-query", "swift"]
 }

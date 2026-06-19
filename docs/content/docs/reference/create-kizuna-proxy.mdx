@@ -1,0 +1,59 @@
+---
+title: createKizunaProxy
+description: Create a context-free, type-safe TanStack Query proxy from a ts-kizuna contract.
+---
+
+Create a module-level proxy whose every operation produces TanStack Query option objects. Use it for client-only apps; for SSR or per-request caching, use [`createKizunaContext`](/docs/reference/create-kizuna-context).
+
+<InstallTabs packageName="@ts-kizuna/react-query @ts-kizuna/fetch @tanstack/react-query" />
+
+```ts
+import { createKizunaProxy } from '@ts-kizuna/react-query';
+```
+
+## Parameters
+
+```ts
+createKizunaProxy<T extends Contract>(options: CreateKizunaProxyOptions<T>): KizunaProxy<T>
+```
+
+| Option        | Type          | Required | Description                                                                                     |
+| ------------- | ------------- | -------- | ----------------------------------------------------------------------------------------------- |
+| `client`      | `Client<T>`   | Yes      | A fetch client built from the same contract via [`createClient`](/docs/reference/create-client) |
+| `queryClient` | `QueryClient` | No       | Accepted for parity with the context setup; the current factories don't need it                 |
+
+## Returns
+
+A proxy mirroring the contract. Each operation carries factories; each router node also carries path-level factories.
+
+| Factory                          | Available on                        | Returns                                          |
+| -------------------------------- | ----------------------------------- | ------------------------------------------------ |
+| `queryOptions(input?, options?)` | `GET` / `HEAD` operations           | Options for `useQuery` / `useSuspenseQuery`      |
+| `queryKey(input?)`               | `GET` / `HEAD` operations           | The operation's query key                        |
+| `queryFilter(input?, filters?)`  | `GET` / `HEAD` operations           | A query filter for this operation                |
+| `mutationOptions(options?)`      | `POST` / `PUT` / `PATCH` / `DELETE` | Options for `useMutation`                        |
+| `mutationKey()`                  | `POST` / `PUT` / `PATCH` / `DELETE` | The operation's mutation key                     |
+| `pathKey()`                      | Any router node                     | A prefix key matching every query under the path |
+| `pathFilter(filters?)`           | Any router node                     | A filter matching every query under the path     |
+
+The `queryOptions`/`mutationOptions` result resolves with the operation's full `{ status, body, headers }` union — discriminate on `status`. See the [React Query guide](/docs/clients/react-query) for the full data model.
+
+## Example
+
+```ts title="src/lib/api.ts"
+import { createClient } from '@ts-kizuna/fetch';
+import { createKizunaProxy } from '@ts-kizuna/react-query';
+import { contract } from '@shared/contract';
+
+const client = createClient(contract, { baseUrl: '/api' });
+export const api = createKizunaProxy<typeof contract>({ client });
+```
+
+```ts title="src/hooks/use-user.ts"
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../lib/api';
+
+export function useUser(userId: string) {
+    return useQuery(api.users.getUser.queryOptions({ params: { id: userId } }));
+}
+```
