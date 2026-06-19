@@ -1,10 +1,17 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { createContract } from './contract.js';
+import { kizuna } from './kizuna.js';
+import { createTags } from './tags.js';
 import { ProblemDetailsSchema } from './error-response.js';
 import type { RouteHandler, HandlerArgs, HandlerReturn, Router } from './handler-pipeline.js';
 
-const contract = createContract({
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
+
+const contractRoutes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -44,8 +51,8 @@ const contract = createContract({
     },
 });
 
-type GetUserRoute = (typeof contract)['getUser'];
-type CreateUserRoute = (typeof contract)['createUser'];
+type GetUserRoute = (typeof contractRoutes)['getUser'];
+type CreateUserRoute = (typeof contractRoutes)['createUser'];
 
 test('HandlerReturn discriminates over literal status codes; success bodies pass through, error bodies are Problem Details', () => {
     type Return = HandlerReturn<GetUserRoute>;
@@ -64,7 +71,7 @@ test('HandlerReturn rejects body that does not match the status', () => {
 });
 
 test('error statuses (4xx/5xx) require a Problem Details schema — non-envelope shapes resolve to never', () => {
-    const customErrorContract = createContract({
+    const customErrorContractRoutes = k.routes('api', {
         getThing: {
             method: 'GET',
             path: '/things/:id',
@@ -81,7 +88,8 @@ test('error statuses (4xx/5xx) require a Problem Details schema — non-envelope
             },
         },
     });
-    type Route = (typeof customErrorContract)['getThing'];
+
+    type Route = (typeof customErrorContractRoutes)['getThing'];
     // Success status keeps its custom shape.
     expectTypeOf<Extract<HandlerReturn<Route>, { status: 200 }>['body']>().toEqualTypeOf<{ id: string }>();
     // 4xx and 5xx with a non-Problem-Details schema are unconstructable.
@@ -123,12 +131,12 @@ test('RouteHandler accepts HandlerContext', () => {
 });
 
 test('Router maps every route key to a RouteHandler', () => {
-    type Implementation = Router<typeof contract, { request: Request }>;
+    type Implementation = Router<typeof contractRoutes, { request: Request }>;
     expectTypeOf<Implementation['getUser']>().parameter(0).toMatchTypeOf<{ params: { id: string }; request: Request }>();
     expectTypeOf<Implementation['createUser']>().parameter(0).toMatchTypeOf<{ body: { name: string; email: string } }>();
 });
 
-type DeleteUserRoute = (typeof contract)['deleteUser'];
+type DeleteUserRoute = (typeof contractRoutes)['deleteUser'];
 
 test('ProblemDetailsSchema body strips title and status, keeps detail required, makes type optional', () => {
     type Return = HandlerReturn<DeleteUserRoute>;

@@ -67,7 +67,7 @@ describe('createModel', () => {
         ).toBe(true);
     });
 
-    it('returns a schema usable in contracts', () => {
+    it('returns a schema usable in routes', () => {
         const User = createModel({
             title: 'User',
             schema: z.object({

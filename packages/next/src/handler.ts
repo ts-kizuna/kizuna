@@ -2,7 +2,7 @@ import {
     type AdapterRequest,
     type AdapterResult,
     type RouteDefinition,
-    type Contract,
+    type Routes,
     type MiddlewareMap,
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
@@ -15,14 +15,27 @@ import {
     renderJsonResult,
     problemDetails,
 } from '@ts-kizuna/core/adapter';
+import type { Contract, TagOptions } from '@ts-kizuna/core';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export interface NextHandlerContext {
     request: NextRequest;
 }
 
+/**
+ * The handler type for a single route, typed against its contract definition.
+ */
 export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, NextHandlerContext>;
-export type Router<T extends Contract> = CoreRouter<T, NextHandlerContext>;
+
+/**
+ * The handler tree for a contract, typed against it.
+ */
+export type Router<C> =
+    C extends Contract<infer R, infer _Tags, infer _Codes>
+        ? CoreRouter<R, NextHandlerContext>
+        : C extends Routes
+          ? CoreRouter<C, NextHandlerContext>
+          : never;
 
 /**
  * Passed to each middleware function as the second argument.
@@ -35,22 +48,18 @@ export interface NextMiddlewareRoute {
 export type NextMiddlewareHandler = (request: NextRequest, route: NextMiddlewareRoute) => Response | void | Promise<Response | void>;
 
 /**
- * Declare per-route middleware in the same shape as the contract.
+ * Declare per-route middleware in the same shape as the contract's routes.
  *
- * ```ts
- * import { createMiddleware } from '@ts-kizuna/next';
- * import { contract } from './contract';
- *
+ * @example
  * export const middleware = createMiddleware(contract, {
  *     listUsers: [authenticate],
  *     createUser: [authenticate, adminOnly],
  * });
- * ```
  */
-export const createMiddleware = <T extends Contract>(
-    _contract: T,
-    map: MiddlewareMap<T, NextMiddlewareHandler>
-): MiddlewareMap<T, NextMiddlewareHandler> => map;
+export const createMiddleware = <const R extends Routes>(
+    _contract: Contract<R, Record<string, TagOptions>, string>,
+    map: MiddlewareMap<R, NextMiddlewareHandler>
+): MiddlewareMap<R, NextMiddlewareHandler> => map;
 
 type Deny = (status: number, detail: string) => Response;
 
@@ -63,26 +72,19 @@ const deny: Deny = (status, detail) =>
     });
 
 /**
- * Create a guard — a middleware that checks access before the handler runs.
+ * Create a guard — a middleware that checks access before the handler runs. Call
+ * `deny(status, detail)` to reject the request; return without calling it to allow.
  *
- * Call `deny(status, message)` to reject the request.
- * Return without calling `deny` to allow it through.
- *
- * ```ts
- * import { createGuard } from '@ts-kizuna/next';
- *
- * const requireAdmin = createGuard(async (request, route, deny) => {
- *     if (request.user.role !== 'admin') {
- *         return deny(403, 'Forbidden');
- *     }
+ * @example
+ * const requireAdmin = createGuard(async ({ request, deny }) => {
+ *     if (request.headers.get('x-role') !== 'admin') return deny(403, 'Forbidden');
  * });
- * ```
  */
 export function createGuard(
-    guard: (request: NextRequest, route: NextMiddlewareRoute, deny: Deny) => Promise<Response | void> | Response | void
+    guard: (args: { request: NextRequest; route: NextMiddlewareRoute; deny: Deny }) => Promise<Response | void> | Response | void
 ): NextMiddlewareHandler {
     return async (request, route) => {
-        const result = await guard(request, route, deny);
+        const result = await guard({ request, route, deny });
         if (result instanceof Response) {
             return result;
         }
@@ -92,34 +94,27 @@ export function createGuard(
 export interface NextHandlerOptions {
     basePath?: string;
     /**
-     * Map a thrown error into a response — the inbound migration seam. Return a
-     * `NextResponse` (e.g. built from `problemDetails(...)`) to normalize existing thrown
-     * domain errors into the shared error shape without rewriting every route; return
-     * `void` to fall through to the default 500.
+     * Map a thrown error into a response. Return a `NextResponse` (e.g. built
+     * from `problemDetails(...)`) to handle the error, or `void` to fall through
+     * to the default 500.
      */
     onError?: (error: unknown, request: NextRequest) => NextResponse | Promise<NextResponse> | void | Promise<void>;
     /**
-     * Reshape error (status >= 400) response bytes — e.g. serve an older client a plain
-     * `application/json` body during migration. Most migrations don't need this (use Problem
-     * Details extension members instead). See {@link ErrorFormatter}.
+     * Reshape error (status >= 400) response bytes before they are sent. See
+     * {@link ErrorFormatter}.
      */
     formatError?: ErrorFormatter<NextRequest>;
     /**
      * Middleware functions that run after route matching but before the handler.
+     * Each receives `(request, route)`; return a `Response` to short-circuit.
      *
-     * Each function receives `(request, route)`. Return a `Response` to short-circuit
-     * (skip remaining middleware and the handler). Return `undefined` to continue.
-     * Properties set on `request` (e.g. `request.userId`) are accessible in the handler
-     * via `{ request }`.
-     *
-     * Functions run in order.
-     *
-     * @deprecated Use `middleware` via `createApi` instead.
+     * @deprecated Declare per-route middleware via `createMiddleware` and `createApi` instead.
      */
     requestMiddleware?: Array<NextMiddlewareHandler>;
     /**
-     * Validate handler return values against the contract's response schemas.
-     * Mismatches surface as 500 errors. Intended for development; disable in production.
+     * Validate handler return values against the routes' response schemas.
+     * Mismatches surface as 500 errors. Intended for development; disable in
+     * production.
      *
      * @default false
      */
@@ -133,11 +128,11 @@ const jsonResponse = (status: number, body: unknown, headers: Record<string, str
         headers,
     });
 
-export const handleNextRequest = async <T extends Contract>(
+export const handleNextRequest = async <T extends Routes>(
     request: NextRequest,
-    contract: T,
-    router: Router<T>,
-    middlewareMap: MiddlewareMap<Contract, NextMiddlewareHandler> | undefined,
+    routes: T,
+    router: CoreRouter<T, NextHandlerContext>,
+    middlewareMap: MiddlewareMap<Routes, NextMiddlewareHandler> | undefined,
     options?: NextHandlerOptions
 ): Promise<NextResponse> => {
     const url = new URL(request.url);
@@ -170,7 +165,7 @@ export const handleNextRequest = async <T extends Contract>(
     const hasMiddleware = middlewareMap || (globalMiddleware && globalMiddleware.length > 0);
 
     if (hasMiddleware) {
-        const matched = matchRoute(request.method, url.pathname, contract as unknown as Contract, options?.basePath);
+        const matched = matchRoute(request.method, url.pathname, routes, options?.basePath);
 
         if (matched.kind === 'matched') {
             const middlewareRoute: NextMiddlewareRoute = {
@@ -207,7 +202,7 @@ export const handleNextRequest = async <T extends Contract>(
             };
 
             return adapter.handle({
-                contract,
+                routes,
                 router,
                 request: adapterRequest,
                 responseContext: {},
@@ -229,7 +224,7 @@ export const handleNextRequest = async <T extends Contract>(
     };
 
     return adapter.handle({
-        contract,
+        routes,
         router,
         request: adapterRequest,
         responseContext: {},

@@ -1,26 +1,26 @@
-import type { Contract, RouteDefinition } from './types.js';
+import type { Routes, RouteDefinition } from './types.js';
 
 /**
- * A contract-shaped structure that maps route keys to middleware arrays.
+ * A routes-shaped structure that maps route keys to middleware arrays.
  *
  * - An array on a leaf key applies that middleware to the single route.
  * - An array on a group key applies that middleware to every route in the group.
  * - A nested object on a group key allows per-route middleware within the group.
  * - A `'*'` key in a nested group provides default middleware for routes not explicitly listed.
  *
- * Every top-level key in the contract must be present — use `[]` for public routes.
- * Inside a group, individual route keys are optional because `'*'` provides the default.
+ * Every top-level group must be present — use `[]` for public routes. Inside a
+ * group, individual route keys are optional because `'*'` provides the default.
  */
-export type MiddlewareMap<T extends Contract, M> = {
+export type MiddlewareMap<T extends Routes, M> = {
     [K in keyof T as K extends symbol ? never : K]: T[K] extends RouteDefinition
         ? M[]
-        : M[] | (MiddlewareGroupMap<Extract<T[K], Contract>, M> & { '*'?: M[] });
+        : M[] | (MiddlewareGroupMap<Extract<T[K], Routes>, M> & { '*'?: M[] });
 };
 
-type MiddlewareGroupMap<T extends Contract, M> = {
+type MiddlewareGroupMap<T extends Routes, M> = {
     [K in keyof T as K extends symbol ? never : K]?: T[K] extends RouteDefinition
         ? M[]
-        : M[] | (MiddlewareGroupMap<Extract<T[K], Contract>, M> & { '*'?: M[] });
+        : M[] | (MiddlewareGroupMap<Extract<T[K], Routes>, M> & { '*'?: M[] });
 };
 
 /**
@@ -29,7 +29,7 @@ type MiddlewareGroupMap<T extends Contract, M> = {
  * If a group key maps to an array, that array applies to all routes in the group.
  * If a group key maps to a nested object, the resolver descends to find the specific route.
  */
-export function resolveMiddleware<M>(routeKey: string, map: MiddlewareMap<Contract, M> | undefined): M[] {
+export function resolveMiddleware<M>(routeKey: string, map: MiddlewareMap<Routes, M> | undefined): M[] {
     if (!map) return [];
 
     const segments = routeKey.split('.');

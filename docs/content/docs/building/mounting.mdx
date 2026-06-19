@@ -1,9 +1,9 @@
 ---
 title: Mounting
-description: Combine a contract and a router into an API object.
+description: Bind your router to the contract and serve it with an adapter.
 ---
 
-Once you have a contract and a router, combine them into an API object that an adapter can mount.
+The last step: `createApi` binds your [router](/docs/building/router) to the [contract](/docs/building/contract), producing the API object your framework adapter mounts. After this, your routes are live.
 
 ## `createApi`
 
@@ -18,9 +18,11 @@ export const api = createApi({
 });
 ```
 
+Add per-route middleware with a `middleware` map here too — see the adapter pages.
+
 ## Mounting
 
-Once you have an `api` object, pass it to the adapter's endpoint function:
+Once you have an `api` object, mount it with the adapter's mount verb:
 
 **Express:**
 
@@ -39,11 +41,11 @@ app.listen(3000);
 
 ```ts title="src/index.ts"
 import Fastify from 'fastify';
-import { fastifyKizuna } from '@ts-kizuna/fastify';
+import { plugin } from '@ts-kizuna/fastify';
 import { api } from './lib/server';
 
 const app = Fastify();
-app.register(fastifyKizuna, {
+app.register(plugin, {
     api,
 });
 app.listen({

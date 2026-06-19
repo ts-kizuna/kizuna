@@ -3,7 +3,7 @@ title: Create a Generator
 description: Build and ship your own code generator or client from a ts-kizuna contract using createGenerator.
 ---
 
-`createGenerator` from `@ts-kizuna/core/generator` lets you walk a contract and produce any output — a typed client for another language, documentation, a route manifest, whatever you need. The OpenAPI and Swift generators are both built on it.
+`createGenerator` from `@ts-kizuna/core/generator` lets you walk your contract and produce any output — a typed client for another language, documentation, a route manifest, whatever you need. The OpenAPI and Swift generators are both built on it.
 
 New first-party generator PRs will be declined — we can't maintain what we don't know well. The generator API is public so you can build your own.
 
@@ -14,14 +14,15 @@ You provide a factory function that receives your options and returns two method
 - `processRoute` — called once for every route in the contract
 - `finalize` — called after all routes are processed, returns your output
 
-`createGenerator` handles contract walking, flattening nested contracts, and resolving `/** @deprecated */` annotations automatically.
+`createGenerator` handles walking the contract, flattening nested route groups, and resolving `/** @deprecated */` annotations automatically.
 
 ## `createGenerator`
 
 ```ts title="generator.ts"
-import { createGenerator, type GeneratorOptions, type GeneratorRouteContext } from '@ts-kizuna/core/generator';
+import { createGenerator, type GeneratorRouteContext } from '@ts-kizuna/core/generator';
+import { contract } from './contract';
 
-interface MyOptions extends GeneratorOptions {
+interface MyOptions {
     prefix?: string;
 }
 
@@ -42,9 +43,6 @@ const generateRouteList = createGenerator((options: MyOptions) => {
 
 const list = generateRouteList(contract, {
     prefix: '> ',
-    deprecationWarnings: {
-        contractPath: path.resolve(import.meta.dirname, './contract.ts'),
-    },
 });
 ```
 
@@ -55,23 +53,15 @@ Each `processRoute` call receives:
 | Property             | Type                               | Description                                                             |
 | -------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
 | `routeKey`           | `string`                           | Dot-separated key path, e.g. `users.getUser`                            |
-| `route`              | `Route`                            | The full route definition                                               |
-| `contractTags`       | `string[]`                         | OpenAPI tags inherited from the sub-contract                            |
+| `route`              | `RouteDefinition`                  | The full route definition                                               |
+| `routeTags`          | `string[]`                         | OpenAPI tags inherited from the sub-routes                              |
 | `deprecated`         | `boolean`                          | `true` if the route is marked `/** @deprecated */`                      |
 | `deprecationMessage` | `string \| undefined`              | The text after `@deprecated`, if any                                    |
 | `fieldDeprecations`  | `Map<string, string> \| undefined` | Field-path → deprecation message for body/query/headers/response fields |
 
 ## Deprecation
 
-Pass `deprecationWarnings.contractPath` to resolve `@deprecated` annotations. Without it, `deprecated` is always `false` and `fieldDeprecations` is always `undefined`.
-
-```ts
-generateRouteList(contract, {
-    deprecationWarnings: {
-        contractPath: path.resolve(import.meta.dirname, './contract.ts'),
-    },
-});
-```
+Deprecation data resolves automatically. When `.kizuna/deprecations.json` exists — produced by `kizuna deprecations` (see [Deprecations](/docs/deprecations)) — each `processRoute` call gets `deprecated`, `deprecationMessage`, and `fieldDeprecations` filled in for the matching route. Without that file, `deprecated` is always `false` and `fieldDeprecations` is always `undefined`.
 
 ## Publishing
 

@@ -1,9 +1,9 @@
 ---
 title: createModel
-description: Give a Zod schema a named identity so OpenAPI and Swift generators produce named types instead of inline definitions.
+description: Give a Zod schema a name so OpenAPI and Swift generators produce named types instead of inline definitions.
 ---
 
-Give a Zod schema a named identity so generators produce named types instead of inline definitions.
+Give a Zod schema a name so generators produce named types instead of inline definitions.
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -27,7 +27,7 @@ createModel(options: ModelOptions): ZodType
 
 ## Returns
 
-The Zod schema with metadata attached. Use it exactly like any other Zod schema in your contract.
+The Zod schema with metadata attached. Use it exactly like any other Zod schema in your routes.
 
 ## Example
 

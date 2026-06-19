@@ -12,9 +12,10 @@ import {
     resolveResponseContentType,
     isJsonMediaType,
     isBinarySchema,
-    type Contract,
+    type Routes,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
+import type { Contract } from '@ts-kizuna/core';
 import { SwiftWriter, camelCase, pascalCase, stringLiteral } from './emit.js';
 import {
     TypeRegistry,
@@ -109,7 +110,7 @@ interface RouteGroup {
     methods: RouteMethod[];
 }
 
-interface ContractPartition {
+interface RoutesPartition {
     flatMethods: RouteMethod[];
     groups: RouteGroup[];
 }
@@ -364,7 +365,7 @@ const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeR
             }
         },
 
-        finalize(): ContractPartition {
+        finalize(): RoutesPartition {
             const groups: RouteGroup[] = [];
             for (const [groupKey, methods] of groupMap) {
                 groups.push({
@@ -1462,7 +1463,7 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
 const emitClient = (
     writer: SwiftWriter,
     config: { clientName: string; anyCodable: boolean },
-    partition: ContractPartition,
+    partition: RoutesPartition,
     context: EmitContext,
     typesByOperation: Map<string, SwiftType[]>
 ): void => {
@@ -1636,14 +1637,12 @@ const emitClient = (
 };
 
 /**
- * Generate a Swift API client from a ts-kizuna contract.
+ * Generate a Swift API client from a kizuna config.
  *
- * @param contract - The router from `createContract({ ... })`.
- * @param config - Override the generated names:
- *   - `clientName` — the actor class. Defaults to `APIClient`.
+ *   - `namespaceName` — the actor class. Defaults to `APIClient`.
  */
-export const generateSwiftClient = (contract: Contract, config: SwiftConfig): string => {
-    const { namespaceName } = config;
+export const generateSwiftClient = (contract: Contract, options: SwiftConfig): string => {
+    const { namespaceName } = options;
 
     const registry = new TypeRegistry();
     const partition = swiftGenerator(contract, {

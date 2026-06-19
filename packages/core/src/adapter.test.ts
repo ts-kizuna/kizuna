@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createContract } from './index.js';
+import { kizuna, createTags } from './index.js';
 import { ProblemDetailsSchema } from './schemas.js';
 import { createAdapter, renderJsonResult, ResponseValidationError, type AdapterRequest, type AdapterResult } from './adapter.js';
 
-const contract = createContract({
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
+
+const contract = k.routes('api', {
     getItem: {
         method: 'GET',
         path: '/items/:id',
@@ -45,7 +51,7 @@ describe('responseValidation', () => {
     it('passes through when handler returns a body matching the response schema', async () => {
         const { adapter, results } = makeAdapter();
         await adapter.handle({
-            contract,
+            routes: contract,
             router: {
                 getItem: ({ params }: { params: { id: string } }) => ({
                     status: 200,
@@ -65,7 +71,7 @@ describe('responseValidation', () => {
     it('produces a handler-error when handler returns a body that fails the response schema', async () => {
         const { adapter, results } = makeAdapter();
         await adapter.handle({
-            contract,
+            routes: contract,
             router: {
                 getItem: () =>
                     ({
@@ -89,7 +95,7 @@ describe('responseValidation', () => {
     it('does not validate when responseValidation is false', async () => {
         const { adapter, results } = makeAdapter();
         await adapter.handle({
-            contract,
+            routes: contract,
             router: {
                 getItem: () =>
                     ({
@@ -107,7 +113,7 @@ describe('responseValidation', () => {
     it('does not validate when responseValidation is omitted', async () => {
         const { adapter, results } = makeAdapter();
         await adapter.handle({
-            contract,
+            routes: contract,
             router: {
                 getItem: () =>
                     ({
@@ -124,7 +130,7 @@ describe('responseValidation', () => {
     it('validates a 404 handler body against the auto-filled Problem Details envelope', async () => {
         const { adapter, results } = makeAdapter();
         await adapter.handle({
-            contract,
+            routes: contract,
             router: {
                 // The handler supplies only `detail`; `type`/`title`/`status` are auto-filled
                 // before validation, so this passes despite ProblemDetailsSchema requiring all four.
@@ -145,7 +151,7 @@ describe('responseValidation', () => {
     it('error() helper throws and adapter returns it as a response', async () => {
         const { adapter, results } = makeAdapter();
         await adapter.handle({
-            contract,
+            routes: contract,
             router: {
                 getItem: ({ error }) => {
                     return error({
@@ -177,7 +183,7 @@ describe('responseValidation', () => {
             },
         });
         await adapter.handle({
-            contract,
+            routes: contract,
             router: {
                 getItem: () => {
                     throw new Error('something broke');
@@ -290,7 +296,7 @@ describe('renderJsonResult — error formatting', () => {
 
 describe('eachRoute', () => {
     it('yields static routes before parameterized routes at the same path segment', () => {
-        const c = createContract({
+        const c = k.routes('api', {
             getById: {
                 method: 'GET',
                 path: '/items/:id',
@@ -315,7 +321,7 @@ describe('eachRoute', () => {
 });
 
 describe('renderJsonResult — non-JSON and binary bodies', () => {
-    const rawContract = createContract({
+    const rawContract = k.routes('api', {
         exportCsv: {
             method: 'GET',
             path: '/export',

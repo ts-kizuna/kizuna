@@ -3,7 +3,7 @@ import { Router as createExpressRouter } from 'express';
 import {
     type AdapterRequest,
     type RouteDefinition,
-    type Contract,
+    type Routes,
     type MiddlewareMap,
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
@@ -14,19 +14,35 @@ import {
     createAdapter,
     resolveMiddleware,
     renderJsonResult,
-    createApi as coreCreateApi,
+    createApi as coreApi,
     problemDetails,
 } from '@ts-kizuna/core/adapter';
+import type { Contract, TagOptions } from '@ts-kizuna/core';
 
-export type ExpressApi<R extends Contract = Contract> = R & ApiWithRouter & { readonly [MIDDLEWARE_META]?: unknown };
+export type ExpressApi<R extends Routes = Routes> = R & ApiWithRouter & { readonly [MIDDLEWARE_META]?: unknown };
 
+/**
+ * The Express request and response passed to each handler.
+ */
 export interface ExpressHandlerContext {
     req: Request;
     res: Response;
 }
 
+/**
+ * The handler for a single route, typed against its contract definition.
+ */
 export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, ExpressHandlerContext>;
-export type Router<T extends Contract> = CoreRouter<T, ExpressHandlerContext>;
+
+/**
+ * The handler tree for a contract, typed against it.
+ */
+export type Router<C> =
+    C extends Contract<infer R, infer _Tags, infer _Codes>
+        ? CoreRouter<R, ExpressHandlerContext>
+        : C extends Routes
+          ? CoreRouter<C, ExpressHandlerContext>
+          : never;
 
 declare global {
     // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -39,22 +55,22 @@ declare global {
 
 export interface ExpressOptions {
     /**
-     * Middleware inserted after `req.kizunaRoute` is set, before the route handler runs.
+     * Express middleware inserted after `req.kizunaRoute` is set and before the
+     * route handler runs.
      *
-     * @deprecated Use `middleware` via `createApi` instead.
+     * @deprecated Declare per-route middleware via `createMiddleware` and `createApi` instead.
      */
     globalMiddleware?: Array<(req: Request & { kizunaRoute: RouteDefinition }, res: Response, next: NextFunction) => void>;
     /**
-     * Validate handler return values against the contract's response schemas.
-     * Mismatches surface as 500 errors. Intended for development; disable in production.
+     * Validate handler return values against the route's response schemas.
+     * Mismatches surface as 500 errors. Enable in development.
      *
      * @default false
      */
     responseValidation?: boolean;
     /**
-     * Reshape error (status >= 400) response bytes — e.g. serve an older client a plain
-     * `application/json` body during migration. Most migrations don't need this (use Problem
-     * Details extension members instead). See {@link ErrorFormatter}.
+     * Reshape error (status >= 400) response bytes before they are sent. See
+     * {@link ErrorFormatter}.
      */
     formatError?: ErrorFormatter<Request>;
 }
@@ -62,36 +78,30 @@ export interface ExpressOptions {
 /**
  * Bind typed handler implementations to a contract.
  *
- * ```ts
- * // src/router.ts
- * import { createRouter } from '@ts-kizuna/express';
- * import { contract } from './contract';
- *
+ * @example
  * export const router = createRouter(contract, {
  *     listUsers: ({ query }) => ({ status: 200, body: { users: [], total: 0 } }),
  *     createUser: ({ body }) => ({ status: 201, body: { id: '1', ...body } }),
  * });
- * ```
  */
-export const createRouter = <T extends Contract>(_contract: T, router: Router<T>): Router<T> => router;
+export const createRouter = <const R extends Routes>(
+    _contract: Contract<R, Record<string, TagOptions>, string>,
+    router: Router<Contract<R>>
+): Router<Contract<R>> => router;
 
 /**
- * Declare per-route middleware in the same shape as the contract.
+ * Declare per-route middleware in the same shape as the contract's routes.
  *
- * ```ts
- * import { createMiddleware } from '@ts-kizuna/express';
- * import { contract } from './contract';
- *
+ * @example
  * export const middleware = createMiddleware(contract, {
  *     listUsers: [authenticate],
  *     createUser: [authenticate, adminOnly],
  * });
- * ```
  */
-export const createMiddleware = <T extends Contract>(
-    _contract: T,
-    map: MiddlewareMap<T, RequestHandler>
-): MiddlewareMap<T, RequestHandler> => map;
+export const createMiddleware = <const R extends Routes>(
+    _contract: Contract<R, Record<string, TagOptions>, string>,
+    map: MiddlewareMap<R, RequestHandler>
+): MiddlewareMap<R, RequestHandler> => map;
 
 type Deny = (status: number, detail: string) => { status: number; detail: string };
 
@@ -101,31 +111,21 @@ const deny: Deny = (status, detail) => ({
 });
 
 /**
- * Create a guard — a middleware that checks access before the handler runs.
+ * Create a guard — a middleware that checks access before the handler runs. Call
+ * `deny(status, detail)` to reject the request; return without calling it to allow.
  *
- * Call `deny(status, message)` to reject the request.
- * Return without calling `deny` to allow it through.
- *
- * ```ts
- * import { createGuard } from '@ts-kizuna/express';
- *
- * const requireAdmin = createGuard(async (req, res, deny) => {
- *     if (req.user.role !== 'admin') {
- *         return deny(403, 'Forbidden');
- *     }
+ * @example
+ * const requireAdmin = createGuard(async ({ req, deny }) => {
+ *     if (req.user?.role !== 'admin') return deny(403, 'Forbidden');
  * });
- * ```
  */
 export function createGuard(
-    guard: (request: Request, response: Response, deny: Deny) => Promise<ReturnType<Deny> | void> | ReturnType<Deny> | void
+    guard: (args: { req: Request; res: Response; deny: Deny }) => Promise<ReturnType<Deny> | void> | ReturnType<Deny> | void
 ): RequestHandler {
-    return async (request, response, next) => {
-        const result = await guard(request, response, deny);
+    return async (req, res, next) => {
+        const result = await guard({ req, res, deny });
         if (result && typeof result === 'object' && 'status' in result) {
-            response
-                .status(result.status)
-                .set('content-type', 'application/problem+json')
-                .json(problemDetails(result.status, result.detail));
+            res.status(result.status).set('content-type', 'application/problem+json').json(problemDetails(result.status, result.detail));
             return;
         }
         next();
@@ -179,20 +179,15 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
 /**
  * Mount a ts-kizuna API onto an Express app.
  *
- * ```ts
- * // src/index.ts
- * import { createExpressEndpoints } from '@ts-kizuna/express';
- * import { api } from './api';
- *
+ * @example
  * createExpressEndpoints(api, app);
- * ```
  */
 export function createExpressEndpoints(api: ExpressApi, app: AppLike, options?: ExpressOptions): ExpressRouter {
-    const resolvedRouter = api[ROUTER_META] as Router<Contract>;
-    const middlewareMap = api[MIDDLEWARE_META] as MiddlewareMap<Contract, RequestHandler> | undefined;
+    const resolvedRouter = api[ROUTER_META] as CoreRouter<Routes, ExpressHandlerContext>;
+    const middlewareMap = api[MIDDLEWARE_META] as MiddlewareMap<Routes, RequestHandler> | undefined;
 
     const expressRouter = createExpressRouter();
-    for (const { routeKey, route } of adapter.eachRoute(api as unknown as Contract, resolvedRouter)) {
+    for (const { routeKey, route } of adapter.eachRoute(api as unknown as Routes, resolvedRouter)) {
         const method = route.method.toLowerCase() as 'get' | 'head' | 'post' | 'put' | 'patch' | 'delete' | 'options';
         const routeMiddleware = resolveMiddleware(routeKey, middlewareMap);
         expressRouter[method](
@@ -218,7 +213,7 @@ export function createExpressEndpoints(api: ExpressApi, app: AppLike, options?: 
                     readBody: () => req.body,
                 };
                 await adapter.handle({
-                    contract: api as unknown as Contract,
+                    routes: api as unknown as Routes,
                     router: resolvedRouter,
                     request: adapterRequest,
                     responseContext: {
@@ -237,29 +232,22 @@ export function createExpressEndpoints(api: ExpressApi, app: AppLike, options?: 
 }
 
 /**
- * Define a fully-typed Express API — routes, handlers, and middleware in one call.
+ * Bind a contract to its router and per-route middleware.
  *
- * ```ts
- * // src/api.ts
- * import { createApi } from '@ts-kizuna/express';
- * import { contract } from './contract';
- * import { router } from './router';
- * import { middleware } from './middleware';
- *
+ * @example
  * export const api = createApi({
  *     contract,
  *     router,
  *     middleware,
  * });
- * ```
  */
-export const createApi = <const R extends Contract>(options: {
-    contract: R;
-    router: Router<R>;
+export const createApi = <const R extends Routes>(options: {
+    contract: Contract<R, Record<string, TagOptions>, string>;
+    router: Router<Contract<R>>;
     middleware?: MiddlewareMap<R, RequestHandler>;
 }): ExpressApi<R> => {
     const { contract, router, middleware } = options;
-    const spec = coreCreateApi(contract);
+    const spec = coreApi(contract.routes);
     return Object.assign(spec, {
         [ROUTER_META]: router,
         [MIDDLEWARE_META]: middleware,

@@ -22,8 +22,9 @@ Use it as a response `body` and pair it with a `contentType`. It defaults to `ap
 
 ```ts
 import { BinarySchema } from '@ts-kizuna/core/schemas';
+import { k } from './k';
 
-export const contract = createContract({
+export const reportsRoutes = k.routes('reports', {
     downloadReport: {
         method: 'GET',
         path: '/reports/:id.pdf',

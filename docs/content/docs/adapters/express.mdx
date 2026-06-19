@@ -1,9 +1,9 @@
 ---
 title: Express
-description: Mount a ts-kizuna contract on an Express 5 application.
+description: Mount a ts-kizuna API on an Express 5 application.
 ---
 
-`@ts-kizuna/express` connects a ts-kizuna contract to an Express 5 application. It handles routing, request validation, body parsing, and error formatting — all driven by your contract schema.
+`@ts-kizuna/express` connects a ts-kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting — all driven by your contract.
 
 **Requires Express ≥ 5.**
 
@@ -13,8 +13,8 @@ description: Mount a ts-kizuna contract on an Express 5 application.
 
 The standard setup uses three functions:
 
-- `createRouter` — bind typed implementations to a contract
-- `createApi` — combine a contract and its handlers into an API object
+- `createRouter` — bind typed implementations to the contract
+- `createApi` — combine your contract, router, and middleware into an API object
 - `createExpressEndpoints` — mount the API on an Express app
 
 ```ts title="src/lib/router.ts"
@@ -22,40 +22,42 @@ import { createRouter } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 
 export const router = createRouter(contract, {
-    listUsers: async ({ query }) => {
-        const users = await db.users.findMany({
-            skip: (query.page - 1) * query.limit,
-            take: query.limit,
-        });
-        return {
-            status: 200,
-            body: {
-                users,
-                total: await db.users.count(),
-            },
-        };
-    },
-    createUser: async ({ body }) => {
-        const user = await db.users.create(body);
-        return {
-            status: 201,
-            body: user,
-        };
-    },
-    getUser: async ({ params }) => {
-        const user = await db.users.findById(params.id);
-        if (!user) {
+    users: {
+        listUsers: async ({ query }) => {
+            const found = await db.users.findMany({
+                skip: (query.page - 1) * query.limit,
+                take: query.limit,
+            });
             return {
-                status: 404,
+                status: 200,
                 body: {
-                    detail: 'Not found',
+                    users: found,
+                    total: await db.users.count(),
                 },
             };
-        }
-        return {
-            status: 200,
-            body: user,
-        };
+        },
+        createUser: async ({ body }) => {
+            const user = await db.users.create(body);
+            return {
+                status: 201,
+                body: user,
+            };
+        },
+        getUser: async ({ params }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'Not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: user,
+            };
+        },
     },
 });
 ```
@@ -100,18 +102,18 @@ getUser: async ({ params, req, res }) => {
 },
 ```
 
-## Middleware and guards
+## Middleware
 
-Use `createGuard` to define access checks and `createMiddleware` to wire them to routes.
+Per-route middleware is a plain Express `RequestHandler`. Declare which routes it runs on with a `middleware` map on `createApi`, shaped like your routes. Authentication is just middleware that attaches data to `req`, which handlers then read.
 
-### Defining guards
+### Writing a guard
 
-`createGuard` creates a middleware that checks access before the handler runs. Call `deny` to reject, return normally to allow. No `next()`, no `res.json()` boilerplate.
+A guard is the common case: a middleware that allows or rejects a request. `createGuard` wraps that check so you skip the `next()` / `res.json()` boilerplate — call `deny(status, detail)` to reject, return to allow.
 
 ```ts title="src/lib/guards.ts"
 import { createGuard } from '@ts-kizuna/express';
 
-export const authenticate = createGuard(async (req, res, deny) => {
+export const authenticate = createGuard(({ req, deny }) => {
     const session = getSession(req);
     if (!session) {
         return deny(401, 'Unauthorized');
@@ -119,34 +121,24 @@ export const authenticate = createGuard(async (req, res, deny) => {
     req.userId = session.userId;
 });
 
-export const requireAdmin = createGuard(async (req, res, deny) => {
+export const requireAdmin = createGuard(({ req, deny }) => {
     if (req.userRole !== 'admin') {
         return deny(403, 'Forbidden');
     }
 });
 
-export const requireMembership = createGuard(async (req, res, deny) => {
-    const locationId = req.params.id;
-    if (!locationId) {
-        return deny(400, 'Missing location ID');
-    }
-
-    const location = await resolveLocation(locationId);
-    if (!location) {
-        return deny(404, 'Location not found');
-    }
-
-    const membership = await checkMembership(req.userId, location.organizationId);
+export const requireMembership = createGuard(async ({ req, deny }) => {
+    const membership = await checkMembership(req.userId, req.params.id);
     if (!membership) {
         return deny(403, 'Forbidden');
     }
-
-    req.location = location;
     req.member = membership;
 });
 ```
 
-### Wiring guards to routes
+### Wiring middleware to routes
+
+The map mirrors your routes. Every top-level group key must be present — use `[]` for public groups.
 
 ```ts title="src/lib/middleware.ts"
 import { createMiddleware } from '@ts-kizuna/express';
@@ -157,15 +149,13 @@ export const middleware = createMiddleware(contract, {
     // Group-level: applies to all routes under "users"
     users: [authenticate],
     // Group default with per-route override
-    billing: {
-        '*': [authenticate],
-        webhook: [],
+    members: {
+        '*': [authenticate, requireMembership],
+        listMembers: [authenticate],
     },
-    // Multiple guards compose left to right
+    // Multiple middleware compose left to right
     admin: [authenticate, requireAdmin],
-    // Individual route
-    locationOrders: [authenticate, requireMembership],
-    // Explicit public route
+    // Explicit public group
     health: [],
 });
 ```
@@ -194,7 +184,7 @@ createExpressEndpoints(api, app, {
 | -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `responseValidation` | `false` | Validate handler return values against response schemas — surfaces as 500 on mismatch. Enable in development.                                                                              |
 | `formatError`        | —       | Reshape error (`>= 400`) response bytes for migrating clients — most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
-| `globalMiddleware`   | `[]`    | **Deprecated.** Use `middleware` via `createApi` instead.                                                                                                                                  |
+| `globalMiddleware`   | `[]`    | **Deprecated.** Use the `middleware` map via `createApi` instead.                                                                                                                          |
 
 ## Type-safe request properties
 

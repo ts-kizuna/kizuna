@@ -2,9 +2,15 @@ import { describe, expect, it } from 'vitest';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import request from 'supertest';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createApi, createExpressEndpoints, createMiddleware } from './server.js';
+
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
 
 interface User {
     id: string;
@@ -12,7 +18,7 @@ interface User {
     email: string;
 }
 
-const contract = createContract({
+const contractRoutes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -68,6 +74,10 @@ const contract = createContract({
             404: ProblemDetailsSchema,
         },
     },
+});
+
+const contract = k.contract({
+    routes: contractRoutes,
 });
 
 const createTestApp = () => {
@@ -202,7 +212,7 @@ describe('Express integration', () => {
 });
 
 describe('Express integration — globalMiddleware', () => {
-    const globalContract = createContract({
+    const globalContractRoutes = k.routes('api', {
         getResource: {
             method: 'GET',
             path: '/resources/:id',
@@ -215,6 +225,10 @@ describe('Express integration — globalMiddleware', () => {
                 }),
             },
         },
+    });
+
+    const globalContract = k.contract({
+        routes: globalContractRoutes,
     });
 
     it('runs globalMiddleware after kizunaRoute is set and before the handler', async () => {
@@ -281,7 +295,7 @@ describe('Express integration — globalMiddleware', () => {
 });
 
 describe('Express integration — all HTTP methods', () => {
-    const allMethodsContract = createContract({
+    const allMethodsContractRoutes = k.routes('api', {
         getItem: {
             method: 'GET',
             path: '/method-items/:id',
@@ -356,6 +370,10 @@ describe('Express integration — all HTTP methods', () => {
         },
     });
 
+    const allMethodsContract = k.contract({
+        routes: allMethodsContractRoutes,
+    });
+
     const echoMethod = (method: string) => () => ({
         status: 200 as const,
         body: {
@@ -426,7 +444,7 @@ describe('Express integration — all HTTP methods', () => {
 });
 
 describe('Express integration — requestValidationErrorHandler', () => {
-    const validationContract = createContract({
+    const validationContractRoutes = k.routes('api', {
         createItem: {
             method: 'POST',
             path: '/items',
@@ -439,6 +457,10 @@ describe('Express integration — requestValidationErrorHandler', () => {
                 }),
             },
         },
+    });
+
+    const validationContract = k.contract({
+        routes: validationContractRoutes,
     });
 
     it('uses the default 400 shape when no handler is provided', async () => {
@@ -494,7 +516,7 @@ describe('Express integration — requestValidationErrorHandler', () => {
 });
 
 describe('declared response contentType', () => {
-    const csvContract = createContract({
+    const csvContractRoutes = k.routes('api', {
         exportItems: {
             method: 'GET',
             path: '/items.csv',
@@ -505,6 +527,10 @@ describe('declared response contentType', () => {
                 },
             },
         },
+    });
+
+    const csvContract = k.contract({
+        routes: csvContractRoutes,
     });
 
     it('sends a non-JSON body raw with the declared content type', async () => {
@@ -528,7 +554,7 @@ describe('declared response contentType', () => {
     });
 
     it('sends a binary body as raw bytes', async () => {
-        const binaryContract = createContract({
+        const binaryContractRoutes = k.routes('api', {
             downloadBadge: {
                 method: 'GET',
                 path: '/badge',
@@ -539,6 +565,10 @@ describe('declared response contentType', () => {
                     },
                 },
             },
+        });
+
+        const binaryContract = k.contract({
+            routes: binaryContractRoutes,
         });
         const app = express();
         const api = createApi({
@@ -567,7 +597,7 @@ describe('declared response contentType', () => {
 });
 
 describe('Express integration — void / noBody responses', () => {
-    const voidContract = createContract({
+    const voidContractRoutes = k.routes('api', {
         deleteItem: {
             method: 'DELETE',
             path: '/items/:id',
@@ -585,6 +615,10 @@ describe('Express integration — void / noBody responses', () => {
                 201: z.void(),
             },
         },
+    });
+
+    const voidContract = k.contract({
+        routes: voidContractRoutes,
     });
 
     const createVoidApp = () => {
@@ -637,18 +671,22 @@ describe('Express handler — responseValidation', () => {
         const app = express();
         app.use(express.json());
 
-        const strictApi = createApi({
-            contract: createContract({
-                getItem: {
-                    method: 'GET',
-                    path: '/items/:id',
-                    responses: {
-                        200: z.object({
-                            id: z.string(),
-                        }),
-                    },
+        const strictRoutes = k.routes('api', {
+            getItem: {
+                method: 'GET',
+                path: '/items/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
                 },
-            }),
+            },
+        });
+        const strictContract = k.contract({
+            routes: strictRoutes,
+        });
+        const strictApi = createApi({
+            contract: strictContract,
             router: {
                 getItem: () => ({ status: 200, body: { id: 123 } }) as any,
             },
@@ -664,7 +702,7 @@ describe('Express handler — responseValidation', () => {
 });
 
 describe('Express integration — middleware map', () => {
-    const middlewareContract = createContract({
+    const middlewareContractRoutes = k.routes('api', {
         publicRoute: {
             method: 'GET',
             path: '/public',
@@ -683,7 +721,7 @@ describe('Express integration — middleware map', () => {
                 }),
             },
         },
-        admin: createContract({
+        admin: {
             dashboard: {
                 method: 'GET',
                 path: '/admin/dashboard',
@@ -702,7 +740,11 @@ describe('Express integration — middleware map', () => {
                     }),
                 },
             },
-        }),
+        },
+    });
+
+    const middlewareContract = k.contract({
+        routes: middlewareContractRoutes,
     });
 
     const requireAuth = (req: Request, res: Response, next: NextFunction) => {

@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { createApi } from './adapter.js';
 import { matchRoute } from './route-matcher.js';
 
-const contract = createContract({
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
+
+const routes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -48,64 +54,55 @@ const contract = createContract({
 
 describe('duplicate route detection', () => {
     it('throws on exact duplicate method + path', () => {
-        expect(() =>
-            createApi(
-                createContract({
-                    getUser: {
-                        method: 'GET',
-                        path: '/users/:id',
-                        responses: { 200: z.string() },
-                    },
-                    fetchUser: {
-                        method: 'GET',
-                        path: '/users/:id',
-                        responses: { 200: z.string() },
-                    },
-                })
-            )
-        ).toThrow(/fetchUser.*conflicts with.*getUser|getUser.*conflicts with.*fetchUser/);
+        const duplicateRoutes = k.routes('api', {
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: { 200: z.string() },
+            },
+            fetchUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: { 200: z.string() },
+            },
+        });
+        expect(() => createApi(duplicateRoutes)).toThrow(/fetchUser.*conflicts with.*getUser|getUser.*conflicts with.*fetchUser/);
     });
 
     it('throws on parametric conflict (same structure, different param names)', () => {
-        expect(() =>
-            createApi(
-                createContract({
-                    getUser: {
-                        method: 'GET',
-                        path: '/users/:id',
-                        responses: { 200: z.string() },
-                    },
-                    fetchUser: {
-                        method: 'GET',
-                        path: '/users/:userId',
-                        responses: { 200: z.string() },
-                    },
-                })
-            )
-        ).toThrow(/conflicts with/);
+        const conflictingRoutes = k.routes('api', {
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: { 200: z.string() },
+            },
+            fetchUser: {
+                method: 'GET',
+                path: '/users/:userId',
+                responses: { 200: z.string() },
+            },
+        });
+        expect(() => createApi(conflictingRoutes)).toThrow(/conflicts with/);
     });
 
-    it('throws on duplicate across nested sub-contracts with dot-notated keys in message', () => {
-        expect(() =>
-            createApi(
-                createContract({
-                    users: {
-                        getUser: {
-                            method: 'GET',
-                            path: '/users/:id',
-                            responses: { 200: z.string() },
-                        },
-                    },
-                    legacy: {
-                        getUser: {
-                            method: 'GET',
-                            path: '/users/:id',
-                            responses: { 200: z.string() },
-                        },
-                    },
-                })
-            )
-        ).toThrow(/users\.getUser|legacy\.getUser/);
+    it('throws on duplicate across nested sub-routes with dot-notated keys in message', () => {
+        const nestedRoutes = k.routes('api', {
+            users: {
+                getUser: {
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: { 200: z.string() },
+                },
+            },
+            legacy: {
+                getUser: {
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: { 200: z.string() },
+                },
+            },
+        });
+        expect(() => createApi(nestedRoutes)).toThrow(/users\.getUser|legacy\.getUser/);
     });
 });
 
@@ -116,7 +113,7 @@ describe('matchRoute', () => {
     };
 
     it('matches GET /users/:id', () => {
-        const match = matched(matchRoute('GET', '/users/123', contract));
+        const match = matched(matchRoute('GET', '/users/123', routes));
         expect(match.routeKey).toBe('getUser');
         expect(match.params).toEqual({
             id: '123',
@@ -124,11 +121,11 @@ describe('matchRoute', () => {
     });
 
     it('matches POST /users', () => {
-        expect(matched(matchRoute('POST', '/users', contract)).routeKey).toBe('createUser');
+        expect(matched(matchRoute('POST', '/users', routes)).routeKey).toBe('createUser');
     });
 
     it('matches multi-param routes', () => {
-        const match = matched(matchRoute('GET', '/users/1/posts/2', contract));
+        const match = matched(matchRoute('GET', '/users/1/posts/2', routes));
         expect(match.routeKey).toBe('getUserPosts');
         expect(match.params).toEqual({
             userId: '1',
@@ -137,12 +134,12 @@ describe('matchRoute', () => {
     });
 
     it('distinguishes /users from /users/:id', () => {
-        expect(matched(matchRoute('GET', '/users', contract)).routeKey).toBe('listUsers');
-        expect(matched(matchRoute('GET', '/users/123', contract)).routeKey).toBe('getUser');
+        expect(matched(matchRoute('GET', '/users', routes)).routeKey).toBe('listUsers');
+        expect(matched(matchRoute('GET', '/users/123', routes)).routeKey).toBe('getUser');
     });
 
     it('returns method-mismatch for the wrong method', () => {
-        const result = matchRoute('DELETE', '/users/123', contract);
+        const result = matchRoute('DELETE', '/users/123', routes);
         expect(result.kind).toBe('method-mismatch');
         if (result.kind === 'method-mismatch') {
             expect(result.allowed).toEqual(['GET']);
@@ -150,11 +147,11 @@ describe('matchRoute', () => {
     });
 
     it('returns not-found for an unknown path', () => {
-        expect(matchRoute('GET', '/unknown/path', contract).kind).toBe('not-found');
+        expect(matchRoute('GET', '/unknown/path', routes).kind).toBe('not-found');
     });
 
     it('strips basePath before matching', () => {
-        const match = matched(matchRoute('GET', '/api/users/123', contract, '/api'));
+        const match = matched(matchRoute('GET', '/api/users/123', routes, '/api'));
         expect(match.routeKey).toBe('getUser');
         expect(match.params).toEqual({
             id: '123',
@@ -162,14 +159,14 @@ describe('matchRoute', () => {
     });
 
     it('decodes URL-encoded path params', () => {
-        const match = matched(matchRoute('GET', '/users/a%20b', contract));
+        const match = matched(matchRoute('GET', '/users/a%20b', routes));
         expect(match.params).toEqual({
             id: 'a b',
         });
     });
 
     it('prefers static segments over parameterized ones regardless of declaration order', () => {
-        const c = createContract({
+        const cartRoutes = k.routes('api', {
             addItem: {
                 method: 'POST',
                 path: '/cart/:itemId',
@@ -181,12 +178,12 @@ describe('matchRoute', () => {
                 responses: { 200: z.object({ ok: z.boolean() }) },
             },
         });
-        const match = matched(matchRoute('POST', '/cart/checkout', c));
+        const match = matched(matchRoute('POST', '/cart/checkout', cartRoutes));
         expect(match.routeKey).toBe('checkout');
     });
 
     it('prefers static over dynamic at the same segment position with equal param counts', () => {
-        const c = createContract({
+        const meRoutes = k.routes('api', {
             getByUserId: {
                 method: 'GET',
                 path: '/users/:id',
@@ -198,12 +195,12 @@ describe('matchRoute', () => {
                 responses: { 200: z.object({ id: z.string() }) },
             },
         });
-        const match = matched(matchRoute('GET', '/users/me', c));
+        const match = matched(matchRoute('GET', '/users/me', meRoutes));
         expect(match.routeKey).toBe('getMe');
     });
 
     it('prefers static over dynamic in deeper paths with equal param counts', () => {
-        const c = createContract({
+        const postRoutes = k.routes('api', {
             getUserPosts: {
                 method: 'GET',
                 path: '/users/:id/posts',
@@ -215,12 +212,12 @@ describe('matchRoute', () => {
                 responses: { 200: z.object({ id: z.string() }) },
             },
         });
-        const match = matched(matchRoute('GET', '/users/me/posts', c));
+        const match = matched(matchRoute('GET', '/users/me/posts', postRoutes));
         expect(match.routeKey).toBe('getMyPosts');
     });
 
     it('matches distinct routes with identical structure but different static segments', () => {
-        const c = createContract({
+        const collectionRoutes = k.routes('api', {
             getUserPosts: {
                 method: 'GET',
                 path: '/users/:id/posts',
@@ -232,7 +229,7 @@ describe('matchRoute', () => {
                 responses: { 200: z.object({ id: z.string() }) },
             },
         });
-        expect(matched(matchRoute('GET', '/users/42/posts', c)).routeKey).toBe('getUserPosts');
-        expect(matched(matchRoute('GET', '/users/42/things', c)).routeKey).toBe('getUserThings');
+        expect(matched(matchRoute('GET', '/users/42/posts', collectionRoutes)).routeKey).toBe('getUserPosts');
+        expect(matched(matchRoute('GET', '/users/42/things', collectionRoutes)).routeKey).toBe('getUserThings');
     });
 });

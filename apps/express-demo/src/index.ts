@@ -4,7 +4,7 @@ import { createApi, createExpressEndpoints } from '@ts-kizuna/express';
 import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '@ts-kizuna-demo/shared';
 
-import { router } from './lib/server';
+import { router, requireUser, requireMember } from './lib/server';
 
 const app = express();
 app.use(express.json());
@@ -12,13 +12,26 @@ app.use(express.json());
 const api = createApi({
     contract,
     router,
+    middleware: {
+        users: [],
+        health: [],
+        notifications: [],
+        members: {
+            '*': [requireMember],
+            listMembers: [requireUser],
+        },
+        workspace: {
+            '*': [requireMember],
+            transfer: [requireUser, requireMember],
+        },
+    },
 });
 
 const openApiSpec = generateOpenApi(contract, {
     info: {
         title: 'ts-kizuna Express Demo',
         version: '1.0.0',
-        description: 'Express adapter demo for the ts-kizuna user contract.',
+        description: 'Express adapter demo for the ts-kizuna user API.',
     },
     servers: [
         {
@@ -73,7 +86,7 @@ app.get('/', (_req, res) => {
     </head>
     <body>
         <h1>ts-kizuna demos</h1>
-        <p>Both demos share the same contract from <code>@ts-kizuna-demo/shared</code>.</p>
+        <p>Both demos share the same routes from <code>@ts-kizuna-demo/shared</code>.</p>
         <ul>
             <li><a href="http://localhost:8000/users">Express API</a> — <code>:8000/users</code> (this server)</li>
             <li><a href="http://localhost:8000/docs">Express API docs (Scalar)</a> — <code>:8000/docs</code></li>

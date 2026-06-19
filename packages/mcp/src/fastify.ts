@@ -1,14 +1,14 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { Contract } from '@ts-kizuna/core';
+import type { Routes } from '@ts-kizuna/core';
 import { type ApiWithRouter } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
 export interface McpEndpointOptions {
     /**
-     * The API object created with `createApi`.
+     * The api from `defineApi`.
      */
-    api: Contract & ApiWithRouter;
+    api: Routes & ApiWithRouter;
 
     /**
      * Path where the MCP endpoint is mounted.
@@ -32,35 +32,22 @@ export interface McpEndpointOptions {
     version?: string;
 
     /**
-     * Predicate to filter which routes become MCP tools.
-     * Return false to exclude a route.
-     * By default, multipart/form-data and application/x-www-form-urlencoded routes are excluded.
+     * Predicate to filter which routes become MCP tools. Return `false` to
+     * exclude a route. By default, `multipart/form-data` and
+     * `application/x-www-form-urlencoded` routes are excluded.
      */
     routeFilter?: McpServerOptions['routeFilter'];
 }
 
 /**
- * Fastify plugin that mounts an MCP endpoint.
+ * Fastify plugin that serves an MCP endpoint. Each route becomes an MCP tool;
+ * calling the tool invokes the api's handler for that route.
  *
- * Each route in the contract becomes an MCP tool. When an AI assistant calls
- * a tool, the corresponding handler from the api's router is invoked directly.
- *
+ * @example
  * ```ts
- * import Fastify from 'fastify';
- * import { fastifyKizuna } from '@ts-kizuna/fastify';
- * import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
- * import { api } from './lib/api';
- *
- * const app = Fastify();
- *
- * app.register(fastifyKizuna, {
+ * app.register(mcpPlugin, {
  *     api,
  * });
- * app.register(fastifyKizunaMcp, {
- *     api,
- * });
- *
- * app.listen({ port: 3000 });
  * ```
  */
 export const fastifyKizunaMcp = async (app: FastifyInstance, options: McpEndpointOptions): Promise<void> => {

@@ -1,24 +1,19 @@
 import Fastify from 'fastify';
-import { createApi, fastifyKizuna } from '@ts-kizuna/fastify';
+import { fastifyKizuna } from '@ts-kizuna/fastify';
 import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
 import { generateOpenApi } from '@ts-kizuna/openapi';
 import fastifyApiReference from '@scalar/fastify-api-reference';
 import { contract } from '@ts-kizuna-demo/shared';
 
-import { router } from './lib/server';
+import { api } from './lib/server';
 
 const app = Fastify();
-
-const api = createApi({
-    contract,
-    router,
-});
 
 const openApiSpec = generateOpenApi(contract, {
     info: {
         title: 'ts-kizuna Fastify Demo',
         version: '1.0.0',
-        description: 'Fastify adapter demo for the ts-kizuna user contract.',
+        description: 'Fastify adapter demo for the ts-kizuna user API.',
     },
     servers: [
         {
@@ -26,20 +21,6 @@ const openApiSpec = generateOpenApi(contract, {
             description: 'Local fastify demo',
         },
     ],
-    security: [
-        {
-            bearerAuth: [],
-        },
-    ],
-    components: {
-        securitySchemes: {
-            bearerAuth: {
-                type: 'http',
-                scheme: 'bearer',
-                bearerFormat: 'JWT',
-            },
-        },
-    },
     setOperationId: true,
 });
 
@@ -73,7 +54,7 @@ app.get('/', async (_request, reply) => {
     </head>
     <body>
         <h1>ts-kizuna Fastify demo</h1>
-        <p>This demo shares the same contract from <code>@ts-kizuna-demo/shared</code>.</p>
+        <p>This demo shares the same routes from <code>@ts-kizuna-demo/shared</code>.</p>
         <ul>
             <li><a href="http://localhost:8002/users">Fastify API</a> — <code>:8002/users</code></li>
             <li><a href="http://localhost:8002/docs">Fastify API docs (Scalar)</a> — <code>:8002/docs</code></li>

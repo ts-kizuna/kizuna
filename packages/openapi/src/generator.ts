@@ -16,10 +16,9 @@ import {
     resolveResponseBody,
     resolveResponseHeaders,
     resolveResponseContentType,
-    type Contract,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
-import { CONTRACT_TAG, CONTRACT_DESCRIPTION, getStatusText } from '@ts-kizuna/core';
+import { type Contract, type TagOptions, getStatusText } from '@ts-kizuna/core';
 
 /**
  * The OpenAPI Specification version declared in the document's `openapi` field.
@@ -107,7 +106,6 @@ export interface GenerateOpenApiOptions {
         securitySchemes?: Record<string, unknown>;
     };
     setOperationId?: boolean | 'concatenated-path';
-    setTagsFromContractKeys?: boolean;
     operationMapper?: (operation: OpenApiOperation, route: RouteDefinition, operationId: string) => OpenApiOperation;
 }
 
@@ -306,13 +304,21 @@ export interface OpenApiRenderer {
     (format: 'yaml'): string;
 }
 
-const openApiGenerator = createGenerator((options: GenerateOpenApiOptions, contract: Contract) => {
+/**
+ * Internal generator options: the public options plus a `key → TagOptions`
+ * lookup built from the contract's tag set, used to resolve tag keys to titles.
+ */
+type GeneratorContext = GenerateOpenApiOptions & {
+    tagLookup?: ReadonlyMap<string, TagOptions>;
+};
+
+const openApiGenerator = createGenerator((options: GeneratorContext, contract: Contract) => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
     const pendingFieldDeprecations: Array<{ operation: OpenApiOperation; fieldDeprecations: Map<string, string> }> = [];
     const schemaDeprecations = loadDeprecations(contractFingerprint(contract))?.schemas;
 
     return {
-        processRoute({ routeKey, route, contractTags, deprecated, fieldDeprecations }) {
+        processRoute({ routeKey, route, routeTags, deprecated, fieldDeprecations }) {
             const openApiPath = convertPath(route.path);
             const method = route.method.toLowerCase();
 
@@ -327,15 +333,12 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions, contr
                     options.setOperationId === 'concatenated-path' ? routeKey : routeKey.slice(routeKey.lastIndexOf('.') + 1);
             }
             if (deprecated) operation.deprecated = true;
-            const resolvedRouteTags = (route.tags ?? []).map((tag) => tag.title);
-            const mergedTags = [...contractTags, ...resolvedRouteTags];
+            const resolveTagTitle = (key: string): string => options.tagLookup?.get(key)?.title ?? key;
+            const mergedTags = [...new Set([...routeTags, ...(route.tags ?? [])].map(resolveTagTitle))];
             if (mergedTags.length > 0) {
                 operation.tags = mergedTags;
-            } else if (options.setTagsFromContractKeys !== false) {
-                const dotIndex = routeKey.lastIndexOf('.');
-                if (dotIndex > 0) operation.tags = routeKey.slice(0, dotIndex).split('.');
             }
-            if (route.security) operation.security = route.security;
+            if (route.security && route.security.length > 0) operation.security = route.security;
             if (route.externalDocs) operation.externalDocs = route.externalDocs;
 
             const parameters: OpenApiParameter[] = [];
@@ -540,45 +543,36 @@ const openApiGenerator = createGenerator((options: GenerateOpenApiOptions, contr
     };
 });
 
-const collectContractTags = (contract: Contract): OpenApiTag[] => {
+const buildTagLookup = (contract: Contract): ReadonlyMap<string, TagOptions> => new Map(Object.entries(contract.tags?.tags ?? {}));
+
+/**
+ * Document-level tag definitions from the contract's declared tag set — one
+ * entry per declared tag, in declaration order, named by its `title`.
+ */
+const tagsFromContract = (contract: Contract): OpenApiTag[] => {
+    const declared = contract.tags?.tags;
+    if (!declared) return [];
     const tags: OpenApiTag[] = [];
-    const tag = (contract as Record<typeof CONTRACT_TAG, string | undefined>)[CONTRACT_TAG];
-    const description = (contract as Record<typeof CONTRACT_DESCRIPTION, string | undefined>)[CONTRACT_DESCRIPTION];
-    if (tag) {
-        const entry: OpenApiTag = { name: tag };
-        if (description) entry.description = description;
+    for (const options of Object.values(declared)) {
+        const entry: OpenApiTag = { name: options.title };
+        if (options.description) entry.description = options.description;
+        if (options.externalDocs) entry.externalDocs = options.externalDocs;
         tags.push(entry);
-    }
-    for (const value of Object.values(contract)) {
-        if (!value || typeof value !== 'object') continue;
-        if ('method' in value) {
-            const route = value as RouteDefinition;
-            for (const routeTag of route.tags ?? []) {
-                if (routeTag.description) {
-                    tags.push({
-                        name: routeTag.title,
-                        description: routeTag.description,
-                    });
-                }
-            }
-        } else {
-            tags.push(...collectContractTags(value as Contract));
-        }
     }
     return tags;
 };
 
 /**
- * Generate an OpenAPI 3.1.0 document from a contract.
+ * Generate an OpenAPI 3.1.0 document from a routes.
  *
  * Returns a renderer — call it with `'json'` for the document object or `'yaml'` for a YAML string.
  *
  * See {@link GenerateOpenApiOptions} for all options.
  *
  * ```ts
- * import { contract } from './contract';
+ * import { routes } from './routes';
  *
- * const spec = generateOpenApi(contract, {
+ * const spec = openapi(routes, {
  *     info: { title: 'My API', version: '1.0.0' },
  *     setOperationId: true,
  * });
@@ -588,13 +582,13 @@ const collectContractTags = (contract: Contract): OpenApiTag[] => {
  * ```
  */
 export function generateOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer {
-    const renderer = openApiGenerator(contract, options);
-    const contractTags = collectContractTags(contract);
-    if (contractTags.length > 0) {
+    const renderer = openApiGenerator(contract, { ...options, tagLookup: buildTagLookup(contract) });
+    const tags = tagsFromContract(contract);
+    if (tags.length > 0) {
         const originalJson = renderer('json') as OpenApiDocument;
         const existingTags = originalJson.tags ?? [];
         const existingNames = new Set(existingTags.map((tag) => tag.name));
-        const newTags = contractTags.filter((tag) => !existingNames.has(tag.name));
+        const newTags = tags.filter((tag) => !existingNames.has(tag.name));
         if (newTags.length > 0) {
             originalJson.tags = [...existingTags, ...newTags];
         }

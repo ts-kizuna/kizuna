@@ -1,13 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createContract } from './contract.js';
-import { createTag } from './tag.js';
-import { CONTRACT_TAG, CONTRACT_DESCRIPTION, type Contract } from './types.js';
+import { kizuna } from './kizuna.js';
+import { createTags } from './tags.js';
+import { ROUTES_TAG, type Routes } from './types.js';
 
-describe('createContract', () => {
+const { k } = kizuna({
+    tags: createTags({
+        users: {
+            title: 'Users',
+            description: 'User management endpoints',
+        },
+    }),
+});
+
+describe('k.routes', () => {
     it('throws when a route has an empty body schema', () => {
         expect(() =>
-            createContract({
+            k.routes('users', {
                 emptyAction: {
                     method: 'POST',
                     path: '/empty',
@@ -24,8 +33,8 @@ describe('createContract', () => {
 
     it('throws when a nested route has an empty body schema', () => {
         expect(() =>
-            createContract({
-                users: createContract({
+            k.routes('users', {
+                management: {
                     update: {
                         method: 'PUT',
                         path: '/users/:id',
@@ -36,14 +45,14 @@ describe('createContract', () => {
                             }),
                         },
                     },
-                }),
+                },
             })
-        ).toThrowError('Route "update" has an empty body schema');
+        ).toThrowError('has an empty body schema');
     });
 
     it('accepts a route with a non-empty body schema', () => {
         expect(() =>
-            createContract({
+            k.routes('users', {
                 createUser: {
                     method: 'POST',
                     path: '/users',
@@ -62,7 +71,7 @@ describe('createContract', () => {
 
     it('accepts a route with z.void() body', () => {
         expect(() =>
-            createContract({
+            k.routes('users', {
                 deleteUser: {
                     method: 'DELETE',
                     path: '/users/:id',
@@ -77,7 +86,7 @@ describe('createContract', () => {
 
     it('accepts a route with no body', () => {
         expect(() =>
-            createContract({
+            k.routes('users', {
                 getUser: {
                     method: 'GET',
                     path: '/users/:id',
@@ -91,11 +100,8 @@ describe('createContract', () => {
         ).not.toThrow();
     });
 
-    it('sets CONTRACT_TAG from createTag title', () => {
-        const Users = createTag({
-            title: 'Users',
-        });
-        const routes = createContract(Users, {
+    it('stamps ROUTES_TAG with the group tag', () => {
+        const routes = k.routes('users', {
             getUser: {
                 method: 'GET',
                 path: '/users/:id',
@@ -106,52 +112,14 @@ describe('createContract', () => {
                 },
             },
         });
-        expect((routes as Contract)[CONTRACT_TAG]).toBe('Users');
-    });
-
-    it('sets CONTRACT_DESCRIPTION from createTag description', () => {
-        const Users = createTag({
-            title: 'Users',
-            description: 'User management endpoints',
-        });
-        const routes = createContract(Users, {
-            getUser: {
-                method: 'GET',
-                path: '/users/:id',
-                responses: {
-                    200: z.object({
-                        id: z.string(),
-                    }),
-                },
-            },
-        });
-        expect((routes as Contract)[CONTRACT_TAG]).toBe('Users');
-        expect((routes as Contract)[CONTRACT_DESCRIPTION]).toBe('User management endpoints');
-    });
-
-    it('does not set CONTRACT_DESCRIPTION when tag has no description', () => {
-        const Users = createTag({
-            title: 'Users',
-        });
-        const routes = createContract(Users, {
-            getUser: {
-                method: 'GET',
-                path: '/users/:id',
-                responses: {
-                    200: z.object({
-                        id: z.string(),
-                    }),
-                },
-            },
-        });
-        expect((routes as Contract)[CONTRACT_DESCRIPTION]).toBeUndefined();
+        expect((routes as Routes)[ROUTES_TAG]).toBe('users');
     });
 });
 
-describe('createContract z.coerce ban', () => {
+describe('k.routes z.coerce ban', () => {
     it('throws when a top-level query schema is coerced', () => {
         expect(() =>
-            createContract({
+            k.routes('users', {
                 listItems: {
                     method: 'GET',
                     path: '/items',
@@ -169,7 +137,7 @@ describe('createContract z.coerce ban', () => {
 
     it('throws and points at the nested field path that uses z.coerce', () => {
         expect(() =>
-            createContract({
+            k.routes('users', {
                 listItems: {
                     method: 'GET',
                     path: '/items',
@@ -189,7 +157,7 @@ describe('createContract z.coerce ban', () => {
 
     it('finds z.coerce hidden inside arrays, wrappers, and unions', () => {
         expect(() =>
-            createContract({
+            k.routes('users', {
                 createItem: {
                     method: 'POST',
                     path: '/items',
@@ -209,7 +177,7 @@ describe('createContract z.coerce ban', () => {
 
     it('rejects z.coerce in a response schema', () => {
         expect(() =>
-            createContract({
+            k.routes('users', {
                 getItem: {
                     method: 'GET',
                     path: '/items/:id',
@@ -226,7 +194,7 @@ describe('createContract z.coerce ban', () => {
 
     it('accepts plain z.number()/z.date()/z.bigint() and z.any()/z.unknown()', () => {
         expect(() =>
-            createContract({
+            k.routes('users', {
                 listItems: {
                     method: 'GET',
                     path: '/items',

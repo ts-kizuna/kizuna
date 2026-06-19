@@ -17,10 +17,10 @@ import { generateSwiftClient } from '@ts-kizuna/swift';
 generateSwiftClient(contract: Contract, config: SwiftConfig): string
 ```
 
-| Parameter  | Type          | Description                                                                   |
-| ---------- | ------------- | ----------------------------------------------------------------------------- |
-| `contract` | `Contract`    | The contract created with [`createContract`](/docs/reference/create-contract) |
-| `config`   | `SwiftConfig` | Generation configuration                                                      |
+| Parameter  | Type          | Description                                              |
+| ---------- | ------------- | -------------------------------------------------------- |
+| `contract` | `Contract`    | The contract from [`k.contract`](/docs/reference/kizuna) |
+| `config`   | `SwiftConfig` | Generation configuration                                 |
 
 ## `SwiftConfig`
 
@@ -35,16 +35,15 @@ A `string` containing the generated Swift source code.
 ## Example
 
 ```ts title="scripts/generate-swift-client.ts"
-import path from 'path';
-import { writeFileSync } from 'fs';
+import { writeFileSync } from 'node:fs';
 import { generateSwiftClient } from '@ts-kizuna/swift';
 import { contract } from '../src/contract';
 
-const swift = generateSwiftClient(contract, {
+const source = generateSwiftClient(contract, {
     namespaceName: 'API',
 });
 
-writeFileSync('generated/API.swift', swift);
+writeFileSync('generated/API.swift', source);
 ```
 
 See the [Swift client guide](/docs/clients/swift) for CLI usage and integration patterns.

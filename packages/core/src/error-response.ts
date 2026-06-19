@@ -10,7 +10,7 @@ import { createModel } from './model.js';
  * ```ts
  * import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
  *
- * const contract = createContract({
+ * const routes = createRoutes({
  *     getUser: {
  *         method: 'GET',
  *         path: '/users/:id',

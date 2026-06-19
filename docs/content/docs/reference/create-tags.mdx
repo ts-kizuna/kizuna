@@ -1,0 +1,87 @@
+---
+title: createTags
+description: Declare the set of tags used to group routes across nested route trees and the OpenAPI spec.
+---
+
+Declare the set of tags used to group routes across nested route trees and the OpenAPI spec. Pass the result to [`kizuna`](/docs/reference/kizuna) so `k.routes` completes the group tag.
+
+<InstallTabs packageName="@ts-kizuna/core" />
+
+```ts
+import { createTags } from '@ts-kizuna/core';
+```
+
+## Parameters
+
+```ts
+createTags(tags: Record<string, TagOptions | string>): TagSet
+```
+
+Each entry is keyed by an id you choose; routes reference tags by these keys. A value may be a `TagOptions` object or a plain title string:
+
+| Option         | Type     | Required | Description                                        |
+| -------------- | -------- | -------- | -------------------------------------------------- |
+| `title`        | `string` | Yes      | Tag name shown in OpenAPI                          |
+| `description`  | `string` | No       | Description included in the OpenAPI tag definition |
+| `externalDocs` | `object` | No       | `{ url, description? }` external docs for the tag  |
+
+## Returns
+
+A `TagSet`. Pass it to [`kizuna`](/docs/reference/kizuna) so `k.routes` completes the group tag and route-level `tags`. `k.contract` carries the set onto the contract — so the generated OpenAPI document lists each tag with its title and description without you passing it again.
+
+## Example
+
+```ts
+// tags.ts
+import { createTags } from '@ts-kizuna/core';
+
+export const tags = createTags({
+    users: {
+        title: 'Users',
+        description: 'User management endpoints',
+    },
+    health: 'Health',
+});
+```
+
+```ts
+// k.ts
+import { kizuna } from '@ts-kizuna/core';
+import { tags } from './tags';
+
+export const { k } = kizuna({
+    tags,
+});
+```
+
+```ts
+// routes.ts
+import { k } from './k';
+
+export const usersRoutes = k.routes('users', {
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        responses: {
+            200: z.object({
+                users: z.array(UserSchema),
+            }),
+        },
+    },
+});
+```
+
+## Cross-tagging
+
+Routes reference tags by key, with completion. A route can list more than one tag — useful for tagging it across groups:
+
+```ts
+cancelAccount: {
+    method: 'POST',
+    path: '/account/cancel',
+    tags: ['users', 'health'],
+    // ...
+},
+```
+
+See the [Contract guide](/docs/building/contract#nested-routes) for the full nesting pattern.

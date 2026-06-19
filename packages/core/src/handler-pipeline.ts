@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { CONTRACT_TAG, type RouteDefinition, type Contract, type Method } from './types.js';
+import { ROUTES_TAG, type RouteDefinition, type Routes, type Method } from './types.js';
 import type { ExtractPathParams } from './path-params.js';
 import { readDef, readObjectShape, WRAPPER_TYPES } from './zod-internals.js';
 
@@ -142,10 +142,10 @@ export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = 
     args: HandlerArgs<R> & HandlerContext
 ) => Promise<HandlerReturn<R>> | HandlerReturn<R>;
 
-export type Router<T extends Contract, HandlerContext = unknown> = {
+export type Router<T extends Routes, HandlerContext = unknown> = {
     [Key in keyof T as Key extends symbol ? never : Key]: T[Key] extends RouteDefinition
         ? RouteHandler<T[Key], HandlerContext>
-        : T[Key] extends Contract
+        : T[Key] extends Routes
           ? Router<T[Key], HandlerContext>
           : never;
 };
@@ -159,23 +159,23 @@ export const isRouteDefinition = (value: unknown): value is RouteDefinition => {
 export interface FlattenedRoute {
     routeKey: string;
     route: RouteDefinition;
-    contractTags: string[];
+    routeTags: string[];
 }
 
-export const flattenContract = (contract: Contract, prefix?: string, inheritedTags: string[] = []): FlattenedRoute[] => {
-    const ownTag = (contract as Record<typeof CONTRACT_TAG, string | undefined>)[CONTRACT_TAG];
+export const flattenRoutes = (routes: Routes, prefix?: string, inheritedTags: string[] = []): FlattenedRoute[] => {
+    const ownTag = (routes as Record<typeof ROUTES_TAG, string | undefined>)[ROUTES_TAG];
     const activeTags = ownTag ? [...inheritedTags, ownTag] : inheritedTags;
     const collected: FlattenedRoute[] = [];
-    for (const [key, value] of Object.entries(contract)) {
+    for (const [key, value] of Object.entries(routes)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
         if (isRouteDefinition(value)) {
             collected.push({
                 routeKey: fullKey,
                 route: value,
-                contractTags: activeTags,
+                routeTags: activeTags,
             });
         } else if (value && typeof value === 'object') {
-            collected.push(...flattenContract(value as Contract, fullKey, activeTags));
+            collected.push(...flattenRoutes(value as Routes, fullKey, activeTags));
         }
     }
     return collected;
@@ -265,9 +265,9 @@ export const validateRequest = (
     };
 };
 
-export const allowedMethodsForPath = (contract: Contract, path: string): Method[] => {
+export const allowedMethodsForPath = (routes: Routes, path: string): Method[] => {
     const methods = new Set<Method>();
-    for (const { route } of flattenContract(contract)) {
+    for (const { route } of flattenRoutes(routes)) {
         if (route.path === path) methods.add(route.method);
     }
     return Array.from(methods);

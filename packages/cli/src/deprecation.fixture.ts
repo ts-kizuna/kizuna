@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createContract, createTag, createApi } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { createClient } from '../../fetch/src/client.js';
 
 const Paginated = <T extends z.ZodType>(itemSchema: T) =>
@@ -32,20 +32,23 @@ const ExtendedUserSchema = UserSchema.extend({
     fullName: z.string(),
 });
 
-// Sub-contract defined with a tag *before* the main export — this used to confuse the
-// deprecation walker into treating the tag string as the routes argument and returning an
-// empty map.
-const Health = createTag({
-    title: 'Health',
+export const tags = createTags({
+    api: {
+        title: 'API',
+    },
+    health: {
+        title: 'Health',
+    },
+    users: {
+        title: 'Users',
+    },
 });
 
-const Users = createTag({
-    title: 'Users',
-});
+const { k } = kizuna({ tags });
 
-const healthContract = createContract(Health, {
+const healthRoutes = k.routes('health', {
     check: {
-        method: 'GET' as const,
+        method: 'GET',
         path: '/health',
         responses: {
             200: z.object({
@@ -55,9 +58,9 @@ const healthContract = createContract(Health, {
     },
 });
 
-const usersContract = createContract(Users, {
+const usersRoutes = k.routes('users', {
     listUsers: {
-        method: 'GET' as const,
+        method: 'GET',
         path: '/users',
         responses: {
             200: z.object({
@@ -66,7 +69,7 @@ const usersContract = createContract(Users, {
         },
     },
     getUser: {
-        method: 'GET' as const,
+        method: 'GET',
         path: '/users/:id',
         responses: {
             200: UserSchema,
@@ -76,7 +79,7 @@ const usersContract = createContract(Users, {
      * @deprecated
      */
     deleteUser: {
-        method: 'DELETE' as const,
+        method: 'DELETE',
         path: '/users/:id',
         responses: {
             200: z.object({
@@ -86,8 +89,8 @@ const usersContract = createContract(Users, {
     },
 });
 
-export const contract = createContract({
-    health: healthContract,
+const routes = k.routes('api', {
+    health: healthRoutes,
     /**
      * @deprecated use newRoute instead
      */
@@ -172,7 +175,7 @@ export const contract = createContract({
     getUserById: {
         method: 'GET',
         path: '/users/by-id/:id',
-        tags: [Users],
+        tags: ['users'],
         security: [
             {
                 bearerAuth: [],
@@ -188,9 +191,13 @@ export const contract = createContract({
     },
 });
 
-export const api = createApi({
-    users: usersContract,
-    health: healthContract,
+export const contract = k.contract({ routes });
+
+export const api = k.contract({
+    routes: {
+        users: usersRoutes,
+        health: healthRoutes,
+    },
 });
 
 export const client = createClient(contract, {

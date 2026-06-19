@@ -50,20 +50,59 @@ generateOpenApi(contract, {
         },
     ],
     setOperationId: true,
-    setTagsFromContractKeys: true,
 });
 ```
 
-| Option                       | Default  | Description                                                                             |
-| ---------------------------- | -------- | --------------------------------------------------------------------------------------- |
-| `info`                       | required | OpenAPI `info` object                                                                   |
-| `servers`                    | —        | Server URLs                                                                             |
-| `setOperationId`             | `false`  | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys. |
-| `setTagsFromContractKeys`    | `false`  | Use contract sub-object keys as OpenAPI tags                                            |
-| `tags`                       | —        | Top-level tag definitions                                                               |
-| `security`                   | —        | Global security requirements                                                            |
-| `components.securitySchemes` | —        | Security scheme definitions                                                             |
-| `operationMapper`            | —        | Callback to transform each operation before it is added to the spec                     |
+| Option            | Default  | Description                                                                                |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------ |
+| `info`            | required | OpenAPI `info` object                                                                      |
+| `servers`         | —        | Server URLs                                                                                |
+| `setOperationId`  | `false`  | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys.    |
+| `tags`            | —        | Top-level tag definitions                                                                  |
+| `security`        | —        | Document-level security requirements (top-level `security`)                                |
+| `components`      | —        | OpenAPI components — `securitySchemes` go here, emitted under `components.securitySchemes` |
+| `operationMapper` | —        | Callback to transform each operation before it is added to the spec                        |
+
+## Security
+
+Security schemes (under `components`) and document-level `security` are generator options — they belong here, not on the contract. Declare the schemes once, then reference them per route with the route's `security` field, which becomes that operation's `security`:
+
+```ts
+const spec = generateOpenApi(contract, {
+    info: {
+        title: 'My API',
+        version: '1.0.0',
+    },
+    security: [
+        {
+            bearerAuth: [],
+        },
+    ],
+    components: {
+        securitySchemes: {
+            bearerAuth: {
+                type: 'http',
+                scheme: 'bearer',
+                bearerFormat: 'JWT',
+            },
+        },
+    },
+});
+```
+
+```ts
+// in your routes
+getUser: {
+    method: 'GET',
+    path: '/users/:id',
+    security: [{ bearerAuth: [] }],
+    responses: {
+        200: UserSchema,
+    },
+},
+```
+
+A route's `security` is documentation only — it has no runtime effect. Enforce access with [middleware](/docs/adapters/express#middleware).
 
 ## Serving with Scalar (Express)
 
@@ -151,7 +190,7 @@ tsx scripts/generate-openapi.ts
 
 Routes with a `body` or `query` schema automatically include a `400` validation error response in the generated spec. This matches the error kizuna returns when request data fails schema validation.
 
-If your contract already declares a `400` response for a route, the automatic validation error is not added — your declaration takes precedence.
+If your routes already declares a `400` response for a route, the automatic validation error is not added — your declaration takes precedence.
 
 ## Reference
 

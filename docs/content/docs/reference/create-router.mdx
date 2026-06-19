@@ -1,26 +1,26 @@
 ---
 title: createRouter
-description: Bind typed handler implementations to a contract with full type inference for inputs and outputs.
+description: Bind typed handler implementations to a contract, checked against every route.
 ---
 
-Bind typed handler implementations to a contract. Each handler receives validated inputs and must return a response matching the contract's declared status codes.
+Bind handler implementations to a contract. The router mirrors the contract's route groups; each handler receives validated inputs and must return a response matching the route's declared status codes.
 
 <AdapterTabs functionName="createRouter" />
 
 ## Parameters
 
 ```ts
-createRouter(contract: Contract, handlers: Router<Contract>): Router<Contract>
+createRouter(contract: Contract, router: Router<Contract>): Router<Contract>
 ```
 
-| Parameter  | Type               | Description                                                                   |
-| ---------- | ------------------ | ----------------------------------------------------------------------------- |
-| `contract` | `Contract`         | The contract created with [`createContract`](/docs/reference/create-contract) |
-| `handlers` | `Router<Contract>` | An object with a handler function for each route in the contract              |
+| Parameter  | Type               | Description                                              |
+| ---------- | ------------------ | -------------------------------------------------------- |
+| `contract` | `Contract`         | The contract from [`k.contract`](/docs/reference/kizuna) |
+| `router`   | `Router<Contract>` | One handler function per route, grouped like the routes  |
 
 ## Returns
 
-The router object, type-checked against the contract.
+The router, type-checked against the contract. Pass it to [`createApi`](/docs/reference/create-api).
 
 ## Example
 
@@ -29,34 +29,45 @@ import { createRouter } from '@ts-kizuna/express';
 import { contract } from './contract';
 
 export const router = createRouter(contract, {
-    listUsers: async ({ query }) => {
-        const users = await db.users.findMany({
-            skip: (query.page - 1) * query.limit,
-            take: query.limit,
-        });
-        return {
-            status: 200,
-            body: {
-                users,
-                total: await db.users.count(),
-            },
-        };
-    },
-    getUser: async ({ params, error }) => {
-        const user = await db.users.findById(params.id);
-        if (!user) {
-            return error({
-                status: 404,
-                body: {
-                    detail: 'Not found',
-                },
+    users: {
+        listUsers: async ({ query }) => {
+            const found = await db.users.findMany({
+                skip: (query.page - 1) * query.limit,
+                take: query.limit,
             });
-        }
-        return {
-            status: 200,
-            body: user,
-        };
+            return {
+                status: 200,
+                body: {
+                    users: found,
+                    total: await db.users.count(),
+                },
+            };
+        },
+        getUser: async ({ params }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: user,
+            };
+        },
     },
+});
+```
+
+Pass the router to [`createApi`](/docs/reference/create-api):
+
+```ts
+export const api = createApi({
+    contract,
+    router,
 });
 ```
 
@@ -87,21 +98,25 @@ Each adapter adds framework-specific properties to the handler arguments:
 | Hono    | `c`                | Hono context                      |
 | Next.js | `request`          | `NextRequest` object              |
 
+Auth middleware attaches data to the request or context (see [`createGuard`](/docs/reference/create-guard)); handlers read it from there — for example `req.userId` on Express or `c.get('user')` on Hono.
+
 ## `RouteHandler` and `Router` types
 
-Annotate handlers individually or as a group:
+Annotate a single handler, or the whole router at once:
 
 ```ts
 import type { RouteHandler, Router } from '@ts-kizuna/express';
 import { contract } from './contract';
 
-const getUser: RouteHandler<typeof contract.getUser> = async ({ params }) => {
+const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ params }) => {
     // ...
 };
 
-const router: Router<typeof contract> = {
+export const router: Router<typeof contract.routes> = {
     // ...
 };
 ```
+
+`Router<typeof contract.routes>` types the full handler tree, which you pass straight to `createApi`'s `router`. Use `RouteHandler` when you split a handler out into its own file.
 
 See the [Router guide](/docs/building/router) for validation errors, error responses, and more.

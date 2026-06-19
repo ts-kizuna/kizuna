@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createApi, fastifyKizuna, createMiddleware, type FastifyPreHandler } from './server.js';
+
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
 
 interface User {
     id: string;
@@ -11,7 +17,7 @@ interface User {
     email: string;
 }
 
-const contract = createContract({
+const contractRoutes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -67,6 +73,10 @@ const contract = createContract({
             404: ProblemDetailsSchema,
         },
     },
+});
+
+const contract = k.contract({
+    routes: contractRoutes,
 });
 
 let users: Map<string, User>;
@@ -358,18 +368,22 @@ describe('Fastify — Accept header / 406', () => {
 describe('Fastify — responseValidation', () => {
     it('returns 500 when responseValidation is enabled and the handler returns a mismatched body', async () => {
         const strictApp = Fastify();
-        const strictApi = createApi({
-            contract: createContract({
-                getItem: {
-                    method: 'GET',
-                    path: '/items/:id',
-                    responses: {
-                        200: z.object({
-                            id: z.string(),
-                        }),
-                    },
+        const strictRoutes = k.routes('api', {
+            getItem: {
+                method: 'GET',
+                path: '/items/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
                 },
-            }),
+            },
+        });
+        const strictContract = k.contract({
+            routes: strictRoutes,
+        });
+        const strictApi = createApi({
+            contract: strictContract,
             router: {
                 getItem: () => ({ status: 200, body: { id: 123 } }) as any,
             },
@@ -391,18 +405,22 @@ describe('Fastify — responseValidation', () => {
 describe('Fastify — handler context', () => {
     it('provides the Fastify request and reply objects', async () => {
         const contextApp = Fastify();
-        const contextApi = createApi({
-            contract: createContract({
-                echo: {
-                    method: 'GET',
-                    path: '/echo',
-                    responses: {
-                        200: z.object({
-                            url: z.string(),
-                        }),
-                    },
+        const contextRoutes = k.routes('api', {
+            echo: {
+                method: 'GET',
+                path: '/echo',
+                responses: {
+                    200: z.object({
+                        url: z.string(),
+                    }),
                 },
-            }),
+            },
+        });
+        const contextContract = k.contract({
+            routes: contextRoutes,
+        });
+        const contextApi = createApi({
+            contract: contextContract,
             router: {
                 echo: ({ request }) => ({
                     status: 200,
@@ -428,7 +446,7 @@ describe('Fastify — handler context', () => {
 });
 
 describe('Fastify — middleware', () => {
-    const middlewareContract = createContract({
+    const middlewareContractRoutes = k.routes('api', {
         publicRoute: {
             method: 'GET',
             path: '/public',
@@ -447,7 +465,7 @@ describe('Fastify — middleware', () => {
                 }),
             },
         },
-        admin: createContract({
+        admin: {
             dashboard: {
                 method: 'GET',
                 path: '/admin/dashboard',
@@ -466,7 +484,11 @@ describe('Fastify — middleware', () => {
                     }),
                 },
             },
-        }),
+        },
+    });
+
+    const middlewareContract = k.contract({
+        routes: middlewareContractRoutes,
     });
 
     const requireAuth: FastifyPreHandler = async (request, reply) => {

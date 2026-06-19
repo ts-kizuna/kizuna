@@ -29,26 +29,27 @@ Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, pow
 - **MCP server generation** — expose your API as MCP tools so AI assistants can call your endpoints
 - **Deprecation support** — mark endpoints and fields as deprecated with a JSDoc `@deprecated` tag — IDEs show strikethroughs, OpenAPI and Swift pick it up automatically
 
-## Define your API contract
+## Define your API routes
 
-The contract is a plain TypeScript object. It lives in a shared package that both your server and client import.
+Define each route: pick a method and path, then describe what it takes in and sends back with Zod.
 
 ```ts
-import { createContract } from '@ts-kizuna/core';
-import { z } from 'zod';
+// routes.ts
+const UserSchema = createModel({
+    title: 'User',
+    schema: z.object({
+        id: z.string(),
+        name: z.string(),
+    }),
+});
 
-export const contract = createContract({
+export const users = k.routes('users', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
         responses: {
-            200: z.object({
-                id: z.string(),
-                name: z.string(),
-            }),
-            404: z.object({
-                message: z.string(),
-            }),
+            200: UserSchema,
+            404: ProblemDetailsSchema,
         },
     },
     createUser: {
@@ -58,60 +59,91 @@ export const contract = createContract({
             name: z.string(),
         }),
         responses: {
-            201: z.object({
-                id: z.string(),
-                name: z.string(),
-            }),
+            201: UserSchema,
         },
     },
 });
 ```
 
-## Fulfill the contract on your server
+## Bundle into a contract
+
+The contract is the single object you hand to the client and the server adapters.
 
 ```ts
-import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
-import { contract } from '@shared/contract';
-
-export const router = createRouter(contract, {
-    getUser: async ({ params }) => {
-        const user = await db.users.findById(params.id);
-        if (!user) {
-            return {
-                status: 404,
-                body: {
-                    message: 'Not found',
-                },
-            };
-        }
-        return {
-            status: 200,
-            body: user,
-        };
-    },
-    createUser: async ({ body }) => {
-        const user = await db.users.create({
-            name: body.name,
-        });
-        return {
-            status: 201,
-            body: user,
-        };
+// contract.ts
+export const contract = k.contract({
+    routes: {
+        users,
     },
 });
+```
+
+## Implement your routes on the server
+
+```ts
+// router.ts
+export const router = createRouter(contract, {
+    users: {
+        getUser: async ({ params }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'Not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: user,
+            };
+        },
+        createUser: async ({ body }) => {
+            const user = await db.users.create({
+                name: body.name,
+            });
+            return {
+                status: 201,
+                body: user,
+            };
+        },
+    },
+});
+```
+
+## Bind the contract to your server
+
+`createApi` joins the contract with your router:
+
+```ts
+// server.ts
+export const api = createApi({
+    contract,
+    router,
+});
+```
+
+Then mount it on your app:
+
+```ts
+// index.ts
+const app = express();
+app.use(express.json());
+
+createExpressEndpoints(api, app);
+app.listen(3000);
 ```
 
 ## Use the API on the client
 
 ```ts
-import { createClient } from '@ts-kizuna/fetch';
-import { contract } from '@shared/contract';
-
+// client.ts
 const client = createClient(contract, {
     baseUrl: 'http://localhost:3000',
 });
 
-const result = await client.getUser({
+const result = await client.users.getUser({
     params: {
         id: '1',
     },
@@ -124,19 +156,19 @@ if (result.status === 200) {
 
 ## Packages
 
-| Package                    | Description                                  |
-| -------------------------- | -------------------------------------------- |
-| `@ts-kizuna/core`          | Contract definition, validation, adapter API |
-| `@ts-kizuna/fetch`         | Typed fetch-based client                     |
-| `@ts-kizuna/express`       | Express adapter                              |
-| `@ts-kizuna/fastify`       | Fastify adapter                              |
-| `@ts-kizuna/hono`          | Hono adapter                                 |
-| `@ts-kizuna/next`          | Next.js App Router adapter                   |
-| `@ts-kizuna/openapi`       | OpenAPI generation                           |
-| `@ts-kizuna/swift`         | Swift client generation                      |
-| `@ts-kizuna/mcp`           | MCP server generation                        |
-| `@ts-kizuna/eslint-plugin` | ESLint rules                                 |
-| `@ts-kizuna/cli`           | Shared CLI and build tooling                 |
+| Package                    | Description                                           |
+| -------------------------- | ----------------------------------------------------- |
+| `@ts-kizuna/core`          | Routes & contract definition, validation, adapter API |
+| `@ts-kizuna/fetch`         | Typed fetch-based client                              |
+| `@ts-kizuna/express`       | Express adapter                                       |
+| `@ts-kizuna/fastify`       | Fastify adapter                                       |
+| `@ts-kizuna/hono`          | Hono adapter                                          |
+| `@ts-kizuna/next`          | Next.js App Router adapter                            |
+| `@ts-kizuna/openapi`       | OpenAPI generation                                    |
+| `@ts-kizuna/swift`         | Swift client generation                               |
+| `@ts-kizuna/mcp`           | MCP server generation                                 |
+| `@ts-kizuna/eslint-plugin` | ESLint rules                                          |
+| `@ts-kizuna/cli`           | Shared CLI and build tooling                          |
 
 ## License
 

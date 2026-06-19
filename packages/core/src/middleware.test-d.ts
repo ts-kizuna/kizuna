@@ -1,9 +1,9 @@
 import { test } from 'vitest';
 import { z } from 'zod';
-import { createContract } from './contract.js';
+import type { Routes } from './types.js';
 import type { MiddlewareMap } from './middleware.js';
 
-const contract = createContract({
+const routes = {
     register: {
         method: 'POST',
         path: '/register',
@@ -28,7 +28,7 @@ const contract = createContract({
             }),
         },
     },
-    user: createContract({
+    user: {
         getUser: {
             method: 'GET',
             path: '/users/:id',
@@ -45,8 +45,8 @@ const contract = createContract({
                 204: z.undefined(),
             },
         },
-    }),
-    billing: createContract({
+    },
+    billing: {
         createInvoice: {
             method: 'POST',
             path: '/invoices',
@@ -69,21 +69,22 @@ const contract = createContract({
                 }),
             },
         },
-    }),
-});
+    },
+} satisfies Routes;
 
+type Routes_ = typeof routes;
 type Middleware = () => void;
 const auth: Middleware = () => {};
 
 test('all top-level keys are required', () => {
     // @ts-expect-error missing register, login, billing
-    const _missing: MiddlewareMap<typeof contract, Middleware> = {
+    const _missing: MiddlewareMap<Routes_, Middleware> = {
         user: [auth],
     };
 });
 
 test('accepts complete map with explicit empty arrays for public routes', () => {
-    const _complete: MiddlewareMap<typeof contract, Middleware> = {
+    const _complete: MiddlewareMap<Routes_, Middleware> = {
         register: [],
         login: [],
         user: [auth],
@@ -92,7 +93,7 @@ test('accepts complete map with explicit empty arrays for public routes', () => 
 });
 
 test('nested group keys are optional when using wildcard default', () => {
-    const _withWildcard: MiddlewareMap<typeof contract, Middleware> = {
+    const _withWildcard: MiddlewareMap<Routes_, Middleware> = {
         register: [],
         login: [],
         user: [auth],
@@ -104,7 +105,7 @@ test('nested group keys are optional when using wildcard default', () => {
 });
 
 test('nested group keys are optional without wildcard', () => {
-    const _partial: MiddlewareMap<typeof contract, Middleware> = {
+    const _partial: MiddlewareMap<Routes_, Middleware> = {
         register: [],
         login: [],
         user: {

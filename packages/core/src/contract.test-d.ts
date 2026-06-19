@@ -1,9 +1,15 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { createContract } from './contract.js';
-import { createTag } from './tag.js';
+import { kizuna } from './kizuna.js';
+import { createTags } from './tags.js';
 
-const contract = createContract({
+const { k } = kizuna({
+    tags: createTags({
+        users: 'Users',
+    }),
+});
+
+const routes = k.routes('users', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -31,41 +37,30 @@ const contract = createContract({
     },
 });
 
-test('contract preserves literal method and path strings', () => {
-    expectTypeOf(contract.getUser.method).toEqualTypeOf<'GET'>();
-    expectTypeOf(contract.getUser.path).toEqualTypeOf<'/users/:id'>();
-    expectTypeOf(contract.createUser.method).toEqualTypeOf<'POST'>();
-    expectTypeOf(contract.createUser.path).toEqualTypeOf<'/users'>();
+const contract = k.contract({
+    routes,
+});
+
+test('routes preserve literal method and path strings', () => {
+    expectTypeOf(routes.getUser.method).toEqualTypeOf<'GET'>();
+    expectTypeOf(routes.getUser.path).toEqualTypeOf<'/users/:id'>();
+    expectTypeOf(routes.createUser.method).toEqualTypeOf<'POST'>();
+    expectTypeOf(routes.createUser.path).toEqualTypeOf<'/users'>();
 });
 
 test('createUser has body, getUser does not', () => {
-    expectTypeOf(contract.createUser.body).not.toBeUndefined();
-    expectTypeOf(contract.getUser).not.toHaveProperty('body');
+    expectTypeOf(routes.createUser.body).not.toBeUndefined();
+    expectTypeOf(routes.getUser).not.toHaveProperty('body');
 });
 
 test('path must start with /', () => {
-    // @ts-expect-error path must start with /
-    createContract({ bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } } });
+    k.routes('users', {
+        // @ts-expect-error path must start with /
+        bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } },
+    });
 });
 
-const Users = createTag({
-    title: 'Users',
-    description: 'User management endpoints',
-});
-
-const tagged = createContract(Users, {
-    getUser: {
-        method: 'GET',
-        path: '/users/:id',
-        responses: {
-            200: z.object({
-                id: z.string(),
-            }),
-        },
-    },
-});
-
-test('tagged contract preserves literal types', () => {
-    expectTypeOf(tagged.getUser.method).toEqualTypeOf<'GET'>();
-    expectTypeOf(tagged.getUser.path).toEqualTypeOf<'/users/:id'>();
+test('contract carries the route literals', () => {
+    expectTypeOf(contract.routes.getUser.method).toEqualTypeOf<'GET'>();
+    expectTypeOf(contract.routes.getUser.path).toEqualTypeOf<'/users/:id'>();
 });

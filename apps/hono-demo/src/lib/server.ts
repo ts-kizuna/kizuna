@@ -1,7 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import { createRouter } from '@ts-kizuna/hono';
+import type { MiddlewareHandler } from 'hono';
+import { createApi, createGuard, type Router } from '@ts-kizuna/hono';
 import { contract } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
+
+type DemoEnv = {
+    Variables: {
+        userId: string;
+        member: { workspaceUserId: string; role: 'owner' | 'admin' };
+    };
+};
 
 interface User {
     id: string;
@@ -25,165 +33,195 @@ users.set('2', {
 
 const archivedUsers = new Set<string>();
 
-export const router = createRouter(contract, {
-    users: {
-        listUsers: ({ query }) => {
-            const all = Array.from(users.values());
-            const start = (query.page - 1) * query.limit;
+const sessions = new Map<string, { userId: string }>([
+    ['tok_ada', { userId: '1' }],
+    ['tok_linus', { userId: '2' }],
+]);
+
+const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | 'admin' }>([
+    ['wst_owner', { workspaceUserId: '1', role: 'owner' }],
+    ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
+]);
+
+const requireUser: MiddlewareHandler<DemoEnv> = createGuard<DemoEnv>(({ c, deny }) => {
+    const auth = c.req.header('authorization');
+    const token = auth ? /^bearer\s+(.+)$/i.exec(auth)?.[1] : undefined;
+    const session = sessions.get(token ?? '');
+    if (!session) {
+        return deny(401, 'Unauthorized');
+    }
+    c.set('userId', session.userId);
+});
+
+const requireMember: MiddlewareHandler<DemoEnv> = createGuard<DemoEnv>(({ c, deny }) => {
+    const token = c.req.header('x-workspace-token');
+    const membership = token ? memberships.get(token) : undefined;
+    if (!membership) {
+        return deny(403, 'Forbidden');
+    }
+    c.set('member', membership);
+});
+
+const usersHandlers: Router<typeof contract, DemoEnv>['users'] = {
+    listUsers: ({ query }) => {
+        const all = Array.from(users.values());
+        const start = (query.page - 1) * query.limit;
+        return {
+            status: 200,
+            body: {
+                users: all.slice(start, start + query.limit),
+                total: all.length,
+            },
+        };
+    },
+    exportUsers: () => {
+        const rows = Array.from(users.values()).map((user) => [user.id, user.name, user.email]);
+        return {
+            status: 200,
+            body: toCsv(['id', 'name', 'email'], rows),
+        };
+    },
+    userBadge: ({ params }) => {
+        const user = users.get(params.id);
+        if (!user) {
+            return {
+                status: 404,
+                body: {
+                    detail: 'User not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: Buffer.from(`BADGE:${user.id}:${user.name}`, 'utf-8'),
+        };
+    },
+    searchUsers: ({ query }) => {
+        const all = Array.from(users.values()).filter((user) => user.name.toLowerCase().includes(query.q.toLowerCase()));
+        const slice = all.slice(query.cursor, query.cursor + query.limit);
+        const nextCursor = query.cursor + slice.length < all.length ? query.cursor + slice.length : null;
+        return {
+            status: 200,
+            body: {
+                users: slice,
+                nextCursor,
+            },
+        };
+    },
+    getUser: ({ params, headers }) => {
+        const user = users.get(params.id);
+        if (!user) {
+            return {
+                status: 404,
+                body: {
+                    detail: 'User not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: user,
+            headers: {
+                'x-request-id': headers['x-request-id'],
+            },
+        };
+    },
+    createUser: ({ body }) => {
+        const user: User = {
+            id: randomUUID(),
+            name: body.name,
+            email: body.email,
+            last_name: body.last_name,
+        };
+        users.set(user.id, user);
+        return {
+            status: 201,
+            body: user,
+        };
+    },
+    deleteUser: ({ params }) => {
+        if (!users.has(params.id)) {
+            return {
+                status: 404,
+                body: {
+                    detail: 'User not found',
+                },
+            };
+        }
+        users.delete(params.id);
+        return {
+            status: 200,
+            body: {
+                success: true,
+            },
+        };
+    },
+    archiveUser: ({ params }) => {
+        if (archivedUsers.has(params.id)) {
             return {
                 status: 200,
                 body: {
-                    users: all.slice(start, start + query.limit),
-                    total: all.length,
-                },
-            };
-        },
-        exportUsers: () => {
-            const rows = Array.from(users.values()).map((user) => [user.id, user.name, user.email]);
-            return {
-                status: 200,
-                body: toCsv(['id', 'name', 'email'], rows),
-            };
-        },
-        userBadge: ({ params }) => {
-            const user = users.get(params.id);
-            if (!user) {
-                return {
-                    status: 404,
-                    body: {
-                        detail: 'User not found',
-                    },
-                };
-            }
-            return {
-                status: 200,
-                body: Buffer.from(`BADGE:${user.id}:${user.name}`, 'utf-8'),
-            };
-        },
-        searchUsers: ({ query }) => {
-            const all = Array.from(users.values()).filter((user) => user.name.toLowerCase().includes(query.q.toLowerCase()));
-            const slice = all.slice(query.cursor, query.cursor + query.limit);
-            const nextCursor = query.cursor + slice.length < all.length ? query.cursor + slice.length : null;
-            return {
-                status: 200,
-                body: {
-                    users: slice,
-                    nextCursor,
-                },
-            };
-        },
-        getUser: ({ params, headers }) => {
-            const user = users.get(params.id);
-            if (!user) {
-                return {
-                    status: 404,
-                    body: {
-                        detail: 'User not found',
-                    },
-                };
-            }
-            return {
-                status: 200,
-                body: user,
-                headers: {
-                    'x-request-id': headers['x-request-id'],
-                },
-            };
-        },
-        createUser: ({ body }) => {
-            const user: User = {
-                id: randomUUID(),
-                name: body.name,
-                email: body.email,
-                last_name: body.last_name,
-            };
-            users.set(user.id, user);
-            return {
-                status: 201,
-                body: user,
-            };
-        },
-        deleteUser: ({ params }) => {
-            if (!users.has(params.id)) {
-                return {
-                    status: 404,
-                    body: {
-                        detail: 'User not found',
-                    },
-                };
-            }
-            users.delete(params.id);
-            return {
-                status: 200,
-                body: {
-                    success: true,
-                },
-            };
-        },
-        archiveUser: ({ params }) => {
-            if (archivedUsers.has(params.id)) {
-                return {
-                    status: 200,
-                    body: {
-                        alreadyArchived: true,
-                        userId: params.id,
-                    },
-                };
-            }
-            archivedUsers.add(params.id);
-            return {
-                status: 201,
-                body: {
-                    archivedAt: new Date().toISOString(),
+                    alreadyArchived: true,
                     userId: params.id,
                 },
             };
-        },
-        uploadAvatar: async ({ body }) => {
-            const buffer = await body.file.arrayBuffer();
-            return {
-                status: 200,
-                body: {
-                    size: buffer.byteLength,
-                    userId: body.userId,
-                },
-            };
-        },
-        pingUser: () => ({
-            status: 204,
-            body: undefined,
-        }),
-        getMyWork: () => ({
-            status: 200,
+        }
+        archivedUsers.add(params.id);
+        return {
+            status: 201,
             body: {
-                items: ['draft report', 'review pull request'],
-                contentType: 'image/jpeg',
+                archivedAt: new Date().toISOString(),
+                userId: params.id,
             },
-        }),
-        checkUser: ({ params }) => {
-            const user = users.get(params.id);
-            if (!user) {
-                return {
-                    status: 404,
-                    body: {
-                        detail: 'User not found',
-                    },
-                };
-            }
-            return {
-                status: 200,
-                body: {
-                    exists: true,
-                },
-            };
-        },
-        describeUsers: () => ({
-            status: 200,
-            body: {
-                allow: 'GET, HEAD, POST, OPTIONS',
-            },
-        }),
+        };
     },
+    uploadAvatar: async ({ body }) => {
+        const buffer = await body.file.arrayBuffer();
+        return {
+            status: 200,
+            body: {
+                size: buffer.byteLength,
+                userId: body.userId,
+            },
+        };
+    },
+    pingUser: () => ({
+        status: 204,
+        body: undefined,
+    }),
+    getMyWork: () => ({
+        status: 200,
+        body: {
+            items: ['draft report', 'review pull request'],
+            contentType: 'image/jpeg',
+        },
+    }),
+    checkUser: ({ params }) => {
+        const user = users.get(params.id);
+        if (!user) {
+            return {
+                status: 404,
+                body: {
+                    detail: 'User not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: {
+                exists: true,
+            },
+        };
+    },
+    describeUsers: () => ({
+        status: 200,
+        body: {
+            allow: 'GET, HEAD, POST, OPTIONS',
+        },
+    }),
+};
+
+const notificationsHandlers: Router<typeof contract, DemoEnv>['notifications'] = {
     listEvents: ({ query }) => {
         return {
             status: 200,
@@ -226,22 +264,110 @@ export const router = createRouter(contract, {
             received: true,
         },
     }),
-    health: {
-        check: () => ({
+};
+
+const healthHandlers: Router<typeof contract, DemoEnv>['health'] = {
+    check: () => ({
+        status: 200,
+        body: {
+            ok: true,
+        },
+    }),
+    version: () => ({
+        status: 200,
+        body: {
+            version: '1.0.0',
+        },
+    }),
+    history: () => ({
+        status: 200,
+        body: [{ ok: true, checkedAt: new Date().toISOString() }],
+    }),
+};
+
+const membersHandlers: Router<typeof contract, DemoEnv>['members'] = {
+    listMembers: ({ c }) => ({
+        status: 200,
+        body: {
+            members: Array.from(users.values()).filter((candidate) => candidate.id !== c.get('userId')),
+        },
+    }),
+    inviteMember: ({ body, c }) => {
+        const existing = Array.from(users.values()).find((candidate) => candidate.email === body.email);
+        if (existing) {
+            return {
+                status: 409,
+                body: {
+                    detail: `${body.email} is already a member (invite attempted by ${c.get('member').role}).`,
+                },
+            };
+        }
+        const invited: User = {
+            id: randomUUID(),
+            name: body.email.split('@')[0] ?? body.email,
+            email: body.email,
+        };
+        users.set(invited.id, invited);
+        return {
+            status: 201,
+            body: invited,
+        };
+    },
+};
+
+const workspaceHandlers: Router<typeof contract, DemoEnv>['workspace'] = {
+    getWorkspace: ({ c }) => ({
+        status: 200,
+        body: {
+            id: c.get('member').workspaceUserId,
+            name: 'Demo Workspace',
+        },
+    }),
+    deleteWorkspace: ({ c }) => ({
+        status: 200,
+        body: {
+            ok: c.get('member').role === 'owner',
+        },
+    }),
+    transfer: ({ body, c }) => {
+        if (body.toUserId === c.get('userId') || c.get('member').role !== 'owner') {
+            return {
+                status: 200,
+                body: {
+                    ok: false,
+                },
+            };
+        }
+        users.delete(body.toUserId);
+        return {
             status: 200,
             body: {
                 ok: true,
             },
-        }),
-        version: () => ({
-            status: 200,
-            body: {
-                version: '1.0.0',
-            },
-        }),
-        history: () => ({
-            status: 200,
-            body: [{ ok: true, checkedAt: new Date().toISOString() }],
-        }),
+        };
+    },
+};
+
+export const api = createApi<typeof contract.routes, DemoEnv>({
+    contract,
+    router: {
+        users: usersHandlers,
+        notifications: notificationsHandlers,
+        health: healthHandlers,
+        members: membersHandlers,
+        workspace: workspaceHandlers,
+    } as Router<typeof contract, DemoEnv>,
+    middleware: {
+        users: [],
+        health: [],
+        notifications: [],
+        members: {
+            '*': [requireMember],
+            listMembers: [requireUser],
+        },
+        workspace: {
+            '*': [requireMember],
+            transfer: [requireUser, requireMember],
+        },
     },
 });

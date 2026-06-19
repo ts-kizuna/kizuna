@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ValidationIssueCode } from './validation-error.js';
 
 /**
  * A validation issue carrying a custom machine-readable {@link code}.
@@ -9,8 +10,11 @@ import { z } from 'zod';
 export interface CodedIssue<Input> {
     /**
      * Machine-readable error classification (e.g. `invalid_phone_number`).
+     *
+     * Built-in Zod codes are suggested for autocomplete, but any custom string
+     * is accepted.
      */
-    code: string;
+    code: ValidationIssueCode;
     /**
      * Human-readable description of the validation failure.
      */
@@ -32,7 +36,7 @@ export interface CodedIssue<Input> {
  * ```ts
  * import { z } from 'zod';
  * import { isValidPhoneNumber } from 'libphonenumber-js';
- * import { addCodedIssue } from '@ts-kizuna/core/schemas';
+ * import { addCodedIssue } from '@ts-kizuna/core/zod';
  *
  * const phoneNumber = z.string().superRefine((value, ctx) => {
  *     if (isValidPhoneNumber(value)) return;

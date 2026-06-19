@@ -5,8 +5,8 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/contract.ts",
-      "default": "./src/contract.ts"
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
     },
     "./csv": {
       "types": "./src/csv.ts",

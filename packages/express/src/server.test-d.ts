@@ -2,10 +2,16 @@ import { expectTypeOf, test } from 'vitest';
 import type { Request } from 'express';
 import type { RouteDefinition } from '@ts-kizuna/core';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { createRouter } from './server.js';
 
-const contract = createContract({
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
+
+const contractRoutes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -34,6 +40,10 @@ const contract = createContract({
             }),
         },
     },
+});
+
+const contract = k.contract({
+    routes: contractRoutes,
 });
 
 test('handler receives typed path params', () => {

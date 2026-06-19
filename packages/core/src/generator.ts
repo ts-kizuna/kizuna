@@ -6,9 +6,10 @@ import {
     type SerializedDeprecationMap,
 } from './deprecation.js';
 import { loadDeprecations } from './load-deprecations.js';
-import { flattenContract } from './handler-pipeline.js';
+import { flattenRoutes } from './handler-pipeline.js';
 import { parsePath } from './path-params.js';
-import type { Contract, RouteDefinition } from './types.js';
+import type { Routes, RouteDefinition } from './types.js';
+import type { Contract } from './contract.js';
 
 export {
     loadDeprecations,
@@ -18,7 +19,7 @@ export {
     type DeprecationMap,
     type SerializedDeprecationMap,
 };
-export type { Contract, RouteDefinition };
+export type { Routes, RouteDefinition };
 export { parsePath };
 
 export {
@@ -48,9 +49,9 @@ export { resolveResponseBody, resolveResponseHeaders, resolveResponseContentType
 export interface GeneratorRouteContext {
     routeKey: string;
     route: RouteDefinition;
-    contractTags: string[];
+    routeTags: string[];
     /**
-     * Whether this route is marked `@deprecated` in the contract source.
+     * Whether this route is marked `@deprecated` in the routes source.
      */
     deprecated: boolean;
     /**
@@ -65,20 +66,20 @@ export interface GeneratorRouteContext {
 }
 
 /**
- * Factory for building type-safe contract generators.
+ * Factory for building type-safe routes generators.
  *
- * Centralises contract walking and deprecation resolution so generator authors
+ * Centralises routes walking and deprecation resolution so generator authors
  * only need to implement `processRoute` and `finalize`.
  *
  * ```ts
- * const generateRouteList = createGenerator((options: GeneratorOptions) => {
- *     const routes: string[] = [];
+ * const generateRouteList = createGenerator(() => {
+ *     const routeList: string[] = [];
  *     return {
- *         processRoute({ routeKey, route, deprecated }) {
- *             routes.push(`${route.method} ${route.path}${deprecated ? ' (deprecated)' : ''}`);
+ *         processRoute({ route, deprecated }) {
+ *             routeList.push(`${route.method} ${route.path}${deprecated ? ' (deprecated)' : ''}`);
  *         },
  *         finalize() {
- *             return routes;
+ *             return routeList;
  *         },
  *     };
  * });
@@ -99,12 +100,12 @@ export const createGenerator =
     (contract, options) => {
         const { processRoute, finalize } = factory(options, contract);
         const deprecation = loadDeprecations(contractFingerprint(contract));
-        for (const { routeKey, route, contractTags } of flattenContract(contract)) {
+        for (const { routeKey, route, routeTags } of flattenRoutes(contract.routes)) {
             const rawMessage = deprecation?.routes.get(routeKey);
             processRoute({
                 routeKey,
                 route,
-                contractTags,
+                routeTags,
                 deprecated: rawMessage !== undefined,
                 deprecationMessage: rawMessage || undefined,
                 fieldDeprecations: deprecation?.fields.get(routeKey),

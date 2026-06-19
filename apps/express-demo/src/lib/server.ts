@@ -1,7 +1,19 @@
 import { randomUUID } from 'node:crypto';
-import { createRouter } from '@ts-kizuna/express';
+import type { RequestHandler } from 'express';
+import { createGuard } from '@ts-kizuna/express';
+import type { Router } from '@ts-kizuna/express';
 import { contract } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
+
+declare global {
+    // eslint-disable-next-line @typescript-eslint/no-namespace
+    namespace Express {
+        interface Request {
+            userId?: string;
+            member?: { workspaceUserId: string; role: 'owner' | 'admin' };
+        }
+    }
+}
 
 interface User {
     id: string;
@@ -25,7 +37,41 @@ users.set('2', {
 
 const archivedUsers = new Set<string>();
 
-export const router = createRouter(contract, {
+const sessions = new Map<string, { userId: string }>([
+    ['tok_ada', { userId: '1' }],
+    ['tok_linus', { userId: '2' }],
+]);
+
+const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | 'admin' }>([
+    ['wst_owner', { workspaceUserId: '1', role: 'owner' }],
+    ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
+]);
+
+const bearerToken = (req: { headers: Record<string, unknown> }): string | undefined => {
+    const header = req.headers['authorization'];
+    const value = Array.isArray(header) ? header[0] : header;
+    return typeof value === 'string' ? /^bearer\s+(.+)$/i.exec(value)?.[1] : undefined;
+};
+
+export const requireUser: RequestHandler = createGuard(({ req, deny }) => {
+    const session = sessions.get(bearerToken(req) ?? '');
+    if (!session) {
+        return deny(401, 'Unauthorized');
+    }
+    req.userId = session.userId;
+});
+
+export const requireMember: RequestHandler = createGuard(({ req, deny }) => {
+    const token = req.headers['x-workspace-token'];
+    const value = Array.isArray(token) ? token[0] : token;
+    const membership = typeof value === 'string' ? memberships.get(value) : undefined;
+    if (!membership) {
+        return deny(403, 'Forbidden');
+    }
+    req.member = membership;
+});
+
+export const router: Router<typeof contract> = {
     users: {
         listUsers: ({ query }) => {
             const all = Array.from(users.values());
@@ -185,48 +231,6 @@ export const router = createRouter(contract, {
             },
         }),
     },
-    listEvents: ({ query }) => {
-        return {
-            status: 200,
-            body: {
-                events: [
-                    {
-                        id: 'evt_1',
-                        kind: 'login',
-                        occurredAt: '2026-04-01T10:00:00.000Z',
-                        userId: '1',
-                    },
-                ],
-                echo: {
-                    since: query.since ? query.since.toISOString() : null,
-                    kind: query.kind ?? null,
-                    ids: query.ids ?? null,
-                    label: query.label ?? null,
-                    tagIds: query.tagIds ?? null,
-                },
-            },
-        };
-    },
-    sendNotification: () => {
-        return {
-            status: 202,
-            body: {
-                accepted: true,
-            },
-        };
-    },
-    validateConfig: () => ({
-        status: 200,
-        body: {
-            status: 'ok',
-        },
-    }),
-    webhook: () => ({
-        status: 200,
-        body: {
-            received: true,
-        },
-    }),
     health: {
         check: () => ({
             status: 200,
@@ -245,4 +249,109 @@ export const router = createRouter(contract, {
             body: [{ ok: true, checkedAt: new Date().toISOString() }],
         }),
     },
-});
+    notifications: {
+        sendNotification: () => {
+            return {
+                status: 202,
+                body: {
+                    accepted: true,
+                },
+            };
+        },
+        listEvents: ({ query }) => {
+            return {
+                status: 200,
+                body: {
+                    events: [
+                        {
+                            id: 'evt_1',
+                            kind: 'login',
+                            occurredAt: '2026-04-01T10:00:00.000Z',
+                            userId: '1',
+                        },
+                    ],
+                    echo: {
+                        since: query.since ? query.since.toISOString() : null,
+                        kind: query.kind ?? null,
+                        ids: query.ids ?? null,
+                        label: query.label ?? null,
+                        tagIds: query.tagIds ?? null,
+                    },
+                },
+            };
+        },
+        validateConfig: () => ({
+            status: 200,
+            body: {
+                status: 'ok',
+            },
+        }),
+        webhook: () => ({
+            status: 200,
+            body: {
+                received: true,
+            },
+        }),
+    },
+    members: {
+        listMembers: ({ req }) => ({
+            status: 200,
+            body: {
+                members: Array.from(users.values()).filter((candidate) => candidate.id !== req.userId),
+            },
+        }),
+        inviteMember: ({ body, req }) => {
+            const existing = Array.from(users.values()).find((candidate) => candidate.email === body.email);
+            if (existing) {
+                return {
+                    status: 409,
+                    body: {
+                        detail: `${body.email} is already a member (invite attempted by ${req.member?.role}).`,
+                    },
+                };
+            }
+            const invited: User = {
+                id: randomUUID(),
+                name: body.email,
+                email: body.email,
+            };
+            users.set(invited.id, invited);
+            return {
+                status: 201,
+                body: invited,
+            };
+        },
+    },
+    workspace: {
+        getWorkspace: ({ req }) => ({
+            status: 200,
+            body: {
+                id: req.member?.workspaceUserId ?? '',
+                name: 'ts-kizuna demo workspace',
+            },
+        }),
+        deleteWorkspace: ({ req }) => ({
+            status: 200,
+            body: {
+                ok: req.member?.role === 'owner',
+            },
+        }),
+        transfer: ({ body, req }) => {
+            if (body.toUserId === req.userId || req.member?.role !== 'owner') {
+                return {
+                    status: 200,
+                    body: {
+                        ok: false,
+                    },
+                };
+            }
+            users.delete(body.toUserId);
+            return {
+                status: 200,
+                body: {
+                    ok: true,
+                },
+            };
+        },
+    },
+};

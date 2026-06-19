@@ -1,6 +1,6 @@
 ---
 title: Fetch
-description: A fully typed HTTP client for consuming ts-kizuna contracts in the browser or on the server.
+description: A fully typed HTTP client for consuming ts-kizuna routes in the browser or on the server.
 ---
 
 `@ts-kizuna/fetch` provides `createClient` — a typed wrapper around the native `fetch` API.
@@ -18,13 +18,13 @@ export const apiClient = createClient(contract, {
 });
 ```
 
-The returned client mirrors the shape of the contract. Each route becomes a function that accepts the route's typed arguments and returns a Promise resolving to the typed response.
+The returned client mirrors the contract's route groups. Each route becomes a function that accepts the route's typed arguments and returns a Promise resolving to the typed response.
 
 ## Calling routes
 
 ```ts
 // GET /users?page=1&limit=10
-const { status, body } = await apiClient.listUsers({
+const { status, body } = await apiClient.users.listUsers({
     query: {
         page: 1,
         limit: 10,
@@ -36,7 +36,7 @@ const { status, body } = await apiClient.listUsers({
 
 ```ts
 // POST /users
-const result = await apiClient.createUser({
+const result = await apiClient.users.createUser({
     body: {
         name: 'Alice',
         email: 'alice@example.com',
@@ -53,7 +53,7 @@ if (result.status === 201) {
 
 ```ts
 // GET /users/:id
-const { status, body } = await apiClient.getUser({
+const { status, body } = await apiClient.users.getUser({
     params: {
         id: 'usr_abc123',
     },
@@ -66,7 +66,7 @@ When the route declares a `pathParams` schema, `params` is typed by that schema'
 
 ```ts
 // contract declares: pathParams: z.object({ id: z.string().brand<'UserId'>() })
-const { body } = await apiClient.getUser({
+const { body } = await apiClient.users.getUser({
     params: {
         id: userId, // must be a UserId — a plain string is a type error
     },
@@ -81,23 +81,25 @@ export interface ClientConfig {
     baseHeaders?: Record<string, string>;
     credentials?: RequestCredentials;
     fetch?: typeof fetch;
+    onRequest?: (context: RequestContext) => void | Promise<void>;
 }
 ```
 
-| Option        | Description                                                  |
-| ------------- | ------------------------------------------------------------ |
-| `baseUrl`     | Base URL prepended to every route path                       |
-| `baseHeaders` | Headers merged into every request                            |
-| `credentials` | Passed as `credentials` to every `fetch` call                |
-| `fetch`       | Custom fetch implementation (e.g. for testing or a polyfill) |
+| Option        | Description                                                               |
+| ------------- | ------------------------------------------------------------------------- |
+| `baseUrl`     | Base URL prepended to every route path                                    |
+| `baseHeaders` | Headers merged into every request                                         |
+| `credentials` | Passed as `credentials` to every `fetch` call                             |
+| `fetch`       | Custom fetch implementation (e.g. for testing or a polyfill)              |
+| `onRequest`   | Callback before each request — receives `{ url, method, headers, route }` |
 
 ## Per-request headers
 
 If a route declares a `headers` schema, the client requires those headers:
 
 ```ts
-// contract declares: headers: z.object({ 'x-request-id': z.string() })
-const { body } = await apiClient.getUser({
+// routes declares: headers: z.object({ 'x-request-id': z.string() })
+const { body } = await apiClient.users.getUser({
     params: { id: 'usr_abc123' },
     headers: { 'x-request-id': crypto.randomUUID() },
 });
@@ -110,7 +112,7 @@ Routes without a `headers` schema accept an optional `headers?: Record<string, s
 Pass any `RequestInit` option via `fetchOptions`:
 
 ```ts
-const { body } = await apiClient.listUsers({
+const { body } = await apiClient.users.listUsers({
     query: { page: 1 },
     fetchOptions: {
         signal: AbortSignal.timeout(5000),
@@ -129,7 +131,7 @@ type ListUsersResponse = { status: 200; body: { users: User[]; total: number }; 
 Narrow on `status` to access the correctly typed `body`:
 
 ```ts
-const result = await apiClient.createUser({ body: { name: 'Alice', email: 'alice@example.com' } });
+const result = await apiClient.users.createUser({ body: { name: 'Alice', email: 'alice@example.com' } });
 
 if (result.status === 201) {
     // result.body is User
@@ -140,10 +142,10 @@ if (result.status === 201) {
 
 ## Validation errors
 
-Routes with a `body` or `query` schema can receive a `400` validation error when the request data fails schema validation. This is automatically included in the response type — you don't need to declare it in your contract.
+Routes with a `body` or `query` schema can receive a `400` validation error when the request data fails schema validation. This is automatically included in the response type — you don't need to declare it in your routes.
 
 ```ts
-const result = await apiClient.createUser({
+const result = await apiClient.users.createUser({
     body: {
         name: '',
         email: 'not-an-email',
@@ -151,7 +153,7 @@ const result = await apiClient.createUser({
 });
 
 if (result.status === 400) {
-    for (const issue of result.body.issues) {
+    for (const issue of result.body.errors) {
         console.log(issue.code, issue.path, issue.message);
         // 'invalid_string_format', ['email'], 'Invalid email'
     }
@@ -162,7 +164,7 @@ Routes without `body` or `query` cannot trigger validation, so the `400` is not 
 
 ### `isValidationError`
 
-If your contract also declares a `400` response on the same route, the body becomes a union of your type and `ValidationError`. Use the `isValidationError` type guard to distinguish them:
+If your routes also declares a `400` response on the same route, the body becomes a union of your type and `ValidationError`. Use the `isValidationError` type guard to distinguish them:
 
 ```ts
 import { isValidationError } from '@ts-kizuna/fetch';
@@ -171,12 +173,12 @@ if (result.status === 400) {
     if (isValidationError(result.body)) {
         // kizuna validation error
     } else {
-        // your contract's 400 response
+        // your routes' 400 response
     }
 }
 ```
 
-If your contract does not declare a `400`, you don't need this — `result.status === 400` narrows the body to `ValidationError` directly.
+If your routes does not declare a `400`, you don't need this — `result.status === 400` narrows the body to `ValidationError` directly.
 
 ## Reference
 

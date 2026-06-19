@@ -1,0 +1,134 @@
+---
+title: kizuna
+description: Create the typed factory for one API surface — its tags, validation codes, route groups, and contract.
+---
+
+`kizuna` builds the typed factory for one API. Destructure `k` from it, then use `k.routes` to define route groups and `k.contract` to assemble them. Set it up once and import `k` wherever you define routes.
+
+<InstallTabs packageName="@ts-kizuna/core" />
+
+```ts
+import { kizuna } from '@ts-kizuna/core';
+```
+
+## Parameters
+
+```ts
+kizuna(config?: {
+    tags?: TagSet;
+    validation?: { issueCodes?: readonly string[] };
+}): { k: K }
+```
+
+| Field                   | Type                | Description                                                                                                            |
+| ----------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `tags`                  | `TagSet`            | Optional. A tag set from [`createTags`](/docs/reference/create-tags). Its keys become the allowed group tags.          |
+| `validation.issueCodes` | `readonly string[]` | Optional. Custom validation issue codes this API's handlers may emit via `addCodedIssue`. Captured as a literal union. |
+
+## Returns
+
+`{ k }`, the factory for this API:
+
+| Method       | Signature                  | Description                                                |
+| ------------ | -------------------------- | ---------------------------------------------------------- |
+| `k.routes`   | `(tag, defs) => Routes`    | Define a route group under one of the tag set's keys.      |
+| `k.contract` | `({ routes }) => Contract` | Assemble route groups into the contract shared everywhere. |
+
+## Example
+
+Set the factory up once — usually in a `k.ts` file — then import `k` wherever you define routes.
+
+```ts
+// k.ts
+import { kizuna } from '@ts-kizuna/core';
+import { tags } from './tags';
+
+export const { k } = kizuna({
+    tags,
+    validation: {
+        issueCodes: ['invalid_phone_number'],
+    },
+});
+```
+
+## Defining route groups
+
+`k.routes(tag, defs)` defines a group of routes under one tag. The tag must be a key of the set you passed to `kizuna`, and TypeScript completes it.
+
+```ts
+// routes.ts
+import { z } from 'zod';
+import { k } from './k';
+
+export const usersRoutes = k.routes('users', {
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        query: z.object({
+            page: z.coerce.number().int().min(1).default(1),
+            limit: z.coerce.number().int().min(1).max(100).default(10),
+        }),
+        responses: {
+            200: z.object({
+                users: z.array(UserSchema),
+                total: z.number(),
+            }),
+        },
+    },
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        body: z.object({
+            name: z.string().min(1),
+            email: z.email(),
+        }),
+        responses: {
+            201: UserSchema,
+            400: ProblemDetailsSchema,
+        },
+    },
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
+            404: ProblemDetailsSchema,
+        },
+    },
+});
+```
+
+### Route definition fields
+
+| Field         | Required | Type                                                                                                |
+| ------------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `method`      | Yes      | `'GET'` `'POST'` `'PUT'` `'PATCH'` `'DELETE'` `'HEAD'` `'OPTIONS'`                                  |
+| `path`        | Yes      | URL path — use `:name` for path parameters                                                          |
+| `body`        | —        | Zod schema for the request body                                                                     |
+| `query`       | —        | Zod schema for the query string                                                                     |
+| `headers`     | —        | Zod schema for request headers                                                                      |
+| `responses`   | Yes      | Response schemas keyed by status code                                                               |
+| `contentType` | —        | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'`      |
+| `summary`     | —        | Short description shown in OpenAPI                                                                  |
+| `tags`        | —        | OpenAPI tag keys (from the tag set), resolved to titles in the spec                                 |
+| `security`    | —        | OpenAPI security requirements, e.g. `[{ bearerAuth: [] }]`. Documentation only — no runtime effect. |
+
+## Assembling the contract
+
+`k.contract({ routes })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/create-client), [server](/docs/reference/create-api), and generators. It carries the routes plus the tags and `issueCodes` you configured on `kizuna`.
+
+```ts
+// contract.ts
+import { k } from './k';
+import { usersRoutes } from './routes';
+
+export const contract = k.contract({
+    routes: {
+        users: usersRoutes,
+    },
+});
+```
+
+The declared `issueCodes` widen `errors[].code` on `400` responses to `ValidationIssueCode | <your codes>`, so the client suggests them in autocomplete. Emit them at runtime with [`addCodedIssue`](/docs/reference/add-coded-issue). Because the factory is per API, codes and tags stay scoped to their API rather than leaking across the multiple kizuna APIs a project may define.
+
+See the [Contract guide](/docs/building/contract) for response schemas, deprecation, typed response headers, and nesting.

@@ -3,7 +3,7 @@ title: createClient
 description: Create a fully typed HTTP client from a ts-kizuna contract using the native fetch API.
 ---
 
-Create a fully typed HTTP client from a contract. The returned client mirrors the shape of the contract — each route becomes a function that accepts typed arguments and returns a typed response.
+Create a fully typed HTTP client from a contract. The returned client mirrors the route structure — each route becomes a function that accepts typed arguments and returns a typed response.
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
@@ -14,13 +14,13 @@ import { createClient } from '@ts-kizuna/fetch';
 ## Parameters
 
 ```ts
-createClient(contract: Contract, config: ClientConfig): Client<Contract>
+createClient(contract: Contract, config: ClientConfig): Client
 ```
 
-| Parameter  | Type           | Description                                                                   |
-| ---------- | -------------- | ----------------------------------------------------------------------------- |
-| `contract` | `Contract`     | The contract created with [`createContract`](/docs/reference/create-contract) |
-| `config`   | `ClientConfig` | Client configuration                                                          |
+| Parameter  | Type           | Description                                              |
+| ---------- | -------------- | -------------------------------------------------------- |
+| `contract` | `Contract`     | The contract from [`k.contract`](/docs/reference/kizuna) |
+| `config`   | `ClientConfig` | Client configuration                                     |
 
 ## `ClientConfig`
 
@@ -34,7 +34,7 @@ createClient(contract: Contract, config: ClientConfig): Client<Contract>
 
 ## Returns
 
-A `Client<T>` that mirrors the contract structure. Each route becomes a function accepting `{ params?, query?, body?, headers?, fetchOptions? }` and returning a `Promise` resolving to `{ status, body, headers }`.
+A `Client` that mirrors the contract's route groups. Each route becomes a function accepting `{ params?, query?, body?, headers?, fetchOptions? }` and returning a `Promise` resolving to `{ status, body, headers }`.
 
 `params` is typed from the route's `pathParams` schema output when one is declared (matching the server-side handler), otherwise from the `:param` placeholders in the path.
 
@@ -44,16 +44,16 @@ The response is a discriminated union over the route's declared status codes. Na
 
 ```ts
 import { createClient } from '@ts-kizuna/fetch';
-import { contract } from '@shared/contract';
+import { contract } from './contract';
 
-const client = createClient(contract, {
+const apiClient = createClient(contract, {
     baseUrl: 'http://localhost:3000',
     baseHeaders: {
         Authorization: `Bearer ${token}`,
     },
 });
 
-const result = await client.createUser({
+const result = await apiClient.users.createUser({
     body: {
         name: 'Alice',
         email: 'alice@example.com',
@@ -72,7 +72,7 @@ if (result.status === 201) {
 Pass `fetchOptions` to customize individual requests:
 
 ```ts
-const { body } = await client.listUsers({
+const { body } = await apiClient.users.listUsers({
     query: {
         page: 1,
     },

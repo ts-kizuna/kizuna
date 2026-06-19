@@ -1,45 +1,56 @@
 ---
 title: createApi
-description: Combine a contract and router into an API object that an adapter can mount.
+description: Bind a contract to its router and per-route middleware, producing an API object an adapter can mount.
 ---
 
-Combine a contract and router into an API object that an adapter can mount.
+Bind a contract to its router — and any per-route middleware — producing the API object an adapter mounts.
 
 <AdapterTabs functionName="createApi" />
 
 ## Parameters
 
 ```ts
-createApi(options: { contract, router, onError? }): Api
+createApi({
+    contract: Contract;
+    router: Router;
+    middleware?: MiddlewareMap;
+}): Api
 ```
 
-| Option     | Type               | Required | Description                                                                                        |
-| ---------- | ------------------ | -------- | -------------------------------------------------------------------------------------------------- |
-| `contract` | `Contract`         | Yes      | The contract created with [`createContract`](/docs/reference/create-contract)                      |
-| `router`   | `Router<Contract>` | Yes      | The router created with [`createRouter`](/docs/reference/create-router)                            |
-| `onError`  | `Function`         | No       | Error handler (Next.js adapter only) — receives `(error, request)` and can return a `NextResponse` |
+| Field        | Type            | Required | Description                                                                        |
+| ------------ | --------------- | -------- | ---------------------------------------------------------------------------------- |
+| `contract`   | `Contract`      | Yes      | The contract from [`k.contract`](/docs/reference/kizuna)                           |
+| `router`     | `Router`        | Yes      | The handler tree from [`createRouter`](/docs/reference/create-router)              |
+| `middleware` | `MiddlewareMap` | No       | Per-route middleware (see [`createMiddleware`](/docs/reference/create-middleware)) |
+
+The Next.js adapter also accepts an `onError` callback alongside `router` and `middleware`.
 
 ## Returns
 
-An API object that carries the contract and router together. Pass it to the adapter's endpoint function:
+An API object carrying the contract, its router, and middleware. Mount it with the adapter's mount verb:
 
-- [`createExpressEndpoints`](/docs/adapters/express)
-- [`fastifyKizuna`](/docs/adapters/fastify)
-- [`createHonoEndpoints`](/docs/adapters/hono)
-- [`createNextEndpoints`](/docs/adapters/next)
-
-The Next.js API also exposes a `mount()` convenience method that calls `createNextEndpoints` internally.
+| Adapter | Mount                                                              |
+| ------- | ------------------------------------------------------------------ |
+| Express | [`createExpressEndpoints(api, app)`](/docs/adapters/express)       |
+| Fastify | [`app.register(fastifyKizuna, { api })`](/docs/adapters/fastify)   |
+| Hono    | [`createHonoEndpoints(api, app)`](/docs/adapters/hono)             |
+| Next.js | [`createNextEndpoints(api)`](/docs/adapters/next) or `api.mount()` |
 
 ## Example
 
 ```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/express';
 import { contract } from './contract';
-import { router } from './router';
+import { router } from './lib/router';
+import { requireUser } from './lib/guards';
 
 export const api = createApi({
     contract,
     router,
+    middleware: {
+        users: [requireUser],
+        health: [],
+    },
 });
 ```
 

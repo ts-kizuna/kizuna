@@ -1,25 +1,20 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { apiReference } from '@scalar/hono-api-reference';
-import { createApi, createHonoEndpoints } from '@ts-kizuna/hono';
+import { createHonoEndpoints } from '@ts-kizuna/hono';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/hono';
 import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '@ts-kizuna-demo/shared';
 
-import { router } from './lib/server';
+import { api } from './lib/server';
 
 const app = new Hono();
-
-const api = createApi({
-    contract,
-    router,
-});
 
 const openApiSpec = generateOpenApi(contract, {
     info: {
         title: 'ts-kizuna Hono Demo',
         version: '1.0.0',
-        description: 'Hono adapter demo for the ts-kizuna user contract.',
+        description: 'Hono adapter demo for the ts-kizuna user API.',
     },
     servers: [
         {
@@ -27,20 +22,6 @@ const openApiSpec = generateOpenApi(contract, {
             description: 'Local hono demo',
         },
     ],
-    security: [
-        {
-            bearerAuth: [],
-        },
-    ],
-    components: {
-        securitySchemes: {
-            bearerAuth: {
-                type: 'http',
-                scheme: 'bearer',
-                bearerFormat: 'JWT',
-            },
-        },
-    },
     setOperationId: true,
 });
 
@@ -76,7 +57,7 @@ app.get('/', (c) => {
     </head>
     <body>
         <h1>ts-kizuna Hono demo</h1>
-        <p>This demo shares the same contract from <code>@ts-kizuna-demo/shared</code>.</p>
+        <p>This demo shares the same routes from <code>@ts-kizuna-demo/shared</code>.</p>
         <ul>
             <li><a href="http://localhost:8001/users">Hono API</a> — <code>:8001/users</code></li>
             <li><a href="http://localhost:8001/docs">Hono API docs (Scalar)</a> — <code>:8001/docs</code></li>

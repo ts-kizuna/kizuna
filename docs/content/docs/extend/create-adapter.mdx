@@ -32,7 +32,7 @@ import {
     parseFetchBody,
     headersToObject,
     type AdapterRequest,
-    type Contract,
+    type Routes,
     type Handlers,
 } from '@ts-kizuna/core/adapter';
 
@@ -55,9 +55,9 @@ const adapter = createAdapter<Request, Response, HandlerContext>({
     },
 });
 
-export const handleRequest = <T extends Contract>(
+export const handleRequest = <T extends Routes>(
     request: Request,
-    contract: T,
+    routes: T,
     router: Router<T, HandlerContext>,
     options?: { basePath?: string }
 ): Promise<Response> => {
@@ -76,7 +76,7 @@ export const handleRequest = <T extends Contract>(
     };
 
     return adapter.handle({
-        contract,
+        routes,
         router,
         request: adapterRequest,
         responseContext: {},
@@ -128,7 +128,7 @@ Use `kind: 'core-match'` for catch-all routing (one handler handles all paths). 
 | -------------------- | -------------------------------------------------------------------------------- |
 | `success`            | Handler returned a valid response                                                |
 | `not-found`          | No route matched the path                                                        |
-| `method-not-allowed` | Path matched but method is not in the contract                                   |
+| `method-not-allowed` | Path matched but method is not in the routes                                     |
 | `validation-failed`  | params, query, headers, or body failed schema validation                         |
 | `handler-error`      | Handler threw an unhandled error                                                 |
 | `raw-response`       | `onError` returned an override — cast `result.response` back to `NativeResponse` |
