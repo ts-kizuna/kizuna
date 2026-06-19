@@ -16,7 +16,7 @@ import { ResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
-import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator.js';
+import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
 
 export type { RouteDefinition, Contract, Method } from './types.js';
 export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
