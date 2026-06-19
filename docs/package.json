@@ -13,21 +13,21 @@
         "fumadocs-mdx": "^14.3.1",
         "fumadocs-twoslash": "^3.2.0",
         "fumadocs-ui": "^16.8.0",
-        "next": "^16.2.4",
-        "react": "^19.1.0",
-        "react-dom": "^19.1.0"
+        "next": "catalog:",
+        "react": "catalog:",
+        "react-dom": "catalog:"
     },
     "devDependencies": {
         "@shikijs/transformers": "^3.7.0",
         "@tailwindcss/postcss": "^4.1.7",
         "@types/mdx": "^2.0.13",
-        "@types/node": "^24",
-        "@types/react": "^19",
-        "@types/react-dom": "^19",
+        "@types/node": "catalog:",
+        "@types/react": "catalog:",
+        "@types/react-dom": "catalog:",
         "postcss": "^8",
         "shiki": "^3.7.0",
         "tailwindcss": "^4.1.7",
-        "typescript": "^5.8.3",
+        "typescript": "catalog:",
         "twoslash": "^0.3.2"
     }
 }

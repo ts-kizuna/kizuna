@@ -17,15 +17,15 @@
     "@ts-kizuna/core": "workspace:*",
     "@ts-kizuna/express": "workspace:*",
     "@ts-kizuna/openapi": "workspace:*",
-    "express": "^5.0.0",
-    "zod": "^4.0.0"
+    "express": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@ts-kizuna/cli": "workspace:*",
-    "@types/express": "^5.0.0",
-    "@types/node": "^22.9.0",
-    "concurrently": "^9.1.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "concurrently": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
   }
 }

@@ -33,9 +33,9 @@
   },
   "devDependencies": {
     "@ts-kizuna/core": "workspace:*",
-    "tsdown": "^0.21.0",
-    "typescript": "^5.6.3",
-    "zod": "^4.0.0"
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
   },
   "dependencies": {
     "yaml": "^2.8.4"

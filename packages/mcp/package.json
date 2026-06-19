@@ -83,14 +83,14 @@
     "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {
-    "@hono/node-server": "^1.14.0",
+    "@hono/node-server": "catalog:",
     "@ts-kizuna/core": "workspace:*",
-    "@types/express": "^5.0.0",
-    "express": "^4.21.0",
-    "fastify": "^5.0.0",
-    "hono": "^4.7.0",
-    "tsdown": "^0.21.0",
-    "typescript": "^5.6.3",
-    "zod": "^4.0.0"
+    "@types/express": "catalog:",
+    "express": "catalog:",
+    "fastify": "catalog:",
+    "hono": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
   }
 }

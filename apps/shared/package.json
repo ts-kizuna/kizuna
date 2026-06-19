@@ -15,6 +15,6 @@
   },
   "dependencies": {
     "@ts-kizuna/core": "workspace:*",
-    "zod": "^4.0.0"
+    "zod": "catalog:"
   }
 }
