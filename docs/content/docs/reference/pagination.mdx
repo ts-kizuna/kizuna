@@ -1,0 +1,150 @@
+---
+title: createPagination
+description: Configure page-based pagination once (createPagination) and compose its query and response schemas into any route.
+---
+
+Page-based pagination shows up on every list endpoint, and writing the query params and the response envelope by hand — on every route, kept in sync by eye — gets old fast. `createPagination` lets you define it **once**, then compose the resulting `query` and `of(item)` schemas into as many routes as you like.
+
+```ts
+import { createPagination } from '@ts-kizuna/core/schemas';
+```
+
+## Quick start
+
+Configure pagination once, then drop `query` and `of(...)` into a route:
+
+```ts
+import { createPagination } from '@ts-kizuna/core/schemas';
+
+const pagination = createPagination();
+
+export const contract = createContract({
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        query: pagination.query,
+        responses: {
+            200: pagination.of(UserSchema),
+            404: ProblemDetailsSchema,
+        },
+    },
+});
+```
+
+It returns two things:
+
+| Member           | Is                                                          | Use                             |
+| ---------------- | ----------------------------------------------------------- | ------------------------------- |
+| `query`          | `z.object({ page, perPage })`                               | The route's `query`             |
+| `of(itemSchema)` | a function returning the page envelope schema for that item | A response body (usually `200`) |
+
+Both are plain Zod objects, so they slot into a route like any other schema — the handler, client, OpenAPI spec, and generated Swift all infer from them with nothing to repeat across files.
+
+## The query
+
+`pagination.query` is `{ page, perPage }`, both coerced from the query string and defaulted, so a request with no params resolves to the first page. `page` is the 1-based page number; `perPage` caps the items per page:
+
+```ts
+z.object({
+    page: z.number().int().min(1).default(1),
+    perPage: z.number().int().min(1).default(10),
+});
+```
+
+## The envelope
+
+`pagination.of(UserSchema)` wraps the item in a page envelope with the metadata a client needs to render page controls:
+
+```ts
+z.object({
+    items: z.array(UserSchema),
+    totalItems: z.number(), // items across all pages
+    page: z.number(), // the page this response represents
+    perPage: z.number(), // items per page
+    totalPages: z.number(),
+    hasNextPage: z.boolean(),
+    hasPreviousPage: z.boolean(),
+});
+```
+
+`hasNextPage` and `hasPreviousPage` are built in — they're on every paginated response, so you never extend just to add them. (The previous/next page numbers are simply `page - 1` / `page + 1`, so they aren't repeated.)
+
+The handler returns that body directly; it's typed against the response schema, so the fields are checked for you:
+
+```ts
+listUsers: ({ query }) => {
+    const all = await db.users.findAll();
+    const start = (query.page - 1) * query.perPage;
+    const items = all.slice(start, start + query.perPage);
+    const totalPages = Math.max(1, Math.ceil(all.length / query.perPage));
+    return {
+        status: 200,
+        body: {
+            items,
+            totalItems: all.length,
+            page: query.page,
+            perPage: query.perPage,
+            totalPages,
+            hasNextPage: query.page < totalPages,
+            hasPreviousPage: query.page > 1,
+        },
+    };
+},
+```
+
+## Casing
+
+Some APIs speak `camelCase` on the wire, others `snake_case`. Pass the convention once and it flows through the query, the envelope, and the inferred types:
+
+```ts
+const pagination = createPagination('snake_case');
+
+pagination.query; // { page, per_page }
+pagination.of(UserSchema); // { items, total_items, page, per_page, total_pages, has_next_page, has_previous_page }
+```
+
+The default is `'camelCase'`. Whichever you choose, both sides of the wire match — no hand-syncing field names between the query and the response.
+
+## Extending
+
+`query` and `of(...)` are plain Zod objects, so add your own fields with `.extend()`, the same way you would [`ProblemDetailsSchema`](/docs/reference/problem-details-schema):
+
+```ts
+listUsers: {
+    method: 'GET',
+    path: '/users',
+    query: pagination.query.extend({
+        sortBy: z.enum(['name', 'createdAt']).optional(),
+    }),
+    responses: {
+        200: pagination.of(UserSchema).extend({
+            facets: z.array(FacetSchema),
+        }),
+    },
+},
+```
+
+The extra fields flow into the inferred types, so the handler is required to supply `facets` and may read `query.sortBy`.
+
+## Reusing one config
+
+A single `createPagination` config isn't tied to one item type — reuse it across resources so they all speak the same wire shape:
+
+```ts
+const pagination = createPagination();
+
+const contract = createContract({
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        query: pagination.query,
+        responses: { 200: pagination.of(UserSchema) },
+    },
+    listOrders: {
+        method: 'GET',
+        path: '/orders',
+        query: pagination.query,
+        responses: { 200: pagination.of(OrderSchema) },
+    },
+});
+```

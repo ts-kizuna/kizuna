@@ -9,6 +9,7 @@
         "create-guard",
         "problem-details-schema",
         "binary-and-file-schemas",
+        "pagination",
         "create-api",
         "create-client",
         "is-validation-error",

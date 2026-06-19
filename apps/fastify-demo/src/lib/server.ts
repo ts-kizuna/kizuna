@@ -38,6 +38,81 @@ export const router = createRouter(contract, {
                 },
             };
         },
+        listUsersPaged: ({ query }) => {
+            const all = Array.from(users.values());
+            const start = (query.page - 1) * query.perPage;
+            const items = all.slice(start, start + query.perPage);
+            const totalPages = Math.max(1, Math.ceil(all.length / query.perPage));
+            return {
+                status: 200,
+                body: {
+                    items,
+                    totalItems: all.length,
+                    page: query.page,
+                    perPage: query.perPage,
+                    totalPages,
+                    hasNextPage: query.page < totalPages,
+                    hasPreviousPage: query.page > 1,
+                },
+            };
+        },
+        listUsersPagedSnake: ({ query }) => {
+            const all = Array.from(users.values());
+            const start = (query.page - 1) * query.per_page;
+            const items = all.slice(start, start + query.per_page);
+            const totalPages = Math.max(1, Math.ceil(all.length / query.per_page));
+            return {
+                status: 200,
+                body: {
+                    items,
+                    total_items: all.length,
+                    page: query.page,
+                    per_page: query.per_page,
+                    total_pages: totalPages,
+                    has_next_page: query.page < totalPages,
+                    has_previous_page: query.page > 1,
+                },
+            };
+        },
+        listUsersSorted: ({ query }) => {
+            const all = Array.from(users.values());
+            const sortBy = query.sortBy;
+            const sorted = sortBy ? [...all].sort((left, right) => left[sortBy].localeCompare(right[sortBy])) : all;
+            const start = (query.page - 1) * query.perPage;
+            const items = sorted.slice(start, start + query.perPage);
+            const totalPages = Math.max(1, Math.ceil(sorted.length / query.perPage));
+            return {
+                status: 200,
+                body: {
+                    items,
+                    totalItems: sorted.length,
+                    page: query.page,
+                    perPage: query.perPage,
+                    totalPages,
+                    hasNextPage: query.page < totalPages,
+                    hasPreviousPage: query.page > 1,
+                },
+            };
+        },
+        listUsersFaceted: ({ query }) => {
+            const all = Array.from(users.values());
+            const start = (query.page - 1) * query.perPage;
+            const items = all.slice(start, start + query.perPage);
+            const totalPages = Math.max(1, Math.ceil(all.length / query.perPage));
+            return {
+                status: 200,
+                body: {
+                    items,
+                    totalItems: all.length,
+                    page: query.page,
+                    perPage: query.perPage,
+                    totalPages,
+                    hasNextPage: query.page < totalPages,
+                    hasPreviousPage: query.page > 1,
+                    facets: [{ value: 'active', count: all.length }],
+                },
+            };
+        },
         exportUsers: () => {
             const rows = Array.from(users.values()).map((user) => [user.id, user.name, user.email]);
             return {

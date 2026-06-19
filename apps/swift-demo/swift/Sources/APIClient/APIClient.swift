@@ -563,6 +563,307 @@ public actor APIClient {
         }
     }
 
+    public enum UsersListUsersPaged {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let items: [API.User]
+            /// Total number of items across all pages.
+            public let totalItems: Int
+            /// The page this response represents.
+            public let page: Int
+            /// Number of items per page.
+            public let pageSize: Int
+            /// Total number of pages.
+            public let totalPages: Int
+            /// Whether a page after this one exists.
+            public let hasNextPage: Bool
+            /// Whether a page before this one exists.
+            public let hasPreviousPage: Bool
+
+            public init(
+                items: [API.User],
+                totalItems: Int,
+                page: Int,
+                pageSize: Int,
+                totalPages: Int,
+                hasNextPage: Bool,
+                hasPreviousPage: Bool
+            ) {
+                self.items = items
+                self.totalItems = totalItems
+                self.page = page
+                self.pageSize = pageSize
+                self.totalPages = totalPages
+                self.hasNextPage = hasNextPage
+                self.hasPreviousPage = hasPreviousPage
+            }
+        }
+
+        public struct Query: Sendable {
+            public let page: Int?
+            public let pageSize: Int?
+
+            public init(
+                page: Int? = nil,
+                pageSize: Int? = nil
+            ) {
+                self.page = page
+                self.pageSize = pageSize
+            }
+
+            public static func query(
+                page: Int? = nil,
+                pageSize: Int? = nil
+            ) -> Self {
+                .init(page: page, pageSize: pageSize)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+        }
+    }
+
+    public enum UsersListUsersPagedSnake {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let items: [API.User]
+            /// Total number of items across all pages.
+            public let total_items: Int
+            /// The page this response represents.
+            public let page: Int
+            /// Number of items per page.
+            public let page_size: Int
+            /// Total number of pages.
+            public let total_pages: Int
+            /// Whether a page after this one exists.
+            public let has_next_page: Bool
+            /// Whether a page before this one exists.
+            public let has_previous_page: Bool
+
+            public init(
+                items: [API.User],
+                total_items: Int,
+                page: Int,
+                page_size: Int,
+                total_pages: Int,
+                has_next_page: Bool,
+                has_previous_page: Bool
+            ) {
+                self.items = items
+                self.total_items = total_items
+                self.page = page
+                self.page_size = page_size
+                self.total_pages = total_pages
+                self.has_next_page = has_next_page
+                self.has_previous_page = has_previous_page
+            }
+        }
+
+        public struct Query: Sendable {
+            public let page: Int?
+            public let page_size: Int?
+
+            public init(
+                page: Int? = nil,
+                page_size: Int? = nil
+            ) {
+                self.page = page
+                self.page_size = page_size
+            }
+
+            public static func query(
+                page: Int? = nil,
+                page_size: Int? = nil
+            ) -> Self {
+                .init(page: page, page_size: page_size)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+        }
+    }
+
+    public enum UsersListUsersSorted {
+
+        public enum QuerySortBy: String, Codable, Sendable {
+            case name = "name"
+            case email = "email"
+        }
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let items: [API.User]
+            /// Total number of items across all pages.
+            public let totalItems: Int
+            /// The page this response represents.
+            public let page: Int
+            /// Number of items per page.
+            public let pageSize: Int
+            /// Total number of pages.
+            public let totalPages: Int
+            /// Whether a page after this one exists.
+            public let hasNextPage: Bool
+            /// Whether a page before this one exists.
+            public let hasPreviousPage: Bool
+
+            public init(
+                items: [API.User],
+                totalItems: Int,
+                page: Int,
+                pageSize: Int,
+                totalPages: Int,
+                hasNextPage: Bool,
+                hasPreviousPage: Bool
+            ) {
+                self.items = items
+                self.totalItems = totalItems
+                self.page = page
+                self.pageSize = pageSize
+                self.totalPages = totalPages
+                self.hasNextPage = hasNextPage
+                self.hasPreviousPage = hasPreviousPage
+            }
+        }
+
+        public struct Query: Sendable {
+            public let page: Int?
+            public let pageSize: Int?
+            public let sortBy: QuerySortBy?
+
+            public init(
+                page: Int? = nil,
+                pageSize: Int? = nil,
+                sortBy: QuerySortBy? = nil
+            ) {
+                self.page = page
+                self.pageSize = pageSize
+                self.sortBy = sortBy
+            }
+
+            public static func query(
+                page: Int? = nil,
+                pageSize: Int? = nil,
+                sortBy: QuerySortBy? = nil
+            ) -> Self {
+                .init(page: page, pageSize: pageSize, sortBy: sortBy)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+        }
+    }
+
+    public enum UsersListUsersFaceted {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let items: [API.User]
+            /// Total number of items across all pages.
+            public let totalItems: Int
+            /// The page this response represents.
+            public let page: Int
+            /// Number of items per page.
+            public let pageSize: Int
+            /// Total number of pages.
+            public let totalPages: Int
+            /// Whether a page after this one exists.
+            public let hasNextPage: Bool
+            /// Whether a page before this one exists.
+            public let hasPreviousPage: Bool
+            public let facets: [ResponseFacetsItem]
+
+            public init(
+                items: [API.User],
+                totalItems: Int,
+                page: Int,
+                pageSize: Int,
+                totalPages: Int,
+                hasNextPage: Bool,
+                hasPreviousPage: Bool,
+                facets: [ResponseFacetsItem]
+            ) {
+                self.items = items
+                self.totalItems = totalItems
+                self.page = page
+                self.pageSize = pageSize
+                self.totalPages = totalPages
+                self.hasNextPage = hasNextPage
+                self.hasPreviousPage = hasPreviousPage
+                self.facets = facets
+            }
+        }
+
+        public struct ResponseFacetsItem: Codable, Sendable, Equatable {
+            public let value: String
+            public let count: Int
+
+            public init(
+                value: String,
+                count: Int
+            ) {
+                self.value = value
+                self.count = count
+            }
+        }
+
+        public struct Query: Sendable {
+            public let page: Int?
+            public let pageSize: Int?
+
+            public init(
+                page: Int? = nil,
+                pageSize: Int? = nil
+            ) {
+                self.page = page
+                self.pageSize = pageSize
+            }
+
+            public static func query(
+                page: Int? = nil,
+                pageSize: Int? = nil
+            ) -> Self {
+                .init(page: page, pageSize: pageSize)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+        }
+    }
+
     public enum UsersExportUsers {
 
         public struct Result: Sendable {
@@ -1194,6 +1495,99 @@ public struct APIUsersClient: Sendable {
             throw APIClient.UsersListUsers.Failure.badRequest(payload)
         default:
             throw APIClient.UsersListUsers.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// List users — exercises createPagination (camelCase)
+    public func listUsersPaged(_ query: APIClient.UsersListUsersPaged.Query = .query()) async throws(APIClient.UsersListUsersPaged.Failure) -> APIClient.UsersListUsersPaged.Result {
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/users/paged"
+        var queryItems: [URLQueryItem] = []
+        queryItems += Kizuna.queryItems(name: "page", value: query.page)
+        queryItems += Kizuna.queryItems(name: "pageSize", value: query.pageSize)
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: queryItems, failure: APIClient.UsersListUsersPaged.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersListUsersPaged.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.UsersListUsersPaged.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersListUsersPaged.Failure.self)
+            return APIClient.UsersListUsersPaged.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersListUsersPaged.Failure.self)
+            throw APIClient.UsersListUsersPaged.Failure.badRequest(payload)
+        default:
+            throw APIClient.UsersListUsersPaged.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// List users — exercises createPagination with snake_case keys (page_size / total_pages)
+    public func listUsersPagedSnake(_ query: APIClient.UsersListUsersPagedSnake.Query = .query()) async throws(APIClient.UsersListUsersPagedSnake.Failure) -> APIClient.UsersListUsersPagedSnake.Result {
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/users/paged-snake"
+        var queryItems: [URLQueryItem] = []
+        queryItems += Kizuna.queryItems(name: "page", value: query.page)
+        queryItems += Kizuna.queryItems(name: "page_size", value: query.page_size)
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: queryItems, failure: APIClient.UsersListUsersPagedSnake.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersListUsersPagedSnake.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.UsersListUsersPagedSnake.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersListUsersPagedSnake.Failure.self)
+            return APIClient.UsersListUsersPagedSnake.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersListUsersPagedSnake.Failure.self)
+            throw APIClient.UsersListUsersPagedSnake.Failure.badRequest(payload)
+        default:
+            throw APIClient.UsersListUsersPagedSnake.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// List users — exercises extending pagination.query with .extend() (hasNextPage is built in)
+    public func listUsersSorted(_ query: APIClient.UsersListUsersSorted.Query = .query()) async throws(APIClient.UsersListUsersSorted.Failure) -> APIClient.UsersListUsersSorted.Result {
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/users/paged-sorted"
+        var queryItems: [URLQueryItem] = []
+        queryItems += Kizuna.queryItems(name: "page", value: query.page)
+        queryItems += Kizuna.queryItems(name: "pageSize", value: query.pageSize)
+        queryItems += Kizuna.queryItems(name: "sortBy", value: query.sortBy)
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: queryItems, failure: APIClient.UsersListUsersSorted.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersListUsersSorted.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.UsersListUsersSorted.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersListUsersSorted.Failure.self)
+            return APIClient.UsersListUsersSorted.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersListUsersSorted.Failure.self)
+            throw APIClient.UsersListUsersSorted.Failure.badRequest(payload)
+        default:
+            throw APIClient.UsersListUsersSorted.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// List users — exercises extending pagination.of() with a nested facets field
+    public func listUsersFaceted(_ query: APIClient.UsersListUsersFaceted.Query = .query()) async throws(APIClient.UsersListUsersFaceted.Failure) -> APIClient.UsersListUsersFaceted.Result {
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/users/paged-faceted"
+        var queryItems: [URLQueryItem] = []
+        queryItems += Kizuna.queryItems(name: "page", value: query.page)
+        queryItems += Kizuna.queryItems(name: "pageSize", value: query.pageSize)
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: queryItems, failure: APIClient.UsersListUsersFaceted.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersListUsersFaceted.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.UsersListUsersFaceted.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersListUsersFaceted.Failure.self)
+            return APIClient.UsersListUsersFaceted.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersListUsersFaceted.Failure.self)
+            throw APIClient.UsersListUsersFaceted.Failure.badRequest(payload)
+        default:
+            throw APIClient.UsersListUsersFaceted.Failure.unexpectedStatus(statusCode, data)
         }
     }
 

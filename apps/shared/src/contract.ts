@@ -1,5 +1,5 @@
 import { createContract, createModel, createTag } from '@ts-kizuna/core';
-import { ProblemDetailsSchema, BinarySchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema, BinarySchema, createPagination } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
 import { PaginationQuery } from './pagination.js';
 
@@ -134,6 +134,9 @@ const healthContract = createContract(Health, {
     },
 });
 
+const pagination = createPagination();
+const snakePagination = createPagination('snake_case');
+
 const usersContract = createContract(Users, {
     listUsers: {
         method: 'GET',
@@ -146,6 +149,51 @@ const usersContract = createContract(Users, {
             }),
         },
         summary: 'List users with pagination',
+    },
+    listUsersPaged: {
+        method: 'GET',
+        path: '/users/paged',
+        query: pagination.query,
+        responses: {
+            200: pagination.of(UserSchema),
+        },
+        summary: 'List users — exercises createPagination (camelCase)',
+    },
+    listUsersPagedSnake: {
+        method: 'GET',
+        path: '/users/paged-snake',
+        query: snakePagination.query,
+        responses: {
+            200: snakePagination.of(UserSchema),
+        },
+        summary: 'List users — exercises createPagination with snake_case keys (page_size / total_pages)',
+    },
+    listUsersSorted: {
+        method: 'GET',
+        path: '/users/paged-sorted',
+        query: pagination.query.extend({
+            sortBy: z.enum(['name', 'email']).optional(),
+        }),
+        responses: {
+            200: pagination.of(UserSchema),
+        },
+        summary: 'List users — exercises extending pagination.query with .extend() (hasNextPage is built in)',
+    },
+    listUsersFaceted: {
+        method: 'GET',
+        path: '/users/paged-faceted',
+        query: pagination.query,
+        responses: {
+            200: pagination.of(UserSchema).extend({
+                facets: z.array(
+                    z.object({
+                        value: z.string(),
+                        count: z.number().int(),
+                    })
+                ),
+            }),
+        },
+        summary: 'List users — exercises extending pagination.of() with a nested facets field',
     },
     exportUsers: {
         method: 'GET',

@@ -147,6 +147,34 @@ responses: {
 },
 ```
 
+## Pagination
+
+Every list endpoint needs the same two shapes: a `page` / `perPage` query and an `{ items, totalItems, … }` response envelope. [`createPagination`](/docs/reference/pagination) defines both once — including your wire casing — so you compose them into routes instead of rewriting them.
+
+```ts
+import { createPagination } from '@ts-kizuna/core/schemas';
+
+const pagination = createPagination(); // or createPagination('snake_case')
+
+listUsers: {
+    method: 'GET',
+    path: '/users',
+    query: pagination.query,
+    responses: {
+        200: pagination.of(UserSchema),
+        404: ProblemDetailsSchema,
+    },
+},
+```
+
+`pagination.query` is `{ page, perPage }`; `pagination.of(UserSchema)` is `{ items, totalItems, page, perPage, totalPages, hasNextPage, hasPreviousPage }`. Both are plain Zod objects, so extend either with `.extend()` for filters, sorting, or extra metadata.
+
+<Callout type="info">
+    **Tip** — one `createPagination` config works across every resource. Reuse `pagination.query` and call `pagination.of(OrderSchema)` on
+    another route to speak the same wire shape everywhere; pass `'snake_case'` once to switch the envelope to `total_items` /
+    `has_next_page`.
+</Callout>
+
 ## Models
 
 Use [`createModel`](/docs/reference/create-model) to give a Zod schema a name that the OpenAPI and Swift generators pick up.
