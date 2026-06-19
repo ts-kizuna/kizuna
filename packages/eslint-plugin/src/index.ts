@@ -32,7 +32,9 @@ const recommended: Linter.Config = {
     languageOptions: {
         parser: parser as Linter.Parser,
         parserOptions: {
-            projectService: true,
+            projectService: {
+                allowDefaultProject: ['*.config.ts', '*.config.cts', '*.config.mts'],
+            },
         },
     },
     rules: {
