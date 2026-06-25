@@ -4,7 +4,7 @@ import { createMiddleware as createHonoMiddleware } from 'hono/factory';
 import { z } from 'zod';
 import { kizuna, createTags } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { createApi, createHonoEndpoints, createMiddleware } from './server.js';
+import { createApi, createHonoEndpoints, createMiddleware, createRouter } from './server.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -78,6 +78,24 @@ const contractRoutes = k.routes('api', {
 
 const contract = k.contract({
     routes: contractRoutes,
+});
+
+describe('createRouter — accepts a contract or a bare route group', () => {
+    it('types handlers from a bare route group and from a full contract', () => {
+        // Bare route group — no `{ routes: ... }` wrapper.
+        const groupRouter = createRouter(contractRoutes, {
+            getUser: ({ params }) => ({ status: 200, body: { id: params.id, name: 'x' } }),
+            createUser: ({ body }) => ({ status: 201, body: { id: '1', name: body.name, email: body.email } }),
+            listUsers: () => ({ status: 200, body: { users: [], total: 0 } }),
+            deleteUser: () => ({ status: 200, body: { success: true } }),
+        });
+
+        // Full contract — the existing form still works.
+        const contractRouter = createRouter(contract, groupRouter);
+
+        expect(typeof groupRouter.getUser).toBe('function');
+        expect(typeof contractRouter.getUser).toBe('function');
+    });
 });
 
 let users: Map<string, User>;

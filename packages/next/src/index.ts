@@ -47,7 +47,7 @@ export type NextApi<R extends Routes = Routes> = R &
     };
 
 /**
- * Bind typed handler implementations to a contract.
+ * Bind typed handler implementations to a contract or route group.
  *
  * @example
  * export const router = createRouter(contract, {
@@ -56,9 +56,9 @@ export type NextApi<R extends Routes = Routes> = R &
  * });
  */
 export const createRouter = <const R extends Routes>(
-    _contract: Contract<R, Record<string, TagOptions>, string>,
-    router: Router<Contract<R>>
-): Router<Contract<R>> => router;
+    _source: Contract<R, Record<string, TagOptions>, string> | R,
+    router: Router<R>
+): Router<R> => router;
 
 /**
  * Create endpoints for a Next.js App Router catch-all route.
