@@ -4,7 +4,7 @@ import request from 'supertest';
 import { z } from 'zod';
 import { kizuna, createTags } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { createApi, createExpressEndpoints, createMiddleware } from './server.js';
+import { createApi, createExpressEndpoints, createMiddleware, createRouter } from './server.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -698,6 +698,54 @@ describe('Express handler — responseValidation', () => {
 
         const response = await request(app).get('/items/1');
         expect(response.status).toBe(500);
+    });
+});
+
+describe('createRouter — accepts a contract or a bare route group', () => {
+    const usersRoutes = k.routes('api', {
+        getUser: {
+            method: 'GET',
+            path: '/sub-users/:id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                }),
+            },
+        },
+    });
+
+    const subContract = k.contract({
+        routes: {
+            users: usersRoutes,
+        },
+    });
+
+    it('types a sub-router from a route group and serves it composed into a contract', async () => {
+        // Bare route group — no `{ routes: ... }` wrapper needed.
+        const usersRouter = createRouter(usersRoutes, {
+            getUser: ({ params }) => ({
+                status: 200,
+                body: {
+                    id: params.id,
+                },
+            }),
+        });
+
+        // Full contract — the existing form still works.
+        const router = createRouter(subContract, {
+            users: usersRouter,
+        });
+
+        const app = express();
+        const api = createApi({
+            contract: subContract,
+            router,
+        });
+        createExpressEndpoints(api, app);
+
+        const response = await request(app).get('/sub-users/42');
+        expect(response.status).toBe(200);
+        expect(response.body.id).toBe('42');
     });
 });
 

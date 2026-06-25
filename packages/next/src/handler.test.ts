@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { kizuna, createTags } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { createApi, createGuard, createMiddleware, createNextEndpoints, NextRequest, NextResponse } from './index.js';
+import { createApi, createGuard, createMiddleware, createNextEndpoints, createRouter, NextRequest, NextResponse } from './index.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -41,6 +41,22 @@ const contractRoutes = k.routes('api', {
 
 const contract = k.contract({
     routes: contractRoutes,
+});
+
+describe('createRouter — accepts a contract or a bare route group', () => {
+    it('types handlers from a bare route group and from a full contract', () => {
+        // Bare route group — no `{ routes: ... }` wrapper.
+        const groupRouter = createRouter(contractRoutes, {
+            getUser: ({ params }) => ({ status: 200, body: { id: params.id, name: 'x' } }),
+            createUser: ({ body }) => ({ status: 201, body: { id: '1', name: body.name, email: body.email } }),
+        });
+
+        // Full contract — the existing form still works.
+        const contractRouter = createRouter(contract, groupRouter);
+
+        expect(typeof groupRouter.getUser).toBe('function');
+        expect(typeof contractRouter.getUser).toBe('function');
+    });
 });
 
 interface User {

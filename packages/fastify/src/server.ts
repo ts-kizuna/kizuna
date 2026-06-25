@@ -32,7 +32,7 @@ export interface FastifyHandlerContext {
 export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, FastifyHandlerContext>;
 
 /**
- * The handler tree for a contract, typed against it.
+ * The handler tree for a contract or route group, typed against it.
  */
 export type Router<C> =
     C extends Contract<infer R, infer _Tags, infer _Codes>
@@ -66,7 +66,7 @@ export interface FastifyOptions {
 }
 
 /**
- * Bind typed handler implementations to a contract.
+ * Bind typed handler implementations to a contract or route group.
  *
  * @example
  * export const router = createRouter(contract, {
@@ -75,12 +75,12 @@ export interface FastifyOptions {
  * });
  */
 export const createRouter = <const R extends Routes>(
-    _contract: Contract<R, Record<string, TagOptions>, string>,
-    router: Router<Contract<R>>
-): Router<Contract<R>> => router;
+    _source: Contract<R, Record<string, TagOptions>, string> | R,
+    router: Router<R>
+): Router<R> => router;
 
 /**
- * Declare per-route middleware in the same shape as the contract's routes.
+ * Declare per-route middleware in the same shape as the contract's or group's routes.
  *
  * @example
  * export const middleware = createMiddleware(contract, {
@@ -89,7 +89,7 @@ export const createRouter = <const R extends Routes>(
  * });
  */
 export const createMiddleware = <const R extends Routes>(
-    _contract: Contract<R, Record<string, TagOptions>, string>,
+    _source: Contract<R, Record<string, TagOptions>, string> | R,
     map: MiddlewareMap<R, FastifyPreHandler>
 ): MiddlewareMap<R, FastifyPreHandler> => map;
 

@@ -48,7 +48,7 @@ export interface NextMiddlewareRoute {
 export type NextMiddlewareHandler = (request: NextRequest, route: NextMiddlewareRoute) => Response | void | Promise<Response | void>;
 
 /**
- * Declare per-route middleware in the same shape as the contract's routes.
+ * Declare per-route middleware in the same shape as the contract's or group's routes.
  *
  * @example
  * export const middleware = createMiddleware(contract, {
@@ -57,7 +57,7 @@ export type NextMiddlewareHandler = (request: NextRequest, route: NextMiddleware
  * });
  */
 export const createMiddleware = <const R extends Routes>(
-    _contract: Contract<R, Record<string, TagOptions>, string>,
+    _source: Contract<R, Record<string, TagOptions>, string> | R,
     map: MiddlewareMap<R, NextMiddlewareHandler>
 ): MiddlewareMap<R, NextMiddlewareHandler> => map;
 
