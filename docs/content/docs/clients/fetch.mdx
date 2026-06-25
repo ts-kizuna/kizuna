@@ -98,7 +98,7 @@ export interface ClientConfig {
 If a route declares a `headers` schema, the client requires those headers:
 
 ```ts
-// routes declares: headers: z.object({ 'x-request-id': z.string() })
+// the route declares: headers: z.object({ 'x-request-id': z.string() })
 const { body } = await apiClient.users.getUser({
     params: { id: 'usr_abc123' },
     headers: { 'x-request-id': crypto.randomUUID() },
@@ -178,7 +178,7 @@ if (result.status === 400) {
 }
 ```
 
-If your routes does not declare a `400`, you don't need this — `result.status === 400` narrows the body to `ValidationError` directly.
+If a route does not declare a `400`, you don't need this — `result.status === 400` narrows the body to `ValidationError` directly.
 
 ## Reference
 

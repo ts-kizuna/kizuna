@@ -173,7 +173,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testSendNotificationEmail() async throws {
-        let result = try await client.sendNotification(
+        let result = try await client.notifications.sendNotification(
             .body(
                 .email(to: "alice@example.com", subject: "Hello")
             )
@@ -182,7 +182,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testSendNotificationSms() async throws {
-        let result = try await client.sendNotification(
+        let result = try await client.notifications.sendNotification(
             .body(
                 .sms(phone: "+1234567890", text: "Hi there")
             )
@@ -209,7 +209,7 @@ final class APIClientTests: XCTestCase {
 
     func testListEventsDateQueryRoundTrip() async throws {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
-        let response = try await client.listEvents(
+        let response = try await client.notifications.listEvents(
             .query(since: date)
         )
         guard let echoed = response.body.echo.since else {
@@ -223,7 +223,7 @@ final class APIClientTests: XCTestCase {
     func testDatetimeFieldDecodesAsDate() async throws {
         // occurredAt: z.iso.datetime() must arrive as Date, not String.
         // Server sends "2026-04-01T10:00:00.000Z" — fractional seconds path.
-        let response = try await client.listEvents()
+        let response = try await client.notifications.listEvents()
         guard let event = response.body.events.first else {
             XCTFail("expected at least one seeded event")
             return
@@ -236,7 +236,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testListEventsEnumQuerySerializesRawValue() async throws {
-        let response = try await client.listEvents(
+        let response = try await client.notifications.listEvents(
             .query(kind: .login)
         )
         XCTAssertEqual(response.body.echo.kind, .login, "enum query param must round-trip via raw value, not case name")
@@ -244,7 +244,7 @@ final class APIClientTests: XCTestCase {
 
     func testListEventsArrayQueryRepeats() async throws {
         let ids = ["a", "b", "c"]
-        let response = try await client.listEvents(
+        let response = try await client.notifications.listEvents(
             .query(ids: ids)
         )
         XCTAssertEqual(response.body.echo.ids, ids, "array query param must serialize as repeated entries, not bracketed string")
@@ -252,7 +252,7 @@ final class APIClientTests: XCTestCase {
 
     func testListEventsTransformQueryParam() async throws {
         // label uses z.string().transform() — the Swift client must accept String, not AnyCodable.
-        let response = try await client.listEvents(
+        let response = try await client.notifications.listEvents(
             .query(label: "hello")
         )
         XCTAssertEqual(response.body.echo.label, "hello", "transform query param must round-trip")
@@ -261,7 +261,7 @@ final class APIClientTests: XCTestCase {
     func testListEventsUnionQueryParam() async throws {
         // tagIds uses z.union([z.array(z.string()), z.string().transform(...)]) — Swift client must
         // accept [String], not AnyCodable. Pass an array and verify the server echoes it back.
-        let response = try await client.listEvents(
+        let response = try await client.notifications.listEvents(
             .query(tagIds: ["tag-a", "tag-b"])
         )
         XCTAssertEqual(response.body.echo.tagIds, ["tag-a", "tag-b"], "union query param must round-trip as array")
@@ -384,7 +384,7 @@ final class APIClientTests: XCTestCase {
     func testWebhookAnyCodableBody() async throws {
         let json = try JSONSerialization.data(withJSONObject: ["event": "test", "count": 42])
         let payload = APIClient.AnyCodable(value: json)
-        let result = try await client.webhook(.body(payload))
+        let result = try await client.notifications.webhook(.body(payload))
         XCTAssertTrue(result.body.received)
     }
 

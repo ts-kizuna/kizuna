@@ -190,7 +190,7 @@ tsx scripts/generate-openapi.ts
 
 Routes with a `body` or `query` schema automatically include a `400` validation error response in the generated spec. This matches the error kizuna returns when request data fails schema validation.
 
-If your routes already declares a `400` response for a route, the automatic validation error is not added — your declaration takes precedence.
+If a route already declares a `400` response, the automatic validation error is not added — your declaration takes precedence.
 
 ## Reference
 

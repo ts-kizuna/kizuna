@@ -112,10 +112,10 @@ export const PaginationQuery = z.object({
 });
 ```
 
-```ts title="contract.ts"
+```ts title="routes.ts"
 import { PaginationQuery } from './pagination.js';
 
-export const contract = createContract({
+export const users = k.routes('users', {
     listUsers: {
         method: 'GET',
         path: '/users',

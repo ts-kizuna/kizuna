@@ -3,7 +3,7 @@ title: MCP
 description: Mount an MCP endpoint on your Express, Fastify, Hono, or Next.js app so AI assistants can call your API.
 ---
 
-`@ts-kizuna/mcp` adds a [Model Context Protocol](https://modelcontextprotocol.io) endpoint to your existing app. Each route in your routes becomes an MCP tool that AI assistants can discover and call. Works with Express, Fastify, Hono, and Next.js.
+`@ts-kizuna/mcp` adds a [Model Context Protocol](https://modelcontextprotocol.io) endpoint to your existing app. Each route becomes an MCP tool that AI assistants can discover and call. Works with Express, Fastify, Hono, and Next.js.
 
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
@@ -30,13 +30,13 @@ app.listen(3000);
 
 ```ts title="src/index.ts"
 import Fastify from 'fastify';
-import { plugin } from '@ts-kizuna/fastify';
+import { fastifyKizuna } from '@ts-kizuna/fastify';
 import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
 import { api } from './lib/api';
 
 const app = Fastify();
 
-app.register(plugin, {
+app.register(fastifyKizuna, {
     api,
 });
 app.register(fastifyKizunaMcp, {
@@ -81,7 +81,7 @@ Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HT
 
 ## How it works
 
-Each route in your routes becomes an MCP tool:
+Each route becomes an MCP tool:
 
 - **Tool name** — the dotted route key from the routes (e.g. `users.getUser`)
 - **Tool description** — from the route's `summary` and `description`, falling back to `METHOD /path`

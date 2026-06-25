@@ -50,12 +50,12 @@ Common error codes: `invalid_type`, `too_small`, `too_big`, `invalid_string_form
 
 ## Example
 
-When your routes declares its own `400` response on a route, the client sees a union of your type and `ValidationError`. Use `isValidationError` to distinguish them:
+When a route declares its own `400` response, the client sees a union of your type and `ValidationError`. Use `isValidationError` to distinguish them:
 
 ```ts
 import { isValidationError } from '@ts-kizuna/fetch';
 
-const result = await client.createUser({
+const result = await client.users.createUser({
     body: {
         name: '',
         email: 'not-an-email',
@@ -73,6 +73,6 @@ if (result.status === 400) {
 }
 ```
 
-If your routes does not declare a `400` response, you don't need this — `result.status === 400` narrows the body to `ValidationError` directly.
+If a route does not declare a `400` response, you don't need this — `result.status === 400` narrows the body to `ValidationError` directly.
 
 See the [Fetch client guide](/docs/clients/fetch#validation-errors) for more details.

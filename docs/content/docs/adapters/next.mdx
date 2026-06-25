@@ -91,7 +91,7 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoi
 });
 ```
 
-`api.mount({ basePath: '/api' })` is a convenience method that calls `endpoints` internally — use whichever you prefer.
+`api.mount({ basePath: '/api' })` is a convenience method that calls `createNextEndpoints` internally — use whichever you prefer.
 
 The `basePath` option tells the adapter to strip the prefix when matching requests against the declared paths.
 
@@ -116,12 +116,12 @@ Per-route middleware runs before the handler. Declare which routes it runs on wi
 
 ### Writing a guard
 
-A guard is the common case: a middleware that allows or rejects a request. `guard` wraps that check so you skip the `new Response()` boilerplate — call `deny(status, detail)` to reject, return to allow. The second argument is the matched `route` (its `path`, `method`, and `params`), handy for per-route decisions in a shared guard.
+A guard is the common case: a middleware that allows or rejects a request. `createGuard` wraps that check so you skip the `new Response()` boilerplate — call `deny(status, detail)` to reject, return to allow. The `route` argument is the matched route (its `path`, `method`, and `params`), handy for per-route decisions in a shared guard.
 
 ```ts title="src/lib/guards.ts"
-import { guard } from '@ts-kizuna/next';
+import { createGuard } from '@ts-kizuna/next';
 
-export const authenticate = guard(async (request, _route, deny) => {
+export const authenticate = createGuard(async ({ request, deny }) => {
     const session = await getSession(request);
     if (!session) {
         return deny(401, 'Unauthorized');
@@ -129,13 +129,13 @@ export const authenticate = guard(async (request, _route, deny) => {
     request.userId = session.userId;
 });
 
-export const requireAdmin = guard((request, _route, deny) => {
+export const requireAdmin = createGuard(({ request, deny }) => {
     if (request.userRole !== 'admin') {
         return deny(403, 'Forbidden');
     }
 });
 
-export const requireMembership = guard(async (request, route, deny) => {
+export const requireMembership = createGuard(async ({ request, route, deny }) => {
     const membership = await checkMembership(request.userId, route.params?.id);
     if (!membership) {
         return deny(403, 'Forbidden');
@@ -184,7 +184,7 @@ Properties set on `request` by guards are accessible in handlers via `{ request 
 
 ## Options
 
-Pass options to `endpoints` (or `api.mount`):
+Pass options to `createNextEndpoints` (or `api.mount`):
 
 ```ts
 createNextEndpoints(api, {
@@ -202,7 +202,7 @@ createNextEndpoints(api, {
 
 ## `onError`
 
-Set `onError` on `createApi` (or pass it to `endpoints`) to send a custom response instead of the default 500:
+Set `onError` on `createApi` (or pass it to `createNextEndpoints`) to send a custom response instead of the default 500:
 
 ```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/next';

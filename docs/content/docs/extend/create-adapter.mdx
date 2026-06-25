@@ -33,7 +33,7 @@ import {
     headersToObject,
     type AdapterRequest,
     type Routes,
-    type Handlers,
+    type Router,
 } from '@ts-kizuna/core/adapter';
 
 export interface HandlerContext {
@@ -137,7 +137,7 @@ Use `kind: 'core-match'` for catch-all routing (one handler handles all paths). 
 
 ### `renderJsonResult`
 
-Translates any `AdapterResult` (except `raw-response`) to `{ status, headers, body }` using ts-kizuna's defaults — 405 with `Allow` header, validation errors with `{ message, issues }`, etc.
+Translates any `AdapterResult` (except `raw-response`) to `{ status, headers, body }` using ts-kizuna's defaults — 405 with `Allow` header, validation errors as Problem Details (`detail` plus an `errors` array), etc.
 
 ```ts
 const rendered = renderJsonResult(result);

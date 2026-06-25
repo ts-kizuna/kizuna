@@ -117,7 +117,7 @@ return {
 
 ## Error responses
 
-Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core` in your routes to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/create-guard) in guards and all built-in kizuna errors.
+Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` in your routes to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/create-guard) in guards and all built-in kizuna errors.
 
 ```ts title="src/contract.ts"
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';

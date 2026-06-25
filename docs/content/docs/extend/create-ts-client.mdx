@@ -3,14 +3,14 @@ title: Create a TypeScript Client Wrapper
 description: Build and ship your own TypeScript client wrapper using the types and client from @ts-kizuna/fetch.
 ---
 
-`@ts-kizuna/fetch` exports `client` and the full routes type system. You can wrap these to build hooks, an SDK layer, or any other integration — no generator needed.
+`@ts-kizuna/fetch` exports `createClient` and the full routes type system. You can wrap these to build hooks, an SDK layer, or any other integration — no generator needed.
 
 New first-party client PRs will be declined — we can't maintain what we don't know well. The client API is public so you can build your own.
 
 ## Pattern
 
 ```ts title="src/lib/api-client.ts"
-import { createClient, type Client, type ClientPayload } from '@ts-kizuna/fetch';
+import { createClient, type Client } from '@ts-kizuna/fetch';
 import { contract } from '@shared/contract';
 
 const baseClient = createClient(contract, {
@@ -25,7 +25,7 @@ export function createMyClient() {
                     id,
                 },
             }),
-        createUser: (data: ClientPayload<typeof usersRoutes.createUser>['body']) =>
+        createUser: (data: Parameters<typeof baseClient.users.createUser>[0]['body']) =>
             baseClient.users.createUser({
                 body: data,
             }),
@@ -37,10 +37,9 @@ export function createMyClient() {
 
 The key types from `@ts-kizuna/fetch`:
 
-| Type               | Description                                                   |
-| ------------------ | ------------------------------------------------------------- |
-| `Client<T>`        | The full typed client shape for your routes                   |
-| `ClientPayload<R>` | Input types for a single route (params, query, body, headers) |
+| Type        | Description                                 |
+| ----------- | ------------------------------------------- |
+| `Client<T>` | The full typed client shape for your routes |
 
 These are fully generic — pass `typeof routes` or `typeof routes.someRoute` to get typed arguments and responses for your wrapper.
 

@@ -41,11 +41,11 @@ app.listen(3000);
 
 ```ts title="src/index.ts"
 import Fastify from 'fastify';
-import { plugin } from '@ts-kizuna/fastify';
+import { fastifyKizuna } from '@ts-kizuna/fastify';
 import { api } from './lib/server';
 
 const app = Fastify();
-app.register(plugin, {
+app.register(fastifyKizuna, {
     api,
 });
 app.listen({
