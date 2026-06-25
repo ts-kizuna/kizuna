@@ -3,6 +3,8 @@ title: Introduction
 description: Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, powered by Zod.
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+
 <BetaNotice>
 
 **Why is it already 1.0 if it's in beta?** We built ts-kizuna for our own apps and have been battle-testing it in production since before we open-sourced it. It's labeled beta because the syntax for how you write contracts, routers, and clients may still change before v2.
@@ -29,157 +31,35 @@ We recommend pinning your version, then upgrading whenever it suits you.
     contracts together. Ship faster knowing that when you change or deprecate a field or endpoint, every client knows.
 </div>
 
-## Adapters
+<Callout type="info">
+    ts-kizuna is Zod only and will not support Standard Schema or other validation libraries. We rely heavily on Zod internals.
+</Callout>
+
+## The idea
+
+One contract is the source of truth — your server, your clients, and every generated artifact read from it.
+
+<ContractExplorer />
+
+<div className="text-sm text-fd-muted-foreground [&>p]:m-0">
+
+Simplified for illustration. In real projects you split routes and schemas across files and compose them — see [organizing the contract](/docs/building/contract#splitting-routes-across-files).
+
+</div>
+
+## Start here
 
 <Cards>
-    <Card title="Express" href="/docs/adapters/express">
-        Classic middleware setup, access to native `req`/`res` in every handler.
+    <Card title="Quickstart" href="/docs/quickstart">
+        Build a working API and a typed client in five minutes.
     </Card>
-    <Card title="Fastify" href="/docs/adapters/fastify">
-        Plugin-based setup, access to `request`/`reply` in every handler.
+    <Card title="Building an API" href="/docs/building/contract">
+        Contract, router, and mounting — explained in depth.
     </Card>
-    <Card title="Hono" href="/docs/adapters/hono">
-        Lightweight, runs on Cloudflare Workers, Deno, Bun, and Node.
+    <Card title="Adapters" href="/docs/adapters/express">
+        Mount your handlers on Express, Fastify, Hono, or Next.js.
     </Card>
-    <Card title="Next.js" href="/docs/adapters/next">
-        Single catch-all route file, native `Request`/`Response`, multipart built-in.
-    </Card>
-</Cards>
-
-## Clients
-
-<Cards>
-    <Card title="Fetch" href="/docs/clients/fetch">
-        Fully typed RPC-like client for the browser or server. Call your API like a function.
-    </Card>
-    <Card title="Swift" href="/docs/clients/swift">
-        Generate a native Swift client for iOS/macOS from the same contract.
+    <Card title="Clients" href="/docs/clients/fetch">
+        The typed fetch client and Swift client generation.
     </Card>
 </Cards>
-
-## Define your API contract
-
-The contract is a plain TypeScript object. It lives in a shared package that both your server and client import.
-
-```ts title="src/contract.ts"
-import { createContract } from '@ts-kizuna/core';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { z } from 'zod';
-
-export const contract = createContract({
-    getUser: {
-        method: 'GET',
-        path: '/users/:id',
-        responses: {
-            200: z.object({
-                id: z.string(),
-                name: z.string(),
-            }),
-            404: ProblemDetailsSchema,
-        },
-    },
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        body: z.object({
-            name: z.string(),
-        }),
-        responses: {
-            201: z.object({
-                id: z.string(),
-                name: z.string(),
-            }),
-        },
-    },
-    deleteUser: {
-        method: 'DELETE',
-        path: '/users/:id',
-        responses: {
-            204: z.void(),
-            404: ProblemDetailsSchema,
-        },
-    },
-});
-```
-
-## Fulfill the contract on your server
-
-```ts title="src/lib/router.ts"
-import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
-import { contract } from '@shared/contract';
-
-export const router = createRouter(contract, {
-    getUser: async ({ params }) => {
-        const user = await db.users.findById(params.id);
-        if (!user) {
-            return {
-                status: 404,
-                body: {
-                    detail: 'Not found',
-                },
-            };
-        }
-        return {
-            status: 200,
-            body: user,
-        };
-    },
-    createUser: async ({ body }) => {
-        const user = await db.users.create({
-            name: body.name,
-        });
-        return {
-            status: 201,
-            body: user,
-        };
-    },
-    deleteUser: async ({ params }) => {
-        const deleted = await db.users.delete(params.id);
-        if (!deleted) {
-            return {
-                status: 404,
-                body: {
-                    detail: 'Not found',
-                },
-            };
-        }
-        return {
-            status: 204,
-        };
-    },
-});
-```
-
-## Use the API on the client
-
-```ts title="src/api.ts"
-import { createClient } from '@ts-kizuna/fetch';
-import { contract } from '@shared/contract';
-
-const client = createClient(contract, {
-    baseUrl: 'http://localhost:3000',
-});
-
-const result = await client.getUser({
-    params: {
-        id: '1',
-    },
-});
-
-if (result.status === 200) {
-    result.body; // { id: string; name: string }
-}
-
-await client.deleteUser({
-    params: {
-        id: '1',
-    },
-});
-```
-
-## Next steps
-
-- [Quickstart](/docs/quickstart) — end-to-end example in 5 minutes
-- [Contract](/docs/building/contract) — all route fields and options
-- [Express](/docs/adapters/express), [Fastify](/docs/adapters/fastify), [Hono](/docs/adapters/hono), or [Next.js](/docs/adapters/next) — mount your handlers
-- [API Reference](/docs/reference/create-contract) — look up any function by name

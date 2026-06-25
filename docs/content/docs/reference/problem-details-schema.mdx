@@ -32,10 +32,10 @@ import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 Use `ProblemDetailsSchema` in your contract's `responses` to document error status codes:
 
 ```ts
-import { createContract } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { k } from './k';
 
-const contract = createContract({
+const usersRoutes = k.routes('users', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -55,20 +55,22 @@ Handlers only need to provide `detail` — kizuna fills in `type`, `title`, and 
 
 ```ts
 const router = createRouter(contract, {
-    getUser: ({ params, error }) => {
-        const user = users.get(params.id);
-        if (!user) {
-            return error({
-                status: 404,
-                body: {
-                    detail: 'User not found',
-                },
-            });
-        }
-        return {
-            status: 200,
-            body: user,
-        };
+    users: {
+        getUser: ({ params, error }) => {
+            const user = userStore.get(params.id);
+            if (!user) {
+                return error({
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                });
+            }
+            return {
+                status: 200,
+                body: user,
+            };
+        },
     },
 });
 ```
@@ -90,10 +92,10 @@ RFC 9457 lets a problem carry extra fields — **extension members** — alongsi
 
 ```ts
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { k } from './k';
 
-const contract = createContract({
+const usersRoutes = k.routes('users', {
     createUser: {
         method: 'POST',
         path: '/users',

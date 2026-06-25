@@ -1,10 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createApi, createGuard, createMiddleware, createNextEndpoints, NextRequest, NextResponse } from './index.js';
 
-const contract = createContract({
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
+
+const contractRoutes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -31,6 +37,10 @@ const contract = createContract({
             }),
         },
     },
+});
+
+const contract = k.contract({
+    routes: contractRoutes,
 });
 
 interface User {
@@ -180,18 +190,22 @@ describe('Next.js handler', () => {
     });
 
     it('routes onError hook overrides the default 500', async () => {
-        const throwingApi = createApi({
-            contract: createContract({
-                boom: {
-                    method: 'GET',
-                    path: '/boom',
-                    responses: {
-                        200: z.object({
-                            ok: z.boolean(),
-                        }),
-                    },
+        const throwingRoutes = k.routes('api', {
+            boom: {
+                method: 'GET',
+                path: '/boom',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
                 },
-            }),
+            },
+        });
+        const throwingContract = k.contract({
+            routes: throwingRoutes,
+        });
+        const throwingApi = createApi({
+            contract: throwingContract,
             router: {
                 boom: () => {
                     throw new Error('handler exploded');
@@ -216,40 +230,44 @@ describe('Next.js handler', () => {
 });
 
 describe('Next.js handler — alternate content types', () => {
-    const uploadApi = createApi({
-        contract: createContract({
-            uploadAvatar: {
-                method: 'POST',
-                path: '/avatar',
-                contentType: 'multipart/form-data',
-                body: z.object({
-                    file: z.instanceof(File),
+    const uploadRoutes = k.routes('api', {
+        uploadAvatar: {
+            method: 'POST',
+            path: '/avatar',
+            contentType: 'multipart/form-data',
+            body: z.object({
+                file: z.instanceof(File),
+                userId: z.string(),
+            }),
+            responses: {
+                200: z.object({
+                    size: z.number(),
+                    contents: z.string(),
                     userId: z.string(),
                 }),
-                responses: {
-                    200: z.object({
-                        size: z.number(),
-                        contents: z.string(),
-                        userId: z.string(),
-                    }),
-                },
             },
-            submitForm: {
-                method: 'POST',
-                path: '/form',
-                contentType: 'application/x-www-form-urlencoded',
-                body: z.object({
+        },
+        submitForm: {
+            method: 'POST',
+            path: '/form',
+            contentType: 'application/x-www-form-urlencoded',
+            body: z.object({
+                name: z.string(),
+                age: z.string(),
+            }),
+            responses: {
+                200: z.object({
                     name: z.string(),
                     age: z.string(),
                 }),
-                responses: {
-                    200: z.object({
-                        name: z.string(),
-                        age: z.string(),
-                    }),
-                },
             },
-        }),
+        },
+    });
+    const uploadContract = k.contract({
+        routes: uploadRoutes,
+    });
+    const uploadApi = createApi({
+        contract: uploadContract,
         router: {
             uploadAvatar: async ({ body }) => {
                 const contents = await body.file.text();
@@ -315,7 +333,7 @@ describe('Next.js handler — alternate content types', () => {
 });
 
 describe('Next.js handler — all HTTP methods', () => {
-    const allMethodsContract = createContract({
+    const allMethodsContractRoutes = k.routes('api', {
         getItem: {
             method: 'GET',
             path: '/items/:id',
@@ -388,6 +406,10 @@ describe('Next.js handler — all HTTP methods', () => {
                 }),
             },
         },
+    });
+
+    const allMethodsContract = k.contract({
+        routes: allMethodsContractRoutes,
     });
 
     const echoMethod = (method: string) => () => ({
@@ -481,18 +503,22 @@ describe('Next.js handler — all HTTP methods', () => {
 
 describe('Next.js handler — responseValidation', () => {
     it('returns 500 when responseValidation is enabled and the handler returns a mismatched body', async () => {
-        const strictApi = createApi({
-            contract: createContract({
-                getItem: {
-                    method: 'GET',
-                    path: '/items/:id',
-                    responses: {
-                        200: z.object({
-                            id: z.string(),
-                        }),
-                    },
+        const strictRoutes = k.routes('api', {
+            getItem: {
+                method: 'GET',
+                path: '/items/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
                 },
-            }),
+            },
+        });
+        const strictContract = k.contract({
+            routes: strictRoutes,
+        });
+        const strictApi = createApi({
+            contract: strictContract,
             router: {
                 getItem: () => ({ status: 200, body: { id: 123 } }) as any,
             },
@@ -551,7 +577,7 @@ describe('Next.js handler — Accept header / 406', () => {
 });
 
 describe('Next.js handler — requestMiddleware', () => {
-    const middlewareContract = createContract({
+    const middlewareContractRoutes = k.routes('api', {
         getResource: {
             method: 'GET',
             path: '/resources/:id',
@@ -562,6 +588,10 @@ describe('Next.js handler — requestMiddleware', () => {
                 }),
             },
         },
+    });
+
+    const middlewareContract = k.contract({
+        routes: middlewareContractRoutes,
     });
 
     it('runs requestMiddleware before the handler with the matched route', async () => {
@@ -712,7 +742,7 @@ describe('Next.js handler — requestMiddleware', () => {
 });
 
 describe('Next.js — middleware map', () => {
-    const middlewareContract = createContract({
+    const middlewareContractRoutes = k.routes('api', {
         publicRoute: {
             method: 'GET',
             path: '/public',
@@ -731,7 +761,7 @@ describe('Next.js — middleware map', () => {
                 }),
             },
         },
-        admin: createContract({
+        admin: {
             dashboard: {
                 method: 'GET',
                 path: '/admin/dashboard',
@@ -750,7 +780,11 @@ describe('Next.js — middleware map', () => {
                     }),
                 },
             },
-        }),
+        },
+    });
+
+    const middlewareContract = k.contract({
+        routes: middlewareContractRoutes,
     });
 
     const requireAuth = (request: NextRequest) => {
@@ -875,7 +909,7 @@ describe('Next.js — middleware map', () => {
 });
 
 describe('Next.js — createGuard', () => {
-    const guardContract = createContract({
+    const guardContractRoutes = k.routes('api', {
         getUser: {
             method: 'GET',
             path: '/users/:id',
@@ -896,8 +930,12 @@ describe('Next.js — createGuard', () => {
         },
     });
 
+    const guardContract = k.contract({
+        routes: guardContractRoutes,
+    });
+
     it('denies requests when guard calls deny', async () => {
-        const requireAuth = createGuard(async (request, route, deny) => {
+        const requireAuth = createGuard(async ({ request, route, deny }) => {
             const token = request.headers.get('authorization');
             if (!token) {
                 return deny(401, 'Unauthorized');
@@ -936,7 +974,7 @@ describe('Next.js — createGuard', () => {
     });
 
     it('allows requests when guard does not call deny', async () => {
-        const requireAuth = createGuard(async (request, route, deny) => {
+        const requireAuth = createGuard(async ({ request, route, deny }) => {
             const token = request.headers.get('authorization');
             if (!token) {
                 return deny(401, 'Unauthorized');
@@ -975,7 +1013,7 @@ describe('Next.js — createGuard', () => {
     });
 
     it('guard can set properties on request that handlers can read', async () => {
-        const attachUser = createGuard(async (request, route, deny) => {
+        const attachUser = createGuard(async ({ request, route, deny }) => {
             const token = request.headers.get('authorization');
             if (!token) {
                 return deny(401, 'Unauthorized');

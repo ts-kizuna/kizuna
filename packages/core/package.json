@@ -26,6 +26,16 @@
         "default": "./dist/schemas.cjs"
       }
     },
+    "./zod": {
+      "import": {
+        "types": "./src/zod.ts",
+        "default": "./dist/zod.mjs"
+      },
+      "require": {
+        "types": "./src/zod.ts",
+        "default": "./dist/zod.cjs"
+      }
+    },
     "./adapter": {
       "import": {
         "types": "./dist/adapter.d.mts",
@@ -58,7 +68,7 @@
     "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/adapter.ts src/generator.ts src/schemas.ts src/load-deprecations.ts --format esm,cjs --dts --clean",
+    "build": "tsdown src/index.ts src/adapter.ts src/generator.ts src/schemas.ts src/zod.ts src/load-deprecations.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

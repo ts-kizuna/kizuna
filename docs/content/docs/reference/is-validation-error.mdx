@@ -37,23 +37,25 @@ interface ValidationError {
     status: number;
     detail: string;
     errors: Array<{
-        code: string;
+        code: ValidationIssueCode;
         path: string[];
         message: string;
     }>;
 }
 ```
 
+`code` is typed as `ValidationIssueCode` — the built-in Zod codes are offered as autocomplete suggestions, while any custom string (e.g. one emitted via [`addCodedIssue`](/docs/reference/add-coded-issue)) is still assignable.
+
 Common error codes: `invalid_type`, `too_small`, `too_big`, `invalid_string_format`, `unrecognized_keys`, `not_multiple_of`, `custom`. To emit your own machine-readable code from a `.superRefine()` check, see [`addCodedIssue`](/docs/reference/add-coded-issue).
 
 ## Example
 
-When your contract declares its own `400` response on a route, the client sees a union of your type and `ValidationError`. Use `isValidationError` to distinguish them:
+When a route declares its own `400` response, the client sees a union of your type and `ValidationError`. Use `isValidationError` to distinguish them:
 
 ```ts
 import { isValidationError } from '@ts-kizuna/fetch';
 
-const result = await client.createUser({
+const result = await client.users.createUser({
     body: {
         name: '',
         email: 'not-an-email',
@@ -71,6 +73,6 @@ if (result.status === 400) {
 }
 ```
 
-If your contract does not declare a `400` response, you don't need this — `result.status === 400` narrows the body to `ValidationError` directly.
+If a route does not declare a `400` response, you don't need this — `result.status === 400` narrows the body to `ValidationError` directly.
 
 See the [Fetch client guide](/docs/clients/fetch#validation-errors) for more details.

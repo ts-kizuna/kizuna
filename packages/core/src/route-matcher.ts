@@ -1,5 +1,5 @@
-import type { RouteDefinition, Contract, Method } from './types.js';
-import { flattenContract } from './handler-pipeline.js';
+import type { RouteDefinition, Routes, Method } from './types.js';
+import { flattenRoutes } from './handler-pipeline.js';
 import type { PathSegment } from './path-params.js';
 import { parsePath } from './path-params.js';
 
@@ -40,12 +40,12 @@ const compileRoute = (routeKey: string, route: RouteDefinition): CompiledRoute =
     };
 };
 
-const cache = new WeakMap<Contract, CompiledRoute[]>();
+const cache = new WeakMap<Routes, CompiledRoute[]>();
 
-const getCompiled = (contract: Contract): CompiledRoute[] => {
-    const existing = cache.get(contract);
+const getCompiled = (routes: Routes): CompiledRoute[] => {
+    const existing = cache.get(routes);
     if (existing) return existing;
-    const fresh = flattenContract(contract).map(({ routeKey, route }) => compileRoute(routeKey, route));
+    const fresh = flattenRoutes(routes).map(({ routeKey, route }) => compileRoute(routeKey, route));
     fresh.sort((a, b) => {
         const limit = Math.min(a.segments.length, b.segments.length);
         for (let index = 0; index < limit; index++) {
@@ -57,7 +57,7 @@ const getCompiled = (contract: Contract): CompiledRoute[] => {
         }
         return a.paramNames.length - b.paramNames.length;
     });
-    cache.set(contract, fresh);
+    cache.set(routes, fresh);
     return fresh;
 };
 
@@ -85,9 +85,9 @@ export const sortFlattenedRoutes = <T extends { route: RouteDefinition }>(routes
     return parsed.map((p) => p.entry);
 };
 
-export const matchRoute = (method: string, pathname: string, contract: Contract, basePath?: string): MatchResult => {
+export const matchRoute = (method: string, pathname: string, routes: Routes, basePath?: string): MatchResult => {
     const target = stripBasePath(pathname, basePath);
-    const compiled = getCompiled(contract);
+    const compiled = getCompiled(routes);
     const allowed = new Set<Method>();
     for (const candidate of compiled) {
         const result = candidate.pattern.exec(target);

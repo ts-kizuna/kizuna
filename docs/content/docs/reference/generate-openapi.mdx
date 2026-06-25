@@ -3,7 +3,7 @@ title: generateOpenApi
 description: Generate an OpenAPI 3.1.0 document from a ts-kizuna contract.
 ---
 
-Generate an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from a contract. Returns a renderer function you call with `'json'` or `'yaml'`.
+Generate an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from a contract. Returns a renderer you call with `'json'` or `'yaml'`.
 
 <InstallTabs packageName="@ts-kizuna/openapi" />
 
@@ -17,23 +17,25 @@ import { generateOpenApi } from '@ts-kizuna/openapi';
 generateOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer
 ```
 
-| Parameter  | Type                     | Description                                                                   |
-| ---------- | ------------------------ | ----------------------------------------------------------------------------- |
-| `contract` | `Contract`               | The contract created with [`createContract`](/docs/reference/create-contract) |
-| `options`  | `GenerateOpenApiOptions` | OpenAPI generation options                                                    |
+| Parameter  | Type                     | Description                                              |
+| ---------- | ------------------------ | -------------------------------------------------------- |
+| `contract` | `Contract`               | The contract from [`k.contract`](/docs/reference/kizuna) |
+| `options`  | `GenerateOpenApiOptions` | OpenAPI generation options                               |
 
 ## Options
 
-| Option                       | Type                                  | Default  | Description                                                                             |
-| ---------------------------- | ------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
-| `info`                       | `{ title, version, description? }`    | required | OpenAPI `info` object                                                                   |
-| `servers`                    | `{ url, description? }[]`             | —        | Server URLs                                                                             |
-| `setOperationId`             | `boolean \| 'concatenated-path'`      | `false`  | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys. |
-| `setTagsFromContractKeys`    | `boolean`                             | `false`  | Use contract sub-object keys as OpenAPI tags                                            |
-| `tags`                       | `OpenApiTag[]`                        | —        | Top-level tag definitions                                                               |
-| `security`                   | `SecurityRequirement[]`               | —        | Global security requirements                                                            |
-| `components.securitySchemes` | `Record<string, unknown>`             | —        | Security scheme definitions                                                             |
-| `operationMapper`            | `(operation, route, id) => operation` | —        | Callback to transform each operation before it is added to the spec                     |
+| Option            | Type                                            | Default   | Description                                                                             |
+| ----------------- | ----------------------------------------------- | --------- | --------------------------------------------------------------------------------------- |
+| `info`            | `{ title, version, description? }`              | required  | OpenAPI `info` object                                                                   |
+| `openApiVersion`  | `'3.1.0'`                                       | `'3.1.0'` | OpenAPI specification version for the generated document                                |
+| `servers`         | `{ url, description? }[]`                       | —         | Server URLs                                                                             |
+| `setOperationId`  | `boolean \| 'concatenated-path'`                | `false`   | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys. |
+| `tags`            | `OpenApiTag[]`                                  | —         | Top-level tag definitions                                                               |
+| `security`        | `Array<Record<string, string[]>>`               | —         | Document-level security requirements, written to the spec's top-level `security`        |
+| `components`      | `{ securitySchemes?: Record<string, unknown> }` | —         | Security schemes, emitted under `components.securitySchemes`                            |
+| `operationMapper` | `(operation, route, id) => operation`           | —         | Callback to transform each operation before it is added to the spec                     |
+
+`security` and `securitySchemes` live here, on the generator — not on the contract. A route's own `security` field (declared in `k.routes`) becomes that operation's `security`, referencing the schemes by name.
 
 ## Returns
 
@@ -46,9 +48,11 @@ renderer('yaml'); // YAML string
 
 ## Example
 
+Declare the scheme on the generator, require it document-wide, and reference it from any route:
+
 ```ts
 import { generateOpenApi } from '@ts-kizuna/openapi';
-import { contract } from '@shared/contract';
+import { contract } from './contract';
 
 const spec = generateOpenApi(contract, {
     info: {
@@ -61,11 +65,47 @@ const spec = generateOpenApi(contract, {
             description: 'Production',
         },
     ],
+    security: [
+        {
+            bearerAuth: [],
+        },
+    ],
+    components: {
+        securitySchemes: {
+            bearerAuth: {
+                type: 'http',
+                scheme: 'bearer',
+                bearerFormat: 'JWT',
+            },
+        },
+    },
 });
 
-// Serve as JSON endpoint
+// Serve as a JSON endpoint
 app.get('/openapi.json', (_req, res) => {
     res.json(spec('json'));
+});
+```
+
+A route opts into (or out of) the scheme with its own `security` field:
+
+```ts
+import { k } from './k';
+
+const usersRoutes = k.routes('users', {
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        security: [
+            {
+                bearerAuth: [],
+            },
+        ],
+        body: CreateUserSchema,
+        responses: {
+            201: UserSchema,
+        },
+    },
 });
 ```
 

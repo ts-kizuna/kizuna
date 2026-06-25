@@ -1,5 +1,6 @@
-import { flattenContract } from './handler-pipeline.js';
-import type { Contract } from './types.js';
+import { flattenRoutes } from './handler-pipeline.js';
+import type { Contract } from './contract.js';
+import type { Routes } from './types.js';
 
 /**
  * Deprecated routes and fields, keyed by route key and field path. Values are the
@@ -52,7 +53,7 @@ const hash = (input: string): string => {
  */
 export const contractFingerprint = (contract: Contract): string =>
     hash(
-        flattenContract(contract)
+        flattenRoutes(contract.routes)
             .map((route) => route.routeKey)
             .sort()
             .join('\n')

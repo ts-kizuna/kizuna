@@ -4,11 +4,17 @@ import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
-import { createContract, createTag, type Contract } from '@ts-kizuna/core';
+import { kizuna, createTags, type Contract } from '@ts-kizuna/core';
 import { contractFingerprint } from '@ts-kizuna/core/generator';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateOpenApi, type GenerateOpenApiOptions } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
+
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
 
 const generateJson = (contract: Contract, options: GenerateOpenApiOptions) => generateOpenApi(contract, options)('json');
 
@@ -22,7 +28,7 @@ declare module 'vitest' {
     }
 }
 
-const contract = createContract({
+const contractRoutes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -72,25 +78,16 @@ const contract = createContract({
     },
 });
 
+const contract = k.contract({
+    routes: contractRoutes,
+});
+
 const baseConfig = {
     info: {
         title: 'Test API',
         version: '1.0.0',
     },
 };
-
-const UsersTag = createTag({
-    title: 'Users',
-});
-
-const HealthTag = createTag({
-    title: 'Health',
-});
-
-const UsersTagWithDescription = createTag({
-    title: 'Users',
-    description: 'User management endpoints',
-});
 
 describe('generateOpenApi', () => {
     const spec = generateJson(contract, baseConfig);
@@ -152,8 +149,8 @@ describe('generateOpenApi', () => {
     });
 
     it('sets concatenated-path operationId for nested routers', () => {
-        const nested = createContract({
-            users: createContract({
+        const nestedRoutes = k.routes('api', {
+            users: {
                 getUser: {
                     method: 'GET',
                     path: '/users/:id',
@@ -163,7 +160,11 @@ describe('generateOpenApi', () => {
                         }),
                     },
                 },
-            }),
+            },
+        });
+
+        const nested = k.contract({
+            routes: nestedRoutes,
         });
 
         const withTrue = generateJson(nested, { ...baseConfig, setOperationId: true });
@@ -174,7 +175,7 @@ describe('generateOpenApi', () => {
     });
 
     it('omits requestBody and response content for z.void()', () => {
-        const voidContract = createContract({
+        const voidContractRoutes = k.routes('api', {
             ping: {
                 method: 'POST',
                 path: '/ping/:id',
@@ -183,6 +184,10 @@ describe('generateOpenApi', () => {
                     204: z.void(),
                 },
             },
+        });
+
+        const voidContract = k.contract({
+            routes: voidContractRoutes,
         });
         const doc = generateJson(voidContract, baseConfig);
         const operation = doc.paths['/ping/{id}']?.post;
@@ -219,7 +224,7 @@ describe('Zod meta() in OpenAPI output', () => {
             id: 'TaggedUser',
         });
 
-    const taggedContract = createContract({
+    const taggedContractRoutes = k.routes('api', {
         getUser: {
             method: 'GET',
             path: '/users/:id',
@@ -227,6 +232,10 @@ describe('Zod meta() in OpenAPI output', () => {
                 200: Tagged,
             },
         },
+    });
+
+    const taggedContract = k.contract({
+        routes: taggedContractRoutes,
     });
 
     it('is a valid OpenAPI 3.1 document', async () => {
@@ -254,11 +263,11 @@ describe('Zod meta() in OpenAPI output', () => {
 });
 
 describe('operation metadata passthrough', () => {
-    const annotated = createContract({
+    const annotatedRoutes = k.routes('api', {
         getUser: {
             method: 'GET',
             path: '/users/:id',
-            tags: [UsersTag],
+            tags: ['api'],
             security: [
                 {
                     bearerAuth: [],
@@ -276,6 +285,10 @@ describe('operation metadata passthrough', () => {
         },
     });
 
+    const annotated = k.contract({
+        routes: annotatedRoutes,
+    });
+
     it('is a valid OpenAPI 3.1 document', async () => {
         const spec = generateJson(annotated, baseConfig);
         await expect(spec).toBeAValidOpenAPIDefinition();
@@ -284,7 +297,7 @@ describe('operation metadata passthrough', () => {
     it('emits route-level tags, security, externalDocs on the operation', () => {
         const spec = generateJson(deprecatedContract, baseConfig);
         const operation = spec.paths['/users/by-id/{id}']?.get;
-        expect(operation?.tags).toEqual(['Users']);
+        expect(operation?.tags).toEqual(['API', 'Users']);
         expect(operation?.security).toEqual([
             {
                 bearerAuth: [],
@@ -319,6 +332,9 @@ describe('operation metadata passthrough', () => {
                 name: 'users',
                 description: 'User-related operations',
             },
+            {
+                name: 'API',
+            },
         ]);
         expect(spec.security).toEqual([
             {
@@ -341,23 +357,34 @@ describe('operation metadata passthrough', () => {
         expect(spec.paths['/users/{id}']?.get?.tags).toEqual(['mapped']);
     });
 
-    it('explicit route.tags are used when set', () => {
-        const nested = createContract({
-            users: {
-                getUser: {
-                    method: 'GET',
-                    path: '/users/:id',
-                    tags: [HealthTag],
-                    responses: {
-                        200: z.object({
-                            id: z.string(),
-                        }),
-                    },
+    it('merges route-level tags with the group tag', () => {
+        const { k } = kizuna({
+            tags: createTags({
+                users: {
+                    title: 'Users',
+                },
+                health: {
+                    title: 'Health',
+                },
+            }),
+        });
+        const usersRoutes = k.routes('users', {
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                tags: ['health'],
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
                 },
             },
         });
-        const spec = generateJson(nested, baseConfig);
-        expect(spec.paths['/users/{id}']?.get?.tags).toEqual(['Health']);
+        const contract = k.contract({
+            routes: usersRoutes,
+        });
+        const spec = generateJson(contract, baseConfig);
+        expect(spec.paths['/users/{id}']?.get?.tags).toEqual(['Users', 'Health']);
     });
 });
 
@@ -379,7 +406,7 @@ describe('discriminated unions', () => {
             .meta({
                 id: 'ValidVideo',
             });
-        const route = createContract({
+        const routeRoutes = k.routes('api', {
             getMedia: {
                 method: 'GET',
                 path: '/media',
@@ -387,6 +414,10 @@ describe('discriminated unions', () => {
                     200: z.discriminatedUnion('type', [Image, Video]),
                 },
             },
+        });
+
+        const route = k.contract({
+            routes: routeRoutes,
         });
         await expect(generateJson(route, baseConfig)).toBeAValidOpenAPIDefinition();
     });
@@ -408,7 +439,7 @@ describe('discriminated unions', () => {
             .meta({
                 id: 'DiscVideo',
             });
-        const route = createContract({
+        const routeRoutes = k.routes('api', {
             getMedia: {
                 method: 'GET',
                 path: '/media',
@@ -416,6 +447,10 @@ describe('discriminated unions', () => {
                     200: z.discriminatedUnion('type', [Image, Video]),
                 },
             },
+        });
+
+        const route = k.contract({
+            routes: routeRoutes,
         });
         const spec = generateJson(route, baseConfig);
         const schema = spec.paths['/media']?.get?.responses['200']?.content?.['application/json']?.schema as Record<string, unknown>;
@@ -437,7 +472,7 @@ describe('discriminated unions', () => {
     });
 
     it('emits discriminator without mapping when variants are not id-tagged', () => {
-        const route = createContract({
+        const routeRoutes = k.routes('api', {
             getMedia: {
                 method: 'GET',
                 path: '/inline-media',
@@ -454,6 +489,10 @@ describe('discriminated unions', () => {
                     ]),
                 },
             },
+        });
+
+        const route = k.contract({
+            routes: routeRoutes,
         });
         const spec = generateJson(route, baseConfig);
         const schema = spec.paths['/inline-media']?.get?.responses['200']?.content?.['application/json']?.schema as Record<string, unknown>;
@@ -484,7 +523,7 @@ describe('discriminated unions', () => {
         const NotificationEvent = z.discriminatedUnion('channel', [EmailEvent, SmsEvent]).meta({
             id: 'NotificationEvent',
         });
-        const route = createContract({
+        const routeRoutes = k.routes('api', {
             sendNotification: {
                 method: 'POST',
                 path: '/notifications',
@@ -495,6 +534,10 @@ describe('discriminated unions', () => {
                     }),
                 },
             },
+        });
+
+        const route = k.contract({
+            routes: routeRoutes,
         });
         const spec = generateJson(route, baseConfig);
         const requestSchema = spec.paths['/notifications']?.post?.requestBody?.content?.['application/json']?.schema;
@@ -520,7 +563,7 @@ describe('discriminated unions', () => {
     });
 
     it('does not add discriminator to plain z.union', () => {
-        const route = createContract({
+        const routeRoutes = k.routes('api', {
             getOne: {
                 method: 'GET',
                 path: '/plain-union',
@@ -528,6 +571,10 @@ describe('discriminated unions', () => {
                     200: z.union([z.string(), z.number()]),
                 },
             },
+        });
+
+        const route = k.contract({
+            routes: routeRoutes,
         });
         const spec = generateJson(route, baseConfig);
         const schema = spec.paths['/plain-union']?.get?.responses['200']?.content?.['application/json']?.schema as Record<string, unknown>;
@@ -537,7 +584,7 @@ describe('discriminated unions', () => {
 
 describe('request body content types', () => {
     it('is a valid OpenAPI 3.1 document', async () => {
-        const route = createContract({
+        const routeRoutes = k.routes('api', {
             uploadAvatar: {
                 method: 'POST',
                 path: '/avatar',
@@ -578,11 +625,15 @@ describe('request body content types', () => {
                 },
             },
         });
+
+        const route = k.contract({
+            routes: routeRoutes,
+        });
         await expect(generateJson(route, baseConfig)).toBeAValidOpenAPIDefinition();
     });
 
     it('emits multipart/form-data when contentType is set, with format: binary for File fields', () => {
-        const route = createContract({
+        const routeRoutes = k.routes('api', {
             uploadAvatar: {
                 method: 'POST',
                 path: '/avatar',
@@ -597,6 +648,10 @@ describe('request body content types', () => {
                     }),
                 },
             },
+        });
+
+        const route = k.contract({
+            routes: routeRoutes,
         });
         const spec = generateJson(route, baseConfig);
         const body = spec.paths['/avatar']?.post?.requestBody;
@@ -614,7 +669,7 @@ describe('request body content types', () => {
     });
 
     it('emits application/x-www-form-urlencoded when contentType is set', () => {
-        const route = createContract({
+        const routeRoutes = k.routes('api', {
             postForm: {
                 method: 'POST',
                 path: '/form',
@@ -629,6 +684,10 @@ describe('request body content types', () => {
                 },
             },
         });
+
+        const route = k.contract({
+            routes: routeRoutes,
+        });
         const spec = generateJson(route, baseConfig);
         const body = spec.paths['/form']?.post?.requestBody;
         expect(body?.content?.['application/x-www-form-urlencoded']).toBeDefined();
@@ -636,7 +695,7 @@ describe('request body content types', () => {
     });
 
     it('defaults to application/json when contentType is not set', () => {
-        const route = createContract({
+        const routeRoutes = k.routes('api', {
             postUser: {
                 method: 'POST',
                 path: '/users',
@@ -650,6 +709,10 @@ describe('request body content types', () => {
                 },
             },
         });
+
+        const route = k.contract({
+            routes: routeRoutes,
+        });
         const spec = generateJson(route, baseConfig);
         expect(spec.paths['/users']?.post?.requestBody?.content?.['application/json']).toBeDefined();
     });
@@ -657,7 +720,7 @@ describe('request body content types', () => {
 
 describe('transform field handling', () => {
     it('uses input schema for request body transform fields', () => {
-        const contract = createContract({
+        const contractRoutes = k.routes('api', {
             createUser: {
                 method: 'POST',
                 path: '/users',
@@ -672,6 +735,10 @@ describe('transform field handling', () => {
                 },
             },
         });
+
+        const contract = k.contract({
+            routes: contractRoutes,
+        });
         const spec = generateJson(contract, baseConfig);
         const properties = spec.paths['/users']?.post?.requestBody?.content?.['application/json']?.schema?.properties as
             | Record<string, unknown>
@@ -685,7 +752,7 @@ describe('transform field handling', () => {
     });
 
     it('uses input schema for transform fields in union query params', () => {
-        const contract = createContract({
+        const contractRoutes = k.routes('api', {
             getItems: {
                 method: 'GET',
                 path: '/items',
@@ -705,6 +772,10 @@ describe('transform field handling', () => {
                 },
             },
         });
+
+        const contract = k.contract({
+            routes: contractRoutes,
+        });
         const spec = generateJson(contract, baseConfig);
         const schema = spec.paths['/items']?.get?.parameters?.find((parameter) => parameter.name === 'ids')?.schema as
             | Record<string, unknown>
@@ -719,7 +790,7 @@ describe('transform field handling', () => {
 
 describe('complex transform edge cases', () => {
     it('handles transforms across nested objects, arrays, records, tuples, unions, nullable, and intersections without producing {}', () => {
-        const insane = createContract({
+        const insaneRoutes = k.routes('api', {
             users: {
                 create: {
                     method: 'POST',
@@ -792,6 +863,10 @@ describe('complex transform edge cases', () => {
             },
         });
 
+        const insane = k.contract({
+            routes: insaneRoutes,
+        });
+
         const spec = generateJson(insane, baseConfig);
         const json = JSON.stringify(spec);
 
@@ -824,7 +899,7 @@ describe('complex transform edge cases', () => {
 
 describe('response headers', () => {
     it('emits OpenAPI headers object on the response when headers are declared', () => {
-        const contract = createContract({
+        const contractRoutes = k.routes('api', {
             getUser: {
                 method: 'GET',
                 path: '/users/:id',
@@ -836,6 +911,10 @@ describe('response headers', () => {
                     404: z.object({ message: z.string() }),
                 },
             },
+        });
+
+        const contract = k.contract({
+            routes: contractRoutes,
         });
         const spec = generateJson(contract, {
             info: {
@@ -859,8 +938,15 @@ describe('response headers', () => {
 });
 
 describe('contract-level tag grouping', () => {
-    it('applies tag from createContract to all routes in that group', () => {
-        const usersContract = createContract(UsersTag, {
+    it('applies the group tag to all routes in that group', () => {
+        const { k } = kizuna({
+            tags: createTags({
+                users: {
+                    title: 'Users',
+                },
+            }),
+        });
+        const usersRoutes = k.routes('users', {
             listUsers: {
                 method: 'GET',
                 path: '/users',
@@ -877,30 +963,26 @@ describe('contract-level tag grouping', () => {
                 },
             },
         });
-        const contract = createContract({ users: usersContract });
+        const contract = k.contract({
+            routes: usersRoutes,
+        });
         const spec = generateJson(contract, baseConfig);
         expect(spec.paths['/users']?.get?.tags).toEqual(['Users']);
         expect(spec.paths['/users']?.post?.tags).toEqual(['Users']);
     });
 
-    it('route-level tags merge with contract tag', () => {
-        const usersContract = createContract(UsersTag, {
-            listUsers: {
-                method: 'GET',
-                path: '/users',
-                tags: [HealthTag],
-                responses: {
-                    200: z.object({ users: z.array(z.string()) }),
+    it('accumulates tags from nested tagged groups', () => {
+        const { k } = kizuna({
+            tags: createTags({
+                users: {
+                    title: 'Users',
                 },
-            },
+                health: {
+                    title: 'Health',
+                },
+            }),
         });
-        const contract = createContract({ users: usersContract });
-        const spec = generateJson(contract, baseConfig);
-        expect(spec.paths['/users']?.get?.tags).toEqual(['Users', 'Health']);
-    });
-
-    it('accumulates tags from nested tagged contracts', () => {
-        const healthContract = createContract(HealthTag, {
+        const healthRoutes = k.routes('health', {
             deleteUser: {
                 method: 'DELETE',
                 path: '/users/:id',
@@ -909,16 +991,26 @@ describe('contract-level tag grouping', () => {
                 },
             },
         });
-        const usersContract = createContract(UsersTag, {
-            health: healthContract,
+        const usersRoutes = k.routes('users', {
+            health: healthRoutes,
         });
-        const contract = createContract({ users: usersContract });
+        const contract = k.contract({
+            routes: usersRoutes,
+        });
         const spec = generateJson(contract, baseConfig);
         expect(spec.paths['/users/{id}']?.delete?.tags).toEqual(['Users', 'Health']);
     });
 
-    it('derives tags from contract keys when no CONTRACT_TAG is set', () => {
-        const untaggedUsers = createContract({
+    it('collects tag descriptions into the document tags', () => {
+        const { k } = kizuna({
+            tags: createTags({
+                users: {
+                    title: 'Users',
+                    description: 'User management endpoints',
+                },
+            }),
+        });
+        const usersRoutes = k.routes('users', {
             listUsers: {
                 method: 'GET',
                 path: '/users',
@@ -927,40 +1019,8 @@ describe('contract-level tag grouping', () => {
                 },
             },
         });
-        const contract = createContract({ users: untaggedUsers });
-        const spec = generateJson(contract, baseConfig);
-        expect(spec.paths['/users']?.get?.tags).toEqual(['users']);
-    });
-
-    it('does not derive tags from contract keys when setTagsFromContractKeys is false', () => {
-        const untaggedUsers = createContract({
-            listUsers: {
-                method: 'GET',
-                path: '/users',
-                responses: {
-                    200: z.object({ ok: z.boolean() }),
-                },
-            },
-        });
-        const contract = createContract({ users: untaggedUsers });
-        const spec = generateJson(contract, { ...baseConfig, setTagsFromContractKeys: false });
-        expect(spec.paths['/users']?.get?.tags).toBeUndefined();
-    });
-
-    it('collects tag descriptions from contract into document tags', () => {
-        const usersContract = createContract(UsersTagWithDescription, {
-            listUsers: {
-                method: 'GET',
-                path: '/users',
-                responses: {
-                    200: z.object({
-                        ok: z.boolean(),
-                    }),
-                },
-            },
-        });
-        const contract = createContract({
-            users: usersContract,
+        const contract = k.contract({
+            routes: usersRoutes,
         });
         const spec = generateJson(contract, baseConfig);
         expect(spec.tags).toEqual([
@@ -971,23 +1031,15 @@ describe('contract-level tag grouping', () => {
         ]);
     });
 
-    it('explicit CONTRACT_TAG takes precedence over key-derived tag', () => {
-        const taggedUsers = createContract(UsersTag, {
-            listUsers: {
-                method: 'GET',
-                path: '/users',
-                responses: {
-                    200: z.object({ ok: z.boolean() }),
+    it('an untagged sub-group inside a tagged group inherits the outer tag', () => {
+        const { k } = kizuna({
+            tags: createTags({
+                users: {
+                    title: 'Users',
                 },
-            },
+            }),
         });
-        const contract = createContract({ users: taggedUsers });
-        const spec = generateJson(contract, baseConfig);
-        expect(spec.paths['/users']?.get?.tags).toEqual(['Users']);
-    });
-
-    it('untagged sub-group inside tagged contract inherits the outer tag', () => {
-        const usersContract = createContract(UsersTag, {
+        const usersRoutes = k.routes('users', {
             nested: {
                 listUsers: {
                     method: 'GET',
@@ -998,7 +1050,9 @@ describe('contract-level tag grouping', () => {
                 },
             },
         });
-        const contract = createContract({ users: usersContract });
+        const contract = k.contract({
+            routes: usersRoutes,
+        });
         const spec = generateJson(contract, baseConfig);
         expect(spec.paths['/users']?.get?.tags).toEqual(['Users']);
     });
@@ -1006,7 +1060,7 @@ describe('contract-level tag grouping', () => {
 
 describe('OpenAPI generator — HEAD method', () => {
     it('omits response content for HEAD routes', () => {
-        const contract = createContract({
+        const contractRoutes = k.routes('api', {
             checkUser: {
                 method: 'HEAD',
                 path: '/users/:id',
@@ -1018,6 +1072,10 @@ describe('OpenAPI generator — HEAD method', () => {
                 },
             },
         });
+
+        const contract = k.contract({
+            routes: contractRoutes,
+        });
         const spec = generateJson(contract, baseConfig);
         const headOp = spec.paths['/users/{id}']?.head;
         expect(headOp).toBeDefined();
@@ -1026,7 +1084,7 @@ describe('OpenAPI generator — HEAD method', () => {
     });
 
     it('OPTIONS routes emit response content normally', () => {
-        const contract = createContract({
+        const contractRoutes = k.routes('api', {
             describeUsers: {
                 method: 'OPTIONS',
                 path: '/users',
@@ -1036,6 +1094,10 @@ describe('OpenAPI generator — HEAD method', () => {
                     }),
                 },
             },
+        });
+
+        const contract = k.contract({
+            routes: contractRoutes,
         });
         const spec = generateJson(contract, baseConfig);
         const optionsOp = spec.paths['/users']?.options;
@@ -1070,7 +1132,7 @@ describe('automatic validation error response', () => {
     });
 
     it('merges with a user-declared 400 using oneOf', () => {
-        const contractWith400 = createContract({
+        const contractWith400Routes = k.routes('api', {
             createItem: {
                 method: 'POST',
                 path: '/items',
@@ -1080,6 +1142,10 @@ describe('automatic validation error response', () => {
                     400: z.object({ error: z.string() }),
                 },
             },
+        });
+
+        const contractWith400 = k.contract({
+            routes: contractWith400Routes,
         });
         const spec = generateJson(contractWith400, baseConfig);
         const response = spec.paths['/items']?.post?.responses?.['400'];
@@ -1104,7 +1170,7 @@ describe('deprecation on a component reached via the schemas map', () => {
             }),
         })
         .meta({ id: 'Account' });
-    const contractWithRef = createContract({
+    const contractWithRefRoutes = k.routes('api', {
         getAccount: {
             method: 'GET',
             path: '/account',
@@ -1112,6 +1178,10 @@ describe('deprecation on a component reached via the schemas map', () => {
                 200: AccountSchema,
             },
         },
+    });
+
+    const contractWithRef = k.contract({
+        routes: contractWithRefRoutes,
     });
 
     it('deprecates a field on a component only reachable through the schemas map', () => {
@@ -1170,7 +1240,7 @@ describe('deprecation from .kizuna', () => {
 });
 
 describe('error response media type (RFC 9457)', () => {
-    const contractWithErrors = createContract({
+    const contractWithErrorsRoutes = k.routes('api', {
         getUser: {
             method: 'GET',
             path: '/users/{id}',
@@ -1191,6 +1261,10 @@ describe('error response media type (RFC 9457)', () => {
                 }),
             },
         },
+    });
+
+    const contractWithErrors = k.contract({
+        routes: contractWithErrorsRoutes,
     });
     const spec = generateJson(contractWithErrors, baseConfig);
     const responses = spec.paths['/users/{id}']?.get?.responses;
@@ -1237,7 +1311,7 @@ describe('error response media type (RFC 9457)', () => {
 });
 
 describe('declared response contentType', () => {
-    const contractWithContentType = createContract({
+    const contractWithContentTypeRoutes = k.routes('api', {
         exportUsers: {
             method: 'GET',
             path: '/users/export',
@@ -1259,6 +1333,10 @@ describe('declared response contentType', () => {
             },
         },
     });
+
+    const contractWithContentType = k.contract({
+        routes: contractWithContentTypeRoutes,
+    });
     const spec = generateJson(contractWithContentType, baseConfig);
 
     it('uses the declared media type for the response', () => {
@@ -1274,7 +1352,7 @@ describe('declared response contentType', () => {
 });
 
 describe('binary response bodies', () => {
-    const binaryContract = createContract({
+    const binaryContractRoutes = k.routes('api', {
         downloadBadge: {
             method: 'GET',
             path: '/badge',
@@ -1285,6 +1363,10 @@ describe('binary response bodies', () => {
                 },
             },
         },
+    });
+
+    const binaryContract = k.contract({
+        routes: binaryContractRoutes,
     });
     const spec = generateJson(binaryContract, baseConfig);
 

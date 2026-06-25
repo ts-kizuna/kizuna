@@ -63,15 +63,19 @@ public enum API {
         public let email: String
         /// Family name. Snake_case wire key, kept verbatim by both clients.
         public let last_name: String?
+        /// Phone number in E.164-ish form. Demonstrates a custom-coded validation issue.
+        public let phone: String?
 
         public init(
             name: String,
             email: String,
-            last_name: String? = nil
+            last_name: String? = nil,
+            phone: String? = nil
         ) {
             self.name = name
             self.email = email
             self.last_name = last_name
+            self.phone = phone
         }
     }
 
@@ -292,227 +296,16 @@ public actor APIClient {
         APIHealthClient(_actor: self)
     }
 
-    public enum SendNotification {
-
-        public struct Response202: Codable, Sendable, Equatable {
-            public let accepted: Bool
-
-            public init(accepted: Bool) {
-                self.accepted = accepted
-            }
-        }
-
-        public struct Body: Sendable {
-            public let payload: API.NotificationEvent
-
-            public init(payload: API.NotificationEvent) {
-                self.payload = payload
-            }
-
-            public static func body(_ value: API.NotificationEvent) -> Self {
-                .init(payload: value)
-            }
-        }
-
-        public struct Result: Sendable {
-            public let body: Response202
-        }
-
-        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
-            case requestFailed(Swift.Error)
-            case cancelled
-            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
-            case unexpectedStatus(Int, Foundation.Data)
-            case badRequest(APIClient.ValidationError)
-        }
+    public var notifications: APINotificationsClient {
+        APINotificationsClient(_actor: self)
     }
 
-    public enum ListEvents {
-
-        public enum QueryKind: String, Codable, Sendable {
-            case login = "login"
-            case logout = "logout"
-            case signup = "signup"
-        }
-
-        public struct Response: Codable, Sendable, Equatable {
-            public let events: [API.EventRecord]
-            public let echo: ResponseEcho
-
-            public init(
-                events: [API.EventRecord],
-                echo: ResponseEcho
-            ) {
-                self.events = events
-                self.echo = echo
-            }
-        }
-
-        public struct ResponseEcho: Codable, Sendable, Equatable {
-            public let since: Date?
-            public let kind: ResponseEchoKind?
-            public let ids: [String]?
-            public let label: String?
-            public let tagIds: [String]?
-
-            public init(
-                since: Date? = nil,
-                kind: ResponseEchoKind? = nil,
-                ids: [String]? = nil,
-                label: String? = nil,
-                tagIds: [String]? = nil
-            ) {
-                self.since = since
-                self.kind = kind
-                self.ids = ids
-                self.label = label
-                self.tagIds = tagIds
-            }
-        }
-
-        public enum ResponseEchoKind: String, Codable, Sendable {
-            case login = "login"
-            case logout = "logout"
-            case signup = "signup"
-        }
-
-        public struct Query: Sendable {
-            public let since: Date?
-            public let kind: QueryKind?
-            public let ids: [String]?
-            public let label: String?
-            public let tagIds: [String]?
-
-            public init(
-                since: Date? = nil,
-                kind: QueryKind? = nil,
-                ids: [String]? = nil,
-                label: String? = nil,
-                tagIds: [String]? = nil
-            ) {
-                self.since = since
-                self.kind = kind
-                self.ids = ids
-                self.label = label
-                self.tagIds = tagIds
-            }
-
-            public static func query(
-                since: Date? = nil,
-                kind: QueryKind? = nil,
-                ids: [String]? = nil,
-                label: String? = nil,
-                tagIds: [String]? = nil
-            ) -> Self {
-                .init(since: since, kind: kind, ids: ids, label: label, tagIds: tagIds)
-            }
-        }
-
-        public struct Result: Sendable {
-            public let body: Response
-        }
-
-        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
-            case requestFailed(Swift.Error)
-            case cancelled
-            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
-            case unexpectedStatus(Int, Foundation.Data)
-            case badRequest(APIClient.ValidationError)
-        }
+    public var members: APIMembersClient {
+        APIMembersClient(_actor: self)
     }
 
-    public enum ValidateConfig {
-
-        public struct Input: Codable, Sendable, Equatable {
-            public let `default`: String
-            public let interval: Int
-
-            private enum CodingKeys: String, CodingKey {
-                case `default`
-                case interval
-            }
-
-            public init(
-                `default`: String,
-                interval: Int
-            ) {
-                self.`default` = `default`
-                self.interval = interval
-            }
-        }
-
-        /// Validation result
-        public struct Response: Codable, Sendable, Equatable {
-            public let status: String
-
-            public init(status: String) {
-                self.status = status
-            }
-        }
-
-        public struct Body: Sendable {
-            public let payload: Input
-
-            public init(payload: Input) {
-                self.payload = payload
-            }
-
-            public static func body(
-                `default`: String,
-                interval: Int
-            ) -> Self {
-                .init(payload: Input(default: `default`, interval: interval))
-            }
-        }
-
-        public struct Result: Sendable {
-            public let body: Response
-        }
-
-        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
-            case requestFailed(Swift.Error)
-            case cancelled
-            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
-            case unexpectedStatus(Int, Foundation.Data)
-            case badRequest(API.ProblemDetails)
-            case unauthorized
-            case validationError(APIClient.ValidationError)
-        }
-    }
-
-    public enum Webhook {
-
-        public struct Response: Codable, Sendable, Equatable {
-            public let received: Bool
-
-            public init(received: Bool) {
-                self.received = received
-            }
-        }
-
-        public struct Body: Sendable {
-            public let payload: APIClient.AnyCodable
-
-            public init(payload: APIClient.AnyCodable) {
-                self.payload = payload
-            }
-
-            public static func body(_ value: APIClient.AnyCodable) -> Self {
-                .init(payload: value)
-            }
-        }
-
-        public struct Result: Sendable {
-            public let body: Response
-        }
-
-        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
-            case requestFailed(Swift.Error)
-            case cancelled
-            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
-            case unexpectedStatus(Int, Foundation.Data)
-            case badRequest(APIClient.ValidationError)
-        }
+    public var workspace: APIWorkspaceClient {
+        APIWorkspaceClient(_actor: self)
     }
 
     public enum UsersListUsers {
@@ -712,9 +505,10 @@ public actor APIClient {
             public static func body(
                 name: String,
                 email: String,
-                last_name: String? = nil
+                last_name: String? = nil,
+                phone: String? = nil
             ) -> Self {
-                .init(payload: API.CreateUserInput(name: name, email: email, last_name: last_name))
+                .init(payload: API.CreateUserInput(name: name, email: email, last_name: last_name, phone: phone))
             }
         }
 
@@ -1071,98 +865,376 @@ public actor APIClient {
         }
     }
 
-    /// Send a notification (discriminated by channel)
-    public func sendNotification(_ body: APIClient.SendNotification.Body) async throws(APIClient.SendNotification.Failure) -> APIClient.SendNotification.Result {
-        let path = "/notifications"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.SendNotification.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.SendNotification.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.SendNotification.Failure.self)
-        switch statusCode {
-        case 202:
-            let body = try Kizuna.decode(APIClient.SendNotification.Response202.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.SendNotification.Failure.self)
-            return APIClient.SendNotification.Result(body: body)
-        case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.SendNotification.Failure.self)
-            throw APIClient.SendNotification.Failure.badRequest(payload)
-        default:
-            throw APIClient.SendNotification.Failure.unexpectedStatus(statusCode, data)
-        }
-    }
+    public enum NotificationsSendNotification {
 
-    /// List events — exercises Date / enum / array query params
-    public func listEvents(_ query: APIClient.ListEvents.Query = .query()) async throws(APIClient.ListEvents.Failure) -> APIClient.ListEvents.Result {
-        let path = "/events"
-        var queryItems: [URLQueryItem] = []
-        queryItems += Kizuna.queryItems(name: "since", value: query.since)
-        queryItems += Kizuna.queryItems(name: "kind", value: query.kind)
-        queryItems += Kizuna.queryItems(name: "ids", value: query.ids)
-        queryItems += Kizuna.queryItems(name: "label", value: query.label)
-        queryItems += Kizuna.queryItems(name: "tagIds", value: query.tagIds)
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: queryItems, failure: APIClient.ListEvents.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
-        request.httpMethod = "GET"
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.ListEvents.Failure.self)
-        switch statusCode {
-        case 200:
-            let body = try Kizuna.decode(APIClient.ListEvents.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.ListEvents.Failure.self)
-            return APIClient.ListEvents.Result(body: body)
-        case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.ListEvents.Failure.self)
-            throw APIClient.ListEvents.Failure.badRequest(payload)
-        default:
-            throw APIClient.ListEvents.Failure.unexpectedStatus(statusCode, data)
-        }
-    }
+        public struct Response202: Codable, Sendable, Equatable {
+            public let accepted: Bool
 
-    /// Validate config — exercises generator bug coverage
-    public func validateConfig(_ body: APIClient.ValidateConfig.Body) async throws(APIClient.ValidateConfig.Failure) -> APIClient.ValidateConfig.Result {
-        let path = "/config/validate"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.ValidateConfig.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.ValidateConfig.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.ValidateConfig.Failure.self)
-        switch statusCode {
-        case 200:
-            let body = try Kizuna.decode(APIClient.ValidateConfig.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.ValidateConfig.Failure.self)
-            return APIClient.ValidateConfig.Result(body: body)
-        case 400:
-            if let payload = try? decoder.decode(API.ProblemDetails.self, from: data) {
-                throw APIClient.ValidateConfig.Failure.badRequest(payload)
+            public init(accepted: Bool) {
+                self.accepted = accepted
             }
-            if let payload = try? decoder.decode(APIClient.ValidationError.self, from: data) {
-                throw APIClient.ValidateConfig.Failure.validationError(payload)
+        }
+
+        public struct Body: Sendable {
+            public let payload: API.NotificationEvent
+
+            public init(payload: API.NotificationEvent) {
+                self.payload = payload
             }
-            throw APIClient.ValidateConfig.Failure.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status 400")), statusCode: statusCode, data: data)
-        case 401:
-            throw APIClient.ValidateConfig.Failure.unauthorized
-        default:
-            throw APIClient.ValidateConfig.Failure.unexpectedStatus(statusCode, data)
+
+            public static func body(_ value: API.NotificationEvent) -> Self {
+                .init(payload: value)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response202
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
         }
     }
 
-    /// Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen
-    public func webhook(_ body: APIClient.Webhook.Body) async throws(APIClient.Webhook.Failure) -> APIClient.Webhook.Result {
-        let path = "/webhook"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.Webhook.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.Webhook.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.Webhook.Failure.self)
-        switch statusCode {
-        case 200:
-            let body = try Kizuna.decode(APIClient.Webhook.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.Webhook.Failure.self)
-            return APIClient.Webhook.Result(body: body)
-        case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.Webhook.Failure.self)
-            throw APIClient.Webhook.Failure.badRequest(payload)
-        default:
-            throw APIClient.Webhook.Failure.unexpectedStatus(statusCode, data)
+    public enum NotificationsListEvents {
+
+        public enum QueryKind: String, Codable, Sendable {
+            case login = "login"
+            case logout = "logout"
+            case signup = "signup"
+        }
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let events: [API.EventRecord]
+            public let echo: ResponseEcho
+
+            public init(
+                events: [API.EventRecord],
+                echo: ResponseEcho
+            ) {
+                self.events = events
+                self.echo = echo
+            }
+        }
+
+        public struct ResponseEcho: Codable, Sendable, Equatable {
+            public let since: Date?
+            public let kind: ResponseEchoKind?
+            public let ids: [String]?
+            public let label: String?
+            public let tagIds: [String]?
+
+            public init(
+                since: Date? = nil,
+                kind: ResponseEchoKind? = nil,
+                ids: [String]? = nil,
+                label: String? = nil,
+                tagIds: [String]? = nil
+            ) {
+                self.since = since
+                self.kind = kind
+                self.ids = ids
+                self.label = label
+                self.tagIds = tagIds
+            }
+        }
+
+        public enum ResponseEchoKind: String, Codable, Sendable {
+            case login = "login"
+            case logout = "logout"
+            case signup = "signup"
+        }
+
+        public struct Query: Sendable {
+            public let since: Date?
+            public let kind: QueryKind?
+            public let ids: [String]?
+            public let label: String?
+            public let tagIds: [String]?
+
+            public init(
+                since: Date? = nil,
+                kind: QueryKind? = nil,
+                ids: [String]? = nil,
+                label: String? = nil,
+                tagIds: [String]? = nil
+            ) {
+                self.since = since
+                self.kind = kind
+                self.ids = ids
+                self.label = label
+                self.tagIds = tagIds
+            }
+
+            public static func query(
+                since: Date? = nil,
+                kind: QueryKind? = nil,
+                ids: [String]? = nil,
+                label: String? = nil,
+                tagIds: [String]? = nil
+            ) -> Self {
+                .init(since: since, kind: kind, ids: ids, label: label, tagIds: tagIds)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+        }
+    }
+
+    public enum NotificationsValidateConfig {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let `default`: String
+            public let interval: Int
+
+            private enum CodingKeys: String, CodingKey {
+                case `default`
+                case interval
+            }
+
+            public init(
+                `default`: String,
+                interval: Int
+            ) {
+                self.`default` = `default`
+                self.interval = interval
+            }
+        }
+
+        /// Validation result
+        public struct Response: Codable, Sendable, Equatable {
+            public let status: String
+
+            public init(status: String) {
+                self.status = status
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(
+                `default`: String,
+                interval: Int
+            ) -> Self {
+                .init(payload: Input(default: `default`, interval: interval))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(API.ProblemDetails)
+            case unauthorized
+            case validationError(APIClient.ValidationError)
+        }
+    }
+
+    public enum NotificationsWebhook {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let received: Bool
+
+            public init(received: Bool) {
+                self.received = received
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: APIClient.AnyCodable
+
+            public init(payload: APIClient.AnyCodable) {
+                self.payload = payload
+            }
+
+            public static func body(_ value: APIClient.AnyCodable) -> Self {
+                .init(payload: value)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+        }
+    }
+
+    public enum MembersListMembers {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let members: [API.User]
+
+            public init(members: [API.User]) {
+                self.members = members
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+        }
+    }
+
+    public enum MembersInviteMember {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let email: String
+
+            public init(email: String) {
+                self.email = email
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(email: String) -> Self {
+                .init(payload: Input(email: email))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: API.User
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case conflict(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
+        }
+    }
+
+    public enum WorkspaceGetWorkspace {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+
+            public init(
+                id: String,
+                name: String
+            ) {
+                self.id = id
+                self.name = name
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+        }
+    }
+
+    public enum WorkspaceDeleteWorkspace {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let ok: Bool
+
+            public init(ok: Bool) {
+                self.ok = ok
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+        }
+    }
+
+    public enum WorkspaceTransfer {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let toUserId: String
+
+            public init(toUserId: String) {
+                self.toUserId = toUserId
+            }
+        }
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let ok: Bool
+
+            public init(ok: Bool) {
+                self.ok = ok
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(toUserId: String) -> Self {
+                .init(payload: Input(toUserId: toUserId))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
         }
     }
 }
@@ -1509,6 +1581,227 @@ public struct APIHealthClient: Sendable {
             return APIClient.HealthHistory.Result(body: body)
         default:
             throw APIClient.HealthHistory.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct APINotificationsClient: Sendable {
+    private let _actor: APIClient
+
+    init(_actor: APIClient) {
+        self._actor = _actor
+    }
+
+    /// Send a notification (discriminated by channel)
+    public func sendNotification(_ body: APIClient.NotificationsSendNotification.Body) async throws(APIClient.NotificationsSendNotification.Failure) -> APIClient.NotificationsSendNotification.Result {
+        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/notifications"
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.NotificationsSendNotification.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.NotificationsSendNotification.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.NotificationsSendNotification.Failure.self)
+        switch statusCode {
+        case 202:
+            let body = try Kizuna.decode(APIClient.NotificationsSendNotification.Response202.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsSendNotification.Failure.self)
+            return APIClient.NotificationsSendNotification.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsSendNotification.Failure.self)
+            throw APIClient.NotificationsSendNotification.Failure.badRequest(payload)
+        default:
+            throw APIClient.NotificationsSendNotification.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// List events — exercises Date / enum / array query params
+    public func listEvents(_ query: APIClient.NotificationsListEvents.Query = .query()) async throws(APIClient.NotificationsListEvents.Failure) -> APIClient.NotificationsListEvents.Result {
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/events"
+        var queryItems: [URLQueryItem] = []
+        queryItems += Kizuna.queryItems(name: "since", value: query.since)
+        queryItems += Kizuna.queryItems(name: "kind", value: query.kind)
+        queryItems += Kizuna.queryItems(name: "ids", value: query.ids)
+        queryItems += Kizuna.queryItems(name: "label", value: query.label)
+        queryItems += Kizuna.queryItems(name: "tagIds", value: query.tagIds)
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: queryItems, failure: APIClient.NotificationsListEvents.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.NotificationsListEvents.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.NotificationsListEvents.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsListEvents.Failure.self)
+            return APIClient.NotificationsListEvents.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsListEvents.Failure.self)
+            throw APIClient.NotificationsListEvents.Failure.badRequest(payload)
+        default:
+            throw APIClient.NotificationsListEvents.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Validate contract — exercises generator bug coverage
+    public func validateConfig(_ body: APIClient.NotificationsValidateConfig.Body) async throws(APIClient.NotificationsValidateConfig.Failure) -> APIClient.NotificationsValidateConfig.Result {
+        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/contract/validate"
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.NotificationsValidateConfig.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.NotificationsValidateConfig.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.NotificationsValidateConfig.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.NotificationsValidateConfig.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsValidateConfig.Failure.self)
+            return APIClient.NotificationsValidateConfig.Result(body: body)
+        case 400:
+            if let payload = try? decoder.decode(API.ProblemDetails.self, from: data) {
+                throw APIClient.NotificationsValidateConfig.Failure.badRequest(payload)
+            }
+            if let payload = try? decoder.decode(APIClient.ValidationError.self, from: data) {
+                throw APIClient.NotificationsValidateConfig.Failure.validationError(payload)
+            }
+            throw APIClient.NotificationsValidateConfig.Failure.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status 400")), statusCode: statusCode, data: data)
+        case 401:
+            throw APIClient.NotificationsValidateConfig.Failure.unauthorized
+        default:
+            throw APIClient.NotificationsValidateConfig.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen
+    public func webhook(_ body: APIClient.NotificationsWebhook.Body) async throws(APIClient.NotificationsWebhook.Failure) -> APIClient.NotificationsWebhook.Result {
+        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/webhook"
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.NotificationsWebhook.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.NotificationsWebhook.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.NotificationsWebhook.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.NotificationsWebhook.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsWebhook.Failure.self)
+            return APIClient.NotificationsWebhook.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsWebhook.Failure.self)
+            throw APIClient.NotificationsWebhook.Failure.badRequest(payload)
+        default:
+            throw APIClient.NotificationsWebhook.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct APIMembersClient: Sendable {
+    private let _actor: APIClient
+
+    init(_actor: APIClient) {
+        self._actor = _actor
+    }
+
+    /// List workspace members
+    public func listMembers() async throws(APIClient.MembersListMembers.Failure) -> APIClient.MembersListMembers.Result {
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/workspace/members"
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.MembersListMembers.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.MembersListMembers.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.MembersListMembers.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.MembersListMembers.Failure.self)
+            return APIClient.MembersListMembers.Result(body: body)
+        default:
+            throw APIClient.MembersListMembers.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Invite a member to the workspace
+    public func inviteMember(_ body: APIClient.MembersInviteMember.Body) async throws(APIClient.MembersInviteMember.Failure) -> APIClient.MembersInviteMember.Result {
+        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/workspace/members"
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.MembersInviteMember.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.MembersInviteMember.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.MembersInviteMember.Failure.self)
+        switch statusCode {
+        case 201:
+            let body = try Kizuna.decode(API.User.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
+            return APIClient.MembersInviteMember.Result(body: body)
+        case 409:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
+            throw APIClient.MembersInviteMember.Failure.conflict(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
+            throw APIClient.MembersInviteMember.Failure.badRequest(payload)
+        default:
+            throw APIClient.MembersInviteMember.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct APIWorkspaceClient: Sendable {
+    private let _actor: APIClient
+
+    init(_actor: APIClient) {
+        self._actor = _actor
+    }
+
+    /// Get workspace info
+    public func getWorkspace() async throws(APIClient.WorkspaceGetWorkspace.Failure) -> APIClient.WorkspaceGetWorkspace.Result {
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/workspace"
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceGetWorkspace.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.WorkspaceGetWorkspace.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.WorkspaceGetWorkspace.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.WorkspaceGetWorkspace.Failure.self)
+            return APIClient.WorkspaceGetWorkspace.Result(body: body)
+        default:
+            throw APIClient.WorkspaceGetWorkspace.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Delete the workspace — owner-only via the auth map
+    public func deleteWorkspace() async throws(APIClient.WorkspaceDeleteWorkspace.Failure) -> APIClient.WorkspaceDeleteWorkspace.Result {
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/workspace"
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "DELETE"
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.WorkspaceDeleteWorkspace.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
+            return APIClient.WorkspaceDeleteWorkspace.Result(body: body)
+        default:
+            throw APIClient.WorkspaceDeleteWorkspace.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Transfer ownership — requires both user and member(owner)
+    public func transfer(_ body: APIClient.WorkspaceTransfer.Body) async throws(APIClient.WorkspaceTransfer.Failure) -> APIClient.WorkspaceTransfer.Result {
+        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()
+        let path = "/workspace/transfer"
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceTransfer.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.WorkspaceTransfer.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.WorkspaceTransfer.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.WorkspaceTransfer.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.WorkspaceTransfer.Failure.self)
+            return APIClient.WorkspaceTransfer.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.WorkspaceTransfer.Failure.self)
+            throw APIClient.WorkspaceTransfer.Failure.badRequest(payload)
+        default:
+            throw APIClient.WorkspaceTransfer.Failure.unexpectedStatus(statusCode, data)
         }
     }
 }

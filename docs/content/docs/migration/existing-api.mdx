@@ -127,7 +127,7 @@ createExpressEndpoints(api, app, {
 });
 ```
 
-This applies to every error — built-in 404/405/415, validation 400s, guard denials, your handlers' `error(...)` — and the option exists on every first-party adapter (`createHonoEndpoints`, `handleNextRequest`, the Fastify plugin). Remove the branch once the old clients are gone. kizuna doesn't dictate the signal — most APIs don't send a useful `Accept`, so you negotiate on whatever you've got.
+This applies to every error — built-in 404/405/415, validation 400s, guard denials, your handlers' `error(...)` — and the option exists on every first-party adapter (`createExpressEndpoints` on Hono, the Fastify plugin's options; Next.js maps inbound errors via `onError`). Remove the branch once the old clients are gone. kizuna doesn't dictate the signal — most APIs don't send a useful `Accept`, so you negotiate on whatever you've got.
 
 (Doing a coordinated cutover with no per-client split? Skip the branch, always return the legacy shape, and delete `formatError` entirely on flip day. The same `request` branch also lets a future error standard ship alongside RFC 9457 without a hard cutover.)
 

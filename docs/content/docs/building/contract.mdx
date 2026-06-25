@@ -1,28 +1,48 @@
 ---
 title: Contract
-description: Define the routes shared between your server and client.
+description: Define your routes and bundle them into a contract — the source of truth shared by your server and clients.
 ---
 
-The contract is a plain TypeScript object that describes every route in your API — methods, paths, Zod schemas for inputs and outputs. Both your server and client import it.
+The contract is the source of truth for your API. Building one is three small steps:
 
-## `createContract`
+1. **`kizuna`** — create the typed factory once and destructure `k`.
+2. **`k.routes`** — describe each endpoint in a group: method, path, and Zod schemas.
+3. **`k.contract`** — bundle those groups (plus optional settings) into the object you share everywhere.
 
-```ts title="src/contract.ts"
-import { createContract } from '@ts-kizuna/core';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+You hand the result to [`createRouter`](/docs/building/router) on the server and [`createClient`](/docs/clients/fetch) on every client. This page covers defining it; the [Router](/docs/building/router) and [Mounting](/docs/building/mounting) pages cover implementing and serving it.
+
+## Create the factory
+
+Set up `kizuna` once — usually in a `k.ts` file — and export `k`. Pass a tag set so route groups have a tag to sit under; the keys become the allowed group names. Then import `k` wherever you define routes.
+
+```ts title="packages/contract/src/k.ts"
+import { kizuna, createTags } from '@ts-kizuna/core';
+
+const tags = createTags({
+    users: 'Users',
+});
+
+export const { k } = kizuna({
+    tags,
+});
+```
+
+## Define your routes
+
+Call `k.routes` with a tag and your routes. For each one, pick a method and path, then describe what it takes in (`body`, `query`, `headers`) and what it sends back (`responses`) with Zod schemas.
+
+```ts title="packages/contract/src/routes.ts"
 import { z } from 'zod';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { k } from './k';
 
-export const UserSchema = z
-    .object({
-        id: z.string(),
-        name: z.string(),
-        email: z.email(),
-    })
-    .meta({
-        id: 'User',
-    });
+export const UserSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.email(),
+});
 
-export const contract = createContract({
+export const usersRoutes = k.routes('users', {
     listUsers: {
         method: 'GET',
         path: '/users',
@@ -60,16 +80,16 @@ export const contract = createContract({
 });
 ```
 
-## Route fields
+### Route fields
 
 | Field         | Required | Description                                                                                    |
 | ------------- | -------- | ---------------------------------------------------------------------------------------------- |
 | `method`      | Yes      | `GET` `POST` `PUT` `PATCH` `DELETE` `HEAD` `OPTIONS`                                           |
 | `path`        | Yes      | URL path — use `:name` for path parameters                                                     |
+| `responses`   | Yes      | Response schemas keyed by status code                                                          |
 | `body`        | —        | Request body schema                                                                            |
 | `query`       | —        | Query string schema                                                                            |
 | `headers`     | —        | Request headers schema                                                                         |
-| `responses`   | Yes      | Response schemas keyed by status code                                                          |
 | `contentType` | —        | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
 | `summary`     | —        | Short description shown in OpenAPI                                                             |
 | `tags`        | —        | OpenAPI tags                                                                                   |
@@ -87,11 +107,11 @@ Values in the URL and in headers always arrive as strings. ts-kizuna coerces the
 
 Arrays of these coerce too (`z.array(z.number())`). The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without any manual formatting. Request bodies are sent as JSON and keep their types, so they are never coerced.
 
-Because coercion is built in, **`z.coerce` is not supported** — `createContract` throws if any schema uses it. Use the plain schema (`z.number()`, `z.date()`, `z.bigint()`) instead. When you genuinely want to receive a different type than you send, `z.string().transform(...)` is the explicit, type-safe way to do it.
+Because coercion is built in, **`z.coerce` is not supported** — `k.routes` throws if any schema uses it. Use the plain schema (`z.number()`, `z.date()`, `z.bigint()`) instead. When you genuinely want to receive a different type than you send, `z.string().transform(...)` is the explicit, type-safe way to do it.
 
-## Response schemas
+### Response schemas
 
-Simple form — a Zod schema per status code:
+The simple form is one Zod schema per status code:
 
 ```ts
 responses: {
@@ -100,7 +120,16 @@ responses: {
 },
 ```
 
-With typed response headers:
+Use `z.void()` for a status that carries no body:
+
+```ts
+responses: {
+    204: z.void(),
+    404: ProblemDetailsSchema,
+},
+```
+
+To type response headers, give the status a `{ body, headers }` object:
 
 ```ts
 responses: {
@@ -110,18 +139,25 @@ responses: {
             'x-request-id': z.string().optional(),
         }),
     },
-    404: ProblemDetailsSchema,
 },
 ```
 
-No-content responses — use `z.void()` when a status code carries no body:
+## Bundle into a contract
 
-```ts
-responses: {
-    204: z.void(),
-    404: ProblemDetailsSchema,
-},
+Assemble your route groups with `k.contract` and default-export the result. This is the object `client` and `createApi` consume.
+
+```ts title="packages/contract/src/contract.ts"
+import { k } from './k';
+import { usersRoutes } from './routes';
+
+export const contract = k.contract({
+    routes: {
+        users: usersRoutes,
+    },
+});
 ```
+
+API-wide settings — tags and [`validation.issueCodes`](/docs/reference/add-coded-issue) for custom validation codes — are configured on `kizuna` and carried onto every contract `k.contract` produces, so you set them once.
 
 Non-JSON responses — set `contentType` to send the body as-is instead of JSON. Responses default to `application/json` (errors to `application/problem+json`); declare a non-JSON body as `z.string()`:
 
@@ -147,11 +183,15 @@ responses: {
 },
 ```
 
-## Models
+That's everything you need to define an API. The rest of this page is optional — reach for it when you need it.
 
-Use [`createModel`](/docs/reference/create-model) to give a Zod schema a name that the OpenAPI and Swift generators pick up.
+## Going further
 
-```ts title="src/contract.ts"
+### Naming schemas with models
+
+By default the generators inline each schema wherever it appears. Use [`createModel`](/docs/reference/create-model) to give a schema a name they can reuse:
+
+```ts
 import { createModel } from '@ts-kizuna/core';
 
 export const UserSchema = createModel({
@@ -165,67 +205,71 @@ export const UserSchema = createModel({
 });
 ```
 
-Without a title, the generators inline the schema everywhere it appears. With `createModel`:
+- **OpenAPI** — extracted into `components.schemas.User`; every usage becomes a `$ref`
+- **Swift** — emitted as a shared `public struct User`
+- **TypeScript** — pair it with an exported type (see [Exporting types](#exporting-types))
 
-- **OpenAPI** — the schema is extracted into `components.schemas.User` and every usage becomes a `$ref: '#/components/schemas/User'` reference
-- **Swift** — the schema becomes a named `public struct User` in the generated client, shared across all routes that reference it
-- **TypeScript** — export a type alongside the schema with `export type User = z.infer<typeof UserSchema>` (see [Exporting types from schemas](#exporting-types-from-schemas))
+### Splitting routes across files
 
-## Nested contracts
+Large contracts split into groups. Declare the tags once with [`createTags`](/docs/reference/create-tags), pass them to `kizuna`, then define each group with `k.routes` in its own file:
 
-Split your contract across files using sub-contracts. Use [`createTag`](/docs/reference/create-tag) to name and describe each group:
+```ts title="contract/tags.ts"
+import { createTags } from '@ts-kizuna/core';
 
-```ts title="contracts/tags.ts"
-import { createTag } from '@ts-kizuna/core';
-
-export const Users = createTag({
-    title: 'Users',
-    description: 'User management endpoints',
-});
-
-export const Health = createTag({
-    title: 'Health',
-    description: 'Service health and uptime monitoring',
+export const tags = createTags({
+    users: {
+        title: 'Users',
+        description: 'User management endpoints',
+    },
+    health: 'Health',
 });
 ```
 
-```ts title="contracts/users.ts"
-import { createContract } from '@ts-kizuna/core';
-import { Users } from './tags';
+```ts title="contract/k.ts"
+import { kizuna } from '@ts-kizuna/core';
+import { tags } from './tags';
 
-export const usersContract = createContract(Users, {
+export const { k } = kizuna({
+    tags,
+});
+```
+
+```ts title="contract/users.ts"
+import { k } from './k';
+
+export const usersRoutes = k.routes('users', {
     listUsers: { ... },
     createUser: { ... },
 });
 ```
 
-```ts title="contract.ts"
-export const contract = createContract({
-    users: usersContract,
-    health: healthContract,
+```ts title="contract/contract.ts"
+import { k } from './k';
+import { usersRoutes } from './users';
+import { healthRoutes } from './health';
+
+export const contract = k.contract({
+    routes: {
+        users: usersRoutes,
+        health: healthRoutes,
+    },
 });
 ```
 
-The tag's `title` becomes the OpenAPI tag for all routes in that sub-contract. The optional `description` is included in the OpenAPI tag definition.
-
-Routes can also reference tags directly for cross-tagging:
+The group tag's `title` becomes the OpenAPI tag for every route in the group; the `description` is included in the tag definition. A route can also cross-tag by listing tag keys directly:
 
 ```ts
-import { Users, Health } from './tags';
-
 cancelAccount: {
     method: 'POST',
     path: '/account/cancel',
-    tags: [Users, Health],
-    ...
+    tags: ['users', 'health'],
+    // ...
 },
 ```
 
-## Deprecating routes and fields
+### Deprecating routes and fields
 
-To deprecate a route or a response field, add a `/** @deprecated */` JSDoc tag directly above it. You can optionally include a migration message: `/** @deprecated use createUser instead */`.
-
-**Route:**
+Add a `/** @deprecated */` JSDoc tag above a route or a response field — optionally with a message, `/** @deprecated use createUser instead */`.
 
 ```ts
 /**
@@ -241,8 +285,6 @@ deleteUser: {
     },
 },
 ```
-
-**Field:**
 
 ```ts
 getUser: {
@@ -263,19 +305,17 @@ getUser: {
 
 IDEs show a strikethrough on deprecated routes and fields right away. To carry the tags into the OpenAPI spec and Swift client, add the one-time build step in [Deprecations](/docs/deprecations).
 
-## Exporting types from schemas
+### Exporting types
 
-Create a separate `types.ts` file that imports your schemas and exports inferred types. This keeps schemas and types cleanly separated:
+Infer TypeScript types from your schemas in a separate `types.ts` so consumers can import them without pulling in runtime code:
 
 ```ts title="packages/contract/src/types.ts"
 import type { z } from 'zod';
-import { UserSchema, CreateUserSchema } from './contract';
+import { UserSchema, CreateUserSchema } from './routes';
 
 export type User = z.infer<typeof UserSchema>;
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 ```
-
-Consumers import the types directly:
 
 ```ts
 import type { User } from '@shared/contract/types';
@@ -287,6 +327,11 @@ function UserCard({ user }: { user: User }) {
 
 ## Reference
 
-- [`createContract`](/docs/reference/create-contract)
+- [`kizuna`](/docs/reference/kizuna)
 - [`createModel`](/docs/reference/create-model)
-- [`createTag`](/docs/reference/create-tag)
+- [`createTags`](/docs/reference/create-tags)
+
+## Next steps
+
+- [Router](/docs/building/router) — implement a handler for each route
+- [Mounting](/docs/building/mounting) — bind the router to the contract and serve it

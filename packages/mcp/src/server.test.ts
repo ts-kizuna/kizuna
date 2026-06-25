@@ -1,13 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { createApi as coreCreateApi, ROUTER_META } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildToolDefinitions, createMcpServer } from './server.js';
 
-const contract = createContract({
-    users: createContract({
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
+
+const contractRoutes = k.routes('api', {
+    users: {
         listUsers: {
             method: 'GET',
             path: '/users',
@@ -57,7 +63,7 @@ const contract = createContract({
                 }),
             },
         },
-    }),
+    },
     health: {
         method: 'GET',
         path: '/health',
@@ -110,6 +116,10 @@ const contract = createContract({
             }),
         },
     },
+});
+
+const contract = k.contract({
+    routes: contractRoutes,
 });
 
 const router = {
@@ -183,7 +193,7 @@ const router = {
 };
 
 const buildApi = (testRouter: Record<string, unknown> = router) =>
-    Object.assign(coreCreateApi(contract), {
+    Object.assign(coreCreateApi(contract.routes), {
         [ROUTER_META]: testRouter,
     });
 
@@ -219,7 +229,7 @@ const connectMcpClient = async (testApi = api, options?: Parameters<typeof creat
 
 describe('buildToolDefinitions', () => {
     it('generates tool definitions from a contract', () => {
-        const definitions = buildToolDefinitions(contract, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const names = definitions.map((definition) => definition.name);
 
         expect(names).toContain('users.listUsers');
@@ -230,14 +240,14 @@ describe('buildToolDefinitions', () => {
     });
 
     it('excludes multipart/form-data routes by default', () => {
-        const definitions = buildToolDefinitions(contract, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const names = definitions.map((definition) => definition.name);
 
         expect(names).not.toContain('uploadAvatar');
     });
 
     it('includes multipart routes when routeFilter allows them', () => {
-        const definitions = buildToolDefinitions(contract, {
+        const definitions = buildToolDefinitions(contract.routes, {
             routeFilter: () => true,
         });
         const names = definitions.map((definition) => definition.name);
@@ -246,7 +256,7 @@ describe('buildToolDefinitions', () => {
     });
 
     it('builds tool descriptions from route summary', () => {
-        const definitions = buildToolDefinitions(contract, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const listUsers = definitions.find((definition) => definition.name === 'users.listUsers')!;
 
         expect(listUsers.description).toContain('List users with pagination');
@@ -254,7 +264,7 @@ describe('buildToolDefinitions', () => {
     });
 
     it('falls back to METHOD /path when no summary', () => {
-        const definitions = buildToolDefinitions(contract, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const health = definitions.find((definition) => definition.name === 'health')!;
 
         expect(health.description).toContain('GET /health');
@@ -263,7 +273,7 @@ describe('buildToolDefinitions', () => {
 
 describe('buildToolDefinitions — input schema', () => {
     it('puts query under a query key', () => {
-        const definitions = buildToolDefinitions(contract, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const listUsers = definitions.find((definition) => definition.name === 'users.listUsers')!;
 
         expect(listUsers.inputSchema.shape).toBeDefined();
@@ -274,7 +284,7 @@ describe('buildToolDefinitions — input schema', () => {
     });
 
     it('puts path params under a params key', () => {
-        const definitions = buildToolDefinitions(contract, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const getUser = definitions.find((definition) => definition.name === 'users.getUser')!;
 
         expect(getUser.inputSchema.shape).toBeDefined();
@@ -283,7 +293,7 @@ describe('buildToolDefinitions — input schema', () => {
     });
 
     it('puts body under a body key', () => {
-        const definitions = buildToolDefinitions(contract, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const createUser = definitions.find((definition) => definition.name === 'users.createUser')!;
 
         expect(createUser.inputSchema.shape).toBeDefined();
@@ -292,14 +302,14 @@ describe('buildToolDefinitions — input schema', () => {
     });
 
     it('returns undefined shape for routes with no inputs', () => {
-        const definitions = buildToolDefinitions(contract, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const health = definitions.find((definition) => definition.name === 'health')!;
 
         expect(health.inputSchema.shape).toBeUndefined();
     });
 
     it('excludes void body from the input schema', () => {
-        const definitions = buildToolDefinitions(contract, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const ping = definitions.find((definition) => definition.name === 'pingUser')!;
 
         expect(ping.inputSchema.hasParams).toBe(true);
@@ -309,7 +319,7 @@ describe('buildToolDefinitions — input schema', () => {
     });
 
     it('handles non-object body (discriminated union)', () => {
-        const unionContract = createContract({
+        const unionContractRoutes = k.routes('api', {
             sendNotification: {
                 method: 'POST',
                 path: '/notifications',
@@ -331,7 +341,11 @@ describe('buildToolDefinitions — input schema', () => {
             },
         });
 
-        const definitions = buildToolDefinitions(unionContract);
+        const unionContract = k.contract({
+            routes: unionContractRoutes,
+        });
+
+        const definitions = buildToolDefinitions(unionContract.routes);
         const send = definitions.find((definition) => definition.name === 'sendNotification')!;
 
         expect(send.inputSchema.hasBody).toBe(true);
@@ -339,7 +353,7 @@ describe('buildToolDefinitions — input schema', () => {
     });
 
     it('combines params, query, and body for complex routes', () => {
-        const complexContract = createContract({
+        const complexContractRoutes = k.routes('api', {
             updateItem: {
                 method: 'PUT',
                 path: '/items/:id',
@@ -357,7 +371,11 @@ describe('buildToolDefinitions — input schema', () => {
             },
         });
 
-        const definitions = buildToolDefinitions(complexContract);
+        const complexContract = k.contract({
+            routes: complexContractRoutes,
+        });
+
+        const definitions = buildToolDefinitions(complexContract.routes);
         const update = definitions.find((definition) => definition.name === 'updateItem')!;
 
         expect(update.inputSchema.hasParams).toBe(true);

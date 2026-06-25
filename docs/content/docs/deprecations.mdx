@@ -6,7 +6,7 @@ description: Mark routes and fields @deprecated and have it reach your IDE, Open
 A `/** @deprecated */` JSDoc tag on a route or field produces a strikethrough in editors, `deprecated: true` in the OpenAPI spec, and `@available(*, deprecated)` in the Swift client. Text after `@deprecated` becomes the Swift `@available` message.
 
 ```ts title="src/contract.ts"
-export const contract = createContract({
+export const usersRoutes = k.routes('users', {
     /**
      * @deprecated use `archiveUser` instead
      */

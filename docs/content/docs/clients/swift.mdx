@@ -1,23 +1,23 @@
 ---
 title: Swift
-description: Generate a native Swift client from your contract with the ts-kizuna-swift CLI.
+description: Generate a native Swift client from your routes with the ts-kizuna-swift CLI.
 ---
 
-`@ts-kizuna/swift` generates a native Swift client from your ts-kizuna contract. The generated client uses `URLSession` and `Codable` — no third-party Swift dependencies required.
+`@ts-kizuna/swift` generates a native Swift client from your ts-kizuna routes. The generated client uses `URLSession` and `Codable` — no third-party Swift dependencies required.
 
 <InstallTabs packageName="@ts-kizuna/swift" />
 
 ## Generate
 
 ```sh
-ts-kizuna-swift generate --contract src/contract.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name MyAPI
+ts-kizuna-swift generate --contract src/contract.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
 ```
 
-| Flag               | Description                                               |
-| ------------------ | --------------------------------------------------------- |
-| `--contract`       | Path to the TypeScript file that exports the contract     |
-| `--output`         | Output path for the generated `.swift` file               |
-| `--namespace-name` | Public enum that wraps all generated types (e.g. `MyAPI`) |
+| Flag               | Description                                                     |
+| ------------------ | --------------------------------------------------------------- |
+| `--contract`       | Path to the TypeScript file default-exporting your `k.contract` |
+| `--output`         | Output path for the generated `.swift` file                     |
+| `--namespace-name` | Public enum wrapping all generated types (e.g. `API`)           |
 
 The CLI reads the contract at runtime using `jiti` — no build step needed. Add the generated file to your Xcode project or Swift package as a regular source file.
 
@@ -91,7 +91,7 @@ public actor APIClient {
 
 ## Deprecation
 
-Routes and fields marked `/** @deprecated */` in the contract emit `@available(*, deprecated)` in the generated Swift code:
+Routes and fields marked `/** @deprecated */` in the routes emit `@available(*, deprecated)` in the generated Swift code:
 
 ```swift
 @available(*, deprecated)
@@ -107,7 +107,7 @@ You can add a script to your `package.json` to regenerate the client whenever th
 ```json title="package.json"
 {
     "scripts": {
-        "generate:swift": "ts-kizuna-swift generate --contract src/contract.ts --output ../ios/MyApp/Generated/APIClient.swift --namespace-name MyAPI"
+        "generate:swift": "ts-kizuna-swift generate --contract src/contract.ts --output ../ios/MyApp/Generated/APIClient.swift --namespace-name API"
     }
 }
 ```

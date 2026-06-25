@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { Contract } from '@ts-kizuna/core';
+import type { Routes } from '@ts-kizuna/core';
 import { type ApiWithRouter } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
@@ -33,34 +33,24 @@ export interface McpEndpointOptions {
     version?: string;
 
     /**
-     * Predicate to filter which routes become MCP tools.
-     * Return false to exclude a route.
-     * By default, multipart/form-data and application/x-www-form-urlencoded routes are excluded.
+     * Predicate to filter which routes become MCP tools. Return `false` to
+     * exclude a route. By default, `multipart/form-data` and
+     * `application/x-www-form-urlencoded` routes are excluded.
      */
     routeFilter?: McpServerOptions['routeFilter'];
 }
 
 /**
- * Mount an MCP endpoint on an Express app.
+ * Mount an MCP endpoint on an Express app. Each route becomes an MCP tool;
+ * calling the tool invokes the api's handler for that route.
  *
- * Each route in the contract becomes an MCP tool. When an AI assistant calls
- * a tool, the corresponding handler from the api's router is invoked directly.
- *
+ * @example
  * ```ts
- * import { createExpressEndpoints } from '@ts-kizuna/express';
- * import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
- * import { api } from './lib/api';
- *
  * const app = express();
- * app.use(express.json());
- *
- * createExpressEndpoints(api, app);
- * createMcpEndpoint(api, app);
- *
- * app.listen(3000);
+ * mountMcp(api, app);
  * ```
  */
-export const createMcpEndpoint = (api: Contract & ApiWithRouter, app: AppLike, options?: McpEndpointOptions): void => {
+export const createMcpEndpoint = (api: Routes & ApiWithRouter, app: AppLike, options?: McpEndpointOptions): void => {
     const mountPath = options?.path ?? '/mcp';
 
     app.post(mountPath, async (request: Request, response: Response) => {

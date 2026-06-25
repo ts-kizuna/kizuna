@@ -1,5 +1,5 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import type { Contract } from '@ts-kizuna/core';
+import type { Routes } from '@ts-kizuna/core';
 import { type ApiWithRouter } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
@@ -27,9 +27,9 @@ export interface McpEndpointOptions {
     version?: string;
 
     /**
-     * Predicate to filter which routes become MCP tools.
-     * Return false to exclude a route.
-     * By default, multipart/form-data and application/x-www-form-urlencoded routes are excluded.
+     * Predicate to filter which routes become MCP tools. Return `false` to
+     * exclude a route. By default, `multipart/form-data` and
+     * `application/x-www-form-urlencoded` routes are excluded.
      */
     routeFilter?: McpServerOptions['routeFilter'];
 }
@@ -53,21 +53,17 @@ const methodNotAllowed = (message: string): Response =>
     );
 
 /**
- * Create MCP route handlers for a Next.js App Router route file.
+ * Serve an MCP endpoint from a Next.js App Router route file. Each route
+ * becomes an MCP tool; calling the tool invokes the api's handler for that
+ * route.
  *
- * Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP
- * Streamable HTTP transport requires. Each route in the contract becomes
- * an MCP tool that invokes the corresponding handler directly.
- *
+ * @example
  * ```ts
  * // app/mcp/route.ts
- * import { createMcpEndpoint } from '@ts-kizuna/mcp/next';
- * import { api } from '../../lib/api';
- *
- * export const { GET, POST, DELETE } = createMcpEndpoint(api);
+ * export const { GET, POST, DELETE } = mcpEndpoints(api);
  * ```
  */
-export const createMcpEndpoint = (api: Contract & ApiWithRouter, options?: McpEndpointOptions): McpEndpoints => {
+export const createMcpEndpoint = (api: Routes & ApiWithRouter, options?: McpEndpointOptions): McpEndpoints => {
     const POST: HttpHandler = async (request: Request) => {
         const server = createMcpServer(api, {
             ...options,

@@ -1,6 +1,13 @@
-import type { Contract, MiddlewareMap } from '@ts-kizuna/core';
-import { createApi as coreCreateApi, type ApiWithRouter, ROUTER_META, MIDDLEWARE_META } from '@ts-kizuna/core/adapter';
-import { handleNextRequest, type Router, type NextHandlerOptions, type NextMiddlewareHandler } from './handler.js';
+import type { Routes, Contract, TagOptions } from '@ts-kizuna/core';
+import {
+    createApi as coreApi,
+    type ApiWithRouter,
+    type MiddlewareMap,
+    type Router as CoreRouter,
+    ROUTER_META,
+    MIDDLEWARE_META,
+} from '@ts-kizuna/core/adapter';
+import { handleNextRequest, type Router, type NextHandlerOptions, type NextHandlerContext, type NextMiddlewareHandler } from './handler.js';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export type {
@@ -32,7 +39,7 @@ type NextApiWithRouter = ApiWithRouter & {
     readonly [MIDDLEWARE_META]?: unknown;
 };
 
-export type NextApi<R extends Contract = Contract> = R &
+export type NextApi<R extends Routes = Routes> = R &
     ApiWithRouter & {
         readonly [_ON_ERROR]?: NextHandlerOptions['onError'];
         readonly [MIDDLEWARE_META]?: unknown;
@@ -42,36 +49,30 @@ export type NextApi<R extends Contract = Contract> = R &
 /**
  * Bind typed handler implementations to a contract.
  *
- * ```ts
- * // lib/router.ts
- * import { createRouter } from '@ts-kizuna/next';
- * import { contract } from './contract';
- *
+ * @example
  * export const router = createRouter(contract, {
  *     listUsers: ({ query }) => ({ status: 200, body: { users: [], total: 0 } }),
  *     createUser: ({ body }) => ({ status: 201, body: { id: '1', ...body } }),
  * });
- * ```
  */
-export const createRouter = <T extends Contract>(_contract: T, router: Router<T>): Router<T> => router;
+export const createRouter = <const R extends Routes>(
+    _contract: Contract<R, Record<string, TagOptions>, string>,
+    router: Router<Contract<R>>
+): Router<Contract<R>> => router;
 
 /**
  * Create endpoints for a Next.js App Router catch-all route.
  *
- * ```ts
+ * @example
  * // app/api/[...ts-kizuna]/route.ts
- * import { createNextEndpoints } from '@ts-kizuna/next';
- * import { api } from '../../lib/api';
- *
  * export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
  *     basePath: '/api',
  * });
- * ```
  */
 export function createNextEndpoints(api: NextApiWithRouter, options?: NextHandlerOptions): HttpHandlers {
-    const middlewareMap = api[MIDDLEWARE_META] as MiddlewareMap<Contract, NextMiddlewareHandler> | undefined;
+    const middlewareMap = api[MIDDLEWARE_META] as MiddlewareMap<Routes, NextMiddlewareHandler> | undefined;
     const handler = (request: NextRequest) =>
-        handleNextRequest(request, api as unknown as Contract, api[ROUTER_META] as Router<Contract>, middlewareMap, {
+        handleNextRequest(request, api as unknown as Routes, api[ROUTER_META] as CoreRouter<Routes, NextHandlerContext>, middlewareMap, {
             basePath: options?.basePath,
             onError: options?.onError ?? api[_ON_ERROR],
             requestMiddleware: options?.requestMiddleware,
@@ -89,38 +90,23 @@ export function createNextEndpoints(api: NextApiWithRouter, options?: NextHandle
 }
 
 /**
- * Define a fully-typed Next.js API — routes and handlers in one call.
+ * Bind a contract to its router and per-route middleware.
  *
- * ```ts
- * // lib/api.ts
- * import { createApi } from '@ts-kizuna/next';
- * import { contract } from './contract';
- * import { handlers } from './handlers';
- *
+ * @example
  * export const api = createApi({
  *     contract,
  *     router,
+ *     middleware,
  * });
- * ```
- *
- * ```ts
- * // app/api/[...ts-kizuna]/route.ts
- * import { createNextEndpoints } from '@ts-kizuna/next';
- * import { api } from '../../lib/api';
- *
- * export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
- *     basePath: '/api',
- * });
- * ```
  */
-export const createApi = <const R extends Contract>(options: {
-    contract: R;
-    router: Router<R>;
+export const createApi = <const R extends Routes>(options: {
+    contract: Contract<R, Record<string, TagOptions>, string>;
+    router: Router<Contract<R>>;
     middleware?: MiddlewareMap<R, NextMiddlewareHandler>;
     onError?: NextHandlerOptions['onError'];
 }): NextApi<R> => {
     const { contract, router, middleware, onError } = options;
-    const spec = coreCreateApi(contract);
+    const spec = coreApi(contract.routes);
     return Object.assign(spec, {
         [ROUTER_META]: router,
         [MIDDLEWARE_META]: middleware,

@@ -2,12 +2,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import express from 'express';
 import { z } from 'zod';
 import type { Server, AddressInfo } from 'node:net';
-import { createContract } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createClient, type Client } from '@ts-kizuna/fetch';
 import { createApi, createExpressEndpoints } from './server.js';
 
-const contract = createContract({
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
+
+const contractRoutes = k.routes('api', {
     createUser: {
         method: 'POST',
         path: '/users',
@@ -37,9 +43,13 @@ const contract = createContract({
     },
 });
 
+const contract = k.contract({
+    routes: contractRoutes,
+});
+
 describe('end-to-end: typed client → Express server', () => {
     let server: Server;
-    let client: Client<typeof contract>;
+    let client: Client<typeof contract.routes>;
     const users = new Map<string, { id: string; name: string; email: string }>();
 
     beforeAll(async () => {
@@ -134,7 +144,7 @@ describe('end-to-end: typed client → Express server', () => {
     });
 });
 
-const contractWithResponseHeaders = createContract({
+const contractWithResponseHeadersRoutes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -153,9 +163,13 @@ const contractWithResponseHeaders = createContract({
     },
 });
 
+const contractWithResponseHeaders = k.contract({
+    routes: contractWithResponseHeadersRoutes,
+});
+
 describe('end-to-end: response headers', () => {
     let server: Server;
-    let client: Client<typeof contractWithResponseHeaders>;
+    let client: Client<typeof contractWithResponseHeaders.routes>;
 
     beforeAll(async () => {
         const app = express();

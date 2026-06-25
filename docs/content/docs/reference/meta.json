@@ -1,15 +1,15 @@
 {
     "title": "API Reference",
     "pages": [
-        "create-contract",
+        "kizuna",
         "create-model",
-        "create-tag",
+        "create-tags",
         "create-router",
         "create-middleware",
         "create-guard",
+        "create-api",
         "problem-details-schema",
         "binary-and-file-schemas",
-        "create-api",
         "create-client",
         "is-validation-error",
         "add-coded-issue",

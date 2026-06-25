@@ -1,31 +1,35 @@
 ---
 title: Router
-description: Implement route handlers with full type inference from the contract.
+description: Implement a handler for each route, with full type inference from the contract.
 ---
 
-A router implements each route in your contract.
+The handlers are your server's implementation of the contract — one function per route. Inputs arrive validated and typed, and return values are checked against the contract's declared responses. Bind them with `createRouter`, then [bind and mount them](/docs/building/mounting).
 
 ## `createRouter`
 
-```ts title="src/lib/router.ts"
-import { createRouter } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
-import { contract } from './contract';
+`createRouter(contract, router)` types the handler tree against the contract — one function per route, grouped to mirror the contract.
 
-export const router = createRouter(contract, {
+Each group lives in its own file, typed against its group in the contract with the [`Router`](#routehandler-and-router-types) type so inputs and responses stay inferred:
+
+```ts
+// users.router.ts
+import type { Router } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
+import type { contract } from './contract';
+
+export const users: Router<typeof contract.routes.users> = {
     listUsers: async ({ query }) => {
-        const users = await db.users.findMany({
+        const found = await db.users.findMany({
             skip: (query.page - 1) * query.limit,
             take: query.limit,
         });
         return {
             status: 200,
             body: {
-                users,
+                users: found,
                 total: await db.users.count(),
             },
         };
     },
-
     createUser: async ({ body }) => {
         const user = await db.users.create(body);
         return {
@@ -33,7 +37,6 @@ export const router = createRouter(contract, {
             body: user,
         };
     },
-
     getUser: async ({ params }) => {
         const user = await db.users.findById(params.id);
         if (!user) {
@@ -49,6 +52,21 @@ export const router = createRouter(contract, {
             body: user,
         };
     },
+};
+```
+
+`createRouter` then composes the groups into the full handler tree — keep this in its own `router.ts`:
+
+```ts
+// router.ts
+import { createRouter } from '@ts-kizuna/express';
+import { contract } from './contract';
+import { users } from './users.router';
+import { health } from './health.router';
+
+export const router = createRouter(contract, {
+    users,
+    health,
 });
 ```
 
@@ -99,13 +117,13 @@ return {
 
 ## Error responses
 
-Error responses (status `>= 400`) are [RFC 9457 Problem Details](/docs/reference/problem-details-schema). Declare them in your contract with [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` — the same shape produced by [`deny()`](/docs/reference/create-guard#deny-and-problemdetailsschema) in guards and all built-in kizuna errors. Handlers supply only `detail` (plus any extension members); `type`, `title`, and `status` are auto-filled.
+Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` in your routes to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/create-guard) in guards and all built-in kizuna errors.
 
 ```ts title="src/contract.ts"
-import { createContract } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { k } from './k';
 
-const contract = createContract({
+const usersRoutes = k.routes('users', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -137,7 +155,7 @@ getUser: async ({ params, error }) => {
 },
 ```
 
-TypeScript enforces that the status and body match the contract — same as a return value.
+TypeScript enforces that the status and body match the routes — same as a return value.
 
 ## Validation errors
 
@@ -145,15 +163,18 @@ When a request body or query fails schema validation, kizuna automatically retur
 
 ```json
 {
-    "message": "Invalid request body",
-    "issues": [
+    "type": "about:blank",
+    "title": "Bad Request",
+    "status": 400,
+    "detail": "Request validation failed",
+    "errors": [
         {
             "code": "invalid_type",
             "path": ["email"],
             "message": "Expected string, received number"
         },
         {
-            "code": "custom",
+            "code": "invalid_phone_number",
             "path": ["phone"],
             "message": "Must include country code"
         }
@@ -173,26 +194,26 @@ Each issue includes a `code` that tells you _why_ the field failed — not just 
 | `not_multiple_of`       | Failed `multipleOf()`                     |
 | `custom`                | `.refine()` or `.superRefine()` check     |
 
-The `custom` code covers all user-defined checks. If you need finer control, `.superRefine()` lets you emit any code string via `ctx.addIssue()`.
+User-defined checks (`.refine()`) report as `custom` by default. To emit a **typed** code instead — like `invalid_phone_number` above — declare it in `validation.issueCodes` on [`kizuna`](/docs/reference/kizuna) and raise it with [`addCodedIssue`](/docs/reference/add-coded-issue). It then shows up in `errors[].code` as a typed literal on both the server and the generated client, not a bare `string`.
 
 The `message` and `path` fields come directly from your Zod schemas. If you use custom messages (e.g. `z.string().min(1, "Name is required")`), those are what the client receives.
 
-You don't need to handle this yourself — kizuna validates against the contract and rejects invalid requests automatically.
+You don't need to handle this yourself — kizuna validates against the routes and rejects invalid requests automatically.
 
 This `400` response is reflected in the [fetch client](/docs/clients/fetch#validation-errors) return type and the [OpenAPI spec](/docs/openapi) for any route that declares a `body` or `query` schema.
 
-If you declare your own `400` response in the contract, the client will see a union of both your type and kizuna's `ValidationError`. Use [`isValidationError`](/docs/clients/fetch#isvalidationerror) on the client to distinguish them.
+If you declare your own `400` response in the routes, the client will see a union of both your type and kizuna's `ValidationError`. Use [`isValidationError`](/docs/clients/fetch#isvalidationerror) on the client to distinguish them.
 
 ## `RouteHandler` and `Router` types
 
-Annotate handlers individually or as a group:
+Annotate a single route, one group, or the whole tree:
 
 ```ts
 import type { RouteHandler, Router } from '@ts-kizuna/express';
 import { contract } from './contract';
 
 // Single route
-const getUser: RouteHandler<typeof contract.getUser> = async ({ params }) => {
+const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ params }) => {
     const user = await db.users.findById(params.id);
     if (!user) {
         return {
@@ -208,14 +229,17 @@ const getUser: RouteHandler<typeof contract.getUser> = async ({ params }) => {
     };
 };
 
-// All routes
-const router: Router<typeof contract> = { ... };
+// One group — what each split file exports
+const users: Router<typeof contract.routes.users> = { ... };
+
+// Whole tree — pass straight to `createRouter` or `createApi`
+const router: Router<typeof contract.routes> = { ... };
 ```
 
 ## Reference
 
 - [`createRouter`](/docs/reference/create-router)
-- [`RouteHandler` and `Router` types](/docs/reference/create-router#routehandler-and-router-types)
+- [`RouteHandler` and `Router` types](/docs/reference/create-router)
 - [`isValidationError`](/docs/reference/is-validation-error)
 
 ## Next steps

@@ -4,10 +4,10 @@ import ts from 'typescript';
 import {
     type DeprecationMap,
     type SerializedDeprecationMap,
-    type Contract,
     serializeDeprecationMap,
     contractFingerprint,
 } from '@ts-kizuna/core/generator';
+import { type Contract } from '@ts-kizuna/core';
 
 const SCHEMA_KEYS: ReadonlySet<string> = new Set(['body', 'query', 'headers']);
 
@@ -131,8 +131,15 @@ const firstObjectLiteralIn = (node: ts.Node, resolve: IdentifierResolver, visite
             if (routesArg) return firstObjectLiteralIn(routesArg, resolve, visited);
             return undefined;
         }
-        if (isRoutesChainCall(node)) {
-            const routesArg = node.arguments[0];
+        if (ts.isIdentifier(node.expression) && node.expression.text === 'createRoutes') {
+            // createRoutes(tagSet, key, routes) | createRoutes(tagSet, routes) | createRoutes(routes)
+            // — the route map is always the final argument.
+            const routesArg = node.arguments[node.arguments.length - 1];
+            if (routesArg) return firstObjectLiteralIn(routesArg, resolve, visited);
+            return undefined;
+        }
+        if (isContractChainCall(node) || isRoutesChainCall(node)) {
+            const routesArg = routesArgFrom(node);
             if (routesArg) return firstObjectLiteralIn(routesArg, resolve, visited);
             return undefined;
         }
@@ -356,7 +363,7 @@ const findRouterCallInNode = (node: ts.Node): ts.CallExpression | undefined => {
         if (ts.isIdentifier(node.expression) && node.expression.text === 'createContract') {
             return node;
         }
-        if (isRoutesChainCall(node)) {
+        if (isContractChainCall(node) || isRoutesChainCall(node)) {
             return node;
         }
     }
@@ -371,8 +378,28 @@ const findRouterCallInNode = (node: ts.Node): ts.CallExpression | undefined => {
 const isRoutesChainCall = (node: ts.CallExpression): boolean =>
     ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.name) && node.expression.name.text === 'routes';
 
+const isContractChainCall = (node: ts.CallExpression): boolean =>
+    ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.name) && node.expression.name.text === 'contract';
+
 const routesArgFrom = (call: ts.CallExpression): ts.Expression | undefined => {
-    if (isRoutesChainCall(call)) return call.arguments[0];
+    // k.routes(tag, routes) | k.routes(routes) — the route map is the final argument.
+    if (isRoutesChainCall(call)) return call.arguments[call.arguments.length - 1];
+    // k.contract({ routes: X }) — unwrap the `routes` property so the walker sees the
+    // route map, not the `{ routes, validation }` wrapper.
+    if (isContractChainCall(call) || (ts.isIdentifier(call.expression) && call.expression.text === 'createContract')) {
+        const arg = call.arguments[0];
+        if (arg && ts.isObjectLiteralExpression(arg)) {
+            for (const prop of arg.properties) {
+                if (ts.isPropertyAssignment(prop) && propertyName(prop.name) === 'routes') return prop.initializer;
+                if (ts.isShorthandPropertyAssignment(prop) && prop.name.text === 'routes') return prop.name;
+            }
+        }
+        return arg;
+    }
+    // createRoutes(tagSet, key, routes) | createRoutes(tagSet, routes) | createRoutes(routes)
+    if (ts.isIdentifier(call.expression) && call.expression.text === 'createRoutes') {
+        return call.arguments[call.arguments.length - 1];
+    }
     const firstArg = call.arguments[0];
     if (!firstArg) return undefined;
     if (call.arguments.length === 2) return call.arguments[1];
@@ -408,13 +435,12 @@ const collectExportedRoutesLiterals = (
 
             if (!ts.isCallExpression(initializer)) continue;
             const callee = initializer.expression;
-            if (!ts.isIdentifier(callee)) continue;
 
-            if (callee.text === 'createContract') {
+            if (isContractChainCall(initializer) || (ts.isIdentifier(callee) && callee.text === 'createContract')) {
                 const routesArg = routesArgFrom(initializer);
                 const lit = routesArg ? firstObjectLiteralIn(routesArg, resolve, new Set()) : undefined;
                 if (lit) into.push(lit);
-            } else if (callee.text === 'createApi') {
+            } else if (ts.isIdentifier(callee) && callee.text === 'createApi') {
                 const routesArg = routesArgFromCreateApi(initializer);
                 const lit = routesArg ? firstObjectLiteralIn(routesArg, resolve, new Set()) : undefined;
                 if (lit) into.push(lit);

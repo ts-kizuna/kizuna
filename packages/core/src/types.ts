@@ -1,5 +1,4 @@
 import type { z } from 'zod';
-import type { Tag } from './tag.js';
 
 export type Method = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS';
 
@@ -49,7 +48,7 @@ export type ResponseDefinition =
           contentType?: ResponseContentType;
       };
 
-export interface RouteDefinition {
+export interface RouteDefinition<TagKeys extends string = string> {
     method: Method;
     /**
      * Route path starting with `/`. Use `:paramName` for path parameters.
@@ -59,7 +58,12 @@ export interface RouteDefinition {
     path: `/${string}`;
     summary?: string;
     description?: string;
-    tags?: readonly Tag[];
+    /**
+     * Tag keys grouping this route in the OpenAPI spec. Keys come from the tag set
+     * declared with `createTags`; `k.routes` stamps the group's tag onto every
+     * route, and the generator resolves each key to its `title` for the spec.
+     */
+    tags?: readonly TagKeys[];
     security?: Array<Record<string, string[]>>;
     externalDocs?: {
         url: string;
@@ -94,11 +98,14 @@ export interface RouteDefinition {
     };
 }
 
-export const CONTRACT_TAG: unique symbol = Symbol('ts-kizuna.contract.tag');
-export const CONTRACT_DESCRIPTION: unique symbol = Symbol('ts-kizuna.contract.description');
+/**
+ * Key under which a routes group carries its group tag key — the source
+ * `flattenRoutes` and the generator use to apply the group's tag to every route
+ * in it. Stamped by `k.routes`.
+ */
+export const ROUTES_TAG: unique symbol = Symbol('ts-kizuna.routes.tag');
 
-export interface Contract {
-    [CONTRACT_TAG]?: string;
-    [CONTRACT_DESCRIPTION]?: string;
-    [key: string]: RouteDefinition | Contract;
+export interface Routes<TagKeys extends string = string> {
+    [ROUTES_TAG]?: string;
+    [key: string]: RouteDefinition<TagKeys> | Routes<TagKeys>;
 }

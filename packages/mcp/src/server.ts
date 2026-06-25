@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { flattenContract, validateRequest } from '@ts-kizuna/core';
+import { flattenRoutes, validateRequest } from '@ts-kizuna/core';
 import { ResponseError, type ApiWithRouter, ROUTER_META } from '@ts-kizuna/core/adapter';
-import type { Contract, RouteDefinition } from '@ts-kizuna/core';
+import type { Routes, RouteDefinition } from '@ts-kizuna/core';
 import { deriveToolNames } from './tool-name.js';
 import { buildToolInputSchema, type ToolInputSchema } from './schema.js';
 
@@ -86,15 +86,15 @@ export interface ToolDefinition {
     routeKey: string;
 }
 
-export const buildToolDefinitions = (contract: Contract, options?: McpServerOptions): ToolDefinition[] => {
+export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions): ToolDefinition[] => {
     const filter = options?.routeFilter ?? defaultRouteFilter;
-    const routes = flattenContract(contract).filter(({ route, routeKey }: { route: RouteDefinition; routeKey: string }) =>
+    const flatRoutes = flattenRoutes(routes).filter(({ route, routeKey }: { route: RouteDefinition; routeKey: string }) =>
         filter(route, routeKey)
     );
-    const names = deriveToolNames(routes);
+    const names = deriveToolNames(flatRoutes);
     const definitions: ToolDefinition[] = [];
 
-    for (const { routeKey, route } of routes) {
+    for (const { routeKey, route } of flatRoutes) {
         const name = names.get(routeKey)!;
         definitions.push({
             name,
@@ -258,7 +258,7 @@ const executeToolCall = async (
 /**
  * Create an MCP server from a kizuna API.
  *
- * Each route in the contract becomes an MCP tool. When an AI assistant calls
+ * Each route in the routes becomes an MCP tool. When an AI assistant calls
  * a tool, the corresponding handler is invoked directly.
  *
  * ```ts
@@ -268,7 +268,7 @@ const executeToolCall = async (
  * const server = createMcpServer(api);
  * ```
  */
-export const createMcpServer = (api: Contract & ApiWithRouter, options?: McpServerOptions): McpServer => {
+export const createMcpServer = (api: Routes & ApiWithRouter, options?: McpServerOptions): McpServer => {
     const router = api[ROUTER_META];
 
     const server = new McpServer({

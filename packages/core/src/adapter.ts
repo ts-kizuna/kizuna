@@ -1,12 +1,12 @@
 import type { z } from 'zod';
-import type { RouteDefinition, Contract, Method } from './types.js';
+import type { RouteDefinition, Routes, Method } from './types.js';
 import {
     type RouteHandler,
     type Router,
     type RawInputs,
     type ValidationStage,
     allowedMethodsForPath,
-    flattenContract,
+    flattenRoutes,
     formatValidationError,
     validateRequest,
 } from './handler-pipeline.js';
@@ -18,8 +18,7 @@ import { STATUS_TITLES } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
 
-export type { RouteDefinition, Contract, Method } from './types.js';
-export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
+export type { RouteDefinition, Routes, Method } from './types.js';
 
 export class ResponseValidationError extends Error {
     readonly routeKey: string;
@@ -42,9 +41,9 @@ export const MIDDLEWARE_META: unique symbol = Symbol('ts-kizuna.middleware');
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter = ApiDefinition & { readonly [ROUTER_META]: Record<string, unknown> };
 
-const assertNoDuplicateRoutes = (contract: Contract): void => {
+const assertNoDuplicateRoutes = (routes: Routes): void => {
     const seen = new Map<string, { routeKey: string; path: string }>();
-    for (const { routeKey, route } of flattenContract(contract)) {
+    for (const { routeKey, route } of flattenRoutes(routes)) {
         const { segments } = parsePath(route.path);
         const normalizedPath = segments.map((segment) => (segment.kind === 'param' ? ':*' : segment.value)).join('');
         const key = `${route.method}:${normalizedPath}`;
@@ -58,26 +57,27 @@ const assertNoDuplicateRoutes = (contract: Contract): void => {
     }
 };
 
-export const createApi = <const R extends Contract>(contract: R): R & ApiDefinition => {
-    assertNoDuplicateRoutes(contract);
-    const result = { ...contract } as R & Record<typeof API_META, true>;
+export const createApi = <const R extends Routes>(routes: R): R & ApiDefinition => {
+    assertNoDuplicateRoutes(routes);
+    const result = { ...routes } as R & Record<typeof API_META, true>;
     result[API_META] = true;
     return result as unknown as R & ApiDefinition;
 };
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
-export { allowedMethodsForPath, flattenContract, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
+export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
 export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';
 export { matchRoute } from './route-matcher.js';
+export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
 
-export type RouteMatcher = (method: string, path: string, contract: Contract, basePath?: string) => MatchResult;
+export type RouteMatcher = (method: string, path: string, routes: Routes, basePath?: string) => MatchResult;
 
 export interface AdapterRequest<NativeRequest> {
     request: NativeRequest;
     method: string;
     /**
-     * - `core-match` — core matches the path against the contract (Next-style catch-all routing).
+     * - `core-match` — core matches the path against the routes (Next-style catch-all routing).
      * - `pre-resolved` — adapter has already routed the request and tells core which route was matched (Express-style per-route registration).
      */
     resolution:
@@ -161,9 +161,9 @@ export interface AdapterDefinition<NativeRequest, NativeResponse, HandlerContext
     matcher?: RouteMatcher;
 }
 
-export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TContract extends Contract> {
-    contract: TContract;
-    router: Router<TContract, HandlerContext>;
+export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRoutes extends Routes> {
+    routes: TRoutes;
+    router: Router<TRoutes, HandlerContext>;
     request: AdapterRequest<NativeRequest>;
     responseContext: ResponseContext;
     basePath?: string;
@@ -171,9 +171,9 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TCon
 }
 
 export interface Adapter<NativeRequest, NativeResponse, HandlerContext, ResponseContext> {
-    handle: <T extends Contract>(args: HandleArgs<NativeRequest, HandlerContext, ResponseContext, T>) => Promise<NativeResponse>;
-    eachRoute: <T extends Contract>(
-        contract: T,
+    handle: <T extends Routes>(args: HandleArgs<NativeRequest, HandlerContext, ResponseContext, T>) => Promise<NativeResponse>;
+    eachRoute: <T extends Routes>(
+        routes: T,
         router: Router<T, HandlerContext>
     ) => Iterable<{
         routeKey: string;
@@ -200,7 +200,7 @@ interface ResolvedRoute {
 
 const resolveRoute = (
     request: AdapterRequest<unknown>,
-    contract: Contract,
+    routes: Routes,
     matcher: RouteMatcher,
     basePath: string | undefined
 ): { ok: true; resolved: ResolvedRoute } | { ok: false; result: AdapterResult } => {
@@ -214,7 +214,7 @@ const resolveRoute = (
             },
         };
     }
-    const matched = matcher(request.method, request.resolution.path, contract, basePath);
+    const matched = matcher(request.method, request.resolution.path, routes, basePath);
     if (matched.kind === 'not-found') {
         return {
             ok: false,
@@ -256,15 +256,15 @@ const isAcceptable = (acceptHeader: string | undefined): boolean => {
 
 const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     request: AdapterRequest<NativeRequest>,
-    contract: Contract,
-    router: Router<Contract, HandlerContext>,
+    routes: Routes,
+    router: Router<Routes, HandlerContext>,
     definition: AdapterDefinition<NativeRequest, unknown, HandlerContext, ResponseContext>,
     responseContext: ResponseContext,
     basePath: string | undefined,
     responseValidation: boolean | undefined
 ): Promise<AdapterResult> => {
     const matcher = definition.matcher ?? defaultMatchRoute;
-    const resolution = resolveRoute(request as AdapterRequest<unknown>, contract, matcher, basePath);
+    const resolution = resolveRoute(request as AdapterRequest<unknown>, routes, matcher, basePath);
     if (!resolution.ok) return resolution.result;
     const { routeKey, route, params } = resolution.resolved;
 
@@ -325,6 +325,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
 
     try {
         const handlerContext = await definition.buildHandlerContext(request, responseContext);
+
         const error = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
             throw new ResponseError(response);
         };
@@ -364,7 +365,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         const successHeaders =
             route.method === 'OPTIONS'
                 ? {
-                      Allow: allowedMethodsForPath(contract, route.path).join(', '),
+                      Allow: allowedMethodsForPath(routes, route.path).join(', '),
                       ...(handlerResult.headers ?? {}),
                   }
                 : handlerResult.headers;
@@ -407,11 +408,11 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
 export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, ResponseContext = Record<string, never>>(
     definition: AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, ResponseContext>
 ): Adapter<NativeRequest, NativeResponse, HandlerContext, ResponseContext> => ({
-    handle: async ({ contract, router, request, responseContext, basePath, responseValidation }) => {
+    handle: async ({ routes, router, request, responseContext, basePath, responseValidation }) => {
         const result = await runPipeline(
             request,
-            contract,
-            router as Router<Contract, HandlerContext>,
+            routes,
+            router as Router<Routes, HandlerContext>,
             definition as AdapterDefinition<NativeRequest, unknown, HandlerContext, ResponseContext>,
             responseContext,
             basePath,
@@ -419,8 +420,8 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
         );
         return definition.respond(result, responseContext);
     },
-    eachRoute: function* (contract, router) {
-        const sorted = sortFlattenedRoutes(flattenContract(contract));
+    eachRoute: function* (routes, router) {
+        const sorted = sortFlattenedRoutes(flattenRoutes(routes));
         for (const { routeKey, route } of sorted) {
             const handler = resolveHandler(router, routeKey);
             if (typeof handler !== 'function') continue;

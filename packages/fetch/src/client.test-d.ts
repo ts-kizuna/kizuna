@@ -1,9 +1,15 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { createContract, type ValidationError } from '@ts-kizuna/core';
+import { kizuna, createTags, type ValidationError } from '@ts-kizuna/core';
 import { createClient } from './client.js';
 
-const contract = createContract({
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
+
+const contractRoutes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -156,7 +162,11 @@ const contract = createContract({
     },
 });
 
-const voidBodyContract = createContract({
+const contract = k.contract({
+    routes: contractRoutes,
+});
+
+const voidBodyContractRoutes = k.routes('api', {
     deleteItem: {
         method: 'DELETE',
         path: '/items/:id',
@@ -167,6 +177,10 @@ const voidBodyContract = createContract({
             }),
         },
     },
+});
+
+const voidBodyContract = k.contract({
+    routes: voidBodyContractRoutes,
 });
 
 const voidBodyClient = createClient(voidBodyContract, {
@@ -184,8 +198,8 @@ test('route with body: z.void() rejects a non-void body', () => {
     voidBodyClient.deleteItem({ params: { id: '1' }, body: { foo: 'bar' } });
 });
 
-const nestedContract = createContract({
-    users: createContract({
+const nestedContractRoutes = k.routes('api', {
+    users: {
         getUser: {
             method: 'GET',
             path: '/users/:id',
@@ -211,8 +225,8 @@ const nestedContract = createContract({
                 }),
             },
         },
-    }),
-    posts: createContract({
+    },
+    posts: {
         listPosts: {
             method: 'GET',
             path: '/posts',
@@ -222,7 +236,11 @@ const nestedContract = createContract({
                 }),
             },
         },
-    }),
+    },
+});
+
+const nestedContract = k.contract({
+    routes: nestedContractRoutes,
 });
 
 const nestedClient = createClient(nestedContract, {
@@ -521,7 +539,7 @@ test('route without body or query does not include ValidationError', async () =>
 
 const UserIdSchema = z.string().brand<'UserId'>();
 
-const pathParamsContract = createContract({
+const pathParamsContractRoutes = k.routes('api', {
     getUserEvents: {
         method: 'GET',
         path: '/users/:userId/events/:eventId',
@@ -548,6 +566,10 @@ const pathParamsContract = createContract({
             }),
         },
     },
+});
+
+const pathParamsContract = k.contract({
+    routes: pathParamsContractRoutes,
 });
 
 const pathParamsClient = createClient(pathParamsContract, {

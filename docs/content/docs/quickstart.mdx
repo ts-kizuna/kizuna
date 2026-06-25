@@ -3,35 +3,23 @@ title: Quickstart
 description: Define a contract, implement a server, and call it from a typed client in five minutes.
 ---
 
-This guide walks through the three steps of a ts-kizuna project: defining the contract, implementing the server, and calling it from a typed client.
+A ts-kizuna project has three parts:
 
-<Steps>
-<Step>
+1. **The contract** — your routes and their Zod schemas, in a package both sides import.
+2. **The server** — handlers that implement those routes, mounted on your framework.
+3. **The client** — built from the same contract, so it knows every route, input, and response.
 
-Create a contract with `@ts-kizuna/core`
-
-</Step>
-<Step>
-
-Create a server implementation with one of our supported frameworks
-
-</Step>
-<Step>
-
-Create a client implementation with one of our supported libraries
-
-</Step>
-</Steps>
+This guide builds all three.
 
 ## Installation
 
-Install the `@ts-kizuna/core` package — the core package that provides the type-safe contract and shared types.
+Install `@ts-kizuna/core` — the package that defines routes and contracts.
 
 <InstallTabs packageName="@ts-kizuna/core zod" />
 
 ts-kizuna requires Zod 4. It leans on Zod 4 internals directly, so older versions won't work.
 
-Enable `strict` in your `tsconfig.json` — this is required for ts-kizuna's type inference to work correctly.
+Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
 ```json title="tsconfig.json"
 {
@@ -41,14 +29,24 @@ Enable `strict` in your `tsconfig.json` — this is required for ts-kizuna's typ
 }
 ```
 
-## 1. Define the contract
+## 1. Define the routes
 
-The contract is the shared source of truth. It lives in a package (or file) that both your server and client import.
+Create the `kizuna` factory once and export `k` — then group your routes with `k.routes`. Keep each piece in its own file (a package both your server and client import).
 
-```ts title="packages/shared/src/contract.ts"
-import { createContract } from '@ts-kizuna/core';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+```ts title="k.ts"
+import { kizuna } from '@ts-kizuna/core';
+
+export const { k } = kizuna();
+```
+
+`kizuna` takes optional tags and validation settings — see [`kizuna`](/docs/reference/kizuna) for the full options.
+
+Each route pairs a method and path with Zod schemas:
+
+```ts title="routes.ts"
 import { z } from 'zod';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { k } from './k';
 
 export const UserSchema = z.object({
     id: z.string(),
@@ -56,7 +54,7 @@ export const UserSchema = z.object({
     email: z.email(),
 });
 
-export const contract = createContract({
+export const usersRoutes = k.routes({
     listUsers: {
         method: 'GET',
         path: '/users',
@@ -94,63 +92,84 @@ export const contract = createContract({
 });
 ```
 
-## 2. Implement the server (Express)
+## 2. Bundle them into a contract
+
+The contract is the one object you hand to both the server and the client. `k.contract` assembles your route groups; it carries the tags and any [custom validation codes](/docs/reference/add-coded-issue) you configured on `kizuna`. Give it its own file — `contract.ts`.
+
+```ts title="contract.ts"
+import { k } from './k';
+import { usersRoutes } from './routes';
+
+export const contract = k.contract({
+    routes: {
+        users: usersRoutes,
+    },
+});
+```
+
+## 3. Implement the server
+
+Pick an adapter — here, Express. Three pieces: a **router**, an **api** that binds it to the contract, and the **mount** that attaches it to your app.
 
 <InstallTabs packageName="@ts-kizuna/express" />
+
+`handlers` supplies one function per route in a group. Inputs arrive validated and typed; return values are checked against the contract's declared responses.
 
 ```ts title="src/lib/router.ts"
 import { createRouter } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 
 export const router = createRouter(contract, {
-    listUsers: async ({ query }) => {
-        const users = await db.users.findMany({
-            skip: (query.page - 1) * query.limit,
-            take: query.limit,
-        });
-        return {
-            status: 200,
-            body: {
-                users,
-                total: await db.users.count(),
-            },
-        };
-    },
-
-    createUser: async ({ body }) => {
-        const existing = await db.users.findByEmail(body.email);
-        if (existing) {
+    users: {
+        listUsers: async ({ query }) => {
+            const users = await db.users.findMany({
+                skip: (query.page - 1) * query.limit,
+                take: query.limit,
+            });
             return {
-                status: 400,
+                status: 200,
                 body: {
-                    detail: 'Email already in use',
+                    users,
+                    total: await db.users.count(),
                 },
             };
-        }
-        const user = await db.users.create(body);
-        return {
-            status: 201,
-            body: user,
-        };
-    },
-
-    getUser: async ({ params }) => {
-        const user = await db.users.findById(params.id);
-        if (!user) {
+        },
+        createUser: async ({ body }) => {
+            const existing = await db.users.findByEmail(body.email);
+            if (existing) {
+                return {
+                    status: 400,
+                    body: {
+                        detail: 'Email already in use',
+                    },
+                };
+            }
+            const user = await db.users.create(body);
             return {
-                status: 404,
-                body: {
-                    detail: 'User not found',
-                },
+                status: 201,
+                body: user,
             };
-        }
-        return {
-            status: 200,
-            body: user,
-        };
+        },
+        getUser: async ({ params }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: user,
+            };
+        },
     },
 });
 ```
+
+`createApi` binds the router to the contract, producing the API object the adapter mounts.
 
 ```ts title="src/lib/server.ts"
 import { createApi } from '@ts-kizuna/express';
@@ -162,6 +181,8 @@ export const api = createApi({
     router,
 });
 ```
+
+Mount it on your app.
 
 ```ts title="src/index.ts"
 import express from 'express';
@@ -176,7 +197,9 @@ createExpressEndpoints(api, app);
 app.listen(3000);
 ```
 
-## 3. Call it from the typed client
+## 4. Call it from a typed client
+
+The client is built from the same contract, so every route, input, and response is already typed — no SDK to generate.
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
@@ -190,37 +213,33 @@ export const apiClient = createClient(contract, {
 ```
 
 ```ts
-const { body } = await apiClient.listUsers({
+const { body } = await apiClient.users.listUsers({
     query: {
         page: 1,
         limit: 10,
     },
 });
 
-// body is { users: User[]; total: number }
-console.log(body.users);
+console.log(body.users); // User[]
 
-const result = await apiClient.createUser({
+const result = await apiClient.users.createUser({
     body: {
         name: 'Alice',
         email: 'alice@example.com',
     },
 });
 
-// status is 201 | 400 — TypeScript narrows from there
+// result.status is 201 | 400 — TypeScript narrows the body from there
 if (result.status === 201) {
     console.log(result.body.id);
 }
 ```
 
-Every field — `query.page`, `body.name`, the response shape — is fully typed from the contract with no extra work.
+Every field — `query.page`, `body.name`, the response shape — is typed straight from the contract, with no extra work.
 
 ## Next steps
 
-- [Contract](/docs/building/contract) — route shapes, nested contracts, supported methods
-- [Express adapter](/docs/adapters/express) — options, error handling, middleware
-- [Fastify adapter](/docs/adapters/fastify) — high-performance Node.js, built-in JSON parsing
-- [Hono adapter](/docs/adapters/hono) — lightweight, runs on Cloudflare Workers, Deno, Bun, Node
-- [Next.js adapter](/docs/adapters/next) — App Router catch-all route setup
-- [Fetch client](/docs/adapters/fetch) — `ClientConfig`, headers, custom fetch
-- [OpenAPI generation](/docs/openapi/generate) — serve a spec alongside your API
+- [Building an API](/docs/building/contract) — the contract, router, and mounting in depth
+- [Adapters](/docs/adapters/express) — Express, Fastify, Hono, and Next.js setup and options
+- [Fetch client](/docs/clients/fetch) — headers, custom fetch, error handling
+- [OpenAPI generation](/docs/openapi) — serve a spec alongside your API

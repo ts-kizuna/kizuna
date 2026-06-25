@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { RouteDefinition, Contract, ValidationError } from '@ts-kizuna/core';
+import type { RouteDefinition, Routes, ValidationError, ValidationErrorFor, Contract, TagOptions } from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
 import { buildPath, isRouteDefinition } from '@ts-kizuna/core';
 
@@ -41,22 +41,26 @@ type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends t
         fetchOptions?: RequestInit;
     };
 
-type ValidationErrorResult = {
+type ValidationErrorResult<Codes extends string> = {
     status: 400;
-    body: ValidationError;
+    // No custom codes declared → exactly `ValidationError`, so the common case
+    // keeps its existing type; otherwise widen `code` with the configured codes.
+    body: [Codes] extends [never] ? ValidationError : ValidationErrorFor<Codes>;
     headers: Record<string, string>;
 };
 
 type HasValidation<R extends RouteDefinition> = R extends { body: z.ZodType } ? true : R extends { query: z.ZodType } ? true : false;
 
-type ClientResponse<R extends RouteDefinition> =
-    HasValidation<R> extends true ? ResponseUnion<R> | ValidationErrorResult : ResponseUnion<R>;
+type ClientResponse<R extends RouteDefinition, Codes extends string> =
+    HasValidation<R> extends true ? ResponseUnion<R> | ValidationErrorResult<Codes> : ResponseUnion<R>;
 
-type ClientFn<R extends RouteDefinition> =
-    {} extends ClientArgs<R> ? (args?: ClientArgs<R>) => Promise<ClientResponse<R>> : (args: ClientArgs<R>) => Promise<ClientResponse<R>>;
+type ClientFn<R extends RouteDefinition, Codes extends string> =
+    {} extends ClientArgs<R>
+        ? (args?: ClientArgs<R>) => Promise<ClientResponse<R, Codes>>
+        : (args: ClientArgs<R>) => Promise<ClientResponse<R, Codes>>;
 
-export type Client<T extends Contract> = {
-    [K in keyof T]: T[K] extends RouteDefinition ? ClientFn<T[K]> : T[K] extends Contract ? Client<T[K]> : never;
+export type Client<T extends Routes, Codes extends string = never> = {
+    [K in keyof T]: T[K] extends RouteDefinition ? ClientFn<T[K], Codes> : T[K] extends Routes ? Client<T[K], Codes> : never;
 };
 
 export interface RequestContext {
@@ -171,39 +175,41 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
     };
 };
 
-const buildClientTree = (router: Contract, config: ClientConfig): Record<string, unknown> => {
+const buildClientTree = (router: Routes, config: ClientConfig): Record<string, unknown> => {
     const result: Record<string, unknown> = {};
     for (const key of Object.keys(router)) {
         const node = router[key];
         if (isRouteDefinition(node)) {
             result[key] = buildRouteFn(node, config);
         } else if (node && typeof node === 'object') {
-            result[key] = buildClientTree(node as Contract, config);
+            result[key] = buildClientTree(node as Routes, config);
         }
     }
     return result;
 };
 
 /**
- * Create a fully-typed fetch client from a contract.
+ * Create a typed fetch client from a contract. Each route becomes a method that
+ * validates its arguments and returns the typed response. The contract's custom
+ * issue codes are carried through to `errors[].code` on `400` responses.
  *
- * ```ts
- * // lib/api-client.ts
- * import { createClient } from '@ts-kizuna/fetch';
- * import { contract } from './contract';
- *
+ * @example
  * export const apiClient = createClient(contract, {
  *     baseUrl: 'https://api.example.com',
- *     baseHeaders: { Authorization: `Bearer ${token}` },
  * });
  *
- * // anywhere in your app
- * const { status, body } = await apiClient.createUser({
- *     body: { name: 'Alice', email: 'alice@example.com' },
+ * const { status, body } = await apiClient.orders.pay({
+ *     params: {
+ *         id: '1',
+ *     },
+ *     body: {
+ *         amount: 10,
+ *     },
  * });
- * if (status === 201) console.log(body.id);
- * ```
  */
-export const createClient = <T extends Contract>(contract: T, config: ClientConfig): Client<T> => {
-    return buildClientTree(contract, config) as Client<T>;
-};
+export function createClient<T extends Routes, Codes extends string = never>(
+    contract: Contract<T, Record<string, TagOptions>, Codes>,
+    config: ClientConfig
+): Client<T, Codes> {
+    return buildClientTree(contract.routes, config) as Client<T, Codes>;
+}

@@ -64,6 +64,12 @@ const main = async (): Promise<void> => {
         await delay(300);
     }
 
+    if (exitCode === 0) {
+        console.log('\n✅ Swift e2e tests passed. The SIGTERM line above is the expected server shutdown, not a failure.');
+    } else {
+        console.log('\n❌ Swift e2e tests failed — see the test output above.');
+    }
+
     process.exit(exitCode);
 };
 

@@ -5,7 +5,7 @@ export const openApiSpec = generateOpenApi(contract, {
     info: {
         title: 'ts-kizuna Next.js Demo',
         version: '1.0.0',
-        description: 'Next.js App Router adapter demo for the ts-kizuna user contract.',
+        description: 'Next.js App Router adapter demo for the ts-kizuna user API.',
     },
     servers: [
         {
@@ -13,19 +13,5 @@ export const openApiSpec = generateOpenApi(contract, {
             description: 'Local Next.js demo',
         },
     ],
-    security: [
-        {
-            bearerAuth: [],
-        },
-    ],
-    components: {
-        securitySchemes: {
-            bearerAuth: {
-                type: 'http',
-                scheme: 'bearer',
-                bearerFormat: 'JWT',
-            },
-        },
-    },
     setOperationId: true,
 });

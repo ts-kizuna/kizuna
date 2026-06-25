@@ -2,9 +2,15 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { createMiddleware as createHonoMiddleware } from 'hono/factory';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createApi, createHonoEndpoints, createMiddleware } from './server.js';
+
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
 
 interface User {
     id: string;
@@ -12,7 +18,7 @@ interface User {
     email: string;
 }
 
-const contract = createContract({
+const contractRoutes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -68,6 +74,10 @@ const contract = createContract({
             404: ProblemDetailsSchema,
         },
     },
+});
+
+const contract = k.contract({
+    routes: contractRoutes,
 });
 
 let users: Map<string, User>;
@@ -347,18 +357,22 @@ describe('Hono — Accept header / 406', () => {
 describe('Hono — responseValidation', () => {
     it('returns 500 when responseValidation is enabled and the handler returns a mismatched body', async () => {
         const strictApp = new Hono();
-        const strictApi = createApi({
-            contract: createContract({
-                getItem: {
-                    method: 'GET',
-                    path: '/items/:id',
-                    responses: {
-                        200: z.object({
-                            id: z.string(),
-                        }),
-                    },
+        const strictRoutes = k.routes('api', {
+            getItem: {
+                method: 'GET',
+                path: '/items/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
                 },
-            }),
+            },
+        });
+        const strictContract = k.contract({
+            routes: strictRoutes,
+        });
+        const strictApi = createApi({
+            contract: strictContract,
             router: {
                 getItem: () => ({ status: 200, body: { id: 123 } }) as any,
             },
@@ -375,18 +389,22 @@ describe('Hono — responseValidation', () => {
 describe('Hono — handler context', () => {
     it('provides the Hono Context object as c', async () => {
         const contextApp = new Hono();
-        const contextApi = createApi({
-            contract: createContract({
-                echo: {
-                    method: 'GET',
-                    path: '/echo',
-                    responses: {
-                        200: z.object({
-                            url: z.string(),
-                        }),
-                    },
+        const contextRoutes = k.routes('api', {
+            echo: {
+                method: 'GET',
+                path: '/echo',
+                responses: {
+                    200: z.object({
+                        url: z.string(),
+                    }),
                 },
-            }),
+            },
+        });
+        const contextContract = k.contract({
+            routes: contextRoutes,
+        });
+        const contextApi = createApi({
+            contract: contextContract,
             router: {
                 echo: ({ c }) => ({
                     status: 200,
@@ -406,7 +424,7 @@ describe('Hono — handler context', () => {
 });
 
 describe('Hono — middleware', () => {
-    const middlewareContract = createContract({
+    const middlewareContractRoutes = k.routes('api', {
         publicRoute: {
             method: 'GET',
             path: '/public',
@@ -425,7 +443,7 @@ describe('Hono — middleware', () => {
                 }),
             },
         },
-        admin: createContract({
+        admin: {
             dashboard: {
                 method: 'GET',
                 path: '/admin/dashboard',
@@ -444,7 +462,11 @@ describe('Hono — middleware', () => {
                     }),
                 },
             },
-        }),
+        },
+    });
+
+    const middlewareContract = k.contract({
+        routes: middlewareContractRoutes,
     });
 
     type AuthEnv = {
@@ -559,18 +581,22 @@ describe('Hono — middleware', () => {
 
     it('middleware sets context variables accessible in the handler', async () => {
         const testApp = new Hono<AuthEnv>();
-        const api = createApi({
-            contract: createContract({
-                check: {
-                    method: 'GET',
-                    path: '/check',
-                    responses: {
-                        200: z.object({
-                            authenticated: z.boolean(),
-                        }),
-                    },
+        const checkRoutes = k.routes('api', {
+            check: {
+                method: 'GET',
+                path: '/check',
+                responses: {
+                    200: z.object({
+                        authenticated: z.boolean(),
+                    }),
                 },
-            }),
+            },
+        });
+        const checkContract = k.contract({
+            routes: checkRoutes,
+        });
+        const api = createApi({
+            contract: checkContract,
             router: {
                 check: ({ c }) => ({
                     status: 200,

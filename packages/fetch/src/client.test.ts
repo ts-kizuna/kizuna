@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { createClient } from './client.js';
 
-const contract = createContract({
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
+
+const contractRoutes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -73,8 +79,12 @@ const contract = createContract({
     },
 });
 
-const nestedContract = createContract({
-    users: createContract({
+const contract = k.contract({
+    routes: contractRoutes,
+});
+
+const nestedContractRoutes = k.routes('api', {
+    users: {
         getUser: {
             method: 'GET',
             path: '/users/:id',
@@ -98,8 +108,8 @@ const nestedContract = createContract({
                 }),
             },
         },
-    }),
-    posts: createContract({
+    },
+    posts: {
         listPosts: {
             method: 'GET',
             path: '/posts',
@@ -109,7 +119,11 @@ const nestedContract = createContract({
                 }),
             },
         },
-    }),
+    },
+});
+
+const nestedContract = k.contract({
+    routes: nestedContractRoutes,
 });
 
 const stubFetch = (status: number, body: unknown, headers: Record<string, string> = {}) =>

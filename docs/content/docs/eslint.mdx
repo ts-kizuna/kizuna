@@ -53,7 +53,7 @@ Flags `body`, `query`, `pathParams`, `headers`, and response schemas in your rou
 
 ### `z.coerce`
 
-kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/building/contract#query-path-and-header-coercion)), so `z.coerce` is redundant — and `createContract` throws on it. Use the plain schema:
+kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/building/contract#query-path-and-header-coercion)), so `z.coerce` is redundant — and `k.routes` throws on it. Use the plain schema:
 
 ```ts
 // flagged
@@ -112,10 +112,10 @@ export const PaginationQuery = z.object({
 });
 ```
 
-```ts title="contract.ts"
+```ts title="routes.ts"
 import { PaginationQuery } from './pagination.js';
 
-export const contract = createContract({
+export const users = k.routes('users', {
     listUsers: {
         method: 'GET',
         path: '/users',

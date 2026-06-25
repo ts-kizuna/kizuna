@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import * as url from 'node:url';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { loadDeprecations, contractFingerprint, serializeDeprecationMap, deserializeDeprecationMap } from '@ts-kizuna/core/generator';
 import { createDeprecationMap, writeKizunaDeprecations } from './deprecation-parser.js';
 import { contract } from './deprecation.fixture.js';
@@ -174,8 +174,16 @@ describe('loadDeprecations', () => {
     test('returns undefined for a contract not in the file', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-'));
         writeKizunaDeprecations([{ contract, contractPath: fixturePath }], dir);
-        const other = createContract({
+        const { k } = kizuna({
+            tags: createTags({
+                ping: 'Ping',
+            }),
+        });
+        const pingRoutes = k.routes('ping', {
             ping: { method: 'GET', path: '/ping', responses: { 200: z.object({ ok: z.boolean() }) } },
+        });
+        const other = k.contract({
+            routes: pingRoutes,
         });
         expect(loadDeprecations(contractFingerprint(other), dir)).toBeUndefined();
     });

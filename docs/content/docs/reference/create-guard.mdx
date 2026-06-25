@@ -1,17 +1,17 @@
 ---
 title: createGuard
-description: Create a route guard that checks access before the handler runs.
+description: Wrap an access check into adapter middleware that rejects or allows a request without boilerplate.
 ---
 
-Create a guard — a middleware that checks whether a request should proceed or be rejected. Guards handle the boilerplate of error responses and calling `next()`. You just write the check.
+`createGuard` turns an access check into a piece of adapter middleware. It handles the boilerplate of error responses and continuing the chain — you just write the check.
 
 <AdapterTabs functionName="createGuard" />
 
 ## How it works
 
-A guard receives the framework's request context and a `deny` function. Call `deny(status, message)` to reject the request with a JSON error response. Return without calling `deny` to allow the request through.
+A guard receives the framework's request context and a `deny` function. Call `deny(status, detail)` to reject the request with an [RFC 9457 Problem Details](/docs/reference/problem-details-schema) response. Return without calling `deny` to allow the request through.
 
-No `next()` calls. No manual `res.json()` or `c.json()`. Just check and deny or continue.
+No `next()` calls. No manual `res.json()` or `c.json()`. Just check, then deny or continue. To pass data to handlers, attach it to the native request or context — guards run before the handler, so whatever they set is available downstream.
 
 ## Hono
 
@@ -27,7 +27,7 @@ type AuthEnv = {
     };
 };
 
-const requireAdmin = createGuard<AuthEnv>(async (c, deny) => {
+const requireAdmin = createGuard<AuthEnv>(async ({ c, deny }) => {
     const user = c.get('user');
     if (user.role !== 'admin') {
         return deny(403, 'Forbidden');
@@ -39,27 +39,21 @@ The `Env` type parameter follows Hono's convention for typed context variables.
 
 ### Resolving entities
 
-Guards are ideal for multi-tenant apps where you need to resolve an entity and check membership before the handler runs.
+Guards are ideal for multi-tenant apps where you resolve an entity and check membership before the handler runs, then stash it on the context:
 
 ```ts
-const requireLocationMembership = createGuard<AuthEnv>(async (c, deny) => {
+const requireMembership = createGuard<AuthEnv>(async ({ c, deny }) => {
     const user = c.get('user');
-    const locationId = c.req.param('id');
-    if (!locationId) {
-        return deny(400, 'Missing location ID');
+    const workspaceId = c.req.param('id');
+    if (!workspaceId) {
+        return deny(400, 'Missing workspace id');
     }
 
-    const location = await resolveLocation(locationId);
-    if (!location) {
-        return deny(404, 'Location not found');
-    }
-
-    const membership = await checkMembership(user.id, location.organizationId);
+    const membership = await checkMembership(user.id, workspaceId);
     if (!membership) {
         return deny(403, 'Forbidden');
     }
 
-    c.set('location', location);
     c.set('member', membership);
 });
 ```
@@ -69,75 +63,85 @@ const requireLocationMembership = createGuard<AuthEnv>(async (c, deny) => {
 ```ts
 import { createGuard } from '@ts-kizuna/express';
 
-const requireAdmin = createGuard(async (req, res, deny) => {
-    if (req.user.role !== 'admin') {
-        return deny(403, 'Forbidden');
+const requireUser = createGuard(({ req, deny }) => {
+    const session = sessions.get(bearerToken(req) ?? '');
+    if (!session) {
+        return deny(401, 'Unauthorized');
     }
+    req.userId = session.userId;
 });
 ```
+
+Type your request properties with [declaration merging](/docs/adapters/express#type-safe-request-properties) so `req.userId` is typed in guards and handlers alike.
 
 ## Fastify
 
 ```ts
 import { createGuard } from '@ts-kizuna/fastify';
 
-const requireAdmin = createGuard(async (request, reply, deny) => {
-    if (request.user.role !== 'admin') {
-        return deny(403, 'Forbidden');
+const requireUser = createGuard(({ request, deny }) => {
+    const session = sessions.get(bearerToken(request) ?? '');
+    if (!session) {
+        return deny(401, 'Unauthorized');
     }
+    request.userId = session.userId;
 });
 ```
 
-Type your request properties with [declaration merging](/docs/adapters/express#type-safe-request-properties) for full autocomplete in guards and handlers.
+Type your request properties with [declaration merging](/docs/adapters/fastify#type-safe-request-properties) for full autocomplete in guards and handlers.
 
 ## Next.js
 
 ```ts
 import { createGuard } from '@ts-kizuna/next';
 
-const requireAdmin = createGuard(async (request, route, deny) => {
-    if (request.user.role !== 'admin') {
-        return deny(403, 'Forbidden');
+const requireUser = createGuard(({ request, route, deny }) => {
+    const auth = request.headers.get('authorization');
+    const session = sessions.get(bearerToken(auth) ?? '');
+    if (!session) {
+        return deny(401, 'Unauthorized');
     }
+    (request as AuthedRequest).userId = session.userId;
 });
 ```
 
-Type your request properties with [module augmentation](/docs/adapters/next#type-safe-request-properties) for full autocomplete in guards and handlers.
+The `route` parameter holds the matched route's `path` and `method`, useful for per-route decisions inside a shared guard. Type your request properties with [module augmentation](/docs/adapters/next#type-safe-request-properties).
 
-The `route` parameter contains the matched contract `path` and `method`, useful for per-route decisions inside a shared guard.
+## Wiring guards to routes
 
-## Using guards with `createMiddleware`
-
-Guards return a middleware function, so they plug directly into `createMiddleware`:
+A guard returns adapter middleware, so it plugs straight into [`createMiddleware`](/docs/reference/create-middleware) (or the inline `middleware` map on [`createApi`](/docs/reference/create-api)):
 
 ```ts
 import { createMiddleware } from '@ts-kizuna/hono';
 import { contract } from './contract';
 
 const middleware = createMiddleware(contract, {
-    users: [auth, requireAdmin],
-    posts: [auth, requireMembership],
+    users: [authenticate, requireAdmin],
+    members: [authenticate, requireMembership],
     health: [],
 });
 ```
 
 ## `deny` and `ProblemDetailsSchema`
 
-When a guard calls `deny(status, message)`, the response matches kizuna's standard [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) shape:
+`deny(status, detail)` writes an [RFC 9457 Problem Details](/docs/reference/problem-details-schema) body — the same shape as kizuna's built-in errors (404, 400 validation, 405):
 
 ```json
 {
-    "message": "Forbidden"
+    "type": "about:blank",
+    "title": "Forbidden",
+    "status": 403,
+    "detail": "Forbidden"
 }
 ```
 
-This is the same shape used by kizuna's built-in errors (404, 400 validation, 405, etc.). Use `ProblemDetailsSchema` in your contracts to document these status codes:
+Declare these status codes with `ProblemDetailsSchema` so they appear in the contract and the generated spec:
 
 ```ts
-import { createContract } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { k } from './k';
 
-const contract = createContract({
+const usersRoutes = k.routes('users', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -151,4 +155,4 @@ const contract = createContract({
 });
 ```
 
-The contract, the guards, and kizuna's built-in errors all produce the same shape.
+The routes, the guards, and kizuna's built-in errors all produce the same shape.

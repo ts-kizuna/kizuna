@@ -8,7 +8,7 @@ import { generateSwiftClient } from './generator.js';
 const usage = `Usage: ts-kizuna-swift generate --contract <path> --output <path> --namespace-name <name>
 
 Required:
-  --contract <path>        TypeScript or JS module exporting \`contract\` (or default-exporting one).
+  --contract <path>        TypeScript or JS module default-exporting a kizuna contract (k.contract).
   --output <path>          File path to write the generated .swift file.
   --namespace-name <name>  Public enum wrapping all generated types (e.g. MyAPI).
 `;

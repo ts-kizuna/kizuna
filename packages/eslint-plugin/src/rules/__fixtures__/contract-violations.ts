@@ -1,7 +1,9 @@
-import { createContract } from '@ts-kizuna/core';
+import { kizuna } from '@ts-kizuna/core';
 import { CoercedQuery, DeprecatedLinkSchema, DuplicateDeprecatedSchema, NestedCoerced } from './shared-schemas.js';
 
-export const contract = createContract({
+const { k } = kizuna();
+
+export const routes = k.routes({
     a: {
         method: 'GET',
         path: '/a',

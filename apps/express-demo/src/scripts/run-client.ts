@@ -1,3 +1,4 @@
+import { isValidationError } from '@ts-kizuna/fetch';
 import { apiClient } from '../lib/api-client';
 
 const main = async () => {
@@ -75,6 +76,24 @@ const main = async () => {
         },
     });
     console.log('status:', bad.status);
+
+    console.log('--- createUser invalid phone (expect 400 with custom code) ---');
+    const badPhone = await apiClient.users.createUser({
+        body: {
+            name: 'Grace Hopper',
+            email: 'grace@example.com',
+            phone: 'not-a-phone',
+        },
+    });
+    if (badPhone.status === 400 && isValidationError(badPhone.body)) {
+        for (const issue of badPhone.body.errors) {
+            // `issue.code` is typed as ValidationIssueCode — comparing against
+            // the custom `invalid_phone_number` is fully type-checked.
+            if (issue.code === 'invalid_phone_number') {
+                console.log('custom code:', issue.code, '->', issue.message);
+            }
+        }
+    }
 };
 
 main().catch((error: unknown) => {

@@ -3,7 +3,7 @@ import fastifyPlugin from 'fastify-plugin';
 import {
     type AdapterRequest,
     type RouteDefinition,
-    type Contract,
+    type Routes,
     type MiddlewareMap,
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
@@ -12,21 +12,34 @@ import {
     ROUTER_META,
     MIDDLEWARE_META,
     createAdapter,
-    createApi as coreCreateApi,
+    createApi as coreApi,
     resolveMiddleware,
     renderJsonResult,
     problemDetails,
 } from '@ts-kizuna/core/adapter';
+import type { Contract, TagOptions } from '@ts-kizuna/core';
 
-export type FastifyApi<R extends Contract = Contract> = R & ApiWithRouter & { readonly [MIDDLEWARE_META]?: unknown };
+export type FastifyApi<R extends Routes = Routes> = R & ApiWithRouter & { readonly [MIDDLEWARE_META]?: unknown };
 
 export interface FastifyHandlerContext {
     request: FastifyRequest;
     reply: FastifyReply;
 }
 
+/**
+ * The handler type for a single route, typed against its contract definition.
+ */
 export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, FastifyHandlerContext>;
-export type Router<T extends Contract> = CoreRouter<T, FastifyHandlerContext>;
+
+/**
+ * The handler tree for a contract, typed against it.
+ */
+export type Router<C> =
+    C extends Contract<infer R, infer _Tags, infer _Codes>
+        ? CoreRouter<R, FastifyHandlerContext>
+        : C extends Routes
+          ? CoreRouter<C, FastifyHandlerContext>
+          : never;
 
 declare module 'fastify' {
     interface FastifyRequest {
@@ -38,16 +51,16 @@ export type FastifyPreHandler = (request: FastifyRequest, reply: FastifyReply) =
 
 export interface FastifyOptions {
     /**
-     * Validate handler return values against the contract's response schemas.
-     * Mismatches surface as 500 errors. Intended for development; disable in production.
+     * Validate handler return values against the routes' response schemas.
+     * Mismatches surface as 500 errors. Intended for development; disable in
+     * production.
      *
      * @default false
      */
     responseValidation?: boolean;
     /**
-     * Reshape error (status >= 400) response bytes — e.g. serve an older client a plain
-     * `application/json` body during migration. Most migrations don't need this (use Problem
-     * Details extension members instead). See {@link ErrorFormatter}.
+     * Reshape error (status >= 400) response bytes before they are sent. See
+     * {@link ErrorFormatter}.
      */
     formatError?: ErrorFormatter<FastifyRequest>;
 }
@@ -55,35 +68,30 @@ export interface FastifyOptions {
 /**
  * Bind typed handler implementations to a contract.
  *
- * ```ts
- * import { createRouter } from '@ts-kizuna/fastify';
- * import { contract } from './contract';
- *
+ * @example
  * export const router = createRouter(contract, {
  *     listUsers: ({ query }) => ({ status: 200, body: { users: [], total: 0 } }),
  *     createUser: ({ body }) => ({ status: 201, body: { id: '1', ...body } }),
  * });
- * ```
  */
-export const createRouter = <T extends Contract>(_contract: T, router: Router<T>): Router<T> => router;
+export const createRouter = <const R extends Routes>(
+    _contract: Contract<R, Record<string, TagOptions>, string>,
+    router: Router<Contract<R>>
+): Router<Contract<R>> => router;
 
 /**
- * Declare per-route middleware in the same shape as the contract.
+ * Declare per-route middleware in the same shape as the contract's routes.
  *
- * ```ts
- * import { createMiddleware } from '@ts-kizuna/fastify';
- * import { contract } from './contract';
- *
+ * @example
  * export const middleware = createMiddleware(contract, {
  *     listUsers: [authenticate],
  *     createUser: [authenticate, adminOnly],
  * });
- * ```
  */
-export const createMiddleware = <T extends Contract>(
-    _contract: T,
-    map: MiddlewareMap<T, FastifyPreHandler>
-): MiddlewareMap<T, FastifyPreHandler> => map;
+export const createMiddleware = <const R extends Routes>(
+    _contract: Contract<R, Record<string, TagOptions>, string>,
+    map: MiddlewareMap<R, FastifyPreHandler>
+): MiddlewareMap<R, FastifyPreHandler> => map;
 
 type Deny = (status: number, detail: string) => { status: number; detail: string };
 
@@ -93,26 +101,23 @@ const deny: Deny = (status, detail) => ({
 });
 
 /**
- * Create a guard — a middleware that checks access before the handler runs.
+ * Create a guard — a middleware that checks access before the handler runs. Call
+ * `deny(status, detail)` to reject the request; return without calling it to allow.
  *
- * Call `deny(status, message)` to reject the request.
- * Return without calling `deny` to allow it through.
- *
- * ```ts
- * import { createGuard } from '@ts-kizuna/fastify';
- *
- * const requireAdmin = createGuard(async (request, reply, deny) => {
- *     if (request.user.role !== 'admin') {
- *         return deny(403, 'Forbidden');
- *     }
+ * @example
+ * const requireAdmin = createGuard(async ({ request, deny }) => {
+ *     if (request.user?.role !== 'admin') return deny(403, 'Forbidden');
  * });
- * ```
  */
 export function createGuard(
-    guard: (request: FastifyRequest, reply: FastifyReply, deny: Deny) => Promise<ReturnType<Deny> | void> | ReturnType<Deny> | void
+    guard: (args: {
+        request: FastifyRequest;
+        reply: FastifyReply;
+        deny: Deny;
+    }) => Promise<ReturnType<Deny> | void> | ReturnType<Deny> | void
 ): FastifyPreHandler {
     return async (request, reply) => {
-        const result = await guard(request, reply, deny);
+        const result = await guard({ request, reply, deny });
         if (result && typeof result === 'object' && 'status' in result) {
             reply
                 .header('content-type', 'application/problem+json')
@@ -156,28 +161,22 @@ const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
 });
 
 /**
- * Define a fully-typed Fastify API — routes, handlers, and middleware in one call.
+ * Bind a contract to its router and per-route middleware.
  *
- * ```ts
- * import { createApi } from '@ts-kizuna/fastify';
- * import { contract } from './contract';
- * import { router } from './router';
- * import { middleware } from './middleware';
- *
+ * @example
  * export const api = createApi({
  *     contract,
  *     router,
  *     middleware,
  * });
- * ```
  */
-export const createApi = <const R extends Contract>(options: {
-    contract: R;
-    router: Router<R>;
+export const createApi = <const R extends Routes>(options: {
+    contract: Contract<R, Record<string, TagOptions>, string>;
+    router: Router<Contract<R>>;
     middleware?: MiddlewareMap<R, FastifyPreHandler>;
 }): FastifyApi<R> => {
     const { contract, router, middleware } = options;
-    const spec = coreCreateApi(contract);
+    const spec = coreApi(contract.routes);
     return Object.assign(spec, {
         [ROUTER_META]: router,
         [MIDDLEWARE_META]: middleware,
@@ -194,26 +193,19 @@ export interface KizunaPluginOptions extends FastifyOptions {
 /**
  * Fastify plugin that mounts a ts-kizuna API.
  *
- * ```ts
- * import Fastify from 'fastify';
- * import { fastifyKizuna } from '@ts-kizuna/fastify';
- * import { api } from './api';
- *
+ * @example
  * const app = Fastify();
  * app.register(fastifyKizuna, {
  *     api,
  * });
- *
- * app.listen({ port: 3000 });
- * ```
  */
 export const fastifyKizuna = fastifyPlugin(
     async (app: FastifyInstance, options: KizunaPluginOptions) => {
         const { api } = options;
-        const resolvedRouter = api[ROUTER_META] as Router<Contract>;
-        const middlewareMap = api[MIDDLEWARE_META] as MiddlewareMap<Contract, FastifyPreHandler> | undefined;
+        const resolvedRouter = api[ROUTER_META] as CoreRouter<Routes, FastifyHandlerContext>;
+        const middlewareMap = api[MIDDLEWARE_META] as MiddlewareMap<Routes, FastifyPreHandler> | undefined;
 
-        for (const { routeKey, route } of adapter.eachRoute(api as unknown as Contract, resolvedRouter)) {
+        for (const { routeKey, route } of adapter.eachRoute(api as unknown as Routes, resolvedRouter)) {
             const routeMiddleware = resolveMiddleware(routeKey, middlewareMap);
 
             app.route({
@@ -223,7 +215,7 @@ export const fastifyKizuna = fastifyPlugin(
                     async (request: FastifyRequest) => {
                         request.kizunaRoute = route;
                     },
-                    ...(routeMiddleware as any[]),
+                    ...routeMiddleware,
                 ],
                 handler: async (request: FastifyRequest, reply: FastifyReply) => {
                     const adapterRequest: AdapterRequest<FastifyRequest> = {
@@ -241,7 +233,7 @@ export const fastifyKizuna = fastifyPlugin(
                     };
 
                     await adapter.handle({
-                        contract: api as unknown as Contract,
+                        routes: api as unknown as Routes,
                         router: resolvedRouter,
                         request: adapterRequest,
                         responseContext: {

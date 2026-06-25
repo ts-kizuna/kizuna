@@ -3,7 +3,7 @@ title: Migrating from ts-rest
 description: Side-by-side comparison of ts-rest and ts-kizuna APIs, with notes on deliberate differences.
 ---
 
-ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered. ts-rest proved that contract-first TypeScript APIs could work beautifully, and a lot of people built real things with it — we did too. We truly appreciate what the team behind ts-rest built. ts-kizuna borrows several of its core concepts and keeps the public API deliberately familiar, but takes a different approach under the hood. This page maps every changed API to its ts-kizuna equivalent.
+ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered. ts-rest proved that routes-first TypeScript APIs could work beautifully, and a lot of people built real things with it — we did too. We truly appreciate what the team behind ts-rest built. ts-kizuna borrows several of its core concepts and keeps the public API deliberately familiar, but takes a different approach under the hood. This page maps every changed API to its ts-kizuna equivalent.
 
 ## Package mapping
 
@@ -14,11 +14,11 @@ ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneer
 | `@ts-rest/next`     | `@ts-kizuna/next`                      |                                    |
 | `@ts-rest/open-api` | `@ts-kizuna/openapi`                   |                                    |
 
-## Contract
+## Routes
 
-### `initContract` → `createContract`
+### `initContract` → `kizuna` + `k.routes`
 
-`initContract` does not exist in ts-kizuna. Use `createContract` directly.
+`initContract` does not exist in ts-kizuna. Create the `kizuna` factory once, then define groups with `k.routes`.
 
 ```ts
 // ts-rest
@@ -29,11 +29,20 @@ export const contract = c.router({ ... });
 
 ```ts
 // ts-kizuna
-import { createContract } from '@ts-kizuna/core';
-export const contract = createContract({ ... });
+import { kizuna, createTags } from '@ts-kizuna/core';
+
+const tags = createTags({
+    users: 'Users',
+});
+
+export const { k } = kizuna({
+    tags,
+});
+
+export const users = k.routes('users', { ... });
 ```
 
-### Nested contracts
+### Nested routes
 
 ```ts
 // ts-rest
@@ -43,13 +52,12 @@ export const contract = c.router({
 ```
 
 ```ts
-// ts-kizuna
-export const contract = createContract({
-    users: createContract('Users', { ... }),
-});
+// ts-kizuna — one group per tag, assembled in the contract
+export const users = k.routes('users', { ... });
+export const health = k.routes('health', { ... });
 ```
 
-The optional string argument to `createContract` sets the OpenAPI tag for all routes in that sub-contract.
+The tag passed to `k.routes` (a key of your `createTags` set) sets the OpenAPI tag for all routes in that group.
 
 ### `c.noBody()` → `z.void()`
 
@@ -74,10 +82,10 @@ export const contract = c.router({
 
 ```ts
 // ts-kizuna — remove `body`, use z.void() for empty responses
-import { createContract } from '@ts-kizuna/core';
 import { z } from 'zod';
+import { k } from './k';
 
-export const contract = createContract({
+export const users = k.routes('users', {
     deleteUser: {
         method: 'DELETE',
         path: '/users/:id',
@@ -89,6 +97,22 @@ export const contract = createContract({
 ```
 
 For request bodies, just remove the `body` field. Use `z.void()` for responses that return no body (like `204`).
+
+## Contract
+
+ts-rest passes its router straight to the client and server. ts-kizuna adds one step: assemble your route groups into a contract with `k.contract`, then pass that everywhere (`client`, `createApi`).
+
+```ts
+// ts-kizuna
+import { k } from './k';
+import { users } from './routes';
+
+export const contract = k.contract({
+    routes: {
+        users,
+    },
+});
+```
 
 ## Client
 
@@ -114,7 +138,7 @@ const client = createClient(contract, {
 
 ### `initServer` → `createRouter` + `createApi`
 
-`initServer` does not exist in ts-kizuna. Use `createRouter` to bind handler implementations to a contract, and `createApi` to produce a mountable API object.
+`initServer` does not exist in ts-kizuna. Use `createRouter` to bind implementations to the contract, and `createApi` to produce a mountable API object.
 
 ```ts
 // ts-rest
@@ -146,17 +170,18 @@ const router: RouterImpl<typeof contract> = { ... };
 ```ts
 // ts-kizuna
 import type { Router, RouteHandler } from '@ts-kizuna/express';
+import { contract } from './contract';
 
-// All routes
-const router: Router<typeof contract> = { ... };
+// Whole handler tree
+const router: Router<typeof contract.routes> = { ... };
 
 // Single route
-const getUser: RouteHandler<typeof contract.getUser> = async ({ params }) => { ... };
+const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ params }) => { ... };
 ```
 
 ## Express adapter
 
-### `createExpressEndpoints`
+### `createExpressEndpoints` → `createExpressEndpoints`
 
 ```ts
 // ts-rest
@@ -170,7 +195,7 @@ import { createExpressEndpoints } from '@ts-kizuna/express';
 createExpressEndpoints(api, app);
 ```
 
-In ts-kizuna, `createExpressEndpoints` takes the `api` object (produced by `createApi`) rather than separate contract and handler arguments.
+In ts-kizuna, `createExpressEndpoints` takes the `api` object (produced by `createApi`) rather than separate routes and handler arguments.
 
 ## Next.js adapter
 
@@ -205,12 +230,11 @@ ts-kizuna targets **Zod 4 only**. ts-rest supports Zod 3 and 4.
 
 If you are upgrading from ts-rest and Zod 3, migrate to Zod 4 alongside this change:
 
-| Zod 3 / ts-rest                   | Zod 4 / ts-kizuna                  |
-| --------------------------------- | ---------------------------------- |
-| `c.noBody()`                      | `z.void()` or omit `body` entirely |
-| `z.ZodTypeAny`                    | `z.ZodType`                        |
-| `ZodIssue` (from `'zod'`)         | `z.core.$ZodIssue`                 |
-| `.openapi({ ... })` (zod-openapi) | `.meta({ ... })`                   |
+| Zod 3 / ts-rest           | Zod 4 / ts-kizuna                  |
+| ------------------------- | ---------------------------------- |
+| `c.noBody()`              | `z.void()` or omit `body` entirely |
+| `z.ZodTypeAny`            | `z.ZodType`                        |
+| `ZodIssue` (from `'zod'`) | `z.core.$ZodIssue`                 |
 
 ## Deprecation
 

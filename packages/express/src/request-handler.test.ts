@@ -2,10 +2,16 @@ import { describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { z } from 'zod';
-import { createContract } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { createApi, createExpressEndpoints } from './server.js';
 
-const contract = createContract({
+const { k } = kizuna({
+    tags: createTags({
+        api: 'API',
+    }),
+});
+
+const contractRoutes = k.routes('api', {
     createUser: {
         method: 'POST',
         path: '/users',
@@ -23,6 +29,10 @@ const contract = createContract({
             }),
         },
     },
+});
+
+const contract = k.contract({
+    routes: contractRoutes,
 });
 
 const createTestApp = () => {
@@ -112,7 +122,7 @@ describe('Zod validation', () => {
 });
 
 describe('validation issue codes', () => {
-    const refinedContract = createContract({
+    const refinedContractRoutes = k.routes('api', {
         register: {
             method: 'POST',
             path: '/register',
@@ -132,6 +142,10 @@ describe('validation issue codes', () => {
                 }),
             },
         },
+    });
+
+    const refinedContract = k.contract({
+        routes: refinedContractRoutes,
     });
 
     const refinedApp = express();

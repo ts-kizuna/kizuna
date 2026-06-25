@@ -9,7 +9,7 @@ export const deriveToolNames = (routes: FlattenedRoute[]): Map<string, string> =
             throw new Error(
                 `Tool name "${routeKey}" is ${routeKey.length} characters, ` +
                     `exceeding the MCP recommended maximum of ${MAX_TOOL_NAME_LENGTH}. ` +
-                    `Restructure your contract to use shorter keys.`
+                    `Restructure your routes to use shorter keys.`
             );
         }
         names.set(routeKey, routeKey);
