@@ -8,9 +8,13 @@ import { generateSwiftClient } from './generator.js';
 const usage = `Usage: ts-kizuna-swift generate --contract <path> --output <path> --namespace-name <name>
 
 Required:
-  --contract <path>        TypeScript or JS module default-exporting a kizuna contract (k.contract).
+  --contract <path>        TypeScript or JS module exporting a kizuna contract (k.contract).
+                           Suffix with the export to read: src/api.ts:appContract.
   --output <path>          File path to write the generated .swift file.
   --namespace-name <name>  Public enum wrapping all generated types (e.g. MyAPI).
+
+Optional:
+  --export <name>          Export name when none is suffixed. Default: contract.
 `;
 
 const die = (message: string, code = 1): never => {
@@ -37,6 +41,9 @@ const main = async (): Promise<void> => {
             'namespace-name': {
                 type: 'string',
             },
+            export: {
+                type: 'string',
+            },
         },
         strict: true,
     });
@@ -45,8 +52,10 @@ const main = async (): Promise<void> => {
     const outArg = values.output ?? die('Missing --output\n\n' + usage);
     const namespaceName = values['namespace-name'] ?? die('Missing --namespace-name\n\n' + usage);
 
-    const contractPath = resolve(process.cwd(), contractArg);
-    const contract = (await loadContract(contractPath)) ?? die(`No \`contract\` or default export found at ${contractPath}`);
+    const [pathPart, exportName = values.export ?? 'contract'] = contractArg.split(':');
+    const contractPath = resolve(process.cwd(), pathPart!);
+    const contract =
+        (await loadContract(contractPath, exportName)) ?? die(`No \`${exportName}\` (or default) export found at ${contractPath}`);
     writeKizunaDeprecations([{ contract, contractPath }], resolve(process.cwd(), '.kizuna'));
     const swiftSource = generateSwiftClient(contract, {
         namespaceName,
