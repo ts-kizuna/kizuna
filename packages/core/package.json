@@ -18,21 +18,21 @@
     },
     "./schemas": {
       "import": {
-        "types": "./src/schemas.ts",
+        "types": "./dist/schemas.d.mts",
         "default": "./dist/schemas.mjs"
       },
       "require": {
-        "types": "./src/schemas.ts",
+        "types": "./dist/schemas.d.cts",
         "default": "./dist/schemas.cjs"
       }
     },
     "./zod": {
       "import": {
-        "types": "./src/zod.ts",
+        "types": "./dist/zod.d.mts",
         "default": "./dist/zod.mjs"
       },
       "require": {
-        "types": "./src/zod.ts",
+        "types": "./dist/zod.d.cts",
         "default": "./dist/zod.cjs"
       }
     },
