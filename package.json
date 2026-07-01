@@ -10,6 +10,7 @@
     "test:ts": "vitest run",
     "test:watch": "vitest",
     "test:types": "vitest --typecheck.only",
+    "test:exports": "pnpm -r --filter \"./packages/*\" exec attw --pack . --profile node16 --ignore-rules false-export-default && pnpm -r --filter \"./packages/*\" exec publint --strict",
     "generate:swift": "pnpm --filter @ts-kizuna-demo/swift generate",
     "test:swift": "pnpm --filter @ts-kizuna-demo/swift test",
     "swift:build": "pnpm --filter @ts-kizuna-demo/swift build",
@@ -21,6 +22,7 @@
     "release": "release-it"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.4",
     "@eslint/js": "^9.39.4",
     "@release-it/conventional-changelog": "^11.0.0",
     "@ts-kizuna/eslint-plugin": "workspace:*",
@@ -31,6 +33,7 @@
     "eslint-plugin-prettier": "^5.5.5",
     "jest-expect-openapi": "^6.0.1",
     "prettier": "^3.3.3",
+    "publint": "^0.3.21",
     "release-it": "^20.0.1",
     "supertest": "^7.1.4",
     "tsdown": "catalog:",

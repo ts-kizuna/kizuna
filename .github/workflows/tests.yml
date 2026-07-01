@@ -35,6 +35,9 @@ jobs:
             - name: Build
               run: pnpm build
 
+            - name: Check package exports
+              run: pnpm test:exports
+
             - name: Test
               run: pnpm test:ts
 
