@@ -875,6 +875,48 @@ describe('Swift generator — owned type nesting', () => {
         expect(output).toContain('public struct Settings');
         expect(output).toContain('public struct Theme');
     });
+
+    it('keeps sibling anonymous objects apart when one field name is a prefix of another (identical shapes)', () => {
+        const contractRoutes = k.routes('api', {
+            getOrderItem: {
+                method: 'GET',
+                path: '/order-items/:id',
+                responses: {
+                    200: z
+                        .object({
+                            type: z.literal('fittingItem'),
+                            image: z
+                                .object({
+                                    id: z.string(),
+                                    url: z.string(),
+                                })
+                                .nullable()
+                                .optional(),
+                            images: z
+                                .array(
+                                    z.object({
+                                        id: z.string(),
+                                        url: z.string(),
+                                    })
+                                )
+                                .optional(),
+                        })
+                        .meta({ id: 'FittingProductOrderItem' }),
+                },
+            },
+        });
+
+        const contract = k.contract({
+            routes: contractRoutes,
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        // `ImagesItem` must nest under the parent, not get claimed by `Image` as `sItem`
+        expect(output).toContain('public struct Image');
+        expect(output).toContain('public struct ImagesItem');
+        expect(output).toContain('let images: [ImagesItem]?');
+        expect(output).not.toContain('struct sItem');
+        expect(output).not.toContain('FittingProductOrderItemImagesItem');
+    });
 });
 
 describe('Swift generator — @available(*, deprecated)', () => {
