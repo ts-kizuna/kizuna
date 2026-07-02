@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { markModelSchema } from './zod-internals.js';
 
 export interface ModelOptions<T extends z.ZodType> {
     /**
@@ -32,8 +33,11 @@ export interface ModelOptions<T extends z.ZodType> {
  * });
  * ```
  */
-export const createModel = <T extends z.ZodType>(options: ModelOptions<T>): T =>
-    options.schema.meta({
+export const createModel = <T extends z.ZodType>(options: ModelOptions<T>): T => {
+    const model = options.schema.meta({
         id: options.title,
         description: options.description,
     }) as T;
+    markModelSchema(model);
+    return model;
+};

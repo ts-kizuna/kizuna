@@ -10,6 +10,7 @@ import {
     parsePath,
     readDiscriminatedUnion,
     readDiscriminatorLiteral,
+    readMeta,
     readMetaId,
     readObjectShape,
     globalRegistrySchemas,
@@ -209,14 +210,16 @@ const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Rec
 
 const buildComponentSchemas = (): Record<string, unknown> | undefined => {
     const discriminators = new Map<string, { propertyName: string; mapping?: Record<string, string> }>();
+    const modelRegistry = z.registry<z.core.GlobalMeta>();
     for (const [id, schema] of globalRegistrySchemas().entries()) {
+        modelRegistry.add(schema as z.ZodType, readMeta(schema) as z.core.GlobalMeta);
         const def = readDiscriminatedUnion(schema);
         if (def) {
             discriminators.set(id, buildDiscriminatorBlock(def.discriminator, def.options));
         }
     }
 
-    const result = z.toJSONSchema(z.globalRegistry, {
+    const result = z.toJSONSchema(modelRegistry, {
         uri: (id: string) => COMPONENT_REF_BASE + id,
         unrepresentable: 'any',
         io: 'output',

@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags, type Contract } from '@ts-kizuna/core';
+import { kizuna, createTags, createModel, type Contract } from '@ts-kizuna/core';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateSwiftClient } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
@@ -223,7 +223,7 @@ describe('Swift generator — namespace wrapper', () => {
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
-                    200: z.object({ id: z.string() }).meta({ id: 'Error' }),
+                    200: createModel({ title: 'Error', schema: z.object({ id: z.string() }) }),
                 },
             },
         });
@@ -703,12 +703,13 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/videos/:id',
                 responses: {
-                    200: z
-                        .object({
+                    200: createModel({
+                        title: 'Video',
+                        schema: z.object({
                             id: z.string(),
                             status: z.enum(['encoding', 'encoded', 'failed']),
-                        })
-                        .meta({ id: 'Video' }),
+                        }),
+                    }),
                 },
             },
         });
@@ -729,12 +730,13 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/files/:id',
                 responses: {
-                    200: z
-                        .object({
+                    200: createModel({
+                        title: 'StoredFile',
+                        schema: z.object({
                             id: z.string(),
                             contentType: z.enum(['image/jpeg', 'text-plain', 'video.mp4', '3d-model']),
-                        })
-                        .meta({ id: 'StoredFile' }),
+                        }),
+                    }),
                 },
             },
         });
@@ -760,12 +762,13 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/orders/:id',
                 responses: {
-                    200: z
-                        .object({
+                    200: createModel({
+                        title: 'Order',
+                        schema: z.object({
                             id: z.string(),
                             status: z.enum(['in_progress', 'awaiting_payment', 'done']),
-                        })
-                        .meta({ id: 'Order' }),
+                        }),
+                    }),
                 },
             },
         });
@@ -788,15 +791,16 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/pages/:id',
                 responses: {
-                    200: z
-                        .object({
+                    200: createModel({
+                        title: 'Page',
+                        schema: z.object({
                             id: z.string(),
                             images: z.object({
                                 portrait: z.string(),
                                 landscape: z.string().optional(),
                             }),
-                        })
-                        .meta({ id: 'Page' }),
+                        }),
+                    }),
                 },
             },
         });
@@ -812,23 +816,25 @@ describe('Swift generator — owned type nesting', () => {
     });
 
     it('does not nest an inline object that has its own meta.id', () => {
-        const Image = z
-            .object({
+        const Image = createModel({
+            title: 'Image',
+            schema: z.object({
                 url: z.string(),
                 width: z.number().int(),
-            })
-            .meta({ id: 'Image' });
+            }),
+        });
         const contractRoutes = k.routes('api', {
             getPage: {
                 method: 'GET',
                 path: '/pages/:id',
                 responses: {
-                    200: z
-                        .object({
+                    200: createModel({
+                        title: 'Page',
+                        schema: z.object({
                             id: z.string(),
                             image: Image,
-                        })
-                        .meta({ id: 'Page' }),
+                        }),
+                    }),
                 },
             },
         });
@@ -853,15 +859,16 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/pages/:id',
                 responses: {
-                    200: z
-                        .object({
+                    200: createModel({
+                        title: 'Page',
+                        schema: z.object({
                             settings: z.object({
                                 theme: z.object({
                                     color: z.string(),
                                 }),
                             }),
-                        })
-                        .meta({ id: 'Page' }),
+                        }),
+                    }),
                 },
             },
         });
@@ -882,8 +889,9 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/order-items/:id',
                 responses: {
-                    200: z
-                        .object({
+                    200: createModel({
+                        title: 'FittingProductOrderItem',
+                        schema: z.object({
                             type: z.literal('fittingItem'),
                             image: z
                                 .object({
@@ -900,8 +908,8 @@ describe('Swift generator — owned type nesting', () => {
                                     })
                                 )
                                 .optional(),
-                        })
-                        .meta({ id: 'FittingProductOrderItem' }),
+                        }),
+                    }),
                 },
             },
         });
@@ -1227,7 +1235,7 @@ describe('Swift generator — grouped request components (params/body/query/head
             createUser: {
                 method: 'POST',
                 path: '/users',
-                body: z.object({ name: z.string(), email: z.string().optional() }).meta({ id: 'CreateUserInput' }),
+                body: createModel({ title: 'CreateUserInput', schema: z.object({ name: z.string(), email: z.string().optional() }) }),
                 responses: {
                     201: z.object({ id: z.string() }),
                 },
@@ -1250,8 +1258,11 @@ describe('Swift generator — grouped request components (params/body/query/head
                 method: 'POST',
                 path: '/notify',
                 body: z.discriminatedUnion('channel', [
-                    z.object({ channel: z.literal('email'), to: z.string(), subject: z.string() }).meta({ id: 'EmailEvent' }),
-                    z.object({ channel: z.literal('sms'), phone: z.string() }).meta({ id: 'SmsEvent' }),
+                    createModel({
+                        title: 'EmailEvent',
+                        schema: z.object({ channel: z.literal('email'), to: z.string(), subject: z.string() }),
+                    }),
+                    createModel({ title: 'SmsEvent', schema: z.object({ channel: z.literal('sms'), phone: z.string() }) }),
                 ]),
                 responses: {
                     202: z.object({ accepted: z.boolean() }),
