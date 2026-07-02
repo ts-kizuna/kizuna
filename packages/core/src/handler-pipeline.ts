@@ -135,6 +135,14 @@ export type HandlerArgs<R extends RouteDefinition> = {
      *
      * This function throws internally and never returns.
      */
+    throwError: (response: HandlerReturn<R>) => never;
+    /**
+     * Throws a typed error response. Takes the same `{ status, body }` shape as a handler return.
+     *
+     * This function throws internally and never returns.
+     *
+     * @deprecated Use `throwError` instead.
+     */
     error: (response: HandlerReturn<R>) => never;
 };
 

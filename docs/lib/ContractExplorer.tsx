@@ -48,10 +48,10 @@ const NODES: OutputNode[] = [
         lang: 'ts',
         code: `createRouter(contract, {
   users: {
-    getUser: async ({ params, error }) => {
+    getUser: async ({ params, throwError }) => {
       const user = await db.users.findById(params.id);
 
-      if (!user) error({
+      if (!user) throwError({
         status: 404,
         body: {
           detail: 'Not found',

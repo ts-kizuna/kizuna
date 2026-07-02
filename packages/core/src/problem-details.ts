@@ -13,7 +13,7 @@ export interface ProblemDetails {
  * ```ts
  * import { problemDetails } from '@ts-kizuna/core';
  *
- * return error({
+ * return throwError({
  *     status: 404,
  *     body: problemDetails(404, 'User not found'),
  * });
