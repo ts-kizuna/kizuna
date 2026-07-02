@@ -148,13 +148,13 @@ describe('responseValidation', () => {
         expect(results[0]?.kind).toBe('success');
     });
 
-    it('error() helper throws and adapter returns it as a response', async () => {
+    it('throwError() helper throws and adapter returns it as a response', async () => {
         const { adapter, results } = makeAdapter();
         await adapter.handle({
             routes: contract,
             router: {
-                getItem: ({ error }) => {
-                    return error({
+                getItem: ({ throwError }) => {
+                    return throwError({
                         status: 404,
                         body: {
                             detail: 'Not found',

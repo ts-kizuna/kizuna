@@ -135,13 +135,13 @@ const usersRoutes = k.routes('users', {
 });
 ```
 
-In the handler, use the `error` helper to return typed error responses. It accepts the same `{ status, body }` as a normal return but throws internally — useful in branching logic where you want to bail out early.
+In the handler, use the `throwError` helper to return typed error responses. It accepts the same `{ status, body }` as a normal return but throws internally — useful in branching logic where you want to bail out early.
 
 ```ts
-getUser: async ({ params, error }) => {
+getUser: async ({ params, throwError }) => {
     const user = await db.users.findById(params.id);
     if (!user) {
-        return error({
+        return throwError({
             status: 404,
             body: {
                 detail: 'Not found',

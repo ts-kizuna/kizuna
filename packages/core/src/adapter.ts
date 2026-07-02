@@ -326,7 +326,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     try {
         const handlerContext = await definition.buildHandlerContext(request, responseContext);
 
-        const error = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
+        const throwError = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
             throw new ResponseError(response);
         };
         const handlerResult = await (
@@ -336,7 +336,9 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             query: validation.parsed.query,
             body: validation.parsed.body,
             headers: validation.parsed.headers,
-            error,
+            throwError,
+            // Deprecated alias for `throwError`; kept for backward compatibility.
+            error: throwError,
             ...handlerContext,
         });
         if (responseValidation) {

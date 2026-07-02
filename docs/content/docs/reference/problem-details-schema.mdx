@@ -56,10 +56,10 @@ Handlers only need to provide `detail` — kizuna fills in `type`, `title`, and 
 ```ts
 const router = createRouter(contract, {
     users: {
-        getUser: ({ params, error }) => {
+        getUser: ({ params, throwError }) => {
             const user = userStore.get(params.id);
             if (!user) {
-                return error({
+                return throwError({
                     status: 404,
                     body: {
                         detail: 'User not found',
