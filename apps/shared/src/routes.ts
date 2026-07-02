@@ -32,6 +32,25 @@ export const UserSchema = createModel({
             description: 'Family name on the wire as `last_name` — exercises snake_case fidelity through the generators.',
             example: 'Hopper',
         }),
+        avatar: z
+            .object({
+                id: z.string(),
+                url: z.string(),
+            })
+            .nullable()
+            .optional()
+            .meta({
+                description:
+                    'Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another.',
+            }),
+        avatars: z
+            .array(
+                z.object({
+                    id: z.string(),
+                    url: z.string(),
+                })
+            )
+            .optional(),
     }),
 });
 

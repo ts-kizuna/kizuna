@@ -9,6 +9,30 @@ public enum API {
 
     /// A user in the system
     public struct User: Codable, Sendable, Equatable {
+        public struct Avatar: Codable, Sendable, Equatable {
+            public let id: String
+            public let url: String
+
+            public init(
+                id: String,
+                url: String
+            ) {
+                self.id = id
+                self.url = url
+            }
+        }
+        public struct AvatarsItem: Codable, Sendable, Equatable {
+            public let id: String
+            public let url: String
+
+            public init(
+                id: String,
+                url: String
+            ) {
+                self.id = id
+                self.url = url
+            }
+        }
         /// Unique user identifier
         public let id: String
         /// Display name
@@ -20,19 +44,26 @@ public enum API {
         public let email_address: String?
         /// Family name on the wire as `last_name` — exercises snake_case fidelity through the generators.
         public let last_name: String?
+        /// Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another.
+        public let avatar: Avatar?
+        public let avatars: [AvatarsItem]?
 
         public init(
             id: String,
             name: String,
             email: String,
             email_address: String? = nil,
-            last_name: String? = nil
+            last_name: String? = nil,
+            avatar: Avatar? = nil,
+            avatars: [AvatarsItem]? = nil
         ) {
             self.id = id
             self.name = name
             self.email = email
             self.email_address = email_address
             self.last_name = last_name
+            self.avatar = avatar
+            self.avatars = avatars
         }
     }
 

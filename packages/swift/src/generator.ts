@@ -130,6 +130,13 @@ interface EmitContext {
 const shortTypeName = (typeName: string, structName: string): string =>
     typeName.startsWith(structName) ? typeName.slice(structName.length) : typeName;
 
+/**
+ * A hint prefix must end on a PascalCase word boundary. Otherwise `Image` claims
+ * `ImagesItem` and the nested short name becomes the mid-word slice `sItem`.
+ */
+const isHintPrefix = (typeName: string, prefix: string): boolean =>
+    typeName.startsWith(prefix) && /[A-Z]/.test(typeName.charAt(prefix.length));
+
 const buildRouteMethod = (
     routeKey: string,
     route: RouteDefinition,
@@ -709,7 +716,7 @@ const buildOperationTypeMap = (allMethods: RouteMethod[], registry: TypeRegistry
     for (const type of registry.all()) {
         let bestMatch: string | undefined;
         for (const operationName of operationNames) {
-            if (type.name.startsWith(operationName)) {
+            if (isHintPrefix(type.name, operationName)) {
                 if (!bestMatch || operationName.length > bestMatch.length) {
                     bestMatch = operationName;
                 }
@@ -1690,7 +1697,7 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
         let bestMatch: string | undefined;
         for (const structName of allStructNames) {
             if (structName === type.name) continue;
-            if (type.name.startsWith(structName) && (!bestMatch || structName.length > bestMatch.length)) {
+            if (isHintPrefix(type.name, structName) && (!bestMatch || structName.length > bestMatch.length)) {
                 bestMatch = structName;
             }
         }
