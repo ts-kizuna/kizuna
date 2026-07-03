@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { kizuna, createTags, createModel } from '@ts-kizuna/core';
 import { createClient } from '../../fetch/src/client.js';
 
 const Paginated = <T extends z.ZodType>(itemSchema: T) =>
@@ -16,17 +16,16 @@ const UserSchema = z.object({
     email: z.string(),
 });
 
-const NamedUserSchema = z
-    .object({
+const NamedUserSchema = createModel({
+    title: 'User',
+    schema: z.object({
         id: z.string(),
         /**
          * @deprecated
          */
         email: z.string(),
-    })
-    .meta({
-        id: 'User',
-    });
+    }),
+});
 
 const ExtendedUserSchema = UserSchema.extend({
     fullName: z.string(),

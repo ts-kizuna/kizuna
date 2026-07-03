@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
-import { kizuna, createTags, type Contract } from '@ts-kizuna/core';
+import { kizuna, createTags, createModel, type Contract } from '@ts-kizuna/core';
 import { contractFingerprint } from '@ts-kizuna/core/generator';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateOpenApi, type GenerateOpenApiOptions } from './generator.js';
@@ -209,8 +209,9 @@ describe('generateOpenApi', () => {
 });
 
 describe('Zod meta() in OpenAPI output', () => {
-    const Tagged = z
-        .object({
+    const Tagged = createModel({
+        title: 'TaggedUser',
+        schema: z.object({
             id: z.string().meta({
                 description: 'User ID',
                 example: 'usr_123',
@@ -219,10 +220,8 @@ describe('Zod meta() in OpenAPI output', () => {
                 description: 'Display name',
             }),
             email: z.email(),
-        })
-        .meta({
-            id: 'TaggedUser',
-        });
+        }),
+    });
 
     const taggedContractRoutes = k.routes('api', {
         getUser: {
@@ -259,6 +258,36 @@ describe('Zod meta() in OpenAPI output', () => {
         expect(properties['id']?.description).toBe('User ID');
         expect(properties['id']?.example).toBe('usr_123');
         expect(properties['name']?.description).toBe('Display name');
+    });
+
+    it('ignores a raw .meta({ id }) set without createModel', () => {
+        const rawTagged = z
+            .object({
+                id: z.string(),
+            })
+            .meta({
+                id: 'RawTagged',
+            });
+        const rawRoutes = k.routes('api', {
+            getRaw: {
+                method: 'GET',
+                path: '/raw',
+                responses: {
+                    200: rawTagged,
+                },
+            },
+        });
+        const spec = generateJson(
+            k.contract({
+                routes: rawRoutes,
+            }),
+            baseConfig
+        );
+        expect(spec.components?.schemas?.RawTagged).toBeUndefined();
+        const responseSchema = spec.paths['/raw']?.get?.responses['200']?.content?.['application/json']?.schema;
+        expect(responseSchema).not.toEqual({
+            $ref: '#/components/schemas/RawTagged',
+        });
     });
 });
 
@@ -390,22 +419,20 @@ describe('operation metadata passthrough', () => {
 
 describe('discriminated unions', () => {
     it('is a valid OpenAPI 3.1 document', async () => {
-        const Image = z
-            .object({
+        const Image = createModel({
+            title: 'ValidImage',
+            schema: z.object({
                 type: z.literal('image'),
                 src: z.string(),
-            })
-            .meta({
-                id: 'ValidImage',
-            });
-        const Video = z
-            .object({
+            }),
+        });
+        const Video = createModel({
+            title: 'ValidVideo',
+            schema: z.object({
                 type: z.literal('video'),
                 url: z.string(),
-            })
-            .meta({
-                id: 'ValidVideo',
-            });
+            }),
+        });
         const routeRoutes = k.routes('api', {
             getMedia: {
                 method: 'GET',
@@ -423,22 +450,20 @@ describe('discriminated unions', () => {
     });
 
     it('emits oneOf + discriminator with mapping when variants are id-tagged', () => {
-        const Image = z
-            .object({
+        const Image = createModel({
+            title: 'DiscImage',
+            schema: z.object({
                 type: z.literal('image'),
                 src: z.string(),
-            })
-            .meta({
-                id: 'DiscImage',
-            });
-        const Video = z
-            .object({
+            }),
+        });
+        const Video = createModel({
+            title: 'DiscVideo',
+            schema: z.object({
                 type: z.literal('video'),
                 url: z.string(),
-            })
-            .meta({
-                id: 'DiscVideo',
-            });
+            }),
+        });
         const routeRoutes = k.routes('api', {
             getMedia: {
                 method: 'GET',
@@ -504,24 +529,23 @@ describe('discriminated unions', () => {
     });
 
     it('attaches discriminator to a registered union via components.schemas', () => {
-        const EmailEvent = z
-            .object({
+        const EmailEvent = createModel({
+            title: 'EmailEvent',
+            schema: z.object({
                 channel: z.literal('email'),
                 to: z.string(),
-            })
-            .meta({
-                id: 'EmailEvent',
-            });
-        const SmsEvent = z
-            .object({
+            }),
+        });
+        const SmsEvent = createModel({
+            title: 'SmsEvent',
+            schema: z.object({
                 channel: z.literal('sms'),
                 phone: z.string(),
-            })
-            .meta({
-                id: 'SmsEvent',
-            });
-        const NotificationEvent = z.discriminatedUnion('channel', [EmailEvent, SmsEvent]).meta({
-            id: 'NotificationEvent',
+            }),
+        });
+        const NotificationEvent = createModel({
+            title: 'NotificationEvent',
+            schema: z.discriminatedUnion('channel', [EmailEvent, SmsEvent]),
         });
         const routeRoutes = k.routes('api', {
             sendNotification: {
@@ -1157,19 +1181,21 @@ describe('automatic validation error response', () => {
 });
 
 describe('deprecation on a component reached via the schemas map', () => {
-    const UserSchema = z
-        .object({
+    const UserSchema = createModel({
+        title: 'User',
+        schema: z.object({
             id: z.string(),
             email: z.string(),
-        })
-        .meta({ id: 'User' });
-    const AccountSchema = z
-        .object({
+        }),
+    });
+    const AccountSchema = createModel({
+        title: 'Account',
+        schema: z.object({
             owner: z.object({
                 user: UserSchema,
             }),
-        })
-        .meta({ id: 'Account' });
+        }),
+    });
     const contractWithRefRoutes = k.routes('api', {
         getAccount: {
             method: 'GET',

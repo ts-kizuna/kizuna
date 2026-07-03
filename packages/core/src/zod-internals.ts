@@ -205,10 +205,20 @@ export const isBinarySchema = (schema: z.core.$ZodType): boolean => {
 export const readMeta = (schema: z.core.$ZodType): Record<string, unknown> | undefined =>
     z.core.globalRegistry.get(schema) as Record<string, unknown> | undefined;
 
+const modelSchemas = new WeakSet<z.core.$ZodType>();
+
 /**
- * Returns a schema's `id` metadata, or undefined.
+ * Marks a schema as a `createModel` model.
+ */
+export const markModelSchema = (schema: z.core.$ZodType): void => {
+    modelSchemas.add(schema);
+};
+
+/**
+ * Returns a `createModel` schema's `id` metadata, or undefined.
  */
 export const readMetaId = (schema: z.core.$ZodType): string | undefined => {
+    if (!modelSchemas.has(schema)) return undefined;
     const id = readMeta(schema)?.id;
     return typeof id === 'string' ? id : undefined;
 };
@@ -222,7 +232,9 @@ export const readMetaDescription = (schema: z.core.$ZodType): string | undefined
 };
 
 /**
- * The global registry's schemas, keyed by their `id`.
+ * The `createModel` schemas in the global registry, keyed by their `id`.
  */
-export const globalRegistrySchemas = (): Map<string, z.core.$ZodType> =>
-    (z.core.globalRegistry as unknown as { _idmap: Map<string, z.core.$ZodType> })._idmap;
+export const globalRegistrySchemas = (): Map<string, z.core.$ZodType> => {
+    const idMap = (z.core.globalRegistry as unknown as { _idmap: Map<string, z.core.$ZodType> })._idmap;
+    return new Map(Array.from(idMap).filter(([, schema]) => modelSchemas.has(schema)));
+};
