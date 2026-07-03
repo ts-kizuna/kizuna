@@ -7,7 +7,7 @@ description: Answers to common questions about ts-kizuna.
 
 One contract, a fully typed stack.
 
-Describe your API once. ts-kizuna infers a typed server and a client you call like a function straight from the contract, and generates OpenAPI docs, a Swift client (Kotlin support planned), and an MCP server from the same definition. No copying types between repos, no docs to keep up to date by hand.
+Describe your API once. ts-kizuna infers a typed server and a client you call like a function straight from the contract, and generates OpenAPI docs, native Swift and Kotlin clients, and an MCP server from the same definition. No copying types between repos, no docs to keep up to date by hand.
 
 Change the API and your editor shows you everything that breaks, right then. Deprecate a field and every caller sees it before it's gone. Frontend, backend, and mobile stay in step because they all come from one source, so the bug where a client quietly drifts from the server just stops happening.
 
@@ -24,7 +24,6 @@ It runs in production in our own apps, so it's battle-tested. The way you define
 We're just getting started. Here's where ts-kizuna is headed:
 
 - A stable v2, with the way you define and call your API locked in
-- Kotlin client generation for Android, joining the Swift client
 - Ongoing docs polish and refinement
 - Whatever the future brings
 
@@ -34,7 +33,7 @@ ts-kizuna won't support Standard Schema or other validators. It leans on Zod int
 
 ## Can I use my API from non-TypeScript clients?
 
-Yes. ts-kizuna describes a real REST API, so anything that speaks HTTP can call it. The same contract also generates an OpenAPI document, a Swift client, and an MCP server.
+Yes. ts-kizuna describes a real REST API, so anything that speaks HTTP can call it. The same contract also generates an OpenAPI document, native Swift and Kotlin clients, and an MCP server.
 
 ## Coming from ts-rest?
 

@@ -1,0 +1,81 @@
+#!/usr/bin/env node
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { parseArgs } from 'node:util';
+import { writeKizunaDeprecations, loadContract } from '@ts-kizuna/cli';
+import { generateKotlinClient } from './generator.js';
+
+const usage = `Usage: ts-kizuna-kotlin generate --contract <path> --out <path> --namespace-name <name>
+
+Required:
+  --contract <path>        TypeScript or JS module exporting a kizuna contract (k.contract).
+                           Suffix with the export to read: src/api.ts:appContract.
+  --out <path>             File path to write the generated .kt file.
+  --namespace-name <name>  Public object wrapping all generated types (e.g. MyAPI).
+
+Optional:
+  --package <name>         Package declaration for the generated file (e.g. com.example.api).
+  --export <name>          Export name when none is suffixed. Default: contract.
+`;
+
+const die = (message: string, code = 1): never => {
+    process.stderr.write(`${message}\n`);
+    process.exit(code);
+};
+
+const main = async (): Promise<void> => {
+    const argv = process.argv.slice(2);
+    const command = argv[0];
+    if (command !== 'generate') {
+        die(usage, command ? 1 : 0);
+    }
+
+    const { values } = parseArgs({
+        args: argv.slice(1),
+        options: {
+            contract: {
+                type: 'string',
+            },
+            out: {
+                type: 'string',
+            },
+            'namespace-name': {
+                type: 'string',
+            },
+            package: {
+                type: 'string',
+            },
+            export: {
+                type: 'string',
+            },
+        },
+        strict: true,
+    });
+
+    const contractArg = values.contract ?? die('Missing --contract\n\n' + usage);
+    const outArg = values.out ?? die('Missing --out\n\n' + usage);
+    const namespaceName = values['namespace-name'] ?? die('Missing --namespace-name\n\n' + usage);
+
+    const [pathPart, exportName = values.export ?? 'contract'] = contractArg.split(':');
+    const contractPath = resolve(process.cwd(), pathPart!);
+    const contract =
+        (await loadContract(contractPath, exportName)) ?? die(`No \`${exportName}\` (or default) export found at ${contractPath}`);
+    writeKizunaDeprecations([{ contract, contractPath }], resolve(process.cwd(), '.kizuna'));
+    const kotlinSource = generateKotlinClient(contract, {
+        namespaceName,
+        packageName: values.package,
+    });
+
+    const outputPath = resolve(process.cwd(), outArg);
+    mkdirSync(dirname(outputPath), {
+        recursive: true,
+    });
+    writeFileSync(outputPath, kotlinSource, 'utf8');
+
+    process.stdout.write(`Wrote ${kotlinSource.length} bytes to ${outputPath}\n`);
+};
+
+main().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    die(`Error: ${message}`);
+});

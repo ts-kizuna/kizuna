@@ -1,0 +1,52 @@
+---
+title: generateKotlinClient
+description: Generate a native Kotlin client from a ts-kizuna contract with OkHttp, kotlinx.serialization, and coroutines.
+---
+
+Generate a native Kotlin client from a contract. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
+
+<InstallTabs packageName="@ts-kizuna/kotlin" />
+
+```ts
+import { generateKotlinClient } from '@ts-kizuna/kotlin';
+```
+
+## Parameters
+
+```ts
+generateKotlinClient(contract: Contract, config: KotlinConfig): string
+```
+
+| Parameter  | Type           | Description                                              |
+| ---------- | -------------- | -------------------------------------------------------- |
+| `contract` | `Contract`     | The contract from [`k.contract`](/docs/reference/kizuna) |
+| `config`   | `KotlinConfig` | Generation configuration                                 |
+
+## `KotlinConfig`
+
+| Option          | Type     | Required | Description                                                           |
+| --------------- | -------- | -------- | --------------------------------------------------------------------- |
+| `namespaceName` | `string` | Yes      | Name for the generated `object` and client class (e.g. `'API'`)       |
+| `packageName`   | `string` | No       | Package declaration for the generated file (e.g. `'com.example.api'`) |
+
+## Returns
+
+A `string` containing the generated Kotlin source code.
+
+## Example
+
+```ts
+import path from 'path';
+import { writeFileSync } from 'fs';
+import { generateKotlinClient } from '@ts-kizuna/kotlin';
+import { contract } from '../src/contract';
+
+const kotlin = generateKotlinClient(contract, {
+    namespaceName: 'API',
+    packageName: 'com.example.api',
+});
+
+writeFileSync('generated/APIClient.kt', kotlin);
+```
+
+See the [Kotlin client guide](/docs/clients/kotlin) for CLI usage and integration patterns.

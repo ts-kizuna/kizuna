@@ -1,0 +1,221 @@
+---
+title: Kotlin
+description: Generate a native Kotlin client from your contract with the ts-kizuna-kotlin CLI.
+---
+
+`@ts-kizuna/kotlin` generates a native Kotlin client from your ts-kizuna contract. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
+
+<InstallTabs packageName="@ts-kizuna/kotlin" />
+
+## Generate
+
+```sh
+ts-kizuna-kotlin generate --contract src/contract.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
+```
+
+| Flag               | Description                                                                    |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `--contract`       | Path to the TypeScript file that exports the contract                          |
+| `--out`            | Output path for the generated `.kt` file                                       |
+| `--namespace-name` | Object wrapping all generated types (e.g. `API`)                               |
+| `--package`        | Optional package declaration for the generated file (e.g. `com.example.api`)   |
+| `--export`         | Export name to read when none is suffixed on `--contract`. Default: `contract` |
+
+The CLI reads the contract at runtime — no build step needed. Add the generated file to your Kotlin project as a regular source file. Pass `--package` so the file declares a package matching its directory (Android/JVM projects expect this).
+
+## Usage
+
+Request inputs are built inside a lambda — `params` (path), `query`, `headers`, and `body`. No type names, autocomplete guides you, and missing a required field is a compile error:
+
+```kotlin
+val client = APIClient(baseUrl = "https://api.example.com")
+
+// path param + header — groups chain in order
+val user = client.users.getUser {
+    params(
+        id = "1",
+    ).headers(
+        xRequestId = "trace-1",
+    )
+}
+
+// query — all-optional, so it can be omitted entirely
+val page = client.users.listUsers {
+    query(
+        page = 1,
+        limit = 20,
+    )
+}
+val all = client.users.listUsers()
+
+// object body
+val created = client.users.createUser {
+    body(
+        name = "Ada",
+        email = "ada@example.com",
+    )
+}
+```
+
+Each method returns the success body directly on its `Response` (no unwrapping, no casting) and **throws** a typed `Failure` for any error status. The happy path just reads `response.body`:
+
+```kotlin
+println(page.body.users)
+```
+
+Void routes return `Unit` — call them and let errors propagate:
+
+```kotlin
+client.users.deleteUser {
+    params(
+        id = "1",
+    )
+}
+```
+
+Catch a specific error only when you care; everything else propagates:
+
+```kotlin
+try {
+    val response = client.users.getUser {
+        params(
+            id = "1",
+        )
+    }
+    println(response.body)
+} catch (error: APIClient.UsersGetUser.Failure.NotFound) {
+    println("missing: ${error.body.detail}")
+}
+```
+
+## Generated client
+
+The generated file exports a typed class with `suspend` methods for each route and sub-clients for grouped routes. Each method takes a request-builder lambda whose receiver (`Scope`) exposes one factory per input group. The lambda must return the operation's `Args`, and only chains that provide every required group produce an `Args` — that is what makes missing required inputs a compile error. Each method returns the route's `Response` (or `Unit` for routes with no success body) and throws its `Failure`:
+
+```kotlin
+import kotlinx.serialization.*
+import okhttp3.*
+
+class APIClient(
+    private val baseUrl: String,
+    private val client: OkHttpClient = OkHttpClient(),
+    private val json: Json = Json { ignoreUnknownKeys = true },
+    private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null,
+    private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null
+) {
+    val users = APIUsersClient(...)
+
+    object UsersListUsers {
+        data class Query(
+            val page: Int? = null,
+            val limit: Int? = null
+        )
+
+        sealed interface Args {
+            val query: Query?
+        }
+
+        object Scope {
+            fun query(page: Int? = null, limit: Int? = null): AfterQuery = ...
+        }
+        // AfterQuery, Response, Success, Failure ...
+    }
+
+    @Throws(UsersListUsers.Failure::class)
+    suspend fun listUsers(build: APIClient.UsersListUsers.Scope.() -> APIClient.UsersListUsers.Args = { query() }): APIClient.UsersListUsers.Response {
+        // ...
+    }
+}
+```
+
+## Interceptors &amp; auth
+
+`requestInterceptor` runs before every request — attach auth headers here. `responseInterceptor` observes every response. Both may suspend (e.g. to refresh a token):
+
+```kotlin
+val client = APIClient(
+    baseUrl = "https://api.example.com",
+    requestInterceptor = { builder ->
+        builder.header("Authorization", "Bearer $token")
+    },
+    responseInterceptor = { request, response ->
+        println("${request.method} ${request.url} -> ${response.code}")
+    }
+)
+```
+
+## Handling responses
+
+Success returns a `Response` with the decoded `body` (and `headers` when the route declares them). Routes with multiple success codes give you a sealed `Success` to `when` over; void routes return `Unit`.
+
+Errors **throw** a sealed `Failure` with one named subtype per declared status (`NotFound`, `BadRequest`, …) carrying its typed `body`, plus `Unexpected(statusCode, data)` for undeclared statuses and `Decoding(cause, statusCode, data)` for bodies that don't parse. Catch one subtype, or `when` over the sealed class — the compiler lists every case:
+
+```kotlin
+try {
+    val response = client.users.getUser {
+        params(
+            id = "1",
+        )
+    }
+    println(response.body)
+} catch (error: APIClient.UsersGetUser.Failure) {
+    when (error) {
+        is APIClient.UsersGetUser.Failure.NotFound -> println("missing: ${error.body.detail}")
+        is APIClient.UsersGetUser.Failure.Unexpected -> println("status ${error.statusCode}")
+        is APIClient.UsersGetUser.Failure.Decoding -> throw error
+    }
+}
+```
+
+Prefer a functional style? Methods throw, so `runCatching` just works:
+
+```kotlin
+val result = runCatching {
+    client.users.getUser {
+        params(
+            id = "1",
+        )
+    }
+}
+result.onSuccess { println(it.body) }.onFailure { println("failed: ${it.message}") }
+```
+
+## Dependencies
+
+Add these to your `build.gradle.kts`:
+
+```kotlin
+dependencies {
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+}
+```
+
+## Deprecation
+
+Routes and fields marked `/** @deprecated */` in the contract emit `@Deprecated` in the generated Kotlin code:
+
+```kotlin
+@Deprecated("use newRoute instead")
+suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.UsersDeleteUser.Args) {
+    // ...
+}
+```
+
+## Tip: automate with a script
+
+You can add a script to your `package.json` to regenerate the client whenever the contract changes:
+
+```json
+{
+    "scripts": {
+        "generate:kotlin": "ts-kizuna-kotlin generate --contract src/contract.ts --out ../android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example"
+    }
+}
+```
+
+## Reference
+
+- [`generateKotlinClient`](/docs/reference/generate-kotlin-client)

@@ -15,6 +15,7 @@
         "add-coded-issue",
         "generate-openapi",
         "generate-swift-client",
+        "generate-kotlin-client",
         "create-mcp-endpoint",
         "fastify-kizuna-mcp",
         "create-mcp-server"

@@ -25,9 +25,9 @@ Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, pow
 - **HTTP/REST** — follows HTTP and REST standards. RFC 9110 semantics, RFC 9457 Problem Details
 - **Built-in coercion** — query, path, and header params are coerced to their declared types (`z.number()`, `z.boolean()`, `z.date()`, `z.bigint()`) — no manual parsing or `z.coerce` needed
 - **OpenAPI generation** — from the same contract, no annotations needed
-- **Swift client generation** — typed API client for iOS/macOS
+- **Native client generation** — typed API clients for Swift (iOS/macOS) and Kotlin (Android/JVM)
 - **MCP server generation** — expose your API as MCP tools so AI assistants can call your endpoints
-- **Deprecation support** — mark endpoints and fields as deprecated with a JSDoc `@deprecated` tag — IDEs show strikethroughs, OpenAPI and Swift pick it up automatically
+- **Deprecation support** — mark endpoints and fields as deprecated with a JSDoc `@deprecated` tag — IDEs show strikethroughs, OpenAPI, Swift, and Kotlin pick it up automatically
 
 ## Define your API routes
 
@@ -166,6 +166,7 @@ if (result.status === 200) {
 | `@ts-kizuna/next`          | Next.js App Router adapter                            |
 | `@ts-kizuna/openapi`       | OpenAPI generation                                    |
 | `@ts-kizuna/swift`         | Swift client generation                               |
+| `@ts-kizuna/kotlin`        | Kotlin client generation                              |
 | `@ts-kizuna/mcp`           | MCP server generation                                 |
 | `@ts-kizuna/eslint-plugin` | ESLint rules                                          |
 | `@ts-kizuna/cli`           | Shared CLI and build tooling                          |

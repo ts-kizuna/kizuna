@@ -1,4 +1,4 @@
-export class SwiftWriter {
+export class KotlinWriter {
     private readonly lines: string[] = [];
     private depth = 0;
 
@@ -26,15 +26,28 @@ export class SwiftWriter {
 
     docComment(text: string | undefined): void {
         if (!text) return;
-        for (const segment of text.split('\n')) {
-            this.line(`/// ${segment}`);
+        const segments = text.split('\n');
+        if (segments.length === 1) {
+            this.line(`/** ${segments[0]} */`);
+            return;
         }
+        this.line('/**');
+        for (const segment of segments) {
+            this.line(` * ${segment}`);
+        }
+        this.line(' */');
     }
 
     blank(): void {
         if (this.lines.length === 0) return;
         if (this.lines[this.lines.length - 1] === '') return;
         this.lines.push('');
+    }
+
+    appendToLastLine(suffix: string): void {
+        if (this.lines.length > 0) {
+            this.lines[this.lines.length - 1] += suffix;
+        }
     }
 
     toString(): string {
