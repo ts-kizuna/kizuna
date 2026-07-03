@@ -12,6 +12,35 @@ export const resolveResponseHeaders = (value: ResponseDefinition): z.ZodType | u
 export const resolveResponseContentType = (value: ResponseDefinition | undefined): string | undefined =>
     value && typeof value === 'object' && 'body' in value ? value.contentType : undefined;
 
+export const toPascalCase = (input: string): string => {
+    if (!input) return input;
+    const cleaned = input.replace(/[^a-zA-Z0-9]+/g, ' ').trim();
+    return cleaned
+        .split(' ')
+        .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+        .join('');
+};
+
+export const toCamelCase = (input: string): string => {
+    const pascal = toPascalCase(input);
+    if (!pascal) return pascal;
+    return pascal.charAt(0).toLowerCase() + pascal.slice(1);
+};
+
+/**
+ * The local name a type gets when nested inside its owning type: the owner's
+ * name stripped from the front (`UserAvatar` inside `User` → `Avatar`).
+ */
+export const shortTypeName = (typeName: string, ownerName: string): string =>
+    typeName.startsWith(ownerName) ? typeName.slice(ownerName.length) : typeName;
+
+/**
+ * A hint prefix must end on a PascalCase word boundary. Otherwise `Image` claims
+ * `ImagesItem` and the nested short name becomes the mid-word slice `sItem`.
+ */
+export const isHintPrefix = (typeName: string, prefix: string): boolean =>
+    typeName.startsWith(prefix) && /[A-Z]/.test(typeName.charAt(prefix.length));
+
 /**
  * Whether a media type is JSON-serialized: `application/json` or any
  * structured-suffix `+json` type (e.g. `application/problem+json`). Any other

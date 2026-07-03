@@ -12,11 +12,15 @@ import {
     resolveResponseContentType,
     isJsonMediaType,
     isBinarySchema,
+    toPascalCase,
+    toCamelCase,
+    shortTypeName,
+    isHintPrefix,
     type Routes,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
 import type { Contract } from '@ts-kizuna/core';
-import { SwiftWriter, camelCase, pascalCase, stringLiteral } from './emit.js';
+import { SwiftWriter, stringLiteral } from './emit.js';
 import {
     TypeRegistry,
     mapType,
@@ -127,16 +131,6 @@ interface EmitContext {
     registry: TypeRegistry;
 }
 
-const shortTypeName = (typeName: string, structName: string): string =>
-    typeName.startsWith(structName) ? typeName.slice(structName.length) : typeName;
-
-/**
- * A hint prefix must end on a PascalCase word boundary. Otherwise `Image` claims
- * `ImagesItem` and the nested short name becomes the mid-word slice `sItem`.
- */
-const isHintPrefix = (typeName: string, prefix: string): boolean =>
-    typeName.startsWith(prefix) && /[A-Z]/.test(typeName.charAt(prefix.length));
-
 const buildRouteMethod = (
     routeKey: string,
     route: RouteDefinition,
@@ -150,11 +144,11 @@ const buildRouteMethod = (
     const fullJoinedName = routeKey.includes('.')
         ? routeKey
               .split('.')
-              .map((segment, index) => (index === 0 ? segment : pascalCase(segment)))
+              .map((segment, index) => (index === 0 ? segment : toPascalCase(segment)))
               .join('')
         : routeKey;
     const methodName = methodNameOverride ?? fullJoinedName;
-    const baseHint = pascalCase(fullJoinedName);
+    const baseHint = toPascalCase(fullJoinedName);
     const pathParams = parsePath(route.path).paramNames;
 
     const queryFields: SwiftField[] = route.query
@@ -341,7 +335,7 @@ const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeR
                 const remainder = routeKey.slice(dotIndex + 1);
                 const leafName = remainder
                     .split('.')
-                    .map((segment: string, index: number) => (index === 0 ? segment : pascalCase(segment)))
+                    .map((segment: string, index: number) => (index === 0 ? segment : toPascalCase(segment)))
                     .join('');
                 const methods = groupMap.get(groupKey) ?? [];
                 if (methods.length === 0) groupMap.set(groupKey, methods);
@@ -377,7 +371,7 @@ const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeR
             for (const [groupKey, methods] of groupMap) {
                 groups.push({
                     groupKey,
-                    structName: `${options.namespaceName}${pascalCase(groupKey)}Client`,
+                    structName: `${options.namespaceName}${toPascalCase(groupKey)}Client`,
                     propertyName: groupKey,
                     methods,
                 });
@@ -461,7 +455,7 @@ const isValidSwiftIdentifier = (value: string): boolean => {
  */
 const sanitizeEnumCaseName = (value: string): string => {
     if (isValidSwiftIdentifier(value)) return value;
-    const camel = camelCase(value);
+    const camel = toCamelCase(value);
     if (!camel) return '_';
     return /^[0-9]/.test(camel) ? `_${camel}` : camel;
 };

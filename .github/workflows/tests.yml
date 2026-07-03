@@ -61,3 +61,29 @@ jobs:
 
             - name: Swift E2E tests
               run: pnpm test:swift
+
+    kotlin-e2e:
+        name: Kotlin E2E
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: pnpm/action-setup@v6
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: 17
+
+            - run: pnpm install --frozen-lockfile
+
+            - name: Build
+              run: pnpm build
+
+            - name: Kotlin E2E tests
+              run: pnpm test:kotlin

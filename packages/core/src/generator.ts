@@ -44,7 +44,16 @@ export {
     type DiscriminatedUnion,
 } from './zod-internals.js';
 
-export { resolveResponseBody, resolveResponseHeaders, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
+export {
+    resolveResponseBody,
+    resolveResponseHeaders,
+    resolveResponseContentType,
+    isJsonMediaType,
+    toPascalCase,
+    toCamelCase,
+    shortTypeName,
+    isHintPrefix,
+} from './generator-utils.js';
 
 export interface GeneratorRouteContext {
     routeKey: string;

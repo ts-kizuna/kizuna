@@ -1,22 +1,13 @@
 import type { z } from 'zod';
 import {
-    isFileSchema,
-    isBinarySchema,
-    isIntegerSchema,
-    readDef,
-    readDefType,
-    readDiscriminatedUnion,
+    isFileSchema as coreIsFileSchema,
     readDiscriminatorLiteral as coreReadDiscriminatorLiteral,
-    readMetaDescription,
-    readMetaId,
-    readObjectShape,
-    unwrapOptionalWrappers,
+    readMetaDescription as coreReadMetaDescription,
+    readMetaId as coreReadMetaId,
     toPascalCase,
 } from '@ts-kizuna/core/generator';
 
-export { isFileSchema, isBinarySchema, readMetaId };
-
-export interface SwiftField {
+export interface KotlinField {
     name: string;
     wireName: string;
     type: string;
@@ -27,10 +18,10 @@ export interface SwiftField {
     deprecationMessage?: string;
 }
 
-const SWIFT_IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const KOTLIN_IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export const sanitizeFieldName = (key: string): string => {
-    if (SWIFT_IDENTIFIER_REGEX.test(key)) return key;
+    if (KOTLIN_IDENTIFIER_REGEX.test(key)) return key;
     const segments = key.split(/[^A-Za-z0-9]+/).filter((segment) => segment.length > 0);
     const head = segments[0];
     if (head === undefined) return 'field';
@@ -44,22 +35,22 @@ export const sanitizeFieldName = (key: string): string => {
     return /^[0-9]/.test(camel) ? `_${camel}` : camel;
 };
 
-export interface SwiftStruct {
-    kind: 'struct';
+export interface KotlinDataClass {
+    kind: 'data-class';
     name: string;
-    fields: SwiftField[];
+    fields: KotlinField[];
     description?: string;
 }
 
-export interface SwiftStringEnum {
-    kind: 'enum';
+export interface KotlinEnumClass {
+    kind: 'enum-class';
     name: string;
     cases: string[];
     description?: string;
 }
 
-export interface SwiftDiscriminatedEnum {
-    kind: 'discriminated-enum';
+export interface KotlinSealedClass {
+    kind: 'sealed-class';
     name: string;
     discriminator: string;
     variants: Array<{
@@ -70,7 +61,7 @@ export interface SwiftDiscriminatedEnum {
     description?: string;
 }
 
-export type SwiftType = SwiftStruct | SwiftStringEnum | SwiftDiscriminatedEnum;
+export type KotlinType = KotlinDataClass | KotlinEnumClass | KotlinSealedClass;
 
 export interface MapResult {
     expression: string;
@@ -79,29 +70,26 @@ export interface MapResult {
 }
 
 export class TypeRegistry {
-    private readonly types = new Map<string, SwiftType>();
+    private readonly types = new Map<string, KotlinType>();
     private readonly warningSet = new Set<string>();
     private readonly explicitIds = new Set<string>();
-    public usesAnyCodable = false;
+    private readonly sealedVariantPayloads = new Set<string>();
+    public usesJsonElement = false;
 
     has(name: string): boolean {
         return this.types.has(name);
     }
 
-    get(name: string): SwiftType | undefined {
-        return this.types.get(name);
-    }
-
-    add(type: SwiftType): void {
+    add(type: KotlinType): void {
         if (this.types.has(type.name)) return;
         this.types.set(type.name, type);
     }
 
-    replace(type: SwiftType): void {
+    replace(type: KotlinType): void {
         this.types.set(type.name, type);
     }
 
-    all(): SwiftType[] {
+    all(): KotlinType[] {
         return Array.from(this.types.values());
     }
 
@@ -113,8 +101,16 @@ export class TypeRegistry {
         return this.explicitIds.has(name);
     }
 
-    warnAnyCodable(hint: string, reason: string): void {
-        this.usesAnyCodable = true;
+    markSealedVariantPayload(name: string): void {
+        this.sealedVariantPayloads.add(name);
+    }
+
+    isSealedVariantPayload(name: string): boolean {
+        return this.sealedVariantPayloads.has(name);
+    }
+
+    warnJsonElement(hint: string, reason: string): void {
+        this.usesJsonElement = true;
         this.warningSet.add(`${hint}: ${reason}`);
     }
 
@@ -123,45 +119,112 @@ export class TypeRegistry {
     }
 }
 
+interface ZodDef {
+    type?: string;
+    innerType?: ZodSchema;
+    element?: ZodSchema;
+    shape?: Record<string, ZodSchema>;
+    entries?: Record<string, string>;
+    values?: unknown[];
+    options?: ZodSchema[];
+    discriminator?: string;
+    checks?: Array<{ def?: { format?: string; check?: string } }>;
+    format?: string;
+    defaultValue?: unknown;
+    valueType?: ZodSchema;
+}
+
+interface ZodSchema {
+    def: ZodDef;
+    _def?: ZodDef;
+    shape?: Record<string, ZodSchema>;
+    safeParse?: (value: unknown) => { success: boolean };
+    meta?: () => Record<string, unknown> | undefined;
+}
+
+const accessDef = (schema: ZodSchema): ZodDef => schema.def ?? schema._def ?? {};
+
+export const isFileSchema = (schema: ZodSchema): boolean => coreIsFileSchema(schema as unknown as z.ZodType);
+
+export const readMetaId = (schema: ZodSchema): string | undefined => coreReadMetaId(schema as unknown as z.ZodType);
+
+const readMetaDescription = (schema: ZodSchema): string | undefined => coreReadMetaDescription(schema as unknown as z.ZodType);
+
+const INTEGER_FORMATS = ['safeint', 'int32', 'int64', 'int'];
+
+const isIntegerNumber = (def: ZodDef): boolean => {
+    if (INTEGER_FORMATS.includes(def.format as string)) return true;
+    if (!def.checks) return false;
+    return def.checks.some((check) => INTEGER_FORMATS.includes(check.def?.format as string));
+};
+
+const unwrapOptional = (schema: ZodSchema): { inner: ZodSchema; optional: boolean } => {
+    let current = schema;
+    let optional = false;
+    while (true) {
+        const def = accessDef(current);
+        if (def.type !== 'optional' && def.type !== 'nullable' && def.type !== 'default' && def.type !== 'nullish') break;
+        optional = true;
+        const next = def.innerType;
+        if (!next) break;
+        current = next;
+    }
+    return {
+        inner: current,
+        optional,
+    };
+};
+
 const sanitizeIdentifier = (input: string): string => {
     const cleaned = input.replace(/[^a-zA-Z0-9_]/g, '_');
     return /^[0-9]/.test(cleaned) ? `_${cleaned}` : cleaned;
 };
 
-/**
- * Discriminator literal narrowed to a string (Swift enum cases require one).
- */
-const readDiscriminatorLiteral = (variant: z.core.$ZodType, propertyName: string): string | undefined => {
-    const literal = coreReadDiscriminatorLiteral(variant, propertyName);
+interface DiscriminatedDef {
+    discriminator: string;
+    options: ZodSchema[];
+}
+
+const readDiscriminatedUnion = (schema: ZodSchema): DiscriminatedDef | undefined => {
+    const def = accessDef(schema);
+    if (def.type !== 'union' || typeof def.discriminator !== 'string' || !Array.isArray(def.options)) return undefined;
+    return {
+        discriminator: def.discriminator,
+        options: def.options,
+    };
+};
+
+const readDiscriminatorLiteral = (variant: ZodSchema, propertyName: string): string | undefined => {
+    const literal = coreReadDiscriminatorLiteral(variant as unknown as z.ZodType, propertyName);
     return typeof literal === 'string' ? literal : undefined;
 };
 
 const objectFields = (
-    schema: z.core.$ZodType,
+    schema: ZodSchema,
     registry: TypeRegistry,
     hint: string,
     deprecatedPaths?: ReadonlyMap<string, string>,
     pathPrefix?: string,
     deprecationSchemas?: ReadonlyMap<string, Map<string, string>>,
     schemaDeprecations?: ReadonlyMap<string, string>
-): SwiftField[] => {
-    const shape = readObjectShape(schema) ?? {};
-    const fields: SwiftField[] = [];
+): KotlinField[] => {
+    const shape = accessDef(schema).shape ?? schema.shape ?? {};
+    const fields: KotlinField[] = [];
     const seen = new Map<string, string>();
     for (const [key, value] of Object.entries(shape)) {
         const childHint = `${hint}${toPascalCase(key)}`;
         const fieldPath = pathPrefix ? `${pathPrefix}.${key}` : key;
         const result = mapType(value, registry, childHint, deprecatedPaths, fieldPath, deprecationSchemas);
-        const swiftName = sanitizeFieldName(key);
-        const previousWireName = seen.get(swiftName);
+        const kotlinName = sanitizeFieldName(key);
+        const previousWireName = seen.get(kotlinName);
         if (previousWireName !== undefined && previousWireName !== key) {
             throw new Error(
-                `@ts-kizuna/swift: field key collision in ${hint} — ${stringify(previousWireName)} and ${stringify(key)} both sanitize to ${stringify(swiftName)}.`
+                `@ts-kizuna/kotlin: field key collision in ${hint} — ${stringify(previousWireName)} and ${stringify(key)} both sanitize to ${stringify(kotlinName)}.`
             );
         }
-        seen.set(swiftName, key);
+        seen.set(kotlinName, key);
         fields.push({
-            name: swiftName,
+            name: kotlinName,
             wireName: key,
             type: result.expression,
             optional: result.optional,
@@ -177,13 +240,15 @@ const objectFields = (
 const stringify = (value: string): string => JSON.stringify(value);
 
 export const mapType = (
-    schema: z.core.$ZodType,
+    rawSchema: z.ZodType | ZodSchema,
     registry: TypeRegistry,
     hint: string,
     deprecatedPaths?: ReadonlyMap<string, string>,
     pathPrefix?: string,
     deprecationSchemas?: ReadonlyMap<string, Map<string, string>>
 ): MapResult => {
+    const schema = rawSchema as ZodSchema;
+
     if (isFileSchema(schema)) {
         return {
             expression: 'MultipartFile',
@@ -192,31 +257,22 @@ export const mapType = (
         };
     }
 
-    if (isBinarySchema(schema)) {
-        return {
-            expression: 'Foundation.Data',
-            optional: false,
-        };
-    }
-
     const id = readMetaId(schema);
-    const def = readDef(schema);
+    const def = accessDef(schema);
 
-    // Discriminated union
     const discriminated = readDiscriminatedUnion(schema);
     if (discriminated) {
         const enumName = id ?? sanitizeIdentifier(toPascalCase(hint));
         if (id) registry.markExplicitId(enumName);
         if (!registry.has(enumName)) {
-            // placeholder to prevent recursion
             registry.add({
-                kind: 'discriminated-enum',
+                kind: 'sealed-class',
                 name: enumName,
                 discriminator: discriminated.discriminator,
                 variants: [],
                 description: readMetaDescription(schema),
             });
-            const variants: SwiftDiscriminatedEnum['variants'] = [];
+            const variants: KotlinSealedClass['variants'] = [];
             for (const option of discriminated.options) {
                 const variantId = readMetaId(option);
                 const literal = readDiscriminatorLiteral(option, discriminated.discriminator);
@@ -230,8 +286,11 @@ export const mapType = (
                     });
                 }
             }
+            for (const variant of variants) {
+                registry.markSealedVariantPayload(variant.payloadType);
+            }
             registry.replace({
-                kind: 'discriminated-enum',
+                kind: 'sealed-class',
                 name: enumName,
                 discriminator: discriminated.discriminator,
                 variants,
@@ -248,14 +307,14 @@ export const mapType = (
         registry.markExplicitId(id);
         if (!registry.has(id)) {
             registry.add({
-                kind: 'struct',
+                kind: 'data-class',
                 name: id,
                 fields: [],
                 description: readMetaDescription(schema),
             });
             const fields = objectFields(schema, registry, id, deprecatedPaths, pathPrefix, deprecationSchemas, deprecationSchemas?.get(id));
             registry.replace({
-                kind: 'struct',
+                kind: 'data-class',
                 name: id,
                 fields,
                 description: readMetaDescription(schema),
@@ -267,7 +326,7 @@ export const mapType = (
         };
     }
 
-    const { inner, optional } = unwrapOptionalWrappers(schema);
+    const { inner, optional } = unwrapOptional(schema);
     if (optional) {
         const innerResult = mapType(inner, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
         return {
@@ -281,18 +340,20 @@ export const mapType = (
         case 'void':
         case 'never':
             return {
-                expression: 'Void',
+                expression: 'Unit',
                 optional: false,
             };
         case 'pipe': {
-            const outType = def.out ? readDefType(def.out) : undefined;
-            if (def.out && outType !== 'transform') {
-                return mapType(def.out, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+            const pipeDef = def as unknown as { in?: ZodSchema; out?: ZodSchema };
+            const outDef = pipeDef.out as unknown as { _def?: { type?: string }; def?: { type?: string } } | undefined;
+            const outType = outDef?._def?.type ?? outDef?.def?.type;
+            if (pipeDef.out && outType !== 'transform') {
+                return mapType(pipeDef.out, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
             }
-            if (def.in) return mapType(def.in, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
-            registry.warnAnyCodable(hint, 'pipe schema missing resolvable type');
+            if (pipeDef.in) return mapType(pipeDef.in, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+            registry.warnJsonElement(hint, 'pipe schema missing resolvable type');
             return {
-                expression: 'AnyCodable',
+                expression: 'JsonElement',
                 optional: false,
             };
         }
@@ -301,64 +362,64 @@ export const mapType = (
                 def.format === 'datetime' ||
                 (def.checks as Array<{ format?: string }> | undefined)?.some((check) => check.format === 'datetime');
             return {
-                expression: isDatetime ? 'Date' : 'String',
+                expression: isDatetime ? 'Instant' : 'String',
                 optional: false,
             };
         }
         case 'number':
             return {
-                expression: isIntegerSchema(schema) ? 'Int' : 'Double',
+                expression: isIntegerNumber(def) ? 'Int' : 'Double',
                 optional: false,
             };
         case 'bigint':
             return {
-                expression: 'Int64',
+                expression: 'Long',
                 optional: false,
             };
         case 'boolean':
             return {
-                expression: 'Bool',
+                expression: 'Boolean',
                 optional: false,
             };
         case 'date':
             return {
-                expression: 'Date',
+                expression: 'Instant',
                 optional: false,
             };
         case 'array': {
             const element = def.element;
             if (!element) {
-                registry.warnAnyCodable(hint, 'array element schema missing');
+                registry.warnJsonElement(hint, 'array element schema missing');
                 return {
-                    expression: '[AnyCodable]',
+                    expression: 'List<JsonElement>',
                     optional: false,
                 };
             }
             const elementResult = mapType(element, registry, `${hint}Item`, deprecatedPaths, pathPrefix, deprecationSchemas);
             return {
-                expression: `[${elementResult.expression.replace(/\?$/, '')}]`,
+                expression: `List<${elementResult.expression.replace(/\?$/, '')}>`,
                 optional: false,
             };
         }
         case 'object': {
-            const structName = sanitizeIdentifier(toPascalCase(hint));
-            if (!registry.has(structName)) {
+            const className = sanitizeIdentifier(toPascalCase(hint));
+            if (!registry.has(className)) {
                 registry.add({
-                    kind: 'struct',
-                    name: structName,
+                    kind: 'data-class',
+                    name: className,
                     fields: [],
                     description: readMetaDescription(schema),
                 });
-                const fields = objectFields(schema, registry, structName, deprecatedPaths, pathPrefix, deprecationSchemas);
+                const fields = objectFields(schema, registry, className, deprecatedPaths, pathPrefix, deprecationSchemas);
                 registry.replace({
-                    kind: 'struct',
-                    name: structName,
+                    kind: 'data-class',
+                    name: className,
                     fields,
                     description: readMetaDescription(schema),
                 });
             }
             return {
-                expression: structName,
+                expression: className,
                 optional: false,
             };
         }
@@ -368,7 +429,7 @@ export const mapType = (
             const cases = Object.values(entries);
             if (!registry.has(enumName)) {
                 registry.add({
-                    kind: 'enum',
+                    kind: 'enum-class',
                     name: enumName,
                     cases,
                     description: readMetaDescription(schema),
@@ -395,20 +456,20 @@ export const mapType = (
             }
             if (values.every((value) => typeof value === 'boolean')) {
                 return {
-                    expression: 'Bool',
+                    expression: 'Boolean',
                     optional: false,
                 };
             }
-            registry.warnAnyCodable(hint, 'literal of mixed types');
+            registry.warnJsonElement(hint, 'literal of mixed types');
             return {
-                expression: 'AnyCodable',
+                expression: 'JsonElement',
                 optional: false,
             };
         }
         case 'union': {
             const options = def.options ?? [];
             const allStringLiterals = options.every((option) => {
-                const optionDef = readDef(option);
+                const optionDef = accessDef(option);
                 return optionDef.type === 'literal' && (optionDef.values ?? []).every((value) => typeof value === 'string');
             });
             if (allStringLiterals) {
@@ -418,31 +479,31 @@ export const mapType = (
                 };
             }
             const resolved = options
-                .map((option) => mapType(option, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas))
-                .filter((result): result is MapResult => result !== undefined && result.expression !== 'AnyCodable');
+                .map((option) => mapType(option as ZodSchema, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas))
+                .filter((result): result is MapResult => result !== undefined && result.expression !== 'JsonElement');
             if (resolved.length === 0) {
-                registry.warnAnyCodable(hint, 'non-discriminated union');
-                return { expression: 'AnyCodable', optional: false };
+                registry.warnJsonElement(hint, 'non-discriminated union');
+                return { expression: 'JsonElement', optional: false };
             }
             const expressions = resolved.map((result) => result.expression);
             const unique = [...new Set(expressions)];
             if (unique.length === 1) {
                 return resolved[0]!;
             }
-            const arrayPattern = /^\[(.+)\]$/;
+            const listPattern = /^List<(.+)>$/;
             const baseTypes = unique.map((expression) => {
-                const match = arrayPattern.exec(expression);
+                const match = listPattern.exec(expression);
                 return match ? match[1] : expression;
             });
             if (new Set(baseTypes).size === 1) {
                 return {
-                    expression: `[${baseTypes[0]}]`,
+                    expression: `List<${baseTypes[0]}>`,
                     optional: false,
                 };
             }
-            registry.warnAnyCodable(hint, 'non-discriminated union');
+            registry.warnJsonElement(hint, 'non-discriminated union');
             return {
-                expression: 'AnyCodable',
+                expression: 'JsonElement',
                 optional: false,
             };
         }
@@ -451,27 +512,27 @@ export const mapType = (
             if (valueType) {
                 const valueResult = mapType(valueType, registry, `${hint}Value`);
                 return {
-                    expression: `[String: ${valueResult.expression.replace(/\?$/, '')}]`,
+                    expression: `Map<String, ${valueResult.expression.replace(/\?$/, '')}>`,
                     optional: false,
                 };
             }
-            registry.warnAnyCodable(hint, 'record without value schema');
+            registry.warnJsonElement(hint, 'record without value schema');
             return {
-                expression: '[String: AnyCodable]',
+                expression: 'Map<String, JsonElement>',
                 optional: false,
             };
         }
         case 'any':
         case 'unknown':
-            registry.warnAnyCodable(hint, `${def.type} schema`);
+            registry.warnJsonElement(hint, `${def.type} schema`);
             return {
-                expression: 'AnyCodable',
+                expression: 'JsonElement',
                 optional: false,
             };
         default:
-            registry.warnAnyCodable(hint, `unhandled schema type: ${def.type ?? 'unknown'}`);
+            registry.warnJsonElement(hint, `unhandled schema type: ${def.type ?? 'unknown'}`);
             return {
-                expression: 'AnyCodable',
+                expression: 'JsonElement',
                 optional: false,
             };
     }
@@ -481,28 +542,38 @@ const sanitizeCaseName = (literal: string): string => {
     const cleaned = literal.replace(/[^a-zA-Z0-9_]/g, '_');
     if (!cleaned) return 'value';
     if (/^[0-9]/.test(cleaned)) return `_${cleaned}`;
-    return cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 };
 
 export const collectObjectFields = (
-    schema: z.core.$ZodType,
+    schema: z.ZodType | ZodSchema,
     registry: TypeRegistry,
     hint: string,
     deprecatedPaths?: ReadonlyMap<string, string>,
     pathPrefix?: string,
     deprecationSchemas?: ReadonlyMap<string, Map<string, string>>
-): SwiftField[] => {
-    return objectFields(schema, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+): KotlinField[] => {
+    return objectFields(schema as ZodSchema, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
 };
 
-export const objectFieldCount = (schema: z.core.$ZodType): number => {
-    return Object.keys(readObjectShape(schema) ?? {}).length;
+export const isObjectSchema = (schema: z.ZodType | ZodSchema): boolean => {
+    return accessDef(schema as ZodSchema).type === 'object';
 };
 
-export const objectShapeKeys = (schema: z.core.$ZodType): Array<{ name: string; wireName: string; isFile: boolean }> => {
-    return Object.entries(readObjectShape(schema) ?? {}).map(([key, value]) => ({
+export const isDiscriminatedUnionSchema = (schema: z.ZodType | ZodSchema): boolean => {
+    return readDiscriminatedUnion(schema as ZodSchema) !== undefined;
+};
+
+export const objectFieldCount = (schema: z.ZodType | ZodSchema): number => {
+    const shape = accessDef(schema as ZodSchema).shape ?? (schema as ZodSchema).shape ?? {};
+    return Object.keys(shape).length;
+};
+
+export const objectShapeKeys = (schema: z.ZodType | ZodSchema): Array<{ name: string; wireName: string; isFile: boolean }> => {
+    const shape = accessDef(schema as ZodSchema).shape ?? (schema as ZodSchema).shape ?? {};
+    return Object.entries(shape).map(([key, value]) => ({
         name: sanitizeFieldName(key),
         wireName: key,
-        isFile: isFileSchema(value),
+        isFile: isFileSchema(value as ZodSchema),
     }));
 };
