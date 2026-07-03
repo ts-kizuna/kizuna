@@ -169,6 +169,15 @@ export const readDiscriminatorLiteral = (variant: z.core.$ZodType, propertyName:
 };
 
 /**
+ * Returns the literal value of `propertyName` on a discriminated-union variant,
+ * or undefined when it is absent, not a single literal, or not a string.
+ */
+export const readDiscriminatorStringLiteral = (variant: z.core.$ZodType, propertyName: string): string | undefined => {
+    const literal = readDiscriminatorLiteral(variant, propertyName);
+    return typeof literal === 'string' ? literal : undefined;
+};
+
+/**
  * A `File` instance used to probe schemas, or null when `File` is unavailable.
  */
 export const FILE_PROBE: unknown = typeof File !== 'undefined' ? new File([''], 'probe') : null;

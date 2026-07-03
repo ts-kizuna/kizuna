@@ -6,9 +6,16 @@ import {
     parsePath,
     resolveResponseBody,
     resolveResponseHeaders,
+    isObjectSchema,
+    isDiscriminatedUnionSchema,
+    readMetaId,
     toPascalCase,
     shortTypeName,
     isHintPrefix,
+    localTypeName,
+    statusToCamelCase,
+    isSuccessStatus,
+    mergeHeaderFields,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
 import type { Contract } from '@ts-kizuna/core';
@@ -17,11 +24,8 @@ import {
     TypeRegistry,
     mapType,
     collectObjectFields,
-    isObjectSchema,
-    isDiscriminatedUnionSchema,
     objectFieldCount,
     objectShapeKeys,
-    readMetaId,
     type KotlinField,
     type KotlinType,
 } from './zod-to-kotlin.js';
@@ -40,36 +44,6 @@ const BODY_FLATTEN_MAX_FIELDS = 6;
 
 // OkHttp's `Request.Builder.method` throws for these methods when the body is null.
 const METHODS_REQUIRING_BODY = new Set(['POST', 'PUT', 'PATCH']);
-
-const statusName = (status: number): string => {
-    const known: Record<number, string> = {
-        400: 'badRequest',
-        401: 'unauthorized',
-        403: 'forbidden',
-        404: 'notFound',
-        405: 'methodNotAllowed',
-        409: 'conflict',
-        410: 'gone',
-        422: 'unprocessableEntity',
-        429: 'tooManyRequests',
-        500: 'internalServerError',
-        502: 'badGateway',
-        503: 'serviceUnavailable',
-    };
-    return known[status] ?? `status${status}`;
-};
-
-const isSuccessStatus = (status: number): boolean => status >= 200 && status < 300;
-
-const mergeHeaderFields = (perStatusHeaders: KotlinField[][]): KotlinField[] => {
-    const nonEmpty = perStatusHeaders.filter((fields) => fields.length > 0);
-    if (nonEmpty.length === 0) return [];
-    const first = nonEmpty[0]!;
-    return first.map((field) => {
-        const universallyPresent = nonEmpty.every((fields) => fields.some((candidate) => candidate.name === field.name));
-        return universallyPresent ? field : { ...field, optional: true };
-    });
-};
 
 interface BodyDescriptor {
     kind: 'json-flat' | 'json-struct' | 'multipart' | 'union' | 'json-empty';
@@ -253,7 +227,7 @@ const buildRouteMethod = (
             });
         } else {
             errorCases.push({
-                caseName: statusName(status),
+                caseName: statusToCamelCase(status),
                 status,
                 type: typeExpression,
             });
@@ -263,7 +237,7 @@ const buildRouteMethod = (
     if (hasValidation) {
         const has400 = errorCases.some((candidate) => candidate.status === 400);
         errorCases.push({
-            caseName: has400 ? 'validationError' : statusName(400),
+            caseName: has400 ? 'validationError' : statusToCamelCase(400),
             status: 400,
             type: 'ValidationError',
         });
@@ -464,11 +438,6 @@ const resolveType = (
         return optional ? `${short}?` : short;
     }
     return optional ? `${clientName}.${owningOp}.${short}?` : `${clientName}.${owningOp}.${short}`;
-};
-
-const localTypeName = (fullName: string, operationName: string): string => {
-    const stripped = fullName.slice(operationName.length);
-    return stripped || fullName;
 };
 
 const buildOperationTypeMap = (allMethods: RouteMethod[], registry: TypeRegistry): Map<string, string> => {
