@@ -16,6 +16,7 @@
         "generate-openapi",
         "generate-swift-client",
         "generate-kotlin-client",
+        "cli",
         "create-mcp-endpoint",
         "fastify-kizuna-mcp",
         "create-mcp-server"

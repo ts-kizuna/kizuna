@@ -28,6 +28,7 @@ Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, pow
 - **Native client generation** — typed API clients for Swift (iOS/macOS) and Kotlin (Android/JVM)
 - **MCP server generation** — expose your API as MCP tools so AI assistants can call your endpoints
 - **Deprecation support** — mark endpoints and fields as deprecated with a JSDoc `@deprecated` tag — IDEs show strikethroughs, OpenAPI, Swift, and Kotlin pick it up automatically
+- **Breaking-change detection** — `kizuna breaking-changes` diffs your contract against a git ref via oasdiff, with a ready-made GitHub Action
 
 ## Define your API routes
 

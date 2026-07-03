@@ -1,0 +1,47 @@
+---
+title: kizuna CLI
+description: The kizuna command-line tool — deprecations extraction and breaking-change detection.
+---
+
+The `kizuna` binary ships with `@ts-kizuna/cli`.
+
+<InstallTabs packageName="@ts-kizuna/cli" />
+
+## `kizuna deprecations`
+
+Extracts `@deprecated` JSDoc tags from a contract into `.kizuna/deprecations.json`, keyed per contract. Generators read it at generate time and apply the deprecations. See the [Deprecations guide](/docs/deprecations).
+
+```bash
+kizuna deprecations <contract.ts...> [--output <dir>] [--export <name>] [--dts <dir>]
+```
+
+| Option     | Description                                                                                                  | Default    |
+| ---------- | ------------------------------------------------------------------------------------------------------------ | ---------- |
+| `--output` | Output directory                                                                                             | `.kizuna`  |
+| `--export` | Default contract export name when none is suffixed                                                           | `contract` |
+| `--dts`    | Re-inject schema-field JSDoc into emitted `.d.ts` files in this directory, so docs reach `z.infer` consumers | —          |
+
+A contract path may be suffixed with the export to read: `src/workspace.ts:workspaceContract`.
+
+## `kizuna breaking-changes`
+
+Compares the working-tree contract against its version at a git ref and reports breaking changes via [`oasdiff breaking`](https://github.com/oasdiff/oasdiff). Requires `oasdiff` on `PATH`. See the [Breaking Changes guide](/docs/breaking-changes).
+
+```bash
+kizuna breaking-changes <contract.ts> --base <git-ref> [options]
+```
+
+| Option              | Description                                                                           | Default    |
+| ------------------- | ------------------------------------------------------------------------------------- | ---------- |
+| `--base`            | Git ref to compare against (branch, tag, or commit). Required.                        | —          |
+| `--export`          | Default contract export name when none is suffixed                                    | `contract` |
+| `--format`          | oasdiff output format: `text`, `json`, `githubactions`, …                             | `text`     |
+| `--fail-on`         | Exit 1 on changes of this level or higher: `ERR` or `WARN`                            | `ERR`      |
+| `--severity-levels` | Rules for which changes count as breaking: an oasdiff severity-levels file, or `none` | built-in   |
+| `--out`             | Write the report to a file instead of stdout                                          | stdout     |
+
+The contract at the base ref is exported via `git archive` into a temporary directory and loaded with the currently installed dependencies.
+
+Exit codes: `0` no breaking changes, `1` breaking changes found, `2` environment or usage error (oasdiff missing, contract failed to load, invalid base).
+
+By default the kizuna severity levels elevate `response-property-enum-value-added` to an error, because the generated [Swift](/docs/reference/generate-swift-client) and [Kotlin](/docs/reference/generate-kotlin-client) clients decode response enums into closed, exhaustive types — a new wire value breaks their decoding.

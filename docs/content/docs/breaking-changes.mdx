@@ -1,106 +1,140 @@
 ---
 title: Breaking Changes
-description: Detect breaking API changes between versions using oasdiff.
+description: Catch changes that would break your API's clients before they merge.
 ---
 
-We recommend using [oasdiff](https://github.com/oasdiff/oasdiff) to detect breaking changes in your API. oasdiff compares OpenAPI specs and reports breaking changes, changelogs, and diffs. Since ts-kizuna generates OpenAPI specs from your routes, you can wire up oasdiff to catch breaking changes before they ship.
+You rename a field, tighten a type, or drop a route — and an app in production breaks. `kizuna breaking-changes` catches this before merge: it compares your contract against the version on another branch and reports every change that would break existing clients.
 
-## Print your spec to stdout
-
-Create a script that prints your OpenAPI spec as YAML to stdout — this is the interface oasdiff and CI workflows consume.
-
-```ts title="scripts/print-openapi.ts"
-import { generateOpenApi } from '@ts-kizuna/openapi';
-import { contract } from '../src/contract';
-
-const spec = generateOpenApi(contract, {
-    info: {
-        title: 'My API',
-        version: '1.0.0',
-    },
-});
-
-console.log(spec('yaml'));
+```bash
+kizuna breaking-changes src/contract.ts --base origin/main
 ```
 
-Add a script to your `package.json`:
+Under the hood, the CLI generates an OpenAPI spec from your contract as it is now and one from the version you compare against, then diffs them with [oasdiff](https://github.com/oasdiff/oasdiff):
 
-```json title="package.json"
-{
-    "scripts": {
-        "print:openapi": "tsx scripts/print-openapi.ts"
-    }
-}
+```bash
+1 changes: 1 error, 0 warning, 0 info
+error   [response-property-removed]
+        in API GET /users/{id}
+                removed the `email` response property
 ```
 
-## GitHub Actions
+Exit codes:
 
-Add a workflow that runs oasdiff on every pull request. This generates the OpenAPI spec from both the base branch and the PR branch, then checks for breaking changes.
+- `0` — no breaking changes
+- `1` — breaking changes found
+- `2` — something is wrong with the setup
+
+## In CI
+
+Use the GitHub Action to check every pull request:
 
 ```yaml title=".github/workflows/breaking-changes.yml"
-# .github/workflows/breaking-changes.yml
 name: Breaking Changes
-
 on:
     pull_request:
         branches: [main]
+        types: [opened, synchronize, reopened, labeled, unlabeled]
 
 jobs:
     breaking-changes:
         runs-on: ubuntu-latest
         steps:
-            - name: Checkout PR branch
-              uses: actions/checkout@v4
+            - uses: actions/checkout@v4
               with:
-                  ref: ${{ github.head_ref }}
+                  fetch-depth: 0
 
-            - name: Setup
-              uses: pnpm/action-setup@v4
+            - uses: pnpm/action-setup@v4
             - uses: actions/setup-node@v4
               with:
                   node-version: 22
                   cache: pnpm
+            - run: pnpm install --frozen-lockfile
 
-            - name: Install and build (PR)
-              run: |
-                  pnpm install --frozen-lockfile
-                  pnpm build
-            - name: Generate PR spec
-              run: pnpm print:openapi > pr-api.yaml
-
-            - name: Checkout base branch
-              uses: actions/checkout@v4
+            - uses: ts-kizuna/kizuna/actions/breaking-changes@main
               with:
-                  ref: ${{ github.base_ref }}
-                  clean: false
-                  path: base
-
-            - name: Install and build (base)
-              working-directory: base
-              run: |
-                  pnpm install --frozen-lockfile
-                  pnpm build
-            - name: Generate base spec
-              working-directory: base
-              run: pnpm print:openapi > ../base-api.yaml
-
-            - name: Check for breaking changes
-              id: oasdiff
-              uses: oasdiff/oasdiff-action/breaking@main
-              with:
-                  base: base-api.yaml
-                  revision: pr-api.yaml
-                  fail-on: ERR
-
-            - name: Require label for breaking changes
-              if: steps.oasdiff.outcome == 'failure'
-              run: |
-                  if [[ "${{ contains(github.event.pull_request.labels.*.name, 'breaking changes') }}" == "true" ]]; then
-                      echo "Breaking changes acknowledged via label."
-                  else
-                      echo "::error::Breaking changes detected. Add the 'breaking changes' label to acknowledge."
-                      exit 1
-                  fi
+                  contract: src/contract.ts
 ```
 
-If oasdiff detects breaking changes, the PR is blocked until someone adds the `breaking changes` label — forcing explicit acknowledgment from the team.
+The action installs oasdiff and compares the PR's contract against the base branch. If the PR breaks the API, the check fails.
+
+`fetch-depth: 0` fetches the full git history. checkout's default shallow clone only contains the PR's commit, and the check needs the base branch to compare against.
+
+### Acknowledging intentional breaks
+
+When a break is intentional, a reviewer adds the `breaking changes` label to the PR and the check passes.
+
+Create the label once in your repository under **Issues → Labels** — it's not a GitHub default. The `labeled, unlabeled` trigger types in the workflow re-run the check when the label is added or removed.
+
+Use the `acknowledge-label` input to pick a different label name, or `none` to always fail on breaking changes.
+
+| Input               | Description                                                                       | Default            |
+| ------------------- | --------------------------------------------------------------------------------- | ------------------ |
+| `contract`          | Path to your contract file. Required.                                             | —                  |
+| `base`              | Git ref to compare against                                                        | the PR base branch |
+| `fail-on`           | Fail on `ERR` (definite breaks) or also on `WARN` (potential breaks)              | `ERR`              |
+| `severity-levels`   | Rules for which changes count as breaking — see [below](#what-counts-as-breaking) | built-in           |
+| `acknowledge-label` | The label that lets an intentional break through, or `none` to always fail        | `breaking changes` |
+| `working-directory` | Where to run, for contracts inside a monorepo package                             | `.`                |
+
+## Running locally
+
+The CLI needs the `oasdiff` binary, so install it once:
+
+```bash
+brew install oasdiff
+# or
+go install github.com/oasdiff/oasdiff@latest
+```
+
+Then check your branch before pushing:
+
+```bash
+kizuna breaking-changes src/contract.ts --base origin/main
+```
+
+## What counts as breaking
+
+oasdiff classifies every change in your API as an error, a warning, or info. Errors fail the check: a removed endpoint, a removed response field, a new required request field, and so on.
+
+`kizuna breaking-changes` adds one rule on top: **adding a value to a response enum is also an error**. Say a response contains this field:
+
+```ts
+status: z.enum(['open', 'closed']);
+```
+
+and you add `'archived'`. For a TypeScript client that's harmless — the new string just flows through. But the generated [Swift](/docs/clients/swift) and [Kotlin](/docs/clients/kotlin) clients turned that enum into a type with exactly two cases. When an app that shipped before the change receives `"archived"`, decoding fails. So the check treats it as breaking:
+
+```bash
+1 changes: 1 error, 0 warning, 0 info
+error   [response-property-enum-value-added]
+        in API GET /orders/{id}
+                added the new `archived` enum value to the `status` response property
+```
+
+### Changing the rules
+
+`--severity-levels` takes a file that reclassifies oasdiff's checks — one check id and level per line:
+
+```text title="severity-levels.txt"
+response-property-enum-value-added warn
+api-removed-without-deprecation err
+```
+
+Levels are `err`, `warn`, `info`, or `none`. Run `oasdiff checks` to list every check id. Pass `--severity-levels none` to drop kizuna's extra rule and use oasdiff's classifications as-is.
+
+## CLI options
+
+```bash
+kizuna breaking-changes <contract.ts> --base <git-ref> [options]
+```
+
+| Option              | Description                                                                       | Default    |
+| ------------------- | --------------------------------------------------------------------------------- | ---------- |
+| `--base`            | Git ref to compare against (branch, tag, or commit). Required.                    | —          |
+| `--export`          | Contract export name (or suffix the path: `src/contract.ts:apiContract`)          | `contract` |
+| `--format`          | oasdiff output format: `text`, `json`, `githubactions`, …                         | `text`     |
+| `--fail-on`         | Fail on `ERR` (definite breaks) or also on `WARN` (potential breaks)              | `ERR`      |
+| `--severity-levels` | Rules for which changes count as breaking — see [above](#what-counts-as-breaking) | built-in   |
+| `--out`             | Write the report to a file instead of stdout                                      | stdout     |
+
+The contract at the base ref is loaded with your currently installed dependencies. For changelogs, diffs against arbitrary spec files, or oasdiff's other subcommands, generate specs with [`generateOpenApi`](/docs/reference/generate-openapi) and run oasdiff directly.

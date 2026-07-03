@@ -27,11 +27,12 @@
     "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external typescript --external jiti",
+    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external @ts-kizuna/openapi --external zod --external typescript --external jiti",
     "prepare": "pnpm run build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ts-kizuna/openapi": "workspace:*",
     "jiti": "^2.7.0",
     "typescript": "catalog:"
   },

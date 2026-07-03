@@ -1,0 +1,75 @@
+name: kizuna breaking changes
+description: >
+    Detect breaking API changes in a ts-kizuna contract with `kizuna breaking-changes`.
+    Installs oasdiff, compares the PR contract against the base branch, and lets a
+    PR label acknowledge intentional breaking changes.
+
+branding:
+    icon: alert-triangle
+    color: red
+
+inputs:
+    contract:
+        description: Path to the contract file, optionally suffixed with the export (src/contract.ts:apiContract).
+        required: true
+    base:
+        description: Git ref to compare against. Defaults to the PR base branch.
+        required: false
+        default: ''
+    fail-on:
+        description: Fail on changes of this level or higher (ERR or WARN).
+        required: false
+        default: ERR
+    severity-levels:
+        description: Rules for which changes count as breaking — an oasdiff severity-levels file, or `none` for kizuna's defaults off.
+        required: false
+        default: ''
+    acknowledge-label:
+        description: PR label that acknowledges intentional breaking changes. Set to `none` to always fail.
+        required: false
+        default: breaking changes
+    working-directory:
+        description: Directory to run in, for contracts inside a monorepo package.
+        required: false
+        default: '.'
+
+runs:
+    using: composite
+    steps:
+        - name: Install oasdiff
+          shell: bash
+          run: |
+              if ! command -v oasdiff >/dev/null 2>&1; then
+                  go install github.com/oasdiff/oasdiff@latest
+                  echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+              fi
+
+        - name: Check for breaking changes
+          id: breaking
+          shell: bash
+          working-directory: ${{ inputs.working-directory }}
+          continue-on-error: true
+          run: |
+              BASE='${{ inputs.base }}'
+              if [[ -z "$BASE" ]]; then
+                  BASE="origin/${{ github.base_ref }}"
+              fi
+              ARGUMENTS=(breaking-changes '${{ inputs.contract }}' --base "$BASE" --format githubactions --fail-on '${{ inputs.fail-on }}')
+              if [[ -n '${{ inputs.severity-levels }}' ]]; then
+                  ARGUMENTS+=(--severity-levels '${{ inputs.severity-levels }}')
+              fi
+              npx kizuna "${ARGUMENTS[@]}"
+
+        - name: Require label for breaking changes
+          if: steps.breaking.outcome == 'failure'
+          shell: bash
+          env:
+              ACKNOWLEDGE_LABEL: ${{ inputs.acknowledge-label }}
+              LABEL_PRESENT: ${{ contains(github.event.pull_request.labels.*.name, inputs.acknowledge-label) }}
+          run: |
+              if [[ "$ACKNOWLEDGE_LABEL" != "none" && "$LABEL_PRESENT" == "true" ]]; then
+                  echo "Breaking changes acknowledged via the '$ACKNOWLEDGE_LABEL' label."
+              else
+                  echo "::error::Breaking changes detected. Add the '$ACKNOWLEDGE_LABEL' label to acknowledge."
+                  exit 1
+              fi

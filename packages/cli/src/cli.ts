@@ -4,8 +4,16 @@ import { parseArgs } from 'node:util';
 import { writeKizunaDeprecations, collectExportedSchemaDocs, patchDeclarationDocs, type ContractSource } from './deprecation-parser.js';
 import { loadContract } from './load-contract.js';
 import { lintDeprecations } from './lint-deprecations.js';
+import { die } from './die.js';
+import { runBreakingChanges } from './breaking-changes.js';
 
-const usage = `Usage: kizuna deprecations <contract.ts...> [--output <dir>] [--export <name>] [--dts <dir>]
+const usage = `Usage: kizuna <command>
+
+Commands:
+  deprecations      Extract @deprecated JSDoc tags from a contract into .kizuna/deprecations.json
+  breaking-changes  Detect breaking API changes between two contract versions using oasdiff
+
+kizuna deprecations <contract.ts...> [--output <dir>] [--export <name>] [--dts <dir>]
 
 Writes deprecations.json into .kizuna, keyed per contract. Generators read it at
 generate time and apply the deprecations.
@@ -17,19 +25,15 @@ Optional:
   --export <name>  Default export name when none is suffixed. Default: contract
   --dts <dir>      Re-inject schema-field JSDoc into emitted .d.ts files in <dir>,
                    so docs survive publishing and reach z.infer consumers.
+
+kizuna breaking-changes <contract.ts> --base <spec-file|git-ref> [options]
+
+Run \`kizuna breaking-changes --help\` for details.
 `;
 
-const die = (message: string, code = 1): never => {
-    process.stderr.write(`${message}\n`);
-    process.exit(code);
-};
-
-const main = async (): Promise<void> => {
-    const argv = process.argv.slice(2);
-    if (argv[0] !== 'deprecations') die(usage, argv[0] ? 1 : 0);
-
+const runDeprecations = async (argv: string[]): Promise<void> => {
     const { values, positionals } = parseArgs({
-        args: argv.slice(1),
+        args: argv,
         options: {
             output: {
                 type: 'string',
@@ -81,6 +85,13 @@ const main = async (): Promise<void> => {
             `Patched JSDoc on ${result.injections} field(s) across ${result.filesChanged} of ${result.filesScanned} .d.ts file(s) in ${dtsDir}\n`
         );
     }
+};
+
+const main = async (): Promise<void> => {
+    const argv = process.argv.slice(2);
+    if (argv[0] === 'deprecations') return runDeprecations(argv.slice(1));
+    if (argv[0] === 'breaking-changes') return runBreakingChanges(argv.slice(1));
+    die(usage, argv[0] ? 1 : 0);
 };
 
 main().catch((error: unknown) => die(`Error: ${error instanceof Error ? error.message : String(error)}`));
