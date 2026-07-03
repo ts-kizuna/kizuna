@@ -12,10 +12,15 @@ import {
     resolveResponseContentType,
     isJsonMediaType,
     isBinarySchema,
+    readMetaId,
     toPascalCase,
     toCamelCase,
     shortTypeName,
     isHintPrefix,
+    localTypeName,
+    statusToCamelCase,
+    isSuccessStatus,
+    mergeHeaderFields,
     type Routes,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
@@ -27,7 +32,6 @@ import {
     collectObjectFields,
     objectFieldCount,
     objectShapeKeys,
-    readMetaId,
     type SwiftField,
     type SwiftType,
 } from './zod-to-swift.js';
@@ -35,36 +39,6 @@ import {
 export interface SwiftConfig {
     namespaceName: string;
 }
-
-const statusName = (status: number): string => {
-    const known: Record<number, string> = {
-        400: 'badRequest',
-        401: 'unauthorized',
-        403: 'forbidden',
-        404: 'notFound',
-        405: 'methodNotAllowed',
-        409: 'conflict',
-        410: 'gone',
-        422: 'unprocessableEntity',
-        429: 'tooManyRequests',
-        500: 'internalServerError',
-        502: 'badGateway',
-        503: 'serviceUnavailable',
-    };
-    return known[status] ?? `status${status}`;
-};
-
-const isSuccessStatus = (status: number): boolean => status >= 200 && status < 300;
-
-const mergeHeaderFields = (perStatusHeaders: SwiftField[][]): SwiftField[] => {
-    const nonEmpty = perStatusHeaders.filter((fields) => fields.length > 0);
-    if (nonEmpty.length === 0) return [];
-    const first = nonEmpty[0]!;
-    return first.map((field) => {
-        const universallyPresent = nonEmpty.every((fields) => fields.some((candidate) => candidate.name === field.name));
-        return universallyPresent ? field : { ...field, optional: true };
-    });
-};
 
 interface BodyDescriptor {
     kind: 'json-flat' | 'json-struct' | 'multipart' | 'union' | 'json-empty';
@@ -261,7 +235,7 @@ const buildRouteMethod = (
             });
         } else {
             errorCases.push({
-                caseName: statusName(status),
+                caseName: statusToCamelCase(status),
                 status,
                 type: typeExpression,
                 isRaw,
@@ -273,7 +247,7 @@ const buildRouteMethod = (
     if (hasValidation) {
         const has400 = errorCases.some((c) => c.status === 400);
         errorCases.push({
-            caseName: has400 ? 'validationError' : statusName(400),
+            caseName: has400 ? 'validationError' : statusToCamelCase(400),
             status: 400,
             type: 'ValidationError',
             isRaw: false,
@@ -721,11 +695,6 @@ const buildOperationTypeMap = (allMethods: RouteMethod[], registry: TypeRegistry
         }
     }
     return operationTypeMap;
-};
-
-const localTypeName = (fullName: string, operationName: string): string => {
-    const stripped = fullName.slice(operationName.length);
-    return stripped || fullName;
 };
 
 const SWIFT_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Bool', 'Date', 'Void', 'Foundation.Data']);

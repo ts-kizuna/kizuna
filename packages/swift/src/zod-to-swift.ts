@@ -6,15 +6,15 @@ import {
     readDef,
     readDefType,
     readDiscriminatedUnion,
-    readDiscriminatorLiteral as coreReadDiscriminatorLiteral,
+    readDiscriminatorStringLiteral,
     readMetaDescription,
     readMetaId,
     readObjectShape,
     unwrapOptionalWrappers,
     toPascalCase,
+    sanitizeFieldName,
+    sanitizeIdentifier,
 } from '@ts-kizuna/core/generator';
-
-export { isFileSchema, isBinarySchema, readMetaId };
 
 export interface SwiftField {
     name: string;
@@ -26,23 +26,6 @@ export interface SwiftField {
     deprecated?: boolean;
     deprecationMessage?: string;
 }
-
-const SWIFT_IDENTIFIER_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-export const sanitizeFieldName = (key: string): string => {
-    if (SWIFT_IDENTIFIER_REGEX.test(key)) return key;
-    const segments = key.split(/[^A-Za-z0-9]+/).filter((segment) => segment.length > 0);
-    const head = segments[0];
-    if (head === undefined) return 'field';
-    const headLower = head.charAt(0).toLowerCase() + head.slice(1);
-    const camel =
-        headLower +
-        segments
-            .slice(1)
-            .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-            .join('');
-    return /^[0-9]/.test(camel) ? `_${camel}` : camel;
-};
 
 export interface SwiftStruct {
     kind: 'struct';
@@ -122,19 +105,6 @@ export class TypeRegistry {
         return Array.from(this.warningSet);
     }
 }
-
-const sanitizeIdentifier = (input: string): string => {
-    const cleaned = input.replace(/[^a-zA-Z0-9_]/g, '_');
-    return /^[0-9]/.test(cleaned) ? `_${cleaned}` : cleaned;
-};
-
-/**
- * Discriminator literal narrowed to a string (Swift enum cases require one).
- */
-const readDiscriminatorLiteral = (variant: z.core.$ZodType, propertyName: string): string | undefined => {
-    const literal = coreReadDiscriminatorLiteral(variant, propertyName);
-    return typeof literal === 'string' ? literal : undefined;
-};
 
 const objectFields = (
     schema: z.core.$ZodType,
@@ -219,7 +189,7 @@ export const mapType = (
             const variants: SwiftDiscriminatedEnum['variants'] = [];
             for (const option of discriminated.options) {
                 const variantId = readMetaId(option);
-                const literal = readDiscriminatorLiteral(option, discriminated.discriminator);
+                const literal = readDiscriminatorStringLiteral(option, discriminated.discriminator);
                 const variantHint = variantId ?? `${enumName}${toPascalCase(literal ?? 'Variant')}`;
                 const variantResult = mapType(option, registry, variantHint, undefined, undefined, deprecationSchemas);
                 if (literal !== undefined) {

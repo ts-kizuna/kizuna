@@ -38,6 +38,7 @@ export {
     readMetaId,
     readMetaDescription,
     readDiscriminatorLiteral,
+    readDiscriminatorStringLiteral,
     globalRegistrySchemas,
     unwrapOptionalWrappers,
     type ZodDef,
@@ -53,6 +54,12 @@ export {
     toCamelCase,
     shortTypeName,
     isHintPrefix,
+    localTypeName,
+    sanitizeFieldName,
+    sanitizeIdentifier,
+    statusToCamelCase,
+    isSuccessStatus,
+    mergeHeaderFields,
 } from './generator-utils.js';
 
 export interface GeneratorRouteContext {
