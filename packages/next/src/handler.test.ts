@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createApi, createGuard, createMiddleware, createNextEndpoints, createRouter, NextRequest, NextResponse } from './index.js';
 
@@ -757,6 +757,114 @@ describe('Next.js handler — requestMiddleware', () => {
     });
 });
 
+describe('Next.js — guards', () => {
+    const user = createIdentity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    });
+
+    const { k: securedK } = kizuna({
+        identities: {
+            user,
+        },
+    });
+
+    const securedRoutes = securedK.routes({
+        publicRoute: {
+            method: 'GET',
+            path: '/public',
+            responses: {
+                200: z.object({
+                    message: z.string(),
+                }),
+            },
+        },
+        whoAmI: {
+            method: 'GET',
+            path: '/who-am-i',
+            responses: {
+                200: z.object({
+                    userId: z.string(),
+                }),
+            },
+        },
+    });
+
+    const securedContract = securedK.contract({
+        routes: {
+            api: securedRoutes,
+        },
+        auth: {
+            api: {
+                '*': false,
+                whoAmI: 'user',
+            },
+        },
+    });
+
+    const requireUser = createGuard(securedContract, 'user', ({ bearer, deny }) => {
+        if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
+        return {
+            userId: '1',
+        };
+    });
+
+    const makeEndpoints = () => {
+        const api = createApi({
+            contract: securedContract,
+            router: {
+                api: {
+                    publicRoute: () => ({
+                        status: 200,
+                        body: {
+                            message: 'public',
+                        },
+                    }),
+                    whoAmI: ({ user: currentUser }) => ({
+                        status: 200,
+                        body: {
+                            userId: currentUser.userId,
+                        },
+                    }),
+                },
+            },
+            guards: {
+                user: requireUser,
+            },
+        });
+        return createNextEndpoints(api, {
+            basePath: '',
+        });
+    };
+
+    it('serves a public route without credentials', async () => {
+        const { GET } = makeEndpoints();
+        const response = await GET(makeRequest('GET', '/public'));
+        expect(response.status).toBe(200);
+    });
+
+    it('denies a secured route without a credential as problem details', async () => {
+        const { GET } = makeEndpoints();
+        const response = await GET(makeRequest('GET', '/who-am-i'));
+        expect(response.status).toBe(401);
+        expect(response.headers.get('content-type')).toContain('application/problem+json');
+        const body = await response.json();
+        expect(body.detail).toBe('Unauthorized');
+    });
+
+    it('passes the guard context to the handler', async () => {
+        const { GET } = makeEndpoints();
+        const authedRequest = makeRequest('GET', '/who-am-i');
+        authedRequest.headers.set('authorization', 'Bearer tok_ada');
+        const response = await GET(authedRequest);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            userId: '1',
+        });
+    });
+});
+
 describe('Next.js — middleware map', () => {
     const middlewareContractRoutes = k.routes('api', {
         publicRoute: {
@@ -921,152 +1029,5 @@ describe('Next.js — middleware map', () => {
 
         const publicResponse = await GET(makeRequest('GET', '/public'));
         expect(publicResponse.status).toBe(200);
-    });
-});
-
-describe('Next.js — createGuard', () => {
-    const guardContractRoutes = k.routes('api', {
-        getUser: {
-            method: 'GET',
-            path: '/users/:id',
-            responses: {
-                200: z.object({
-                    userId: z.string(),
-                }),
-            },
-        },
-        publicRoute: {
-            method: 'GET',
-            path: '/public',
-            responses: {
-                200: z.object({
-                    message: z.string(),
-                }),
-            },
-        },
-    });
-
-    const guardContract = k.contract({
-        routes: guardContractRoutes,
-    });
-
-    it('denies requests when guard calls deny', async () => {
-        const requireAuth = createGuard(async ({ request, route, deny }) => {
-            const token = request.headers.get('authorization');
-            if (!token) {
-                return deny(401, 'Unauthorized');
-            }
-        });
-
-        const guardApi = createApi({
-            contract: guardContract,
-            router: {
-                getUser: () => ({
-                    status: 200 as const,
-                    body: {
-                        userId: '1',
-                    },
-                }),
-                publicRoute: () => ({
-                    status: 200 as const,
-                    body: {
-                        message: 'public',
-                    },
-                }),
-            },
-            middleware: createMiddleware(guardContract, {
-                getUser: [requireAuth],
-                publicRoute: [],
-            }),
-        });
-        const { GET } = createNextEndpoints(guardApi, {
-            basePath: '',
-        });
-
-        const noAuth = await GET(makeRequest('GET', '/users/1'));
-        expect(noAuth.status).toBe(401);
-        const body = await noAuth.json();
-        expect(body.detail).toBe('Unauthorized');
-    });
-
-    it('allows requests when guard does not call deny', async () => {
-        const requireAuth = createGuard(async ({ request, route, deny }) => {
-            const token = request.headers.get('authorization');
-            if (!token) {
-                return deny(401, 'Unauthorized');
-            }
-        });
-
-        const guardApi = createApi({
-            contract: guardContract,
-            router: {
-                getUser: () => ({
-                    status: 200 as const,
-                    body: {
-                        userId: '1',
-                    },
-                }),
-                publicRoute: () => ({
-                    status: 200 as const,
-                    body: {
-                        message: 'public',
-                    },
-                }),
-            },
-            middleware: createMiddleware(guardContract, {
-                getUser: [requireAuth],
-                publicRoute: [],
-            }),
-        });
-        const { GET } = createNextEndpoints(guardApi, {
-            basePath: '',
-        });
-
-        const authedRequest = makeRequest('GET', '/users/1');
-        authedRequest.headers.set('authorization', 'Bearer valid');
-        const response = await GET(authedRequest);
-        expect(response.status).toBe(200);
-    });
-
-    it('guard can set properties on request that handlers can read', async () => {
-        const attachUser = createGuard(async ({ request, route, deny }) => {
-            const token = request.headers.get('authorization');
-            if (!token) {
-                return deny(401, 'Unauthorized');
-            }
-            (request as any).userId = 'user-from-guard';
-        });
-
-        const guardApi = createApi({
-            contract: guardContract,
-            router: {
-                getUser: ({ request }) => ({
-                    status: 200 as const,
-                    body: {
-                        userId: (request as any).userId,
-                    },
-                }),
-                publicRoute: () => ({
-                    status: 200 as const,
-                    body: {
-                        message: 'public',
-                    },
-                }),
-            },
-            middleware: createMiddleware(guardContract, {
-                getUser: [attachUser],
-                publicRoute: [],
-            }),
-        });
-        const { GET } = createNextEndpoints(guardApi, {
-            basePath: '',
-        });
-
-        const authedRequest = makeRequest('GET', '/users/1');
-        authedRequest.headers.set('authorization', 'Bearer valid');
-        const response = await GET(authedRequest);
-        expect(response.status).toBe(200);
-        const body = await response.json();
-        expect(body.userId).toBe('user-from-guard');
     });
 });

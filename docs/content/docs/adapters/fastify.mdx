@@ -14,7 +14,7 @@ description: Mount a ts-kizuna API on a Fastify application.
 The standard setup uses three functions:
 
 - `createRouter` — bind typed implementations to the contract
-- `createApi` — combine your contract, router, and middleware into an API object
+- `createApi` — combine your contract, router, and guards into an API object
 - `fastifyKizuna` — the Fastify plugin that mounts the API
 
 ```ts title="src/lib/router.ts"
@@ -103,75 +103,28 @@ getUser: async ({ params, request }) => {
 },
 ```
 
-## Middleware
+## Guards
 
-Per-route middleware is a Fastify pre-handler — `FastifyPreHandler`, i.e. `(request, reply) => void | Promise<void>`. Declare which routes it runs on with a `middleware` map on `createApi`, shaped like your routes. Authentication is just middleware that attaches data to `request`, which handlers then read.
-
-### Writing a guard
-
-A guard is the common case: a pre-handler that allows or rejects a request. `createGuard` wraps that check so you skip the boilerplate — call `deny(status, detail)` to reject, return to allow.
+One guard per identity. The credential arrives extracted and typed, alongside the native `request`/`reply` — see the [Auth guide](/docs/auth).
 
 ```ts title="src/lib/guards.ts"
 import { createGuard } from '@ts-kizuna/fastify';
+import { contract } from '@shared/contract';
 
-export const auth = createGuard(async ({ request, deny }) => {
-    const token = request.headers.authorization?.slice(7);
-    if (!token) {
-        return deny(401, 'Unauthorized');
-    }
-    const session = await verifyToken(token);
+export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {
+    const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
     }
-    request.userId = session.userId;
-    request.userRole = session.role;
-});
-
-export const requireAdmin = createGuard(({ request, deny }) => {
-    if (request.userRole !== 'admin') {
-        return deny(403, 'Forbidden');
-    }
+    return {
+        userId: session.userId,
+    };
 });
 ```
 
-### Wiring middleware to routes
+## Middleware
 
-The map mirrors your routes. Every top-level group key must be present — use `[]` for public groups.
-
-```ts title="src/lib/middleware.ts"
-import { createMiddleware } from '@ts-kizuna/fastify';
-import { contract } from '@shared/contract';
-import { auth, requireAdmin } from './guards';
-
-export const middleware = createMiddleware(contract, {
-    // Group-level: applies to all routes under "users"
-    users: [auth],
-    // Group default with per-route override
-    members: {
-        '*': [auth, requireAdmin],
-        listMembers: [auth],
-    },
-    // Multiple middleware compose left to right
-    admin: [auth, requireAdmin],
-    // Explicit public group
-    health: [],
-});
-```
-
-### Plugging into the API
-
-```ts title="src/lib/server.ts"
-import { createApi } from '@ts-kizuna/fastify';
-import { contract } from '@shared/contract';
-import { router } from './router';
-import { middleware } from './middleware';
-
-export const api = createApi({
-    contract,
-    router,
-    middleware,
-});
-```
+For request-scoped values handlers need, use [`createRequestContext`](/docs/reference/create-request-context). For other middleware — logging, rate limiting — use Fastify's own [hooks](https://fastify.dev/docs/latest/Reference/Hooks/) (`app.addHook('preHandler', ...)`). Authentication belongs in [guards](#guards).
 
 ## Options
 
@@ -191,38 +144,26 @@ app.register(fastifyKizuna, {
 
 ## Type-safe request properties
 
-If your middleware or guards set custom properties on `request`, use Fastify's [declaration merging](https://fastify.dev/docs/latest/Reference/TypeScript/#creating-a-typescript-fastify-plugin) to extend the `FastifyRequest` interface:
+Auth data doesn't need request mutation — guards return typed context that handlers receive directly. But if non-auth middleware sets custom properties on `request`, such as a request id, use Fastify's [declaration merging](https://fastify.dev/docs/latest/Reference/TypeScript/#creating-a-typescript-fastify-plugin) to extend the `FastifyRequest` interface:
 
 ```ts title="types/fastify.d.ts"
 declare module 'fastify' {
     interface FastifyRequest {
-        userId: string;
-        userRole: string;
+        requestId: string;
     }
 }
 ```
 
-With the augmentation in place, both guards and handlers are fully typed:
+With the augmentation in place, both middleware and handlers are fully typed:
 
 ```ts
-// Guards can set typed properties
-export const auth = createGuard(async ({ request, deny }) => {
-    const session = await verifyToken(request.headers.authorization);
-    if (!session) {
-        return deny(401, 'Unauthorized');
-    }
-    request.userId = session.userId;
-    request.userRole = session.role;
-});
-
-// Handlers can read them
 getUser: async ({ params, request }) => {
-    console.log(request.userId);
+    console.log(request.requestId);
     // ...
 },
 ```
 
-The adapter also sets `request.kizunaRoute` on every request before middleware runs, containing the matched `RouteDefinition`. This is available without any extra type setup.
+The adapter also sets `request.kizunaRoute` on every matched request, containing the matched `RouteDefinition`. This is available without any extra type setup.
 
 ## `RouteHandler` and `Router` types
 
@@ -250,12 +191,11 @@ const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ par
 };
 
 // Whole handler tree
-const router: Router<typeof contract.routes> = { ... };
+const router: Router<typeof contract> = { ... };
 ```
 
 ## Reference
 
 - [`createRouter`](/docs/reference/create-router)
 - [`createApi`](/docs/reference/create-api)
-- [`createMiddleware`](/docs/reference/create-middleware)
 - [`createGuard`](/docs/reference/create-guard)

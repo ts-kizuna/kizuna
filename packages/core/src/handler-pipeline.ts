@@ -1,6 +1,8 @@
 import type { z } from 'zod';
 import { ROUTES_TAG, type RouteDefinition, type Routes, type Method } from './types.js';
 import type { ExtractPathParams } from './path-params.js';
+import type { ContextOf } from './security-scheme.js';
+import type { IdentityAccess } from './identity.js';
 import { readDef, readObjectShape, WRAPPER_TYPES } from './zod-internals.js';
 
 const resolveBaseType = (schema: z.core.$ZodType): string => {
@@ -155,6 +157,168 @@ export type Router<T extends Routes, HandlerContext = unknown> = {
         ? RouteHandler<T[Key], HandlerContext>
         : T[Key] extends Routes
           ? Router<T[Key], HandlerContext>
+          : never;
+};
+
+/**
+ * Narrow an identity's access to the constraint a route puts on it. A
+ * `{ field: value }` constraint narrows that field to the value (or to the union,
+ * for `{ field: [a, b] }`); an oauth2 scope array leaves access unconstrained.
+ *
+ * @example
+ * type Narrowed = NarrowAccess<typeof member, { role: 'owner' }>;
+ * // { role: 'owner' } — even though member.access allows 'owner' | 'admin'
+ */
+type NarrowAccess<Id, Constraint> = Constraint extends readonly unknown[]
+    ? IdentityAccess<Id>
+    : Constraint extends Record<string, unknown>
+      ? Omit<IdentityAccess<Id>, keyof Constraint> & {
+            [Field in keyof Constraint & keyof IdentityAccess<Id>]: IdentityAccess<Id>[Field] extends readonly unknown[]
+                ? IdentityAccess<Id>[Field]
+                : Constraint[Field] extends readonly (infer Value)[]
+                  ? Value
+                  : Constraint[Field];
+        }
+      : IdentityAccess<Id>;
+
+/**
+ * The object a passing guard returns for an identity: its `context` and `access`
+ * fields flattened into one type. Read in a handler under the identity's name and
+ * checked against the route's access gate. Flattened (rather than left as an
+ * intersection) so it works as a contextual type — letting a guard return literal
+ * access values like `role: 'owner'` without an annotation.
+ */
+export type GuardSuccess<S> = {
+    [Field in keyof (ContextOf<S> & IdentityAccess<S>)]: (ContextOf<S> & IdentityAccess<S>)[Field];
+};
+
+/**
+ * The scheme-keyed security context a single route's handler receives, derived
+ * from the auth value the route resolves to: `false` (public) contributes
+ * nothing; a scheme name yields that identity's context and full access; a
+ * constraint object keys each named identity to its context and narrowed access.
+ *
+ * @example
+ * type Context = ContextFromAuthValue<{ member: { role: 'owner' } }, { member: typeof member }>;
+ * // { member: { workspaceUserId: string; role: 'owner' } }
+ */
+export type ContextFromAuthValue<Value, Identities> = Value extends false
+    ? {}
+    : Value extends string
+      ? Value extends keyof Identities
+          ? [keyof (ContextOf<Identities[Value]> & IdentityAccess<Identities[Value]>)] extends [never]
+              ? {}
+              : { [Name in Value]: ContextOf<Identities[Name]> & IdentityAccess<Identities[Name]> }
+          : {}
+      : Value extends Record<string, unknown>
+        ? {
+              [Name in Extract<keyof Value, string> & keyof Identities as [
+                  keyof (ContextOf<Identities[Name]> & NarrowAccess<Identities[Name], Value[Name]>),
+              ] extends [never]
+                  ? never
+                  : Name]: ContextOf<Identities[Name]> & NarrowAccess<Identities[Name], Value[Name]>;
+          }
+        : {};
+
+/**
+ * An auth value normalized to its identity-map form: `false` contributes
+ * nothing, a scheme name becomes `{ name: true }`, an object stays as is.
+ */
+type NormalizeAuthValue<Value> = Value extends false ? {} : Value extends string ? { [Name in Value]: true } : Value;
+
+/**
+ * The auth value that applies to one route within a group's auth entry. A cascade
+ * (`{ '*': default, routeKey: entry }`) merges the route's entry into the `'*'`
+ * default — the route inherits the default's identities and refines or adds per
+ * identity, and `false` opts it out. Any other value — a scheme name, `false`,
+ * or a single constraint object — applies to every route in the group.
+ */
+export type RouteAuthValue<GroupAuth, RouteKey extends string> = GroupAuth extends { '*': infer Default }
+    ? RouteKey extends keyof GroupAuth
+        ? GroupAuth[RouteKey] extends false
+            ? false
+            : Omit<NormalizeAuthValue<Default>, keyof NormalizeAuthValue<GroupAuth[RouteKey]>> & NormalizeAuthValue<GroupAuth[RouteKey]>
+        : Default
+    : GroupAuth;
+
+/**
+ * The values handlers receive from the contract's request context schemas,
+ * keyed by provider name.
+ */
+export type RequestContextValues<RequestContext> = string extends keyof RequestContext
+    ? {}
+    : {
+          [Name in keyof RequestContext]: RequestContext[Name] extends { context: infer Schema extends z.ZodType }
+              ? z.output<Schema>
+              : never;
+      };
+
+/**
+ * The identity names an {@link AuthValue} requires: a name, the keys of a
+ * constraint object, or none for `false`.
+ */
+type AuthValueIdentityNames<Value> = Value extends false ? never : Value extends string ? Value : Extract<keyof Value, string>;
+
+type GroupGuardedParamNames<G extends Routes, GroupAuthValue, Name extends string> = {
+    [Key in keyof G & string]: G[Key] extends RouteDefinition
+        ? Name extends AuthValueIdentityNames<RouteAuthValue<GroupAuthValue, Key>>
+            ? keyof ExtractPathParams<G[Key]['path']> & string
+            : never
+        : G[Key] extends Routes
+          ? GroupGuardedParamNames<G[Key], GroupAuthValue, Name>
+          : never;
+}[keyof G & string];
+
+/**
+ * The path param names of every route the identity `Name` secures, per the
+ * contract's auth map.
+ */
+export type GuardedParamNames<R extends Routes, Auth, Name extends string> = {
+    [Group in keyof R & string]: R[Group] extends RouteDefinition
+        ? Name extends AuthValueIdentityNames<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group>>
+            ? keyof ExtractPathParams<R[Group]['path']> & string
+            : never
+        : R[Group] extends Routes
+          ? GroupGuardedParamNames<R[Group], Group extends keyof Auth ? Auth[Group] : false, Name>
+          : never;
+}[keyof R & string];
+
+/**
+ * The `params` a guard for identity `Name` receives: the param names of the
+ * routes it secures, each optional since the guard runs across all of them.
+ * Falls back to `Record<string, string>` when no params are derivable.
+ */
+export type GuardParams<R extends Routes, Auth, Name extends string> = [GuardedParamNames<R, Auth, Name>] extends [never]
+    ? Record<string, string>
+    : { [Param in GuardedParamNames<R, Auth, Name>]?: string };
+
+type GroupHandlers<G extends Routes, HandlerContext, Identities, GroupAuth> = {
+    [Key in keyof G as Key extends symbol ? never : Key]: G[Key] extends RouteDefinition
+        ? RouteHandlerFromContext<G[Key], HandlerContext, ContextFromAuthValue<RouteAuthValue<GroupAuth, Key & string>, Identities>>
+        : G[Key] extends Routes
+          ? GroupHandlers<G[Key], HandlerContext, Identities, GroupAuth>
+          : never;
+};
+
+type RouteHandlerFromContext<R extends RouteDefinition, HandlerContext, SecurityContext> = (
+    args: HandlerArgs<R> & HandlerContext & SecurityContext
+) => Promise<HandlerReturn<R>> | HandlerReturn<R>;
+
+/**
+ * The handler tree for a contract: every route group, each route typed with its
+ * inputs, the adapter's handler context, and the scheme-keyed security context
+ * its entry in the `auth` map resolves to. Identities and access fields a route
+ * requires appear in the handler args under each identity's name.
+ */
+export type HandlersFromAuth<R extends Routes, HandlerContext, Identities, Auth> = {
+    [Group in keyof R as Group extends symbol ? never : Group]: R[Group] extends RouteDefinition
+        ? RouteHandlerFromContext<
+              R[Group],
+              HandlerContext,
+              ContextFromAuthValue<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>, Identities>
+          >
+        : R[Group] extends Routes
+          ? GroupHandlers<R[Group], HandlerContext, Identities, Group extends keyof Auth ? Auth[Group] : false>
           : never;
 };
 

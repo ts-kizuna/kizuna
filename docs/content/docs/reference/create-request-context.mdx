@@ -1,0 +1,85 @@
+---
+title: createRequestContext
+description: Provide request-scoped values — analytics ids, loggers, tenants — to every handler, typed.
+---
+
+Not everything that runs before a handler is auth. Analytics ids, request loggers, tenant lookups — values every handler wants, gating nothing. Declare them with `createRequestContext`, register them on `kizuna`, resolve each with the adapter's `createRequestContextResolver`, and every handler receives them typed under their name.
+
+<AdapterTabs functionName="createRequestContextResolver" />
+
+A declaration can bind to request `headers`. Those headers stay off the routes and out of the OpenAPI document, but the clients type them: the fetch client takes them on `createClient`, and the generated Swift and Kotlin clients take them in their initializers — so a caller sets them once, and the resolver reads them validated.
+
+```ts title="packages/contract/src/request-contexts.ts"
+import { z } from 'zod';
+import { createRequestContext } from '@ts-kizuna/core';
+
+export const analytics = createRequestContext({
+    headers: z.object({
+        'x-posthog-session-id': z.string().optional(),
+    }),
+    context: z.object({
+        sessionId: z.string().nullable(),
+    }),
+});
+```
+
+```ts title="packages/contract/src/k.ts"
+import { analytics } from './request-contexts';
+
+export const { k } = kizuna({
+    requestContext: {
+        analytics,
+    },
+});
+```
+
+```ts title="src/lib/request-context.ts"
+import { createRequestContextResolver } from '@ts-kizuna/express';
+import { contract } from './contract';
+
+export const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ headers }) => ({
+    sessionId: headers['x-posthog-session-id'] ?? null,
+}));
+```
+
+```ts title="src/lib/server.ts"
+export const api = createApi({
+    contract,
+    router,
+    requestContext: {
+        analytics: captureAnalytics,
+    },
+});
+```
+
+```ts
+listUsers: ({ query, analytics }) => {
+    track(analytics.sessionId, 'listUsers');
+    // ...
+},
+```
+
+## Sending values from a client
+
+The fetch client takes the declared headers under `requestContext` and sends them with every request — required when a header is, optional otherwise:
+
+```ts
+const apiClient = createClient(contract, {
+    baseUrl: 'https://api.example.com',
+    requestContext: {
+        'x-posthog-session-id': sessionId,
+    },
+});
+```
+
+The generated Swift and Kotlin clients take a `RequestContext` in their initializer:
+
+```swift
+let client = APIClient(baseURL: url, requestContext: .init(xPosthogSessionId: sessionId))
+```
+
+```kotlin
+val client = APIClient(baseUrl = baseUrl, requestContext = APIClient.RequestContext(xPosthogSessionId = sessionId))
+```
+
+Resolvers run on every route — public ones included — before the guards, and never deny a request. They receive the adapter's native request objects, the route's `params`, and the declared `headers` (validated). The return is checked against the `context` schema, and `createApi` requires a resolver for every declared key. Request context never appears in the OpenAPI document.

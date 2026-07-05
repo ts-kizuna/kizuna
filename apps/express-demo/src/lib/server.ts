@@ -1,19 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import type { RequestHandler } from 'express';
-import { createGuard } from '@ts-kizuna/express';
+import { createRequestContextResolver, createGuard } from '@ts-kizuna/express';
 import type { Router } from '@ts-kizuna/express';
 import { contract } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
-
-declare global {
-    // eslint-disable-next-line @typescript-eslint/no-namespace
-    namespace Express {
-        interface Request {
-            userId?: string;
-            member?: { workspaceUserId: string; role: 'owner' | 'admin' };
-        }
-    }
-}
 
 interface User {
     id: string;
@@ -47,28 +36,27 @@ const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | '
     ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
 ]);
 
-const bearerToken = (req: { headers: Record<string, unknown> }): string | undefined => {
-    const header = req.headers['authorization'];
-    const value = Array.isArray(header) ? header[0] : header;
-    return typeof value === 'string' ? /^bearer\s+(.+)$/i.exec(value)?.[1] : undefined;
-};
+export const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ headers }) => ({
+    sessionId: headers['x-posthog-session-id'] ?? null,
+    distinctId: headers['x-posthog-distinct-id'] ?? null,
+}));
 
-export const requireUser: RequestHandler = createGuard(({ req, deny }) => {
-    const session = sessions.get(bearerToken(req) ?? '');
+export const requireUser = createGuard(contract, 'user', ({ bearer, deny }) => {
+    const session = bearer ? sessions.get(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
     }
-    req.userId = session.userId;
+    return {
+        userId: session.userId,
+    };
 });
 
-export const requireMember: RequestHandler = createGuard(({ req, deny }) => {
-    const token = req.headers['x-workspace-token'];
-    const value = Array.isArray(token) ? token[0] : token;
-    const membership = typeof value === 'string' ? memberships.get(value) : undefined;
+export const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) => {
+    const membership = apiKey ? memberships.get(apiKey.value) : undefined;
     if (!membership) {
         return deny(403, 'Forbidden');
     }
-    req.member = membership;
+    return membership;
 });
 
 export const router: Router<typeof contract> = {
@@ -258,7 +246,7 @@ export const router: Router<typeof contract> = {
                 },
             };
         },
-        listEvents: ({ query }) => {
+        listEvents: ({ query, analytics }) => {
             return {
                 status: 200,
                 body: {
@@ -276,6 +264,7 @@ export const router: Router<typeof contract> = {
                         ids: query.ids ?? null,
                         label: query.label ?? null,
                         tagIds: query.tagIds ?? null,
+                        sessionId: analytics.sessionId,
                     },
                 },
             };
@@ -294,19 +283,19 @@ export const router: Router<typeof contract> = {
         }),
     },
     members: {
-        listMembers: ({ req }) => ({
+        listMembers: ({ user }) => ({
             status: 200,
             body: {
-                members: Array.from(users.values()).filter((candidate) => candidate.id !== req.userId),
+                members: Array.from(users.values()).filter((candidate) => candidate.id !== user.userId),
             },
         }),
-        inviteMember: ({ body, req }) => {
+        inviteMember: ({ body, member }) => {
             const existing = Array.from(users.values()).find((candidate) => candidate.email === body.email);
             if (existing) {
                 return {
                     status: 409,
                     body: {
-                        detail: `${body.email} is already a member (invite attempted by ${req.member?.role}).`,
+                        detail: `${body.email} is already a member (invite attempted by ${member.role}).`,
                     },
                 };
             }
@@ -323,21 +312,21 @@ export const router: Router<typeof contract> = {
         },
     },
     workspace: {
-        getWorkspace: ({ req }) => ({
+        getWorkspace: ({ member }) => ({
             status: 200,
             body: {
-                id: req.member?.workspaceUserId ?? '',
+                id: member.workspaceUserId,
                 name: 'ts-kizuna demo workspace',
             },
         }),
-        deleteWorkspace: ({ req }) => ({
+        deleteWorkspace: ({ member }) => ({
             status: 200,
             body: {
-                ok: req.member?.role === 'owner',
+                ok: member.role === 'owner',
             },
         }),
-        transfer: ({ body, req }) => {
-            if (body.toUserId === req.userId || req.member?.role !== 'owner') {
+        transfer: ({ body, member }) => {
+            if (body.toUserId === member.workspaceUserId) {
                 return {
                     status: 200,
                     body: {

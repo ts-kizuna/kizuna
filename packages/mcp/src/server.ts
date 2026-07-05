@@ -1,7 +1,22 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { flattenRoutes, validateRequest } from '@ts-kizuna/core';
-import { ResponseError, type ApiWithRouter, ROUTER_META } from '@ts-kizuna/core/adapter';
-import type { Routes, RouteDefinition } from '@ts-kizuna/core';
+import {
+    ResponseError,
+    type AdapterRequest,
+    type ApiWithRouter,
+    type GuardMap,
+    type RequestContextMap,
+    ROUTER_META,
+    GUARDS_META,
+    SCHEMES_META,
+    REQUEST_CONTEXT_META,
+    extractCredential,
+    gatePermits,
+    resolveSecurityRequirements,
+    guardDeny,
+    isGuardDenial,
+} from '@ts-kizuna/core/adapter';
+import type { Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
 import { deriveToolNames } from './tool-name.js';
 import { buildToolInputSchema, type ToolInputSchema } from './schema.js';
 
@@ -35,6 +50,14 @@ export interface McpServerOptions {
      * `{ request }` for Next.js).
      */
     handlerContext?: Record<string, unknown>;
+
+    /**
+     * Headers of the MCP transport request, used to extract credentials for
+     * secured routes so their guards can run per tool call. Adapter-specific
+     * endpoints populate this automatically; configure the MCP client to send
+     * the credential (e.g. an `Authorization` header) on its connection.
+     */
+    credentialHeaders?: Record<string, string | string[] | undefined>;
 }
 
 const defaultRouteFilter = (route: RouteDefinition): boolean => {
@@ -120,12 +143,103 @@ const resolveHandler = (router: Record<string, unknown>, routeKey: string): unkn
 
 type ToolCallResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
+const toolError = (status: number, detail: string): ToolCallResult => ({
+    content: [
+        {
+            type: 'text' as const,
+            text: JSON.stringify(
+                {
+                    status,
+                    body: {
+                        detail,
+                    },
+                },
+                null,
+                2
+            ),
+        },
+    ],
+    isError: true,
+});
+
+/**
+ * Run the guards a secured route requires, extracting each identity's
+ * credential from the MCP transport request headers — the same pipeline the
+ * HTTP adapters run. Returns the scheme-keyed security context for the handler
+ * args, or a {@link ToolCallResult} error when a guard denies or a gate fails.
+ */
+const runGuards = async (
+    route: RouteDefinition,
+    routeKey: string,
+    params: Record<string, string>,
+    guards: GuardMap | undefined,
+    schemes: Record<string, SecurityScheme> | undefined,
+    handlerContext: Record<string, unknown> | undefined,
+    credentialHeaders: Record<string, string | string[] | undefined> | undefined
+): Promise<{ ok: true; securityContext: Record<string, unknown> } | { ok: false; result: ToolCallResult }> => {
+    const securityContext: Record<string, unknown> = {};
+    const credentialRequest = {
+        headers: credentialHeaders ?? {},
+        query: {},
+    } as unknown as AdapterRequest<unknown>;
+
+    for (const { scheme, scopes } of resolveSecurityRequirements(route)) {
+        const guard = guards?.[scheme];
+        if (!guard) {
+            return {
+                ok: false,
+                result: toolError(500, `No guard registered for security scheme "${scheme}" required by route "${routeKey}".`),
+            };
+        }
+        const schemeDefinition = schemes?.[scheme];
+        const credential = schemeDefinition ? extractCredential(schemeDefinition, credentialRequest) : {};
+        const guardResult = await guard({
+            ...(handlerContext ?? {}),
+            ...credential,
+            params,
+            deny: guardDeny,
+            scopes,
+        } as Parameters<typeof guard>[0]);
+        if (isGuardDenial(guardResult)) {
+            return {
+                ok: false,
+                result: toolError(guardResult.status, guardResult.detail),
+            };
+        }
+        if (guardResult && typeof guardResult === 'object') {
+            const gate = route.accessGate?.[scheme];
+            if (gate) {
+                for (const [field, allowed] of Object.entries(gate)) {
+                    const value = (guardResult as Record<string, unknown>)[field];
+                    const permitted = gatePermits(value, allowed);
+                    if (!permitted) {
+                        return {
+                            ok: false,
+                            result: toolError(403, `Forbidden: ${scheme}.${field} is not permitted on this route.`),
+                        };
+                    }
+                }
+            }
+            securityContext[scheme] = guardResult;
+        }
+    }
+
+    return {
+        ok: true,
+        securityContext,
+    };
+};
+
 const executeToolCall = async (
     route: RouteDefinition,
     routeKey: string,
     args: Record<string, unknown>,
     router: Record<string, unknown>,
-    handlerContext?: Record<string, unknown>
+    handlerContext?: Record<string, unknown>,
+    guards?: GuardMap,
+    schemes?: Record<string, SecurityScheme>,
+    credentialHeaders?: Record<string, string | string[] | undefined>,
+    contextResolvers?: RequestContextMap
 ): Promise<ToolCallResult> => {
     const params = (args.params ?? {}) as Record<string, string>;
     const query = (args.query ?? {}) as Record<string, unknown>;
@@ -182,6 +296,22 @@ const executeToolCall = async (
         };
     }
 
+    const requestContext: Record<string, unknown> = {};
+    if (contextResolvers) {
+        for (const [name, resolver] of Object.entries(contextResolvers)) {
+            requestContext[name] = await resolver({
+                ...(handlerContext ?? {}),
+                params,
+                headers: credentialHeaders ?? {},
+            } as Parameters<typeof resolver>[0]);
+        }
+    }
+
+    const guardOutcome = await runGuards(route, routeKey, params, guards, schemes, handlerContext, credentialHeaders);
+    if (!guardOutcome.ok) {
+        return guardOutcome.result;
+    }
+
     try {
         const error = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
             throw new ResponseError(response);
@@ -194,6 +324,8 @@ const executeToolCall = async (
             headers: validation.parsed.headers,
             error,
             ...handlerContext,
+            ...requestContext,
+            ...guardOutcome.securityContext,
         });
 
         const isError = result.status >= 400;
@@ -270,6 +402,9 @@ const executeToolCall = async (
  */
 export const createMcpServer = (api: Routes & ApiWithRouter, options?: McpServerOptions): McpServer => {
     const router = api[ROUTER_META];
+    const guards = (api as unknown as Record<typeof GUARDS_META, GuardMap | undefined>)[GUARDS_META];
+    const schemes = (api as unknown as Record<typeof SCHEMES_META, Record<string, SecurityScheme> | undefined>)[SCHEMES_META];
+    const contextResolvers = (api as unknown as Record<typeof REQUEST_CONTEXT_META, RequestContextMap | undefined>)[REQUEST_CONTEXT_META];
 
     const server = new McpServer({
         name: options?.name ?? 'MCP Server',
@@ -287,7 +422,17 @@ export const createMcpServer = (api: Routes & ApiWithRouter, options?: McpServer
                 annotations: buildToolAnnotations(definition.route),
             },
             async (args: Record<string, unknown>) =>
-                executeToolCall(definition.route, definition.routeKey, args ?? {}, router, options?.handlerContext)
+                executeToolCall(
+                    definition.route,
+                    definition.routeKey,
+                    args ?? {},
+                    router,
+                    options?.handlerContext,
+                    guards,
+                    schemes,
+                    options?.credentialHeaders,
+                    contextResolvers
+                )
         );
     }
 

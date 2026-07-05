@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags, createModel, type Contract } from '@ts-kizuna/core';
+import { kizuna, createTags, createModel, createRequestContext, type Contract } from '@ts-kizuna/core';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateSwiftClient } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
@@ -1324,5 +1324,68 @@ describe('Swift generator — positional request groups (required-first, single 
         expect(output).toContain('func list(_ params: TestAPIClient.List.Params, _ query: TestAPIClient.List.Query = .query())');
         const signatureCount = output.split('func list(').length - 1;
         expect(signatureCount).toBe(1);
+    });
+});
+
+describe('Swift generator — request context', () => {
+    const analytics = createRequestContext({
+        headers: z.object({
+            'x-session-id': z.string().optional(),
+            'x-tenant': z.string(),
+        }),
+        context: z.object({
+            sessionId: z.string().nullable(),
+        }),
+    });
+
+    const { k: ctxK } = kizuna({
+        requestContext: {
+            analytics,
+        },
+    });
+
+    const ctxContract = ctxK.contract({
+        routes: {
+            users: ctxK.routes({
+                listUsers: {
+                    method: 'GET',
+                    path: '/users',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            }),
+        },
+    });
+
+    it('emits a RequestContext struct and a required init parameter', () => {
+        const output = generateSwiftClient(ctxContract, baseConfig);
+        expect(output).toContain('public struct RequestContext: Sendable, Equatable');
+        expect(output).toContain('requestContext: RequestContext,');
+        expect(output).toContain('self.requestContextHeaders = requestContext.headerFields');
+        expect(output).toContain('for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }');
+        expect(output).toContain('fields["x-tenant"] = xTenant');
+        expect(output).toContain('if let xSessionId { fields["x-session-id"] = xSessionId }');
+    });
+
+    it('emits nothing when the contract declares no request context headers', () => {
+        const plainContract = k.contract({
+            routes: k.routes('api', {
+                ping: {
+                    method: 'GET',
+                    path: '/ping',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            }),
+        });
+        const output = generateSwiftClient(plainContract, baseConfig);
+        expect(output).not.toContain('RequestContext');
+        expect(output).not.toContain('requestContextHeaders');
     });
 });

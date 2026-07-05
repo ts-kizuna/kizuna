@@ -14,7 +14,7 @@ description: Mount a ts-kizuna API on a Hono application.
 The standard setup uses three functions:
 
 - `createRouter` — bind typed implementations to the contract
-- `createApi` — combine your contract, router, and middleware into an API object
+- `createApi` — combine your contract, router, and guards into an API object
 - `createHonoEndpoints` — mount the API on a Hono app
 
 ```ts title="src/lib/router.ts"
@@ -114,7 +114,7 @@ type AppEnv = {
     };
 };
 
-export const router = createRouter<typeof contract.routes, AppEnv>(contract, {
+export const router = createRouter<typeof contract, AppEnv>(contract, {
     users: {
         getUser: async ({ params, c }) => {
             const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(params.id).first();
@@ -127,99 +127,28 @@ export const router = createRouter<typeof contract.routes, AppEnv>(contract, {
 });
 ```
 
-## Middleware
+## Guards
 
-Per-route middleware is a plain Hono `MiddlewareHandler`. Declare which routes it runs on with a `middleware` map on `createApi`, shaped like your routes. Authentication is just middleware that sets context variables, which handlers then read via `c.get(...)`.
-
-### Writing a guard
-
-A guard is the common case: a middleware that allows or rejects a request. `createGuard` wraps that check so you skip the `next()` / `c.json()` boilerplate — call `deny(status, detail)` to reject, return to allow.
+One guard per identity. The credential arrives extracted and typed, alongside the native context `c` — see the [Auth guide](/docs/auth).
 
 ```ts title="src/lib/guards.ts"
 import { createGuard } from '@ts-kizuna/hono';
+import { contract } from '@shared/contract';
 
-type AuthEnv = {
-    Variables: {
-        userId: string;
-        userRole: string;
-    };
-};
-
-export const auth = createGuard<AuthEnv>(async ({ c, deny }) => {
-    const token = c.req.header('authorization')?.slice(7);
-    if (!token) {
-        return deny(401, 'Unauthorized');
-    }
-    const session = await verifyToken(token);
+export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {
+    const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
     }
-    c.set('userId', session.userId);
-    c.set('userRole', session.role);
-});
-
-export const requireAdmin = createGuard<AuthEnv>(({ c, deny }) => {
-    if (c.get('userRole') !== 'admin') {
-        return deny(403, 'Forbidden');
-    }
-});
-
-export const requireMembership = createGuard<AuthEnv>(async ({ c, deny }) => {
-    const membership = await checkMembership(c.get('userId'), c.req.param('id'));
-    if (!membership) {
-        return deny(403, 'Forbidden');
-    }
-    c.set('member', membership);
+    return {
+        userId: session.userId,
+    };
 });
 ```
 
-### Wiring middleware to routes
+## Middleware
 
-The map mirrors your routes. Every top-level group key must be present — use `[]` for public groups.
-
-```ts title="src/lib/middleware.ts"
-import { createMiddleware } from '@ts-kizuna/hono';
-import { contract } from '@shared/contract';
-import { auth, requireAdmin, requireMembership } from './guards';
-
-export const middleware = createMiddleware(contract, {
-    // Group-level: applies to all routes under "users"
-    users: [auth],
-    // Group default with per-route override
-    members: {
-        '*': [auth, requireMembership],
-        listMembers: [auth],
-    },
-    // Multiple middleware compose left to right
-    admin: [auth, requireAdmin],
-    // Explicit public group
-    health: [],
-});
-```
-
-### Plugging into the API
-
-```ts title="src/lib/server.ts"
-import { createApi } from '@ts-kizuna/hono';
-import { contract } from '@shared/contract';
-import { router } from './router';
-import { middleware } from './middleware';
-
-export const api = createApi({
-    contract,
-    router,
-    middleware,
-});
-```
-
-Handlers access context variables set by guards via `c`:
-
-```ts
-getUser: async ({ params, c }) => {
-    const userId = c.get('userId');
-    // ...
-},
-```
+For request-scoped values handlers need, use [`createRequestContext`](/docs/reference/create-request-context). For other middleware — logging, rate limiting, caching headers — use Hono's own `app.use`. Authentication belongs in [guards](#guards).
 
 ## Options
 
@@ -260,12 +189,11 @@ const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ par
 };
 
 // Whole handler tree
-const router: Router<typeof contract.routes> = { ... };
+const router: Router<typeof contract> = { ... };
 ```
 
 ## Reference
 
 - [`createRouter`](/docs/reference/create-router)
 - [`createApi`](/docs/reference/create-api)
-- [`createMiddleware`](/docs/reference/create-middleware)
 - [`createGuard`](/docs/reference/create-guard)

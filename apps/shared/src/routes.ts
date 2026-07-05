@@ -391,7 +391,7 @@ const workspaceInfo = k.routes('workspace', {
                 ok: z.boolean(),
             }),
         },
-        summary: 'Transfer ownership — requires both user and member(owner)',
+        summary: 'Transfer ownership — owner-only via the auth map',
     },
 });
 
@@ -447,6 +447,7 @@ export const notificationsRoutes = k.routes('notifications', {
                     ids: z.array(z.string()).nullable(),
                     label: z.string().nullable(),
                     tagIds: z.array(z.string()).nullable(),
+                    sessionId: z.string().nullable(),
                 }),
             }),
         },

@@ -48,7 +48,33 @@ export type ResponseDefinition =
           contentType?: ResponseContentType;
       };
 
-export interface RouteDefinition<TagKeys extends string = string> {
+/**
+ * A single security requirement on a route: either a scheme name (sugar for the
+ * scheme with no scopes) or a map of scheme name → required scopes. Mirrors an
+ * entry of OpenAPI's `operation.security` array.
+ *
+ * ```ts
+ * security: ['user']                  // just authenticated
+ * security: [{ user: ['admin'] }]     // authenticated AND has the admin scope
+ * ```
+ */
+export type SecurityRequirement<SchemeNames extends string = string> = SchemeNames | { [Name in SchemeNames]?: readonly string[] };
+
+/**
+ * The scheme name(s) a {@link SecurityRequirement} entry references.
+ */
+export type SchemeNameOf<Entry> = Entry extends string ? Entry : Extract<keyof Entry, string>;
+
+/**
+ * A route's resolved access gate, produced by `k.contract` from the `auth` map.
+ * Keyed by identity name, then by access field, mapping to the allowed value or
+ * values. Adapters deny requests whose field value is not allowed and narrow the
+ * field in the handler args. An empty object requires authentication with no
+ * field constraint.
+ */
+export type AccessGate = Record<string, Record<string, unknown>>;
+
+export interface RouteDefinition<TagKeys extends string = string, SchemeNames extends string = string> {
     method: Method;
     /**
      * Route path starting with `/`. Use `:paramName` for path parameters.
@@ -64,7 +90,17 @@ export interface RouteDefinition<TagKeys extends string = string> {
      * route, and the generator resolves each key to its `title` for the spec.
      */
     tags?: readonly TagKeys[];
-    security?: Array<Record<string, string[]>>;
+    /**
+     * The security schemes this route requires, referencing identities registered
+     * on the `kizuna` factory. Each entry is a scheme name or a `{ scheme: scopes }`
+     * map. Set by `k.contract` from the `auth` map; `[]` marks the route public.
+     */
+    security?: readonly SecurityRequirement<SchemeNames>[];
+    /**
+     * The route's resolved access gate, set by `k.contract` from the `auth` map's
+     * `{ scheme: { field: value } }` constraints. See {@link AccessGate}.
+     */
+    accessGate?: AccessGate;
     externalDocs?: {
         url: string;
         description?: string;
@@ -105,7 +141,25 @@ export interface RouteDefinition<TagKeys extends string = string> {
  */
 export const ROUTES_TAG: unique symbol = Symbol('ts-kizuna.routes.tag');
 
-export interface Routes<TagKeys extends string = string> {
+export interface Routes<TagKeys extends string = string, SchemeNames extends string = string> {
     [ROUTES_TAG]?: string;
-    [key: string]: RouteDefinition<TagKeys> | Routes<TagKeys>;
+    [key: string]: RouteDefinition<TagKeys, SchemeNames> | Routes<TagKeys, SchemeNames>;
+}
+
+/**
+ * A route as authored in `k.routes`: the route shape minus `security` and
+ * `accessGate`, which the `auth` map owns and `k.contract` resolves. Writing
+ * either on a route is a type error.
+ */
+export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<RouteDefinition<TagKeys>, 'security' | 'accessGate'> & {
+    security?: never;
+    accessGate?: never;
+};
+
+/**
+ * A tree of {@link AuthoredRouteDefinition}s, the shape `k.routes` accepts.
+ */
+export interface AuthoredRoutes<TagKeys extends string = string> {
+    [ROUTES_TAG]?: string;
+    [key: string]: AuthoredRouteDefinition<TagKeys> | AuthoredRoutes<TagKeys>;
 }

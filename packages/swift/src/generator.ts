@@ -103,6 +103,8 @@ interface EmitContext {
     ownedTypeMap: Map<string, string>; // typeName → owningStructName
     // Lets the tuple-based call surface recurse into nested object / union payload fields.
     registry: TypeRegistry;
+    // Header fields from the contract's request context declarations; empty when none.
+    requestContextFields: SwiftField[];
 }
 
 const buildRouteMethod = (
@@ -1218,6 +1220,9 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
     );
     writer.line('var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)');
     writer.line(`request.httpMethod = ${stringLiteral(method.method)}`);
+    if (context.requestContextFields.length > 0) {
+        writer.line('for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }');
+    }
 
     if (method.body) {
         emitBodyEncoding(writer, method, context);
@@ -1378,8 +1383,9 @@ const emitSubClientMethod = (writer: SwiftWriter, method: RouteMethod, context: 
                 ? 'encoder'
                 : '_';
         const decoderSlot = methodUsesDecoder(method) ? 'decoder' : '_';
+        const contextSlot = context.requestContextFields.length > 0 ? ', requestContextHeaders' : '';
         writer.line(
-            `let (baseURL, session, ${encoderSlot}, ${decoderSlot}, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()`
+            `let (baseURL, session, ${encoderSlot}, ${decoderSlot}, requestMiddleware, responseMiddleware, timeout${contextSlot}) = await _actor._kizunaContext()`
         );
         emitMethodBody(writer, method, context);
     });
@@ -1443,8 +1449,43 @@ const emitClient = (
 
     const usesMultipart = allMethods.some((method) => method.body?.kind === 'multipart');
 
+    const contextFields = context.requestContextFields;
+    const contextRequired = contextFields.some((field) => !field.optional);
+
     writer.blank();
     writer.block(`public actor ${clientName}`, () => {
+        if (contextFields.length > 0) {
+            writer.blank();
+            writer.docComment("Values sent as headers on every request, from the contract's request context.");
+            writer.block('public struct RequestContext: Sendable, Equatable', () => {
+                for (const field of contextFields) {
+                    writer.line(`public var ${escapeKeyword(field.name)}: ${field.type}`);
+                }
+                writer.blank();
+                const initParams = contextFields
+                    .map((field) => `${escapeKeyword(field.name)}: ${field.type}${field.optional ? ' = nil' : ''}`)
+                    .join(', ');
+                writer.block(`public init(${initParams})`, () => {
+                    for (const field of contextFields) {
+                        writer.line(`self.${escapeKeyword(field.name)} = ${escapeKeyword(field.name)}`);
+                    }
+                });
+                writer.blank();
+                writer.block('var headerFields: [String: String]', () => {
+                    writer.line('var fields: [String: String] = [:]');
+                    for (const field of contextFields) {
+                        if (field.optional) {
+                            writer.line(
+                                `if let ${escapeKeyword(field.name)} { fields[${stringLiteral(field.wireName)}] = ${escapeKeyword(field.name)} }`
+                            );
+                        } else {
+                            writer.line(`fields[${stringLiteral(field.wireName)}] = ${escapeKeyword(field.name)}`);
+                        }
+                    }
+                    writer.line('return fields');
+                });
+            });
+        }
         if (usesMultipart) {
             writer.blank();
             writer.block('public struct MultipartFile: Sendable, Equatable', () => {
@@ -1550,17 +1591,25 @@ const emitClient = (
         writer.line('public let baseURL: URL');
         writer.line('public let session: URLSession');
         writer.line('public nonisolated let timeout: TimeInterval');
+        if (contextFields.length > 0) {
+            writer.line('nonisolated let requestContextHeaders: [String: String]');
+        }
         writer.line('public var requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?');
         writer.line('public var responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?');
         writer.line('private let encoder: JSONEncoder');
         writer.line('private let decoder: JSONDecoder');
         writer.blank();
+        const contextInitParam =
+            contextFields.length > 0 ? `, requestContext: RequestContext${contextRequired ? '' : ' = RequestContext()'}` : '';
         writer.block(
-            'public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil)',
+            `public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30${contextInitParam}, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil)`,
             () => {
                 writer.line('self.baseURL = baseURL');
                 writer.line('self.session = session');
                 writer.line('self.timeout = timeout');
+                if (contextFields.length > 0) {
+                    writer.line('self.requestContextHeaders = requestContext.headerFields');
+                }
                 writer.line('self.requestMiddleware = requestMiddleware');
                 writer.line('self.responseMiddleware = responseMiddleware');
                 writer.line('self.encoder = Kizuna.makeJSONEncoder()');
@@ -1570,10 +1619,14 @@ const emitClient = (
 
         if (groups.length > 0) {
             writer.blank();
+            const contextTupleType = contextFields.length > 0 ? ', [String: String]' : '';
+            const contextTupleValue = contextFields.length > 0 ? ', requestContextHeaders' : '';
             writer.block(
-                'func _kizunaContext() -> (URL, URLSession, JSONEncoder, JSONDecoder, (@Sendable (inout URLRequest) async throws -> Void)?, (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, TimeInterval)',
+                `func _kizunaContext() -> (URL, URLSession, JSONEncoder, JSONDecoder, (@Sendable (inout URLRequest) async throws -> Void)?, (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, TimeInterval${contextTupleType})`,
                 () => {
-                    writer.line('return (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout)');
+                    writer.line(
+                        `return (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout${contextTupleValue})`
+                    );
                 }
             );
 
@@ -1669,6 +1722,13 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
     const ownedTypeLookup = new Map(sharedTypes.filter((type) => ownedTypeMap.has(type.name)).map((type) => [type.name, type]));
     const topLevelSharedTypes = sharedTypes.filter((type) => !ownedTypeMap.has(type.name));
 
+    const requestContextFields: SwiftField[] = [];
+    for (const declaration of Object.values(contract.requestContext ?? {})) {
+        const headersSchema = (declaration as { headers?: z.ZodType }).headers;
+        if (!headersSchema) continue;
+        requestContextFields.push(...collectObjectFields(headersSchema, registry, 'RequestContext', undefined, 'headers', undefined));
+    }
+
     const context: EmitContext = {
         namespaceName,
         clientName,
@@ -1676,6 +1736,7 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
         fileLevelTypeNames,
         ownedTypeMap,
         registry,
+        requestContextFields,
     };
 
     writer.block(`public enum ${namespaceName}`, () => {

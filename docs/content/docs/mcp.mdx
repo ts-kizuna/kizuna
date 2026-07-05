@@ -99,7 +99,30 @@ Handlers called via MCP receive the same framework context as regular HTTP handl
 - **Hono** — handlers receive `c` (Hono Context)
 - **Next.js** — handlers receive `request`
 
-Auth middleware that reads headers and sets `req.user` works out of the box — MCP clients can send authorization headers when connecting to the endpoint.
+## Auth
+
+Secured tools authenticate via the headers of the MCP transport request. When an assistant calls one, the endpoint runs the [guards](/docs/auth) registered on `createApi`, exactly like the HTTP pipeline: each identity's credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context as usual. Nothing extra to wire — mounting a secured API gives you a secured MCP endpoint.
+
+Configure the MCP client to send the credential as a header on the connection. For example, with Claude Code:
+
+```sh
+claude mcp add --transport http my-api http://localhost:3000/mcp --header "Authorization: Bearer <token>"
+```
+
+For an `apiKey` identity, send the header the identity names (e.g. `x-workspace-token`) instead.
+
+When a guard denies the call — or an access gate fails — the tool call returns an error result (`isError: true`) carrying the status and detail, so the assistant sees exactly why it was refused:
+
+```json
+{
+    "status": 401,
+    "body": {
+        "detail": "Unauthorized"
+    }
+}
+```
+
+Public routes (`false` in the auth map) run without guards, credentials or not.
 
 ## Options
 

@@ -24,23 +24,26 @@ createClient(contract: Contract, config: ClientConfig): Client
 
 ## `ClientConfig`
 
-| Option        | Type                     | Required | Description                                                               |
-| ------------- | ------------------------ | -------- | ------------------------------------------------------------------------- |
-| `baseUrl`     | `string`                 | Yes      | Base URL prepended to every route path                                    |
-| `baseHeaders` | `Record<string, string>` | No       | Headers merged into every request                                         |
-| `credentials` | `RequestCredentials`     | No       | Passed as `credentials` to every `fetch` call                             |
-| `fetch`       | `typeof fetch`           | No       | Custom fetch implementation (e.g. for testing or a polyfill)              |
-| `onRequest`   | `(context) => void`      | No       | Callback before each request — receives `{ url, method, headers, route }` |
+| Option           | Type                     | Required | Description                                                                                                              |
+| ---------------- | ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `baseUrl`        | `string`                 | Yes      | Base URL prepended to every route path                                                                                   |
+| `baseHeaders`    | `Record<string, string>` | No       | Headers merged into every request                                                                                        |
+| `credentials`    | `RequestCredentials`     | No       | Passed as `credentials` to every `fetch` call                                                                            |
+| `fetch`          | `typeof fetch`           | No       | Custom fetch implementation (e.g. for testing or a polyfill)                                                             |
+| `onRequest`      | `(context) => void`      | No       | Callback before each request — receives `{ url, method, headers, route }`                                                |
+| `requestContext` | `Record<string, string>` | \*       | Header values for the contract's [request context](/docs/reference/create-request-context) — required when any header is |
 
 ## Returns
 
-A `Client` that mirrors the contract's route groups. Each route becomes a function accepting `{ params?, query?, body?, headers?, fetchOptions? }` and returning a `Promise` resolving to `{ status, body, headers }`.
+`createClient` returns the `Client`, mirroring the contract's route groups. Each route becomes a function accepting `{ params?, query?, body?, headers?, fetchOptions? }` and returning a `Promise` resolving to `{ status, body, headers }`.
 
 `params` is typed from the route's `pathParams` schema output when one is declared (matching the server-side handler), otherwise from the `:param` placeholders in the path.
 
 The response is a discriminated union over the route's declared status codes. Narrow on `status` to access the correctly typed `body`.
 
 ## Example
+
+When the contract secures routes with [identities](/docs/auth), send the credential in `baseHeaders`:
 
 ```ts
 import { createClient } from '@ts-kizuna/fetch';
@@ -72,7 +75,7 @@ if (result.status === 201) {
 Pass `fetchOptions` to customize individual requests:
 
 ```ts
-const { body } = await apiClient.users.listUsers({
+const { body } = await client.users.listUsers({
     query: {
         page: 1,
     },

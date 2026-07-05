@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags, type ValidationError } from '@ts-kizuna/core';
+import { kizuna, createTags, createRequestContext, type ValidationError } from '@ts-kizuna/core';
 import { createClient } from './client.js';
 
 const { k } = kizuna({
@@ -610,4 +610,107 @@ test('coerced pathParams reject values the output type does not accept', () => {
 
 test('routes without a pathParams schema keep template-derived params', () => {
     expectTypeOf<Parameters<typeof client.getUser>[0]['params']>().toEqualTypeOf<{ id: string }>();
+});
+
+const analyticsContext = createRequestContext({
+    headers: z.object({
+        'x-session-id': z.string().optional(),
+    }),
+    context: z.object({
+        sessionId: z.string().nullable(),
+    }),
+});
+
+const tenantContext = createRequestContext({
+    headers: z.object({
+        'x-tenant': z.string(),
+    }),
+    context: z.object({
+        tenantId: z.string(),
+    }),
+});
+
+const { k: optionalCtxK } = kizuna({
+    requestContext: {
+        analytics: analyticsContext,
+    },
+});
+
+const optionalCtxContract = optionalCtxK.contract({
+    routes: {
+        users: optionalCtxK.routes({
+            listUsers: {
+                method: 'GET',
+                path: '/users',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        }),
+    },
+});
+
+const { k: requiredCtxK } = kizuna({
+    requestContext: {
+        analytics: analyticsContext,
+        tenant: tenantContext,
+    },
+});
+
+const requiredCtxContract = requiredCtxK.contract({
+    routes: {
+        users: requiredCtxK.routes({
+            listUsers: {
+                method: 'GET',
+                path: '/users',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        }),
+    },
+});
+
+test('requestContext config is optional when every declared header is optional', () => {
+    createClient(optionalCtxContract, {
+        baseUrl: 'https://api.example.com',
+    });
+    createClient(optionalCtxContract, {
+        baseUrl: 'https://api.example.com',
+        requestContext: {
+            'x-session-id': 's1',
+        },
+    });
+    createClient(optionalCtxContract, {
+        baseUrl: 'https://api.example.com',
+        requestContext: {
+            // @ts-expect-error unknown context header
+            'x-unknown': 'nope',
+        },
+    });
+});
+
+test('requestContext config is required when a declared header is required', () => {
+    createClient(requiredCtxContract, {
+        baseUrl: 'https://api.example.com',
+        requestContext: {
+            'x-tenant': 't1',
+            'x-session-id': 's1',
+        },
+    });
+    // @ts-expect-error requestContext is required: x-tenant must be sent
+    createClient(requiredCtxContract, {
+        baseUrl: 'https://api.example.com',
+    });
+    createClient(requiredCtxContract, {
+        baseUrl: 'https://api.example.com',
+        // @ts-expect-error x-tenant is required
+        requestContext: {
+            'x-session-id': 's1',
+        },
+    });
 });

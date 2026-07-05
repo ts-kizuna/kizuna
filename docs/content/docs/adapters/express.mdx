@@ -14,7 +14,7 @@ description: Mount a ts-kizuna API on an Express 5 application.
 The standard setup uses three functions:
 
 - `createRouter` — bind typed implementations to the contract
-- `createApi` — combine your contract, router, and middleware into an API object
+- `createApi` — combine your contract, router, and guards into an API object
 - `createExpressEndpoints` — mount the API on an Express app
 
 ```ts title="src/lib/router.ts"
@@ -102,75 +102,28 @@ getUser: async ({ params, req, res }) => {
 },
 ```
 
-## Middleware
+## Guards
 
-Per-route middleware is a plain Express `RequestHandler`. Declare which routes it runs on with a `middleware` map on `createApi`, shaped like your routes. Authentication is just middleware that attaches data to `req`, which handlers then read.
-
-### Writing a guard
-
-A guard is the common case: a middleware that allows or rejects a request. `createGuard` wraps that check so you skip the `next()` / `res.json()` boilerplate — call `deny(status, detail)` to reject, return to allow.
+One guard per identity. The credential arrives extracted and typed, alongside the native `req`/`res` — see the [Auth guide](/docs/auth).
 
 ```ts title="src/lib/guards.ts"
 import { createGuard } from '@ts-kizuna/express';
+import { contract } from '@shared/contract';
 
-export const authenticate = createGuard(({ req, deny }) => {
-    const session = getSession(req);
+export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {
+    const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
     }
-    req.userId = session.userId;
-});
-
-export const requireAdmin = createGuard(({ req, deny }) => {
-    if (req.userRole !== 'admin') {
-        return deny(403, 'Forbidden');
-    }
-});
-
-export const requireMembership = createGuard(async ({ req, deny }) => {
-    const membership = await checkMembership(req.userId, req.params.id);
-    if (!membership) {
-        return deny(403, 'Forbidden');
-    }
-    req.member = membership;
+    return {
+        userId: session.userId,
+    };
 });
 ```
 
-### Wiring middleware to routes
+## Middleware
 
-The map mirrors your routes. Every top-level group key must be present — use `[]` for public groups.
-
-```ts title="src/lib/middleware.ts"
-import { createMiddleware } from '@ts-kizuna/express';
-import { contract } from '@shared/contract';
-import { authenticate, requireAdmin, requireMembership } from './guards';
-
-export const middleware = createMiddleware(contract, {
-    // Group-level: applies to all routes under "users"
-    users: [authenticate],
-    // Group default with per-route override
-    members: {
-        '*': [authenticate, requireMembership],
-        listMembers: [authenticate],
-    },
-    // Multiple middleware compose left to right
-    admin: [authenticate, requireAdmin],
-    // Explicit public group
-    health: [],
-});
-```
-
-### Plugging into the API
-
-```ts title="src/lib/server.ts"
-import { createApi } from '@ts-kizuna/express';
-
-export const api = createApi({
-    contract,
-    router,
-    middleware,
-});
-```
+For request-scoped values handlers need, use [`createRequestContext`](/docs/reference/create-request-context). For everything else — rate limiting, multipart parsing — use Express's own `app.use`. Authentication belongs in [guards](#guards).
 
 ## Options
 
@@ -184,18 +137,16 @@ createExpressEndpoints(api, app, {
 | -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `responseValidation` | `false` | Validate handler return values against response schemas — surfaces as 500 on mismatch. Enable in development.                                                                              |
 | `formatError`        | —       | Reshape error (`>= 400`) response bytes for migrating clients — most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
-| `globalMiddleware`   | `[]`    | **Deprecated.** Use the `middleware` map via `createApi` instead.                                                                                                                          |
 
 ## Type-safe request properties
 
-If your middleware sets custom properties on `req`, use declaration merging to extend the Express `Request` interface:
+Auth data doesn't need request mutation — guards return typed context that handlers receive directly. But if non-auth middleware sets custom properties on `req`, such as a request id, use declaration merging to extend the Express `Request` interface:
 
 ```ts title="types/express.d.ts"
 declare global {
     namespace Express {
         interface Request {
-            userId: string;
-            sessionId?: string | null;
+            requestId: string;
         }
     }
 }
@@ -205,7 +156,7 @@ With the augmentation in place, both middleware and handlers are fully typed:
 
 ```ts
 getUser: async ({ params, req }) => {
-    console.log(req.userId);
+    console.log(req.requestId);
     // ...
 },
 ```
@@ -236,5 +187,4 @@ createExpressEndpoints(api, app);
 
 - [`createRouter`](/docs/reference/create-router)
 - [`createApi`](/docs/reference/create-api)
-- [`createMiddleware`](/docs/reference/create-middleware)
 - [`createGuard`](/docs/reference/create-guard)

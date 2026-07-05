@@ -1,9 +1,9 @@
 ---
 title: createApi
-description: Bind a contract to its router and per-route middleware, producing an API object an adapter can mount.
+description: Bind a contract to its router and a guard per identity, producing an API object an adapter can mount.
 ---
 
-Bind a contract to its router — and any per-route middleware — producing the API object an adapter mounts.
+Bind a contract to its router — plus a guard per identity — producing the API object an adapter mounts.
 
 <AdapterTabs functionName="createApi" />
 
@@ -13,21 +13,28 @@ Bind a contract to its router — and any per-route middleware — producing the
 createApi({
     contract: Contract;
     router: Router;
-    middleware?: MiddlewareMap;
+    guards?: Record<string, Guard>;
 }): Api
 ```
 
-| Field        | Type            | Required | Description                                                                        |
-| ------------ | --------------- | -------- | ---------------------------------------------------------------------------------- |
-| `contract`   | `Contract`      | Yes      | The contract from [`k.contract`](/docs/reference/kizuna)                           |
-| `router`     | `Router`        | Yes      | The handler tree from [`createRouter`](/docs/reference/create-router)              |
-| `middleware` | `MiddlewareMap` | No       | Per-route middleware (see [`createMiddleware`](/docs/reference/create-middleware)) |
+| Field            | Type                    | Required | Description                                                                                          |
+| ---------------- | ----------------------- | -------- | ---------------------------------------------------------------------------------------------------- |
+| `contract`       | `Contract`              | Yes      | The contract from [`k.contract`](/docs/reference/kizuna)                                             |
+| `router`         | `Router`                | Yes      | The handler tree from [`createRouter`](/docs/reference/create-router)                                |
+| `guards`         | `Record<string, Guard>` | No       | One guard per identity, keyed by identity name (see [`createGuard`](/docs/reference/create-guard))   |
+| `requestContext` | `Record<string, Fn>`    | \*       | One resolver per declared key (see [`createRequestContext`](/docs/reference/create-request-context)) |
 
-The Next.js adapter also accepts an `onError` callback alongside `router` and `middleware`.
+The Next.js adapter also accepts an `onError` callback alongside `router`.
+
+### `guards`
+
+`requestContext` is keyed by the names declared on `kizuna` — one [resolver](/docs/reference/create-request-context) each, required when the contract declares any.
+
+`guards` is keyed by the identity names registered on [`kizuna`](/docs/reference/kizuna). When provided, it must cover every identity — one guard each, no route-by-route wiring. kizuna attaches each guard to the routes the contract's `auth` map secures with that identity, and the guard's return value reaches those handlers under the identity's name.
 
 ## Returns
 
-An API object carrying the contract, its router, and middleware. Mount it with the adapter's mount verb:
+An API object carrying the contract, its router, and guards. Mount it with the adapter's mount verb:
 
 | Adapter | Mount                                                              |
 | ------- | ------------------------------------------------------------------ |
@@ -38,18 +45,18 @@ An API object carrying the contract, its router, and middleware. Mount it with t
 
 ## Example
 
-```ts title="src/lib/server.ts"
+```ts title="src/lib/api.ts"
 import { createApi } from '@ts-kizuna/express';
 import { contract } from './contract';
 import { router } from './lib/router';
-import { requireUser } from './lib/guards';
+import { requireUser, requireMember } from './lib/guards';
 
 export const api = createApi({
     contract,
     router,
-    middleware: {
-        users: [requireUser],
-        health: [],
+    guards: {
+        user: requireUser,
+        member: requireMember,
     },
 });
 ```

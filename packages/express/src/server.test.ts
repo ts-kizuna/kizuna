@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import request from 'supertest';
 import { z } from 'zod';
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { createApi, createExpressEndpoints, createMiddleware, createRouter } from './server.js';
+import { createApi, createExpressEndpoints, createGuard, createMiddleware, createRouter } from './server.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -208,89 +208,6 @@ describe('Express integration', () => {
         const response = await request(app).get('/users/missing');
         expect(response.status).toBe(404);
         expect(response.body.detail).toBeDefined();
-    });
-});
-
-describe('Express integration — globalMiddleware', () => {
-    const globalContractRoutes = k.routes('api', {
-        getResource: {
-            method: 'GET',
-            path: '/resources/:id',
-            responses: {
-                200: z.object({
-                    id: z.string(),
-                }),
-                401: z.object({
-                    message: z.string(),
-                }),
-            },
-        },
-    });
-
-    const globalContract = k.contract({
-        routes: globalContractRoutes,
-    });
-
-    it('runs globalMiddleware after kizunaRoute is set and before the handler', async () => {
-        const app = express();
-        app.use(express.json());
-
-        const routesSeen: string[] = [];
-
-        const api = createApi({
-            contract: globalContract,
-            router: {
-                getResource: ({ params }) => ({
-                    status: 200,
-                    body: {
-                        id: params.id,
-                    },
-                }),
-            },
-        });
-
-        createExpressEndpoints(api, app, {
-            globalMiddleware: [
-                (req, _res, next) => {
-                    routesSeen.push(req.kizunaRoute.path);
-                    next();
-                },
-            ],
-        });
-
-        await request(app).get('/resources/42');
-        expect(routesSeen).toEqual(['/resources/:id']);
-    });
-
-    it('globalMiddleware can short-circuit the request', async () => {
-        const app = express();
-        app.use(express.json());
-
-        const api = createApi({
-            contract: globalContract,
-            router: {
-                getResource: ({ params }) => ({
-                    status: 200,
-                    body: {
-                        id: params.id,
-                    },
-                }),
-            },
-        });
-
-        createExpressEndpoints(api, app, {
-            globalMiddleware: [
-                (_req, res, _next) => {
-                    res.status(401).json({
-                        message: 'Unauthorized',
-                    });
-                },
-            ],
-        });
-
-        const response = await request(app).get('/resources/1');
-        expect(response.status).toBe(401);
-        expect(response.body.message).toBe('Unauthorized');
     });
 });
 
@@ -749,6 +666,201 @@ describe('createRouter — accepts a contract or a bare route group', () => {
     });
 });
 
+describe('guards', () => {
+    const user = createIdentity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    });
+
+    const member = createIdentity.apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            workspaceUserId: z.string(),
+        }),
+        access: z.object({
+            role: z.enum(['owner', 'admin']),
+        }),
+    });
+
+    const { k: securedK } = kizuna({
+        identities: {
+            user,
+            member,
+        },
+    });
+
+    const securedRoutes = securedK.routes({
+        publicRoute: {
+            method: 'GET',
+            path: '/public',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+        whoAmI: {
+            method: 'GET',
+            path: '/who-am-i',
+            responses: {
+                200: z.object({
+                    userId: z.string(),
+                }),
+            },
+        },
+        ownerOnly: {
+            method: 'GET',
+            path: '/owner-only',
+            responses: {
+                200: z.object({
+                    role: z.string(),
+                }),
+            },
+        },
+        both: {
+            method: 'GET',
+            path: '/both',
+            responses: {
+                200: z.object({
+                    userId: z.string(),
+                    workspaceUserId: z.string(),
+                }),
+            },
+        },
+    });
+
+    const securedContract = securedK.contract({
+        routes: {
+            api: securedRoutes,
+        },
+        auth: {
+            api: {
+                '*': false,
+                whoAmI: 'user',
+                ownerOnly: {
+                    member: {
+                        role: 'owner',
+                    },
+                },
+                both: {
+                    user: true,
+                    member: true,
+                },
+            },
+        },
+    });
+
+    const sessions = new Map([['tok_ada', { userId: '1' }]]);
+    const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | 'admin' }>([
+        ['wst_owner', { workspaceUserId: '1', role: 'owner' }],
+        ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
+    ]);
+
+    const requireUser = createGuard(securedContract, 'user', ({ bearer, deny }) => {
+        const session = bearer ? sessions.get(bearer.token) : undefined;
+        if (!session) return deny(401, 'Unauthorized');
+        return session;
+    });
+
+    const requireMember = createGuard(securedContract, 'member', ({ apiKey, deny }) => {
+        const membership = apiKey ? memberships.get(apiKey.value) : undefined;
+        if (!membership) return deny(403, 'Forbidden');
+        return membership;
+    });
+
+    const makeApp = () => {
+        const app = express();
+        app.use(express.json());
+        const api = createApi({
+            contract: securedContract,
+            router: {
+                api: {
+                    publicRoute: () => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    }),
+                    whoAmI: ({ user: currentUser }) => ({
+                        status: 200,
+                        body: {
+                            userId: currentUser.userId,
+                        },
+                    }),
+                    ownerOnly: ({ member: currentMember }) => ({
+                        status: 200,
+                        body: {
+                            role: currentMember.role,
+                        },
+                    }),
+                    both: ({ user: currentUser, member: currentMember }) => ({
+                        status: 200,
+                        body: {
+                            userId: currentUser.userId,
+                            workspaceUserId: currentMember.workspaceUserId,
+                        },
+                    }),
+                },
+            },
+            guards: {
+                user: requireUser,
+                member: requireMember,
+            },
+        });
+        createExpressEndpoints(api, app);
+        return app;
+    };
+
+    it('serves a public route without credentials', async () => {
+        const response = await request(makeApp()).get('/public');
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({
+            ok: true,
+        });
+    });
+
+    it('denies a secured route without a credential as problem details', async () => {
+        const response = await request(makeApp()).get('/who-am-i');
+        expect(response.status).toBe(401);
+        expect(response.headers['content-type']).toContain('application/problem+json');
+        expect(response.body.detail).toBe('Unauthorized');
+    });
+
+    it('passes the guard context to the handler', async () => {
+        const response = await request(makeApp()).get('/who-am-i').set('authorization', 'Bearer tok_ada');
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({
+            userId: '1',
+        });
+    });
+
+    it('rejects a gated route when the access field is not permitted', async () => {
+        const response = await request(makeApp()).get('/owner-only').set('x-workspace-token', 'wst_admin');
+        expect(response.status).toBe(403);
+    });
+
+    it('allows a gated route when the access field is permitted', async () => {
+        const response = await request(makeApp()).get('/owner-only').set('x-workspace-token', 'wst_owner');
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({
+            role: 'owner',
+        });
+    });
+
+    it('requires every identity on a multi-identity route', async () => {
+        const missingMember = await request(makeApp()).get('/both').set('authorization', 'Bearer tok_ada');
+        expect(missingMember.status).toBe(403);
+
+        const complete = await request(makeApp()).get('/both').set('authorization', 'Bearer tok_ada').set('x-workspace-token', 'wst_owner');
+        expect(complete.status).toBe(200);
+        expect(complete.body).toEqual({
+            userId: '1',
+            workspaceUserId: '1',
+        });
+    });
+});
 describe('Express integration — middleware map', () => {
     const middlewareContractRoutes = k.routes('api', {
         publicRoute: {

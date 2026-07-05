@@ -2,10 +2,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import express from 'express';
 import { z } from 'zod';
 import type { Server, AddressInfo } from 'node:net';
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createClient, type Client } from '@ts-kizuna/fetch';
-import { createApi, createExpressEndpoints } from './server.js';
+import { createApi, createExpressEndpoints, createGuard } from './server.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -219,5 +219,110 @@ describe('end-to-end: response headers', () => {
         });
         expect(result.status).toBe(200);
         expect(result.headers['x-request-id']).toBe('trace-e2e-999');
+    });
+});
+
+const userIdentity = createIdentity.bearer({
+    context: z.object({
+        userId: z.string(),
+    }),
+});
+
+const { k: securedK } = kizuna({
+    identities: {
+        user: userIdentity,
+    },
+});
+
+const securedRoutes = securedK.routes({
+    whoAmI: {
+        method: 'GET',
+        path: '/who-am-i',
+        responses: {
+            200: z.object({
+                userId: z.string(),
+            }),
+            401: ProblemDetailsSchema,
+        },
+    },
+});
+
+const securedContract = securedK.contract({
+    routes: {
+        api: securedRoutes,
+    },
+    auth: {
+        api: 'user',
+    },
+});
+
+describe('end-to-end: typed client → secured Express route', () => {
+    let server: Server;
+    let baseUrl: string;
+
+    beforeAll(async () => {
+        const app = express();
+        app.use(express.json());
+
+        const requireUser = createGuard(securedContract, 'user', ({ bearer, deny }) => {
+            if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
+            return {
+                userId: '1',
+            };
+        });
+
+        const api = createApi({
+            contract: securedContract,
+            router: {
+                api: {
+                    whoAmI: ({ user }) => ({
+                        status: 200,
+                        body: {
+                            userId: user.userId,
+                        },
+                    }),
+                },
+            },
+            guards: {
+                user: requireUser,
+            },
+        });
+
+        createExpressEndpoints(api, app);
+
+        await new Promise<void>((resolve) => {
+            server = app.listen(0, () => resolve());
+        });
+        const address = server.address() as AddressInfo;
+        baseUrl = `http://localhost:${address.port}`;
+    });
+
+    afterAll(() => {
+        server?.close();
+    });
+
+    it('round-trips with the credential in baseHeaders', async () => {
+        const client = createClient(securedContract, {
+            baseUrl,
+            baseHeaders: {
+                authorization: 'Bearer tok_ada',
+            },
+        });
+        const response = await client.api.whoAmI();
+        expect(response.status).toBe(200);
+        if (response.status === 200) {
+            expect(response.body.userId).toBe('1');
+        }
+    });
+
+    it('surfaces the typed 401 without a credential', async () => {
+        const client = createClient(securedContract, {
+            baseUrl,
+        });
+        const response = await client.api.whoAmI();
+        expect(response.status).toBe(401);
+        if (response.status === 401) {
+            expect(response.body.detail).toBe('Unauthorized');
+        }
     });
 });

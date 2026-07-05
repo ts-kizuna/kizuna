@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import type { Routes } from '@ts-kizuna/core';
-import { type ApiWithRouter } from '@ts-kizuna/core/adapter';
+import { type ApiWithRouter, headersToObject } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
 interface AppLike {
@@ -59,6 +59,7 @@ export const createMcpEndpoint = (api: Routes & ApiWithRouter, app: AppLike, opt
             handlerContext: {
                 c,
             },
+            credentialHeaders: headersToObject(c.req.raw.headers),
         });
         const transport = new WebStandardStreamableHTTPServerTransport({
             sessionIdGenerator: undefined,

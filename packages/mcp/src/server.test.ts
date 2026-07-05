@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags } from '@ts-kizuna/core';
-import { createApi as coreCreateApi, ROUTER_META } from '@ts-kizuna/core/adapter';
+import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
+import { createApi as coreCreateApi, ROUTER_META, GUARDS_META, SCHEMES_META, type GuardDeny } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildToolDefinitions, createMcpServer } from './server.js';
@@ -204,7 +204,7 @@ const baseOptions = {
     version: '1.0.0',
 };
 
-const connectMcpClient = async (testApi = api, options?: Parameters<typeof createMcpServer>[1]) => {
+const connectMcpClient = async (testApi: Parameters<typeof createMcpServer>[0] = api, options?: Parameters<typeof createMcpServer>[1]) => {
     const server = createMcpServer(testApi, {
         ...baseOptions,
         ...options,
@@ -644,6 +644,171 @@ describe('MCP server e2e', () => {
             role: 'admin',
         });
 
+        await close();
+    });
+});
+
+describe('MCP server — guards', () => {
+    const user = createIdentity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    });
+
+    const { k: securedK } = kizuna({
+        identities: {
+            user,
+        },
+    });
+
+    const securedRoutes = securedK.routes({
+        publicRoute: {
+            method: 'GET',
+            path: '/public',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+        whoAmI: {
+            method: 'GET',
+            path: '/who-am-i',
+            responses: {
+                200: z.object({
+                    userId: z.string(),
+                }),
+            },
+        },
+    });
+
+    const securedContract = securedK.contract({
+        routes: {
+            api: securedRoutes,
+        },
+        auth: {
+            api: {
+                '*': false,
+                whoAmI: 'user',
+            },
+        },
+    });
+
+    const makeSecuredApi = () => {
+        const spec = coreCreateApi(securedContract.routes);
+        return Object.assign(spec, {
+            [ROUTER_META]: {
+                api: {
+                    publicRoute: () => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    }),
+                    whoAmI: (args: Record<string, unknown>) => ({
+                        status: 200,
+                        body: {
+                            userId: (args.user as { userId: string }).userId,
+                        },
+                    }),
+                },
+            },
+            [GUARDS_META]: {
+                user: ({ bearer, deny }: { bearer: { token: string } | null; deny: GuardDeny }) => {
+                    if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
+                    return {
+                        userId: '1',
+                    };
+                },
+            },
+            [SCHEMES_META]: securedContract.securitySchemes,
+        }) as Parameters<typeof createMcpServer>[0];
+    };
+
+    it('keeps secured routes in the tool list', async () => {
+        const { client, close } = await connectMcpClient(makeSecuredApi());
+        const { tools } = await client.listTools();
+        const names = tools.map((tool) => tool.name);
+        expect(names).toContain('api.whoAmI');
+        expect(names).toContain('api.publicRoute');
+        await close();
+    });
+
+    it('denies a secured tool call without a credential', async () => {
+        const { client, close } = await connectMcpClient(makeSecuredApi());
+        const result = await client.callTool({
+            name: 'api.whoAmI',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(result.isError).toBe(true);
+        expect(parsed.status).toBe(401);
+        expect(parsed.body.detail).toBe('Unauthorized');
+        await close();
+    });
+
+    it('runs the guard with the transport credential and passes its context to the handler', async () => {
+        const { client, close } = await connectMcpClient(makeSecuredApi(), {
+            credentialHeaders: {
+                authorization: 'Bearer tok_ada',
+            },
+        });
+        const result = await client.callTool({
+            name: 'api.whoAmI',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(parsed.status).toBe(200);
+        expect(parsed.body).toEqual({
+            userId: '1',
+        });
+        await close();
+    });
+
+    it('serves public tools without guards', async () => {
+        const { client, close } = await connectMcpClient(makeSecuredApi());
+        const result = await client.callTool({
+            name: 'api.publicRoute',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(parsed.status).toBe(200);
+        await close();
+    });
+
+    it('errors clearly when a secured tool has no registered guard', async () => {
+        const spec = coreCreateApi(securedContract.routes);
+        const apiWithoutGuards = Object.assign(spec, {
+            [ROUTER_META]: {
+                api: {
+                    publicRoute: () => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    }),
+                    whoAmI: () => ({
+                        status: 200,
+                        body: {
+                            userId: '1',
+                        },
+                    }),
+                },
+            },
+        }) as Parameters<typeof createMcpServer>[0];
+        const { client, close } = await connectMcpClient(apiWithoutGuards);
+        const result = await client.callTool({
+            name: 'api.whoAmI',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(result.isError).toBe(true);
+        expect(parsed.status).toBe(500);
+        expect(parsed.body.detail).toContain('No guard registered');
         await close();
     });
 });

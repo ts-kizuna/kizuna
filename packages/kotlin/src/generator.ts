@@ -100,6 +100,8 @@ interface EmitContext {
     operationTypeMap: Map<string, string>;
     fileLevelTypeNames: Set<string>;
     ownedTypeMap: Map<string, string>;
+    // Header fields from the contract's request context declarations; empty when none.
+    requestContextFields: KotlinField[];
 }
 
 const buildRouteMethod = (
@@ -1099,6 +1101,10 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
         writer.line(`    .method(${stringLiteral(method.method)}, null)`);
     }
 
+    if (context.requestContextFields.length > 0) {
+        writer.line('for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)');
+    }
+
     for (const field of method.headers) {
         const accessor = groupMemberAccessor('headers', field);
         const setHeader = (sourceExpression: string): void => {
@@ -1250,7 +1256,7 @@ const emitSubClientMethod = (writer: KotlinWriter, method: RouteMethod, context:
 const emitSubClientClass = (writer: KotlinWriter, group: RouteGroup, clientName: string, context: EmitContext): void => {
     writer.blank();
     writer.block(
-        `class ${group.className}(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?)`,
+        `class ${group.className}(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?)`,
         () => {
             for (const method of group.methods) {
                 writer.blank();
@@ -1323,10 +1329,35 @@ const emitClient = (
 
     const usesMultipart = allMethods.some((method) => method.body?.kind === 'multipart');
 
+    const contextFields = context.requestContextFields;
+    const contextRequired = contextFields.some((field) => !field.optional);
+    const contextParam = contextFields.length > 0 ? `requestContext: RequestContext${contextRequired ? '' : ' = RequestContext()'}, ` : '';
+
     writer.blank();
     writer.block(
-        `class ${clientName}(private val baseUrl: String, private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null)`,
+        `class ${clientName}(private val baseUrl: String, ${contextParam}private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null)`,
         () => {
+            if (contextFields.length > 0) {
+                writer.blank();
+                writer.line("/** Values sent as headers on every request, from the contract's request context. */");
+                emitConstructorClass(
+                    writer,
+                    'data class RequestContext',
+                    contextFields.map((field) => `val ${escapeKeyword(field.name)}: ${field.type}${field.optional ? ' = null' : ''}`)
+                );
+                writer.blank();
+                writer.block('private val requestContextHeaders: Map<String, String> = buildMap', () => {
+                    for (const field of contextFields) {
+                        if (field.optional) {
+                            writer.line(
+                                `if (requestContext.${escapeKeyword(field.name)} != null) put(${stringLiteral(field.wireName)}, requestContext.${escapeKeyword(field.name)}!!)`
+                            );
+                        } else {
+                            writer.line(`put(${stringLiteral(field.wireName)}, requestContext.${escapeKeyword(field.name)})`);
+                        }
+                    }
+                });
+            }
             if (usesMultipart) {
                 writer.blank();
                 emitConstructorClass(writer, 'data class MultipartFile', [
@@ -1371,7 +1402,7 @@ const emitClient = (
                 for (const group of groups) {
                     writer.blank();
                     writer.line(
-                        `val ${escapeKeyword(group.propertyName)} = ${group.className}(client, baseUrl, json, requestInterceptor, responseInterceptor)`
+                        `val ${escapeKeyword(group.propertyName)} = ${group.className}(client, baseUrl, json, ${contextFields.length > 0 ? 'requestContextHeaders' : 'emptyMap()'}, requestInterceptor, responseInterceptor)`
                     );
                 }
             }
@@ -1459,12 +1490,20 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     const ownedTypeLookup = new Map(sharedTypes.filter((type) => ownedTypeMap.has(type.name)).map((type) => [type.name, type]));
     const topLevelSharedTypes = sharedTypes.filter((type) => !ownedTypeMap.has(type.name) && !registry.isSealedVariantPayload(type.name));
 
+    const requestContextFields: KotlinField[] = [];
+    for (const declaration of Object.values(contract.requestContext ?? {})) {
+        const headersSchema = (declaration as { headers?: z.ZodType }).headers;
+        if (!headersSchema) continue;
+        requestContextFields.push(...collectObjectFields(headersSchema, registry, 'RequestContext', undefined, 'headers', undefined));
+    }
+
     const context: EmitContext = {
         namespaceName,
         clientName,
         operationTypeMap,
         fileLevelTypeNames,
         ownedTypeMap,
+        requestContextFields,
     };
 
     writer.block(`object ${namespaceName}`, () => {

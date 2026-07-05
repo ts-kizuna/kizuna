@@ -4,7 +4,7 @@ import { createApi, createExpressEndpoints } from '@ts-kizuna/express';
 import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '@ts-kizuna-demo/shared';
 
-import { router, requireUser, requireMember } from './lib/server';
+import { router, requireUser, requireMember, captureAnalytics } from './lib/server';
 
 const app = express();
 app.use(express.json());
@@ -12,18 +12,12 @@ app.use(express.json());
 const api = createApi({
     contract,
     router,
-    middleware: {
-        users: [],
-        health: [],
-        notifications: [],
-        members: {
-            '*': [requireMember],
-            listMembers: [requireUser],
-        },
-        workspace: {
-            '*': [requireMember],
-            transfer: [requireUser, requireMember],
-        },
+    guards: {
+        user: requireUser,
+        member: requireMember,
+    },
+    requestContext: {
+        analytics: captureAnalytics,
     },
 });
 
@@ -39,20 +33,6 @@ const openApiSpec = generateOpenApi(contract, {
             description: 'Local express demo',
         },
     ],
-    security: [
-        {
-            bearerAuth: [],
-        },
-    ],
-    components: {
-        securitySchemes: {
-            bearerAuth: {
-                type: 'http',
-                scheme: 'bearer',
-                bearerFormat: 'JWT',
-            },
-        },
-    },
     setOperationId: true,
 });
 

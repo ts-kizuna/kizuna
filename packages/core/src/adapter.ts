@@ -1,5 +1,7 @@
 import type { z } from 'zod';
 import type { RouteDefinition, Routes, Method } from './types.js';
+import type { SecurityScheme } from './security-scheme.js';
+import type { Credential } from './identity.js';
 import {
     type RouteHandler,
     type Router,
@@ -36,10 +38,86 @@ export class ResponseValidationError extends Error {
 
 export const API_META: unique symbol = Symbol('ts-kizuna.api.meta');
 export const ROUTER_META: unique symbol = Symbol('ts-kizuna.router');
+export const GUARDS_META: unique symbol = Symbol('ts-kizuna.guards');
+export const SCHEMES_META: unique symbol = Symbol('ts-kizuna.schemes');
+export const REQUEST_CONTEXT_META: unique symbol = Symbol('ts-kizuna.request-context');
+/**
+ * @deprecated Define auth with identities + the contract's `auth` map and pass
+ * `guards` to `createApi`. See /docs/auth.
+ */
 export const MIDDLEWARE_META: unique symbol = Symbol('ts-kizuna.middleware');
 
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter = ApiDefinition & { readonly [ROUTER_META]: Record<string, unknown> };
+
+/**
+ * The marker a guard's `deny(status, detail)` returns. Distinguishes a denial
+ * from the context object a passing guard returns.
+ */
+const GUARD_DENY: unique symbol = Symbol('ts-kizuna.guard.deny');
+
+/**
+ * The result of `deny(status, detail)` inside a guard — short-circuits the
+ * request with an RFC 9457 problem details response of the given status.
+ */
+export interface GuardDenial {
+    readonly [GUARD_DENY]: true;
+    status: number;
+    detail: string;
+}
+
+/**
+ * Reject the request from inside a guard.
+ */
+export type GuardDeny = (status: number, detail: string) => GuardDenial;
+
+export const guardDeny: GuardDeny = (status, detail) => ({
+    [GUARD_DENY]: true,
+    status,
+    detail,
+});
+
+export const isGuardDenial = (value: unknown): value is GuardDenial => typeof value === 'object' && value !== null && GUARD_DENY in value;
+
+/**
+ * The runtime behavior of a guard. It receives one object: the adapter's handler
+ * context (e.g. `req`/`res`) plus the credential the identity's method extracted
+ * from the request (or `null` if absent), a `deny` helper, and the matched
+ * route's required `scopes`. It returns the context the scheme provides (keyed
+ * under the identity's name in the handler args) or `deny(...)` to reject.
+ */
+export type GuardRun<HandlerContext = unknown> = (
+    args: HandlerContext &
+        Credential & {
+            params: Record<string, string>;
+            deny: GuardDeny;
+            scopes: string[];
+        }
+) => Promise<Record<string, unknown> | GuardDenial | void> | Record<string, unknown> | GuardDenial | void;
+
+/**
+ * Guards keyed by the security scheme name they satisfy. A route's resolved
+ * `security` selects which guards run before its handler.
+ */
+export type GuardMap<HandlerContext = unknown> = Record<string, GuardRun<HandlerContext>>;
+
+/**
+ * The runtime behavior of a request context resolver. It runs on every route
+ * before the guards, receives the handler context plus the matched route's
+ * `params`, and returns the value handlers read under the context's name. It
+ * never denies a request.
+ */
+export type RequestContextRun<HandlerContext = unknown> = (
+    args: HandlerContext & {
+        params: Record<string, string>;
+        headers: Record<string, string | string[] | undefined>;
+    }
+) => Promise<unknown> | unknown;
+
+/**
+ * Request context resolvers keyed by the name they were declared under on `kizuna`.
+ */
+export type RequestContextMap<HandlerContext = unknown> = Record<string, RequestContextRun<HandlerContext>>;
 
 const assertNoDuplicateRoutes = (routes: Routes): void => {
     const seen = new Map<string, { routeKey: string; path: string }>();
@@ -130,6 +208,11 @@ export type AdapterResult =
           routeKey: string;
       }
     | {
+          kind: 'guard-denied';
+          status: number;
+          detail: string;
+      }
+    | {
           kind: 'handler-error';
           routeKey: string;
           route: RouteDefinition;
@@ -166,9 +249,129 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
     router: Router<TRoutes, HandlerContext>;
     request: AdapterRequest<NativeRequest>;
     responseContext: ResponseContext;
+    /**
+     * Guards keyed by security scheme name. The matched route's resolved
+     * `security` selects which run before its handler; their returned context is
+     * merged into the handler args.
+     */
+    guards?: GuardMap<HandlerContext>;
+    /**
+     * The contract's identities keyed by name. The runtime extracts each required
+     * scheme's credential from the request (per its declared location) and passes
+     * it to that scheme's guard.
+     */
+    schemes?: Record<string, SecurityScheme>;
+    /**
+     * Request context resolvers keyed by name. Each runs on every route before
+     * the guards; its value lands in the handler args under its name.
+     */
+    requestContext?: RequestContextMap<HandlerContext>;
     basePath?: string;
     responseValidation?: boolean;
 }
+
+/**
+ * Expand a route's resolved `security` into the concrete (scheme, scopes) pairs
+ * whose guards must run before the handler.
+ */
+export const resolveSecurityRequirements = (route: RouteDefinition): Array<{ scheme: string; scopes: string[] }> => {
+    const requirements: Array<{ scheme: string; scopes: string[] }> = [];
+    for (const entry of route.security ?? []) {
+        if (typeof entry === 'string') {
+            requirements.push({
+                scheme: entry,
+                scopes: [],
+            });
+            continue;
+        }
+        for (const [scheme, scopes] of Object.entries(entry)) {
+            requirements.push({
+                scheme,
+                scopes: [...(scopes ?? [])],
+            });
+        }
+    }
+    return requirements;
+};
+
+/**
+ * Read a raw header value as a single string: the first entry of an array
+ * header, `undefined` when absent. For guards and request context resolvers on
+ * adapters that expose raw header records.
+ */
+export const getHeaderValue = (value: unknown): string | undefined => {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+    return undefined;
+};
+
+const parseCookies = (cookieHeader: string | undefined): Record<string, string> => {
+    const cookies: Record<string, string> = {};
+    if (!cookieHeader) return cookies;
+    for (const part of cookieHeader.split(';')) {
+        const separator = part.indexOf('=');
+        if (separator === -1) continue;
+        const name = part.slice(0, separator).trim();
+        if (name) cookies[name] = decodeURIComponent(part.slice(separator + 1).trim());
+    }
+    return cookies;
+};
+
+/**
+ * Whether a guard's returned field satisfies a gate value. Array fields pass
+ * when they contain an allowed value; scalar fields when they equal one.
+ */
+export const gatePermits = (value: unknown, allowed: unknown): boolean => {
+    if (Array.isArray(value)) {
+        return Array.isArray(allowed) ? allowed.some((entry) => value.includes(entry)) : value.includes(allowed);
+    }
+    return Array.isArray(allowed) ? allowed.includes(value) : value === allowed;
+};
+
+/**
+ * Extract the credential an identity's authentication method expects from the
+ * request, labelled with its scheme kind: the value of the named
+ * header/query/cookie for `apiKey`, the decoded `username`/`password` for HTTP
+ * `basic`, or the bearer token for everything else. The credential is `null`
+ * when it is absent or malformed.
+ */
+export const extractCredential = (scheme: SecurityScheme, request: AdapterRequest<unknown>): Credential => {
+    const openapi = scheme.openapi;
+    const headers = (request.headers ?? {}) as Record<string, string | string[] | undefined>;
+
+    if (openapi.type === 'apiKey') {
+        let value: string | undefined;
+        if (openapi.in === 'header') value = getHeaderValue(headers[openapi.name.toLowerCase()]);
+        else if (openapi.in === 'cookie') value = parseCookies(getHeaderValue(headers['cookie']))[openapi.name];
+        else {
+            const query = (request.query ?? {}) as Record<string, unknown>;
+            const queryValue = query[openapi.name];
+            value = typeof queryValue === 'string' ? queryValue : undefined;
+        }
+        return { apiKey: value === undefined ? null : { in: openapi.in, name: openapi.name, value } };
+    }
+
+    const authorization = getHeaderValue(headers['authorization']);
+    if (openapi.type === 'http' && openapi.scheme === 'basic') {
+        let credentials: { username: string; password: string } | null = null;
+        if (authorization && /^basic\s+/i.test(authorization)) {
+            try {
+                const decoded = atob(authorization.replace(/^basic\s+/i, ''));
+                const separator = decoded.indexOf(':');
+                if (separator !== -1) credentials = { username: decoded.slice(0, separator), password: decoded.slice(separator + 1) };
+            } catch {
+                credentials = null;
+            }
+        }
+        return { basic: credentials };
+    }
+
+    const bearer = authorization ? /^bearer\s+(.+)$/i.exec(authorization) : null;
+    const token = bearer ? { token: bearer[1]! } : null;
+    if (openapi.type === 'oauth2') return { oauth2: token };
+    if (openapi.type === 'openIdConnect') return { openIdConnect: token };
+    return { bearer: token };
+};
 
 export interface Adapter<NativeRequest, NativeResponse, HandlerContext, ResponseContext> {
     handle: <T extends Routes>(args: HandleArgs<NativeRequest, HandlerContext, ResponseContext, T>) => Promise<NativeResponse>;
@@ -260,6 +463,9 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     router: Router<Routes, HandlerContext>,
     definition: AdapterDefinition<NativeRequest, unknown, HandlerContext, ResponseContext>,
     responseContext: ResponseContext,
+    guards: GuardMap<HandlerContext> | undefined,
+    schemes: Record<string, SecurityScheme> | undefined,
+    contextResolvers: RequestContextMap<HandlerContext> | undefined,
     basePath: string | undefined,
     responseValidation: boolean | undefined
 ): Promise<AdapterResult> => {
@@ -326,6 +532,58 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     try {
         const handlerContext = await definition.buildHandlerContext(request, responseContext);
 
+        const requestContext: Record<string, unknown> = {};
+        if (contextResolvers) {
+            for (const [name, resolver] of Object.entries(contextResolvers)) {
+                requestContext[name] = await resolver({
+                    ...(handlerContext as Record<string, unknown>),
+                    params,
+                    headers: raw.headers as Record<string, string | string[] | undefined>,
+                } as Parameters<typeof resolver>[0]);
+            }
+        }
+
+        const securityContext: Record<string, unknown> = {};
+        for (const { scheme, scopes } of resolveSecurityRequirements(route)) {
+            const guard = guards?.[scheme];
+            if (!guard) {
+                throw new Error(`No guard registered for security scheme "${scheme}" required by route "${routeKey}".`);
+            }
+            const schemeDefinition = schemes?.[scheme];
+            const credential = schemeDefinition ? extractCredential(schemeDefinition, request as AdapterRequest<unknown>) : {};
+            const guardResult = await guard({
+                ...(handlerContext as Record<string, unknown>),
+                ...credential,
+                params,
+                deny: guardDeny,
+                scopes,
+            } as Parameters<typeof guard>[0]);
+            if (isGuardDenial(guardResult)) {
+                return {
+                    kind: 'guard-denied',
+                    status: guardResult.status,
+                    detail: guardResult.detail,
+                };
+            }
+            if (guardResult && typeof guardResult === 'object') {
+                const gate = route.accessGate?.[scheme];
+                if (gate) {
+                    for (const [field, allowed] of Object.entries(gate)) {
+                        const value = (guardResult as Record<string, unknown>)[field];
+                        const permitted = gatePermits(value, allowed);
+                        if (!permitted) {
+                            return {
+                                kind: 'guard-denied',
+                                status: 403,
+                                detail: `Forbidden: ${scheme}.${field} is not permitted on this route.`,
+                            };
+                        }
+                    }
+                }
+                securityContext[scheme] = guardResult;
+            }
+        }
+
         const throwError = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
             throw new ResponseError(response);
         };
@@ -340,6 +598,8 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             // Deprecated alias for `throwError`; kept for backward compatibility.
             error: throwError,
             ...handlerContext,
+            ...requestContext,
+            ...securityContext,
         });
         if (responseValidation) {
             const responseSpec = route.responses[handlerResult.status];
@@ -410,13 +670,16 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
 export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, ResponseContext = Record<string, never>>(
     definition: AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, ResponseContext>
 ): Adapter<NativeRequest, NativeResponse, HandlerContext, ResponseContext> => ({
-    handle: async ({ routes, router, request, responseContext, basePath, responseValidation }) => {
+    handle: async ({ routes, router, request, responseContext, guards, schemes, requestContext, basePath, responseValidation }) => {
         const result = await runPipeline(
             request,
             routes,
             router as Router<Routes, HandlerContext>,
             definition as AdapterDefinition<NativeRequest, unknown, HandlerContext, ResponseContext>,
             responseContext,
+            guards,
+            schemes,
+            requestContext,
             basePath,
             responseValidation
         );
@@ -567,6 +830,8 @@ export const renderJsonResult = (
             });
         case 'no-handler':
             return renderError(500, `Handler not implemented: ${result.routeKey}`);
+        case 'guard-denied':
+            return renderError(result.status, result.detail);
         case 'unsupported-media-type':
             return renderError(415, `Unsupported Media Type: expected ${result.expected}, received ${result.received}`);
         case 'not-acceptable':

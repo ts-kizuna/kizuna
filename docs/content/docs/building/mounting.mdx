@@ -11,14 +11,29 @@ The last step: `createApi` binds your [router](/docs/building/router) to the [co
 import { createApi } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
 import { contract } from './contract';
 import { router } from './router';
+import { requireUser, requireMember } from './guards';
 
 export const api = createApi({
     contract,
     router,
+    guards: {
+        user: requireUser,
+        member: requireMember,
+    },
 });
 ```
 
-Add per-route middleware with a `middleware` map here too — see the adapter pages.
+## Guards
+
+If the contract declares identities, pass one guard per identity under `guards` — created with the adapter's `createGuard`, a guard verifies the extracted credential and returns the identity's context or a denial. The contract's auth map decides which routes each guard protects, so `createApi` attaches them automatically. See the [Auth guide](/docs/auth) for the whole pipeline and the adapter pages for each framework's guard context.
+
+## Request context
+
+For request-scoped values every handler needs — analytics ids, a logger, a tenant — declare them with [`createRequestContext`](/docs/reference/create-request-context), register them on `kizuna`, and resolve each with the adapter's `createRequestContextResolver`. Resolvers run on every route, never deny, and handlers receive their values typed under each name.
+
+## Middleware
+
+For everything else — rate limiting, multipart parsing — use your framework's own middleware (`app.use`, Fastify hooks). Authentication belongs in guards, request-scoped values in `requestContext`.
 
 ## Mounting
 
@@ -80,6 +95,7 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoi
 ## Reference
 
 - [`createApi`](/docs/reference/create-api)
+- [`createGuard`](/docs/reference/create-guard)
 
 ## Next steps
 
