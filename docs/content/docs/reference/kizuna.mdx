@@ -204,7 +204,7 @@ workspace: {
 },
 ```
 
-Every route under `workspace` requires `member`; `deleteWorkspace` additionally gates on `role: 'owner'` — and inside its handler, `member.role` is typed `'owner'`.
+Every route under `workspace` requires `member`; `deleteWorkspace` additionally gates on `role: 'owner'` — and inside its handler, `auth.member.role` is typed `'owner'`.
 
 `k.contract` resolves the map onto every route's `security` (and `accessGate` where fields are constrained), which the [guards](/docs/reference/create-guard), [router](/docs/reference/create-router) types, and [OpenAPI spec](/docs/reference/generate-openapi) all read.
 
@@ -226,7 +226,7 @@ export const contract = k.contract({
 
 ## Request context
 
-`requestContext` registers declarations from [`createRequestContext`](/docs/reference/create-request-context) — request-scoped values like analytics ids or a logger. Every handler receives them typed under their name; each is resolved per request by a [`createRequestContextResolver`](/docs/reference/create-request-context) wired on `createApi`.
+`requestContext` registers declarations from [`createRequestContext`](/docs/reference/create-request-context) — request-scoped values like analytics ids or a logger. Every handler receives them typed under `requestContext`, keyed by their name; each is resolved per request by a [`createRequestContextResolver`](/docs/reference/create-request-context) wired on `createApi`.
 
 ```ts title="request-contexts.ts"
 import { z } from 'zod';
@@ -250,8 +250,8 @@ export const { k } = kizuna({
 ```
 
 ```ts
-listUsers: ({ query, analytics }) => {
-    track(analytics.sessionId, 'listUsers');
+listUsers: ({ query, requestContext }) => {
+    track(requestContext.analytics.sessionId, 'listUsers');
     // ...
 },
 ```

@@ -72,14 +72,14 @@ export const api = createApi({
 });
 ```
 
-Every route under `members` now runs the guard, and its handler receives the guard's return — typed — under the identity's name:
+Every route under `members` now runs the guard, and its handler receives the guard's return — typed — under `auth`, keyed by the identity's name:
 
 ```ts
 members: {
-    listMembers: ({ user }) => ({
+    listMembers: ({ auth }) => ({
         status: 200,
         body: {
-            members: findMembersExcept(user.userId),
+            members: findMembersExcept(auth.user.userId),
         },
     }),
 },
@@ -154,20 +154,20 @@ A route entry inherits the `'*'` default and only states its delta — `deleteWo
 
 ### Access gates
 
-`{ member: { role: 'owner' } }` rejects other roles with a `403` before the handler runs — and inside the handler, `member.role` narrows to `'owner'`. Array fields pass when they contain the value (`{ member: { permissions: 'invoicing' } }`):
+`{ member: { role: 'owner' } }` rejects other roles with a `403` before the handler runs — and inside the handler, `auth.member.role` narrows to `'owner'`. Array fields pass when they contain the value (`{ member: { permissions: 'invoicing' } }`):
 
 ```ts
 workspace: {
-    deleteWorkspace: ({ member }) => ({
+    deleteWorkspace: ({ auth }) => ({
         status: 200,
         body: {
-            ok: member.role === 'owner',
+            ok: auth.member.role === 'owner',
         },
     }),
 },
 ```
 
-A route requiring several identities receives all of them — `transfer: ({ body, user, member }) => ...`.
+A route requiring several identities receives all of them under `auth` — `transfer: ({ body, auth }) => ...`.
 
 ## Guards
 

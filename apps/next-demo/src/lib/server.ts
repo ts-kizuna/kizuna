@@ -258,7 +258,7 @@ export const api = createApi({
                     },
                 };
             },
-            listEvents: ({ query, analytics }) => {
+            listEvents: ({ query, requestContext }) => {
                 return {
                     status: 200,
                     body: {
@@ -276,7 +276,7 @@ export const api = createApi({
                             ids: query.ids ?? null,
                             label: query.label ?? null,
                             tagIds: query.tagIds ?? null,
-                            sessionId: analytics.sessionId,
+                            sessionId: requestContext.analytics.sessionId,
                         },
                     },
                 };
@@ -295,19 +295,19 @@ export const api = createApi({
             }),
         },
         members: {
-            listMembers: ({ user }) => ({
+            listMembers: ({ auth }) => ({
                 status: 200,
                 body: {
-                    members: Array.from(users.values()).filter((candidate) => candidate.id !== user.userId),
+                    members: Array.from(users.values()).filter((candidate) => candidate.id !== auth.user.userId),
                 },
             }),
-            inviteMember: ({ body, member }) => {
+            inviteMember: ({ body, auth }) => {
                 const existing = Array.from(users.values()).find((candidate) => candidate.email === body.email);
                 if (existing) {
                     return {
                         status: 409,
                         body: {
-                            detail: `${body.email} is already a member (invite attempted by ${member.role}).`,
+                            detail: `${body.email} is already a member (invite attempted by ${auth.member.role}).`,
                         },
                     };
                 }
@@ -324,21 +324,21 @@ export const api = createApi({
             },
         },
         workspace: {
-            getWorkspace: ({ member }) => ({
+            getWorkspace: ({ auth }) => ({
                 status: 200,
                 body: {
-                    id: member.workspaceUserId,
+                    id: auth.member.workspaceUserId,
                     name: 'ts-kizuna workspace',
                 },
             }),
-            deleteWorkspace: ({ member }) => ({
+            deleteWorkspace: ({ auth }) => ({
                 status: 200,
                 body: {
-                    ok: member.role === 'owner',
+                    ok: auth.member.role === 'owner',
                 },
             }),
-            transfer: ({ body, member }) => {
-                if (body.toUserId === member.workspaceUserId) {
+            transfer: ({ body, auth }) => {
+                if (body.toUserId === auth.member.workspaceUserId) {
                     return {
                         status: 200,
                         body: {

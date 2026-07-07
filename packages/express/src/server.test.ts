@@ -783,23 +783,23 @@ describe('guards', () => {
                             ok: true,
                         },
                     }),
-                    whoAmI: ({ user: currentUser }) => ({
+                    whoAmI: ({ auth }) => ({
                         status: 200,
                         body: {
-                            userId: currentUser.userId,
+                            userId: auth.user.userId,
                         },
                     }),
-                    ownerOnly: ({ member: currentMember }) => ({
+                    ownerOnly: ({ auth }) => ({
                         status: 200,
                         body: {
-                            role: currentMember.role,
+                            role: auth.member.role,
                         },
                     }),
-                    both: ({ user: currentUser, member: currentMember }) => ({
+                    both: ({ auth }) => ({
                         status: 200,
                         body: {
-                            userId: currentUser.userId,
-                            workspaceUserId: currentMember.workspaceUserId,
+                            userId: auth.user.userId,
+                            workspaceUserId: auth.member.workspaceUserId,
                         },
                     }),
                 },

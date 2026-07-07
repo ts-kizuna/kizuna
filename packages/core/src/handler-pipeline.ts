@@ -221,6 +221,12 @@ export type ContextFromAuthValue<Value, Identities> = Value extends false
         : {};
 
 /**
+ * The `auth` argument a secured route's handler receives.
+ */
+type AuthArg<Value, Identities> =
+    ContextFromAuthValue<Value, Identities> extends infer Ctx ? ([keyof Ctx] extends [never] ? {} : { auth: Ctx }) : never;
+
+/**
  * An auth value normalized to its identity-map form: `false` contributes
  * nothing, a scheme name becomes `{ name: true }`, an object stays as is.
  */
@@ -242,16 +248,19 @@ export type RouteAuthValue<GroupAuth, RouteKey extends string> = GroupAuth exten
     : GroupAuth;
 
 /**
- * The values handlers receive from the contract's request context schemas,
- * keyed by provider name.
+ * The `requestContext` argument a handler receives.
  */
 export type RequestContextValues<RequestContext> = string extends keyof RequestContext
     ? {}
-    : {
-          [Name in keyof RequestContext]: RequestContext[Name] extends { context: infer Schema extends z.ZodType }
-              ? z.output<Schema>
-              : never;
-      };
+    : [keyof RequestContext] extends [never]
+      ? {}
+      : {
+            requestContext: {
+                [Name in keyof RequestContext]: RequestContext[Name] extends { context: infer Schema extends z.ZodType }
+                    ? z.output<Schema>
+                    : never;
+            };
+        };
 
 /**
  * The identity names an {@link AuthValue} requires: a name, the keys of a
@@ -294,7 +303,7 @@ export type GuardParams<R extends Routes, Auth, Name extends string> = [GuardedP
 
 type GroupHandlers<G extends Routes, HandlerContext, Identities, GroupAuth> = {
     [Key in keyof G as Key extends symbol ? never : Key]: G[Key] extends RouteDefinition
-        ? RouteHandlerFromContext<G[Key], HandlerContext, ContextFromAuthValue<RouteAuthValue<GroupAuth, Key & string>, Identities>>
+        ? RouteHandlerFromContext<G[Key], HandlerContext, AuthArg<RouteAuthValue<GroupAuth, Key & string>, Identities>>
         : G[Key] extends Routes
           ? GroupHandlers<G[Key], HandlerContext, Identities, GroupAuth>
           : never;
@@ -308,14 +317,14 @@ type RouteHandlerFromContext<R extends RouteDefinition, HandlerContext, Security
  * The handler tree for a contract: every route group, each route typed with its
  * inputs, the adapter's handler context, and the scheme-keyed security context
  * its entry in the `auth` map resolves to. Identities and access fields a route
- * requires appear in the handler args under each identity's name.
+ * requires appear in the handler args under `auth`, keyed by each identity's name.
  */
 export type HandlersFromAuth<R extends Routes, HandlerContext, Identities, Auth> = {
     [Group in keyof R as Group extends symbol ? never : Group]: R[Group] extends RouteDefinition
         ? RouteHandlerFromContext<
               R[Group],
               HandlerContext,
-              ContextFromAuthValue<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>, Identities>
+              AuthArg<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>, Identities>
           >
         : R[Group] extends Routes
           ? GroupHandlers<R[Group], HandlerContext, Identities, Group extends keyof Auth ? Auth[Group] : false>

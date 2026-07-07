@@ -151,7 +151,7 @@ test('secured handlers receive typed identity context; public handlers do not', 
     createRouter(securedContract, {
         api: {
             publicRoute: (args) => {
-                expectTypeOf(args).not.toHaveProperty('user');
+                expectTypeOf(args).not.toHaveProperty('auth');
                 return {
                     status: 200,
                     body: {
@@ -159,17 +159,17 @@ test('secured handlers receive typed identity context; public handlers do not', 
                     },
                 };
             },
-            whoAmI: ({ user }) => {
-                expectTypeOf(user).toEqualTypeOf<{ userId: string }>();
+            whoAmI: ({ auth }) => {
+                expectTypeOf(auth.user).toEqualTypeOf<{ userId: string }>();
                 return {
                     status: 200,
                     body: {
-                        userId: user.userId,
+                        userId: auth.user.userId,
                     },
                 };
             },
-            ownerOnly: ({ member }) => {
-                expectTypeOf(member.role).toEqualTypeOf<'owner'>();
+            ownerOnly: ({ auth }) => {
+                expectTypeOf(auth.member.role).toEqualTypeOf<'owner'>();
                 return {
                     status: 200,
                     body: {
@@ -189,12 +189,12 @@ test('createRouter types a single group by key', () => {
                 ok: true,
             },
         }),
-        whoAmI: ({ user }) => {
-            expectTypeOf(user).toEqualTypeOf<{ userId: string }>();
+        whoAmI: ({ auth }) => {
+            expectTypeOf(auth.user).toEqualTypeOf<{ userId: string }>();
             return {
                 status: 200,
                 body: {
-                    userId: user.userId,
+                    userId: auth.user.userId,
                 },
             };
         },
@@ -254,10 +254,10 @@ test('createApi requires a complete guard map when guards are provided', () => {
                         ok: true,
                     },
                 }),
-                whoAmI: ({ user }) => ({
+                whoAmI: ({ auth }) => ({
                     status: 200,
                     body: {
-                        userId: user.userId,
+                        userId: auth.user.userId,
                     },
                 }),
                 ownerOnly: () => ({
@@ -356,7 +356,7 @@ test('a handler for a gate-only route receives no arg for the identity', () => {
     createRouter(gateContract, {
         api: {
             publicRoute: (args) => {
-                expectTypeOf(args).not.toHaveProperty('apiConsumer');
+                expectTypeOf(args).not.toHaveProperty('auth');
                 return {
                     status: 200,
                     body: {
@@ -365,8 +365,8 @@ test('a handler for a gate-only route receives no arg for the identity', () => {
                 };
             },
             apiOnly: (args) => {
-                // The gate-only identity contributes `{}` — no `apiConsumer` arg.
-                expectTypeOf(args).not.toHaveProperty('apiConsumer');
+                // The gate-only identity contributes `{}` — no `auth` arg.
+                expectTypeOf(args).not.toHaveProperty('auth');
                 return {
                     status: 200,
                     body: {
@@ -374,12 +374,12 @@ test('a handler for a gate-only route receives no arg for the identity', () => {
                     },
                 };
             },
-            whoAmI: ({ user }) => {
-                expectTypeOf(user).toEqualTypeOf<{ userId: string }>();
+            whoAmI: ({ auth }) => {
+                expectTypeOf(auth.user).toEqualTypeOf<{ userId: string }>();
                 return {
                     status: 200,
                     body: {
-                        userId: user.userId,
+                        userId: auth.user.userId,
                     },
                 };
             },
@@ -422,8 +422,8 @@ const contextContract = contextK.contract({
 test('handlers receive typed request context on every route', () => {
     createRouter(contextContract, {
         api: {
-            publicRoute: ({ analytics }) => {
-                expectTypeOf(analytics).toEqualTypeOf<{ sessionId: string | null }>();
+            publicRoute: ({ requestContext }) => {
+                expectTypeOf(requestContext.analytics).toEqualTypeOf<{ sessionId: string | null }>();
                 return {
                     status: 200,
                     body: {

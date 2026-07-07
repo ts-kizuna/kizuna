@@ -21,7 +21,7 @@ createGuard(contract: Contract, identity: string, run: GuardFn): Guard
 
 ## How it works
 
-The credential arrives already parsed and typed. Return the identity's context — handlers receive it under the identity's name — or `deny(status, detail)`:
+The credential arrives already parsed and typed. Return the identity's context — handlers receive it under `auth`, keyed by the identity's name — or `deny(status, detail)`:
 
 ```ts title="src/lib/server.ts"
 import { createGuard } from '@ts-kizuna/express';

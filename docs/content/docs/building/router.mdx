@@ -90,32 +90,32 @@ Each handler receives an object with the validated inputs for that route:
 
 ## Identity context
 
-When the contract's [auth map](/docs/auth) secures a route, the handler receives the identity's context — whatever its guard returned — under the identity's name. There's nothing to look up or cast; the guard already ran, so the value is simply there, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/create-request-context) arrive the same way, on every route.
+When the contract's [auth map](/docs/auth) secures a route, the handler receives the identity's context — whatever its guard returned — under `auth`, keyed by the identity's name. There's nothing to look up or cast; the guard already ran, so the value is simply there, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/create-request-context) arrive the same way, under `requestContext` on every route.
 
 ```ts
-listMembers: ({ user }) => ({
+listMembers: ({ auth }) => ({
     status: 200,
     body: {
-        members: findMembersExcept(user.userId),
+        members: findMembersExcept(auth.user.userId),
     },
 }),
 ```
 
-A route requiring several identities receives all of them:
+A route requiring several identities receives all of them under `auth`:
 
 ```ts
-transfer: ({ body, user, member }) => {
-    // user.userId and member.workspaceUserId are both available and typed
+transfer: ({ body, auth }) => {
+    // auth.user.userId and auth.member.workspaceUserId are both available and typed
 },
 ```
 
-On routes with an [access gate](/docs/auth#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `member.role` is typed `'owner'` — the runtime check and the type agree by construction:
+On routes with an [access gate](/docs/auth#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `auth.member.role` is typed `'owner'` — the runtime check and the type agree by construction:
 
 ```ts
-deleteWorkspace: ({ member }) => ({
+deleteWorkspace: ({ auth }) => ({
     status: 200,
     body: {
-        ok: member.role === 'owner',
+        ok: auth.member.role === 'owner',
     },
 }),
 ```

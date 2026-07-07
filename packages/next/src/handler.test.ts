@@ -821,10 +821,10 @@ describe('Next.js — guards', () => {
                             message: 'public',
                         },
                     }),
-                    whoAmI: ({ user: currentUser }) => ({
+                    whoAmI: ({ auth }) => ({
                         status: 200,
                         body: {
-                            userId: currentUser.userId,
+                            userId: auth.user.userId,
                         },
                     }),
                 },
