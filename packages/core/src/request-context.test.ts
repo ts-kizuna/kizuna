@@ -92,7 +92,7 @@ describe('request context providers', () => {
         }),
     };
 
-    it('runs on public routes and lands under the provider name', async () => {
+    it('runs on public routes and lands under requestContext by provider name', async () => {
         const { adapter, results } = makeAdapter();
         let received: unknown;
         await adapter.handle({
@@ -100,7 +100,7 @@ describe('request context providers', () => {
             router: {
                 api: {
                     publicRoute: (args: Record<string, unknown>) => {
-                        received = args.analytics;
+                        received = (args.requestContext as Record<string, unknown>).analytics;
                         return okHandler();
                     },
                     whoAmI: okHandler,
@@ -125,7 +125,7 @@ describe('request context providers', () => {
                 api: {
                     publicRoute: okHandler,
                     whoAmI: (args: Record<string, unknown>) => {
-                        received = args.analytics;
+                        received = (args.requestContext as Record<string, unknown>).analytics;
                         return okHandler();
                     },
                 },

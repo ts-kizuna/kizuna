@@ -60,8 +60,8 @@ export const member = createIdentity.apiKey({
 
 Both describe what the guard returns and the handler reads:
 
-- **`context`** — who the caller is. A guard must return it; handlers of secured routes receive it under the identity's name (`{ user }`, `{ member }`).
-- **`access`** — the fields the `auth` map may gate per route. Gating on `{ member: { role: 'owner' } }` enforces a 403 at runtime and narrows the handler's type — `member.role` is `'owner'`, not `'owner' | 'admin'`.
+- **`context`** — who the caller is. A guard must return it; handlers of secured routes receive it under `auth`, keyed by the identity's name (`auth.user`, `auth.member`).
+- **`access`** — the fields the `auth` map may gate per route. Gating on `{ member: { role: 'owner' } }` enforces a 403 at runtime and narrows the handler's type — `auth.member.role` is `'owner'`, not `'owner' | 'admin'`.
 
 Skip `access` for identities that never gate on fields; the auth map can still require them (`'user'`), it just can't constrain them.
 

@@ -3,7 +3,7 @@ title: createRequestContext
 description: Provide request-scoped values — analytics ids, loggers, tenants — to every handler, typed.
 ---
 
-Not everything that runs before a handler is auth. Analytics ids, request loggers, tenant lookups — values every handler wants, gating nothing. Declare them with `createRequestContext`, register them on `kizuna`, resolve each with the adapter's `createRequestContextResolver`, and every handler receives them typed under their name.
+Not everything that runs before a handler is auth. Analytics ids, request loggers, tenant lookups — values every handler wants, gating nothing. Declare them with `createRequestContext`, register them on `kizuna`, resolve each with the adapter's `createRequestContextResolver`, and every handler receives them typed under `requestContext`, keyed by their name.
 
 <AdapterTabs functionName="createRequestContextResolver" />
 
@@ -53,8 +53,8 @@ export const api = createApi({
 ```
 
 ```ts
-listUsers: ({ query, analytics }) => {
-    track(analytics.sessionId, 'listUsers');
+listUsers: ({ query, requestContext }) => {
+    track(requestContext.analytics.sessionId, 'listUsers');
     // ...
 },
 ```

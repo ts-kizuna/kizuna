@@ -506,10 +506,10 @@ describe('guards', () => {
                             ok: true,
                         },
                     }),
-                    whoAmI: ({ user: currentUser }) => ({
+                    whoAmI: ({ auth }) => ({
                         status: 200,
                         body: {
-                            userId: currentUser.userId,
+                            userId: auth.user.userId,
                         },
                     }),
                 },

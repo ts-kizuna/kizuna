@@ -83,8 +83,8 @@ export const isGuardDenial = (value: unknown): value is GuardDenial => typeof va
  * The runtime behavior of a guard. It receives one object: the adapter's handler
  * context (e.g. `req`/`res`) plus the credential the identity's method extracted
  * from the request (or `null` if absent), a `deny` helper, and the matched
- * route's required `scopes`. It returns the context the scheme provides (keyed
- * under the identity's name in the handler args) or `deny(...)` to reject.
+ * route's required `scopes`. It returns the context the scheme provides (nested
+ * under `auth`, keyed by the identity's name in the handler args) or `deny(...)` to reject.
  */
 export type GuardRun<HandlerContext = unknown> = (
     args: HandlerContext &
@@ -263,7 +263,7 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
     schemes?: Record<string, SecurityScheme>;
     /**
      * Request context resolvers keyed by name. Each runs on every route before
-     * the guards; its value lands in the handler args under its name.
+     * the guards; its value lands in the handler args under `requestContext`, keyed by its name.
      */
     requestContext?: RequestContextMap<HandlerContext>;
     basePath?: string;
@@ -598,8 +598,8 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             // Deprecated alias for `throwError`; kept for backward compatibility.
             error: throwError,
             ...handlerContext,
-            ...requestContext,
-            ...securityContext,
+            ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
+            ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
         });
         if (responseValidation) {
             const responseSpec = route.responses[handlerResult.status];

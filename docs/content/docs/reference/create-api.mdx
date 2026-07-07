@@ -30,7 +30,7 @@ The Next.js adapter also accepts an `onError` callback alongside `router`.
 
 `requestContext` is keyed by the names declared on `kizuna` — one [resolver](/docs/reference/create-request-context) each, required when the contract declares any.
 
-`guards` is keyed by the identity names registered on [`kizuna`](/docs/reference/kizuna). When provided, it must cover every identity — one guard each, no route-by-route wiring. kizuna attaches each guard to the routes the contract's `auth` map secures with that identity, and the guard's return value reaches those handlers under the identity's name.
+`guards` is keyed by the identity names registered on [`kizuna`](/docs/reference/kizuna). When provided, it must cover every identity — one guard each, no route-by-route wiring. kizuna attaches each guard to the routes the contract's `auth` map secures with that identity, and the guard's return value reaches those handlers under `auth`, keyed by the identity's name.
 
 ## Returns
 

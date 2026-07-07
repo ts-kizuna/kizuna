@@ -708,7 +708,7 @@ describe('MCP server — guards', () => {
                     whoAmI: (args: Record<string, unknown>) => ({
                         status: 200,
                         body: {
-                            userId: (args.user as { userId: string }).userId,
+                            userId: (args.auth as { user: { userId: string } }).user.userId,
                         },
                     }),
                 },

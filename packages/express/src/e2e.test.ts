@@ -275,10 +275,10 @@ describe('end-to-end: typed client → secured Express route', () => {
             contract: securedContract,
             router: {
                 api: {
-                    whoAmI: ({ user }) => ({
+                    whoAmI: ({ auth }) => ({
                         status: 200,
                         body: {
-                            userId: user.userId,
+                            userId: auth.user.userId,
                         },
                     }),
                 },

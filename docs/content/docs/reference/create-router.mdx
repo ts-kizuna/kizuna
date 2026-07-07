@@ -112,18 +112,18 @@ Each handler receives an object with the validated inputs for that route:
 | `headers` | Route has a `headers` schema         |
 | `error`   | Always                               |
 
-Secured routes additionally receive each required identity's context, under the identity's name — see below.
+Secured routes additionally receive each required identity's context under `auth`, keyed by the identity's name — see below.
 
 ## Identity context
 
-Routes the contract's [`auth` map](/docs/reference/kizuna#the-auth-map) secures receive the [guard's](/docs/reference/create-guard) return value in their handler args, keyed by the identity's name. No request mutation, no casts — the type flows from the identity's schemas:
+Routes the contract's [`auth` map](/docs/reference/kizuna#the-auth-map) secures receive the [guard's](/docs/reference/create-guard) return value in their handler args, under `auth` and keyed by the identity's name. No request mutation, no casts — the type flows from the identity's schemas:
 
 ```ts
 members: {
-    listMembers: ({ user }) => ({
+    listMembers: ({ auth }) => ({
         status: 200,
         body: {
-            members: findMembersExcept(user.userId),
+            members: findMembersExcept(auth.user.userId),
         },
     }),
 },
@@ -133,16 +133,16 @@ When the auth map gates a route on access fields, the handler's type narrows to 
 
 ```ts
 workspace: {
-    deleteWorkspace: ({ member }) => ({
+    deleteWorkspace: ({ auth }) => ({
         status: 200,
         body: {
-            ok: member.role === 'owner',
+            ok: auth.member.role === 'owner',
         },
     }),
 },
 ```
 
-Routes requiring multiple identities receive each one: `transfer: ({ user, member }) => ...`.
+Routes requiring multiple identities receive each one under `auth`: `transfer: ({ auth }) => ...`.
 
 ## Handler return type
 

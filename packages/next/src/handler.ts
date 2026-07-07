@@ -47,7 +47,7 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, NextHa
 /**
  * The handler tree for a contract, typed against it. Routes secured by the
  * contract's `auth` map additionally receive each required identity's context
- * in their handler args, under the identity's name.
+ * in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C> =
     C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext>
@@ -148,7 +148,7 @@ export function createRequestContextResolver<
  * plus the credential the identity's method extracted (`bearer`, `apiKey`, or
  * `basic` — `null` when absent), a `deny` helper, and the route's `scopes`.
  * Return the identity's context and access fields to allow the request (read in
- * handlers under the identity's name), or call `deny(status, detail)`.
+ * handlers under `auth`, keyed by the identity's name), or call `deny(status, detail)`.
  *
  * @example
  * export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {

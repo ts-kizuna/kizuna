@@ -145,7 +145,7 @@ describe('guard pipeline', () => {
                 items: {
                     listItems: okHandler,
                     getSecret: (args: Record<string, unknown>) => {
-                        received = args.user;
+                        received = (args.auth as Record<string, unknown>).user;
                         return okHandler();
                     },
                     ownerOnly: okHandler,
@@ -236,7 +236,7 @@ describe('guard pipeline', () => {
                     listItems: okHandler,
                     getSecret: okHandler,
                     ownerOnly: (args: Record<string, unknown>) => {
-                        received = args.member;
+                        received = (args.auth as Record<string, unknown>).member;
                         return okHandler();
                     },
                     scoped: okHandler,

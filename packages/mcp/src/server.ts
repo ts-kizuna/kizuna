@@ -324,8 +324,8 @@ const executeToolCall = async (
             headers: validation.parsed.headers,
             error,
             ...handlerContext,
-            ...requestContext,
-            ...guardOutcome.securityContext,
+            ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
+            ...(Object.keys(guardOutcome.securityContext).length > 0 ? { auth: guardOutcome.securityContext } : {}),
         });
 
         const isError = result.status >= 400;

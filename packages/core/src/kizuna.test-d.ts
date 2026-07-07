@@ -80,26 +80,25 @@ const contract = k.contract({
 type Identities = NonNullable<typeof contract.securitySchemes>;
 type Handlers = HandlersFromAuth<typeof contract.routes, {}, Identities, NonNullable<typeof contract.auth>>;
 
-test('a public route receives no identity context', () => {
+test('a public route receives no auth context', () => {
     type Args = Parameters<Handlers['users']['listUsers']>[0];
-    expectTypeOf<Args>().not.toHaveProperty('user');
-    expectTypeOf<Args>().not.toHaveProperty('member');
+    expectTypeOf<Args>().not.toHaveProperty('auth');
 });
 
-test('a group-secured route receives the identity context under its name', () => {
+test('a group-secured route receives the identity context under auth by name', () => {
     type Args = Parameters<Handlers['workspace']['getWorkspace']>[0];
-    expectTypeOf<Args['user']>().toEqualTypeOf<{ userId: string }>();
+    expectTypeOf<Args['auth']['user']>().toEqualTypeOf<{ userId: string }>();
 });
 
 test('a gated route narrows the constrained access field to its literal', () => {
     type Args = Parameters<Handlers['workspace']['deleteWorkspace']>[0];
-    expectTypeOf<Args['member']['role']>().toEqualTypeOf<'owner'>();
-    expectTypeOf<Args['member']['workspaceUserId']>().toEqualTypeOf<string>();
+    expectTypeOf<Args['auth']['member']['role']>().toEqualTypeOf<'owner'>();
+    expectTypeOf<Args['auth']['member']['workspaceUserId']>().toEqualTypeOf<string>();
 });
 
 test('a route entry inherits the * default identities', () => {
     type Args = Parameters<Handlers['workspace']['deleteWorkspace']>[0];
-    expectTypeOf<Args['user']>().toEqualTypeOf<{ userId: string }>();
+    expectTypeOf<Args['auth']['user']>().toEqualTypeOf<{ userId: string }>();
 });
 
 test('an auth-less contract degrades to plain handlers', () => {
@@ -119,7 +118,7 @@ test('an auth-less contract degrades to plain handlers', () => {
     type PlainHandlers = HandlersFromAuth<typeof plainContract.routes, {}, Record<string, never>, NonNullable<typeof plainContract.auth>>;
     type Args = Parameters<PlainHandlers['items']['listItems']>[0];
     expectTypeOf<Args>().toHaveProperty('query');
-    expectTypeOf<Args>().not.toHaveProperty('user');
+    expectTypeOf<Args>().not.toHaveProperty('auth');
     expectTypeOf<ReturnType<PlainHandlers['items']['listItems']>>().toEqualTypeOf<
         HandlerReturn<(typeof items)['listItems']> | Promise<HandlerReturn<(typeof items)['listItems']>>
     >();
