@@ -250,6 +250,23 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(response.body.echo.ids, ids, "array query param must serialize as repeated entries, not bracketed string")
     }
 
+    func testRequestContextHeaderReachesHandler() async throws {
+        // The contract declares `analytics` request context sourced from the
+        // x-posthog-session-id header. A client sets it once on the initializer;
+        // the server resolves it and the handler echoes it back.
+        let url = URL(string: ProcessInfo.processInfo.environment["API_BASE_URL"] ?? "http://localhost:8000")!
+        let contextClient = APIClient(baseURL: url, requestContext: .init(xPosthogSessionId: "sess-swift-123"))
+        let response = try await contextClient.notifications.listEvents()
+        XCTAssertEqual(response.body.echo.sessionId, "sess-swift-123", "request context header should reach the handler")
+    }
+
+    func testRequestContextOmittedWhenNotSet() async throws {
+        // The header is optional, so the default client sends nothing and the
+        // resolver returns null.
+        let response = try await client.notifications.listEvents()
+        XCTAssertNil(response.body.echo.sessionId, "no request context header should resolve to null")
+    }
+
     func testListEventsTransformQueryParam() async throws {
         // label uses z.string().transform() — the Swift client must accept String, not AnyCodable.
         let response = try await client.notifications.listEvents(

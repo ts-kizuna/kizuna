@@ -3,4 +3,7 @@ import { contract } from '@ts-kizuna-demo/shared';
 
 export const apiClient = createClient(contract, {
     baseUrl: process.env.BASE_URL ?? 'http://localhost:8000',
+    requestContext: {
+        'x-posthog-session-id': process.env.POSTHOG_SESSION_ID,
+    },
 });

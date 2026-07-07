@@ -1,15 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import type { FastifyRequest } from 'fastify';
-import { createGuard, createApi, type FastifyPreHandler, type Router } from '@ts-kizuna/fastify';
+import { createRequestContextResolver, createGuard, createApi, type Router } from '@ts-kizuna/fastify';
+import { getHeaderValue } from '@ts-kizuna/core';
 import { contract } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
-
-declare module 'fastify' {
-    interface FastifyRequest {
-        userId?: string;
-        member?: { workspaceUserId: string; role: 'owner' | 'admin' };
-    }
-}
 
 interface User {
     id: string;
@@ -43,44 +36,37 @@ const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | '
     ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
 ]);
 
-const bearerToken = (request: FastifyRequest): string | undefined => {
-    const header = request.headers['authorization'];
-    const value = Array.isArray(header) ? header[0] : header;
-    return typeof value === 'string' ? /^bearer\s+(.+)$/i.exec(value)?.[1] : undefined;
-};
+const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ request }) => ({
+    sessionId: getHeaderValue(request.headers['x-posthog-session-id']) ?? null,
+    distinctId: getHeaderValue(request.headers['x-posthog-distinct-id']) ?? null,
+}));
 
-const requireUser: FastifyPreHandler = createGuard(({ request, deny }) => {
-    const session = sessions.get(bearerToken(request) ?? '');
+const requireUser = createGuard(contract, 'user', ({ bearer, deny }) => {
+    const session = bearer ? sessions.get(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
     }
-    request.userId = session.userId;
+    return {
+        userId: session.userId,
+    };
 });
 
-const requireMember: FastifyPreHandler = createGuard(({ request, deny }) => {
-    const token = request.headers['x-workspace-token'];
-    const value = Array.isArray(token) ? token[0] : token;
-    const membership = typeof value === 'string' ? memberships.get(value) : undefined;
+const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) => {
+    const membership = apiKey ? memberships.get(apiKey.value) : undefined;
     if (!membership) {
         return deny(403, 'Forbidden');
     }
-    request.member = membership;
+    return membership;
 });
 
 export const api = createApi({
     contract,
-    middleware: {
-        users: [],
-        health: [],
-        notifications: [],
-        members: {
-            '*': [requireMember],
-            listMembers: [requireUser],
-        },
-        workspace: {
-            '*': [requireMember],
-            transfer: [requireUser, requireMember],
-        },
+    guards: {
+        user: requireUser,
+        member: requireMember,
+    },
+    requestContext: {
+        analytics: captureAnalytics,
     },
     router: {
         users: {
@@ -242,7 +228,7 @@ export const api = createApi({
             }),
         },
         notifications: {
-            listEvents: ({ query }) => {
+            listEvents: ({ query, analytics }) => {
                 return {
                     status: 200,
                     body: {
@@ -260,6 +246,7 @@ export const api = createApi({
                             ids: query.ids ?? null,
                             label: query.label ?? null,
                             tagIds: query.tagIds ?? null,
+                            sessionId: analytics.sessionId,
                         },
                     },
                 };
@@ -286,19 +273,19 @@ export const api = createApi({
             }),
         },
         members: {
-            listMembers: ({ request }) => ({
+            listMembers: ({ user }) => ({
                 status: 200,
                 body: {
-                    members: Array.from(users.values()).filter((candidate) => candidate.id !== request.userId),
+                    members: Array.from(users.values()).filter((candidate) => candidate.id !== user.userId),
                 },
             }),
-            inviteMember: ({ body, request }) => {
+            inviteMember: ({ body, member }) => {
                 const existing = Array.from(users.values()).find((candidate) => candidate.email === body.email);
                 if (existing) {
                     return {
                         status: 409,
                         body: {
-                            detail: `${body.email} is already a member (invite attempted by ${request.member?.role}).`,
+                            detail: `${body.email} is already a member (invite attempted by ${member.role}).`,
                         },
                     };
                 }
@@ -315,21 +302,21 @@ export const api = createApi({
             },
         },
         workspace: {
-            getWorkspace: ({ request }) => ({
+            getWorkspace: ({ member }) => ({
                 status: 200,
                 body: {
-                    id: request.member?.workspaceUserId ?? '',
+                    id: member.workspaceUserId,
                     name: 'Demo Workspace',
                 },
             }),
-            deleteWorkspace: ({ request }) => ({
+            deleteWorkspace: ({ member }) => ({
                 status: 200,
                 body: {
-                    ok: request.member?.role === 'owner',
+                    ok: member.role === 'owner',
                 },
             }),
-            transfer: ({ body, request }) => {
-                if (body.toUserId === request.userId || request.member?.role !== 'owner') {
+            transfer: ({ body, member }) => {
+                if (body.toUserId === member.workspaceUserId) {
                     return {
                         status: 200,
                         body: {

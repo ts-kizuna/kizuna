@@ -11,12 +11,14 @@ Bind handler implementations to a contract. The router mirrors the contract's ro
 
 ```ts
 createRouter(contract: Contract, router: Router<Contract>): Router<Contract>
+createRouter(contract: Contract, group: string, handlers: Router<Contract>[Group]): Router<Contract>[Group]
 ```
 
-| Parameter  | Type               | Description                                              |
-| ---------- | ------------------ | -------------------------------------------------------- |
-| `contract` | `Contract`         | The contract from [`k.contract`](/docs/reference/kizuna) |
-| `router`   | `Router<Contract>` | One handler function per route, grouped like the routes  |
+| Parameter  | Type               | Description                                                         |
+| ---------- | ------------------ | ------------------------------------------------------------------- |
+| `contract` | `Contract`         | The contract from [`k.contract`](/docs/reference/kizuna)            |
+| `group`    | `string`           | Optional. A route group key, to implement one group in its own file |
+| `router`   | `Router<Contract>` | One handler function per route, grouped like the routes             |
 
 ## Returns
 
@@ -71,6 +73,33 @@ export const api = createApi({
 });
 ```
 
+## Implementing one group at a time
+
+Pass a group key as the second argument to type a single group's handlers — handy when each group lives in its own file:
+
+```ts title="src/lib/users-handlers.ts"
+import { createRouter } from '@ts-kizuna/express';
+import { contract } from './contract';
+
+export const usersHandlers = createRouter(contract, 'users', {
+    listUsers: ({ query }) => {
+        // ...
+    },
+    getUser: ({ params }) => {
+        // ...
+    },
+});
+```
+
+Assemble the groups into the full router afterwards:
+
+```ts
+export const router = createRouter(contract, {
+    users: usersHandlers,
+    health: healthHandlers,
+});
+```
+
 ## Handler arguments
 
 Each handler receives an object with the validated inputs for that route:
@@ -82,6 +111,38 @@ Each handler receives an object with the validated inputs for that route:
 | `body`    | Route has a `body` schema            |
 | `headers` | Route has a `headers` schema         |
 | `error`   | Always                               |
+
+Secured routes additionally receive each required identity's context, under the identity's name — see below.
+
+## Identity context
+
+Routes the contract's [`auth` map](/docs/reference/kizuna#the-auth-map) secures receive the [guard's](/docs/reference/create-guard) return value in their handler args, keyed by the identity's name. No request mutation, no casts — the type flows from the identity's schemas:
+
+```ts
+members: {
+    listMembers: ({ user }) => ({
+        status: 200,
+        body: {
+            members: findMembersExcept(user.userId),
+        },
+    }),
+},
+```
+
+When the auth map gates a route on access fields, the handler's type narrows to the gate. With `deleteWorkspace` gated to `{ member: { role: 'owner' } }`:
+
+```ts
+workspace: {
+    deleteWorkspace: ({ member }) => ({
+        status: 200,
+        body: {
+            ok: member.role === 'owner',
+        },
+    }),
+},
+```
+
+Routes requiring multiple identities receive each one: `transfer: ({ user, member }) => ...`.
 
 ## Handler return type
 
@@ -98,7 +159,7 @@ Each adapter adds framework-specific properties to the handler arguments:
 | Hono    | `c`                | Hono context                      |
 | Next.js | `request`          | `NextRequest` object              |
 
-Auth middleware attaches data to the request or context (see [`createGuard`](/docs/reference/create-guard)); handlers read it from there — for example `req.userId` on Express or `c.get('user')` on Hono.
+These are for framework-specific needs (cookies, streaming, headers not in the contract). Authentication data doesn't live here — it arrives typed through the [identity context](#identity-context).
 
 ## `RouteHandler` and `Router` types
 
@@ -112,11 +173,11 @@ const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ par
     // ...
 };
 
-export const router: Router<typeof contract.routes> = {
+export const router: Router<typeof contract> = {
     // ...
 };
 ```
 
-`Router<typeof contract.routes>` types the full handler tree, which you pass straight to `createApi`'s `router`. Use `RouteHandler` when you split a handler out into its own file.
+`Router<typeof contract>` types the full handler tree — including each secured route's identity context from the auth map — which you pass straight to `createApi`'s `router`. Use `RouteHandler` when you split a handler out into its own file.
 
 See the [Router guide](/docs/building/router) for validation errors, error responses, and more.

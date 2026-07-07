@@ -9,7 +9,16 @@ import {
     type Router as CoreRouter,
     type ApiWithRouter,
     type ErrorFormatter,
+    type GuardMap,
+    type GuardRun,
+    type GuardDeny,
+    type GuardDenial,
+    type RequestContextMap,
+    type RequestContextRun,
     ROUTER_META,
+    GUARDS_META,
+    SCHEMES_META,
+    REQUEST_CONTEXT_META,
     MIDDLEWARE_META,
     createAdapter,
     createApi as coreApi,
@@ -17,11 +26,28 @@ import {
     renderJsonResult,
     parseFetchBody,
     headersToObject,
-    problemDetails,
 } from '@ts-kizuna/core/adapter';
-import type { Contract, TagOptions } from '@ts-kizuna/core';
+import type { z } from 'zod';
+import type {
+    Contract,
+    TagOptions,
+    SecurityScheme,
+    HandlersFromAuth,
+    GuardSuccess,
+    CredentialOf,
+    GuardParams,
+    RequestContextSchema,
+    RequestContextHeaderValues,
+    RequestContextValues,
+} from '@ts-kizuna/core';
 
-export type HonoApi<R extends Routes = Routes> = R & ApiWithRouter & { readonly [MIDDLEWARE_META]?: unknown };
+export type HonoApi<R extends Routes = Routes> = R &
+    ApiWithRouter & {
+        readonly [GUARDS_META]?: unknown;
+        readonly [SCHEMES_META]?: unknown;
+        readonly [REQUEST_CONTEXT_META]?: unknown;
+        readonly [MIDDLEWARE_META]?: unknown;
+    };
 
 export interface HonoHandlerContext<E extends Env = Env> {
     c: Context<E>;
@@ -34,11 +60,13 @@ export type RouteHandler<R extends RouteDefinition, E extends Env = Env> = CoreR
 
 /**
  * The handler tree for a contract or route group, typed against it. Preserves
- * Hono's {@link Env} generic for the handler context.
+ * Hono's {@link Env} generic for the handler context. Routes secured by the
+ * contract's `auth` map additionally receive each required identity's context
+ * in their handler args, under the identity's name.
  */
 export type Router<C, E extends Env = Env> =
-    C extends Contract<infer R, infer _Tags, infer _Codes>
-        ? CoreRouter<R, HonoHandlerContext<E>>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext>
+        ? HandlersFromAuth<R, HonoHandlerContext<E> & RequestContextValues<RequestContext>, Schemes, Auth>
         : C extends Routes
           ? CoreRouter<C, HonoHandlerContext<E>>
           : never;
@@ -60,7 +88,8 @@ export interface HonoOptions {
 }
 
 /**
- * Bind typed handler implementations to a contract or route group.
+ * Bind typed handler implementations to a contract, one of its route groups
+ * (pass the group key as the second argument), or a bare route group.
  *
  * @example
  * export const router = createRouter(contract, {
@@ -68,18 +97,25 @@ export interface HonoOptions {
  *     createUser: ({ body }) => ({ status: 201, body: { id: '1', ...body } }),
  * });
  */
-export const createRouter = <const R extends Routes, E extends Env = Env>(
-    _source: Contract<R, Record<string, TagOptions>, string> | R,
-    router: Router<R, E>
-): Router<R, E> => router;
+export const createRouter: {
+    <const C extends Contract, const Group extends Extract<keyof Router<C>, string>, E extends Env = Env>(
+        source: C,
+        group: Group,
+        router: Router<C, E>[Group]
+    ): Router<C, E>[Group];
+    <const C extends Contract | Routes, E extends Env = Env>(source: C, router: Router<C, E>): Router<C, E>;
+} = (_source: unknown, groupOrRouter: unknown, groupRouter?: unknown) => (groupRouter ?? groupOrRouter) as never;
 
 /**
  * Declare per-route middleware in the same shape as the contract's or group's routes.
  *
+ * @deprecated Define auth with identities + the contract's `auth` map and pass
+ * `guards` to `createApi`. See /docs/auth.
+ *
  * @example
  * export const middleware = createMiddleware(contract, {
- *     listUsers: [auth],
- *     createUser: [auth, adminOnly],
+ *     listUsers: [authenticate],
+ *     createUser: [authenticate, adminOnly],
  * });
  */
 export const createMiddleware = <const R extends Routes, E extends Env = Env>(
@@ -87,35 +123,99 @@ export const createMiddleware = <const R extends Routes, E extends Env = Env>(
     map: MiddlewareMap<R, MiddlewareHandler<E>>
 ): MiddlewareMap<R, MiddlewareHandler<E>> => map;
 
-type Deny = (status: number, detail: string) => Response;
-
-const deny: Deny = (status, detail) =>
-    new Response(JSON.stringify(problemDetails(status, detail)), {
-        status,
-        headers: {
-            'content-type': 'application/problem+json',
-        },
-    });
+/**
+ * A guard per identity, keyed by name. Each receives the handler context, a
+ * `deny` helper, and the matched route's required scopes, and returns that
+ * identity's {@link GuardSuccess} (its context and access fields) or a `deny(...)`
+ * result. Keying by name lets each guard's return be typed against its own
+ * identity, so access values narrow without an annotation. An
+ * authentication-only identity (no context, no access) returns nothing on
+ * success, or `deny(...)`.
+ */
+type GuardFns<Schemes extends Record<string, SecurityScheme>, Params, E extends Env> = {
+    [Name in keyof Schemes]: (
+        args: HonoHandlerContext<E> &
+            CredentialOf<Schemes[Name]> & {
+                params: Params;
+                deny: GuardDeny;
+                scopes: string[];
+            }
+    ) => [keyof GuardSuccess<Schemes[Name]>] extends [never]
+        ? void | GuardDenial | Promise<void | GuardDenial>
+        : GuardSuccess<Schemes[Name]> | GuardDenial | Promise<GuardSuccess<Schemes[Name]> | GuardDenial>;
+};
 
 /**
- * Create a guard — a middleware that checks access before the handler runs. Call
- * `deny(status, detail)` to reject the request; return without calling it to allow.
+ * One guard per identity declared on the contract.
+ */
+type GuardsForSchemes<Schemes extends Record<string, SecurityScheme>, E extends Env> = {
+    [Name in keyof Schemes]: GuardRun<HonoHandlerContext<E>>;
+};
+
+/**
+ * The resolver functions for the request context schemas declared on `kizuna`,
+ * keyed by name. Each runs on every route and returns its schema's value.
+ */
+type RequestResolverFns<RequestContext extends Record<string, RequestContextSchema>, E extends Env> = {
+    [Name in keyof RequestContext]: (
+        args: HonoHandlerContext<E> & {
+            params: Record<string, string>;
+            headers: RequestContextHeaderValues<RequestContext[Name]>;
+        }
+    ) => z.output<RequestContext[Name]['context']> | Promise<z.output<RequestContext[Name]['context']>>;
+};
+
+/**
+ * Implement a request context provider declared on `kizuna` under `context`. It
+ * runs on every route — public ones included — and never denies; handlers read
+ * its value under the provider's name.
  *
  * @example
- * const requireAdmin = createGuard<AuthEnv>(async ({ c, deny }) => {
- *     if (c.get('user').role !== 'admin') return deny(403, 'Forbidden');
+ * export const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ c }) => ({
+ *     sessionId: c.req.header('x-posthog-session-id') ?? null,
+ * }));
+ */
+export function createRequestContextResolver<
+    RequestContext extends Record<string, RequestContextSchema>,
+    const Name extends Extract<keyof RequestContext, string>,
+    E extends Env = Env,
+>(
+    _contract: Contract<Routes, Record<string, TagOptions>, string, Record<string, SecurityScheme>, unknown, RequestContext>,
+    _name: Name,
+    run: RequestResolverFns<RequestContext, E>[Name]
+): RequestContextRun<HonoHandlerContext<E>> {
+    return run as unknown as RequestContextRun<HonoHandlerContext<E>>;
+}
+
+/**
+ * Define a guard for an identity. It runs before the handlers of routes whose
+ * `auth` entry requires the identity. The argument carries the request context
+ * plus the credential the identity's method extracted (`bearer`, `apiKey`, or
+ * `basic` — `null` when absent), a `deny` helper, and the route's `scopes`.
+ * Return the identity's context and access fields to allow the request (read in
+ * handlers under the identity's name), or call `deny(status, detail)`.
+ *
+ * @example
+ * export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {
+ *     const session = bearer && (await verify(bearer.token));
+ *     if (!session) return deny(401, 'Unauthorized');
+ *     return {
+ *         userId: session.userId,
+ *     };
  * });
  */
-export function createGuard<E extends Env = Env>(
-    guard: (args: { c: Context<E>; deny: Deny }) => Promise<Response | void> | Response | void
-): MiddlewareHandler<E> {
-    return async (context, next) => {
-        const result = await guard({ c: context, deny });
-        if (result instanceof Response) {
-            return result;
-        }
-        await next();
-    };
+export function createGuard<
+    const R extends Routes,
+    Schemes extends Record<string, SecurityScheme>,
+    Auth,
+    const Name extends Extract<keyof Schemes, string>,
+    E extends Env = Env,
+>(
+    _contract: Contract<R, Record<string, TagOptions>, string, Schemes, Auth>,
+    _identity: Name,
+    run: GuardFns<Schemes, GuardParams<R, Auth, Name>, E>[Name]
+): GuardRun<HonoHandlerContext<E>> {
+    return run as unknown as GuardRun<HonoHandlerContext<E>>;
 }
 
 const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { c: Context<Env>; formatError?: ErrorFormatter<Request> }>({
@@ -140,24 +240,46 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
 });
 
 /**
- * Bind a contract to its router and per-route middleware.
+ * Bind a contract to its router and a guard per identity.
  *
  * @example
  * export const api = createApi({
  *     contract,
  *     router,
- *     middleware,
+ *     guards: {
+ *         user: requireUser,
+ *     },
  * });
  */
-export function createApi<const R extends Routes, E extends Env = Env>(options: {
-    contract: Contract<R, Record<string, TagOptions>, string>;
-    router: Router<Contract<R>, E>;
-    middleware?: MiddlewareMap<R, MiddlewareHandler<E>>;
-}): HonoApi<R> {
-    const { contract, router, middleware } = options;
+export function createApi<
+    const R extends Routes,
+    Schemes extends Record<string, SecurityScheme>,
+    Auth,
+    RequestContext extends Record<string, RequestContextSchema>,
+    E extends Env,
+>(
+    options: {
+        contract: Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext>;
+        router: Router<Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext>, E>;
+        guards?: NoInfer<GuardsForSchemes<Schemes, E>>;
+        /**
+         * Per-route middleware, in the same shape as the contract's routes.
+         *
+         * @deprecated Define auth with identities + the contract's `auth` map and
+         * pass `guards` instead. See /docs/auth.
+         */
+        middleware?: MiddlewareMap<R, MiddlewareHandler<E>>;
+    } & (string extends keyof RequestContext
+        ? { requestContext?: undefined }
+        : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<HonoHandlerContext<E>> }> })
+): HonoApi<R> {
+    const { contract, router, guards, requestContext, middleware } = options;
     const spec = coreApi(contract.routes);
     return Object.assign(spec, {
         [ROUTER_META]: router,
+        [GUARDS_META]: guards,
+        [SCHEMES_META]: contract.securitySchemes,
+        [REQUEST_CONTEXT_META]: requestContext,
         [MIDDLEWARE_META]: middleware,
     }) as unknown as HonoApi<R>;
 }
@@ -171,6 +293,9 @@ export function createApi<const R extends Routes, E extends Env = Env>(options: 
  */
 export function createHonoEndpoints<E extends Env = Env>(api: HonoApi, app: Hono<E>, options?: HonoOptions): void {
     const resolvedRouter = api[ROUTER_META] as CoreRouter<Routes, HonoHandlerContext<E>>;
+    const guards = api[GUARDS_META] as GuardMap<HonoHandlerContext<Env>> | undefined;
+    const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
+    const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<HonoHandlerContext<Env>> | undefined;
     const middlewareMap = api[MIDDLEWARE_META] as MiddlewareMap<Routes, MiddlewareHandler<E>> | undefined;
 
     for (const { routeKey, route } of honoAdapter.eachRoute(
@@ -204,6 +329,9 @@ export function createHonoEndpoints<E extends Env = Env>(api: HonoApi, app: Hono
                     c: c as unknown as Context<Env>,
                     formatError: options?.formatError,
                 },
+                guards,
+                schemes,
+                requestContext,
                 responseValidation: options?.responseValidation,
             });
         };

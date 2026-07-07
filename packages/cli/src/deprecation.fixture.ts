@@ -175,11 +175,6 @@ const routes = k.routes('api', {
         method: 'GET',
         path: '/users/by-id/:id',
         tags: ['users'],
-        security: [
-            {
-                bearerAuth: [],
-            },
-        ],
         externalDocs: {
             url: 'https://example.com/docs/getUser',
             description: 'Reference docs',

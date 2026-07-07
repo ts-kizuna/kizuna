@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
-import { kizuna, createTags, createModel, type Contract } from '@ts-kizuna/core';
+import { kizuna, createTags, createModel, createIdentity, type Contract } from '@ts-kizuna/core';
 import { contractFingerprint } from '@ts-kizuna/core/generator';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateOpenApi, type GenerateOpenApiOptions } from './generator.js';
@@ -297,11 +297,6 @@ describe('operation metadata passthrough', () => {
             method: 'GET',
             path: '/users/:id',
             tags: ['api'],
-            security: [
-                {
-                    bearerAuth: [],
-                },
-            ],
             externalDocs: {
                 url: 'https://example.com/docs/getUser',
                 description: 'Reference docs',
@@ -323,33 +318,23 @@ describe('operation metadata passthrough', () => {
         await expect(spec).toBeAValidOpenAPIDefinition();
     });
 
-    it('emits route-level tags, security, externalDocs on the operation', () => {
+    it('emits route-level tags and externalDocs on the operation', () => {
         const spec = generateJson(deprecatedContract, baseConfig);
         const operation = spec.paths['/users/by-id/{id}']?.get;
         expect(operation?.tags).toEqual(['API', 'Users']);
-        expect(operation?.security).toEqual([
-            {
-                bearerAuth: [],
-            },
-        ]);
         expect(operation?.externalDocs).toEqual({
             url: 'https://example.com/docs/getUser',
             description: 'Reference docs',
         });
     });
 
-    it('emits document-level tags, security, externalDocs from config', () => {
+    it('emits document-level tags and externalDocs from config', () => {
         const spec = generateJson(annotated, {
             ...baseConfig,
             tags: [
                 {
                     name: 'users',
                     description: 'User-related operations',
-                },
-            ],
-            security: [
-                {
-                    bearerAuth: [],
                 },
             ],
             externalDocs: {
@@ -363,11 +348,6 @@ describe('operation metadata passthrough', () => {
             },
             {
                 name: 'API',
-            },
-        ]);
-        expect(spec.security).toEqual([
-            {
-                bearerAuth: [],
             },
         ]);
         expect(spec.externalDocs).toEqual({
@@ -1401,5 +1381,219 @@ describe('binary response bodies', () => {
             | Record<string, unknown>
             | undefined;
         expect(schema).toEqual({ type: 'string', format: 'binary' });
+    });
+});
+
+describe('security from the contract', () => {
+    const user = createIdentity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+        bearerFormat: 'JWT',
+    });
+
+    const member = createIdentity.apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            workspaceUserId: z.string(),
+        }),
+        access: z.object({
+            role: z.enum(['owner', 'admin']),
+        }),
+    });
+
+    const makeSecuredContract = () => {
+        const { k: securedK } = kizuna({
+            identities: {
+                user,
+                member,
+            },
+        });
+        const routes = securedK.routes({
+            listUsers: {
+                method: 'GET',
+                path: '/users',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+            getSecret: {
+                method: 'GET',
+                path: '/secret',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+            deleteWorkspace: {
+                method: 'DELETE',
+                path: '/workspace',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+            scoped: {
+                method: 'GET',
+                path: '/scoped',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        });
+        return securedK.contract({
+            routes: {
+                api: routes,
+            },
+            auth: {
+                api: {
+                    '*': false,
+                    getSecret: 'user',
+                    deleteWorkspace: {
+                        member: {
+                            role: 'owner',
+                        },
+                    },
+                    scoped: {
+                        user: ['read:secrets'],
+                    },
+                },
+            },
+        });
+    };
+
+    const spec = generateJson(makeSecuredContract(), baseConfig);
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+
+    it('emits components.securitySchemes from the contract identities', () => {
+        expect(spec.components?.securitySchemes).toEqual({
+            user: {
+                type: 'http',
+                scheme: 'bearer',
+                bearerFormat: 'JWT',
+            },
+            member: {
+                type: 'apiKey',
+                name: 'x-workspace-token',
+                in: 'header',
+            },
+        });
+    });
+
+    it('emits operation.security for an identity-secured route', () => {
+        expect(spec.paths['/secret']?.get?.security).toEqual([
+            {
+                user: [],
+            },
+        ]);
+    });
+
+    it('emits operation.security for a gated route without leaking the gate', () => {
+        expect(spec.paths['/workspace']?.delete?.security).toEqual([
+            {
+                member: [],
+            },
+        ]);
+    });
+
+    it('emits the required scopes on a scoped route', () => {
+        expect(spec.paths['/scoped']?.get?.security).toEqual([
+            {
+                user: ['read:secrets'],
+            },
+        ]);
+    });
+
+    it('omits security entirely on a public route', () => {
+        expect(spec.paths['/users']?.get?.security).toBeUndefined();
+    });
+
+    it('omits securitySchemes when the contract has no identities', () => {
+        const plain = k.contract({
+            routes: contractRoutes,
+        });
+        const plainSpec = generateJson(plain, baseConfig);
+        expect(plainSpec.components?.securitySchemes).toBeUndefined();
+    });
+});
+
+describe('shared scheme names', () => {
+    it('emits one securitySchemes entry for identities sharing a scheme', () => {
+        const admin = createIdentity.bearer({
+            scheme: 'user',
+            context: z.object({
+                userId: z.string(),
+            }),
+        });
+        const viewer = createIdentity.bearer({
+            scheme: 'user',
+            context: z.object({
+                userId: z.string(),
+            }),
+        });
+        const { k: sharedK } = kizuna({
+            identities: {
+                admin,
+                viewer,
+            },
+        });
+        const routes = sharedK.routes({
+            updateSettings: {
+                method: 'GET',
+                path: '/settings/update',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+            getSettings: {
+                method: 'GET',
+                path: '/settings',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        });
+        const sharedContract = sharedK.contract({
+            routes: {
+                api: routes,
+            },
+            auth: {
+                api: {
+                    '*': 'viewer',
+                    updateSettings: 'admin',
+                },
+            },
+        });
+        const spec = generateJson(sharedContract, baseConfig);
+        expect(spec.components?.securitySchemes).toEqual({
+            user: {
+                type: 'http',
+                scheme: 'bearer',
+            },
+        });
+        expect(spec.paths['/settings/update']?.get?.security).toEqual([
+            {
+                user: [],
+            },
+        ]);
+        expect(spec.paths['/settings']?.get?.security).toEqual([
+            {
+                user: [],
+            },
+        ]);
     });
 });

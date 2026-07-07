@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createModel, type Contract } from '@ts-kizuna/core';
+import { kizuna, createModel, createRequestContext, type Contract } from '@ts-kizuna/core';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateKotlinClient } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
@@ -1332,5 +1332,68 @@ describe('Kotlin generator — grouped request components (params/body/query/hea
         // dashes → underscores, leading digit → `_` prefix; the original value is kept as the wireValue
         expect(output).toContain('@SerialName("3d-model") _3D_MODEL("3d-model")');
         expect(output).not.toContain(' 3D_MODEL(');
+    });
+});
+
+describe('Kotlin generator — request context', () => {
+    const analytics = createRequestContext({
+        headers: z.object({
+            'x-session-id': z.string().optional(),
+            'x-tenant': z.string(),
+        }),
+        context: z.object({
+            sessionId: z.string().nullable(),
+        }),
+    });
+
+    const { k: ctxK } = kizuna({
+        requestContext: {
+            analytics,
+        },
+    });
+
+    const ctxContract = ctxK.contract({
+        routes: {
+            users: ctxK.routes({
+                listUsers: {
+                    method: 'GET',
+                    path: '/users',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            }),
+        },
+    });
+
+    it('emits a RequestContext class and a required constructor parameter', () => {
+        const output = generateKotlinClient(ctxContract, baseConfig);
+        expect(output).toContain('data class RequestContext');
+        expect(output).toContain('requestContext: RequestContext,');
+        expect(output).toContain('private val requestContextHeaders: Map<String, String> = buildMap');
+        expect(output).toContain('for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)');
+        expect(output).toContain('put("x-tenant", requestContext.xTenant)');
+        expect(output).toContain('if (requestContext.xSessionId != null) put("x-session-id", requestContext.xSessionId!!)');
+    });
+
+    it('emits nothing when the contract declares no request context headers', () => {
+        const plainContract = k.contract({
+            routes: k.routes('api', {
+                ping: {
+                    method: 'GET',
+                    path: '/ping',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            }),
+        });
+        const output = generateKotlinClient(plainContract, baseConfig);
+        expect(output).not.toContain('RequestContext');
+        expect(output).not.toContain('requestContextHeaders');
     });
 });

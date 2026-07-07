@@ -10,6 +10,9 @@ import type { Routes, RouteDefinition } from './types.js';
  *
  * Every top-level group must be present — use `[]` for public routes. Inside a
  * group, individual route keys are optional because `'*'` provides the default.
+ *
+ * @deprecated Define auth with identities + the contract's `auth` map and pass
+ * `guards` to `createApi`. See /docs/auth.
  */
 export type MiddlewareMap<T extends Routes, M> = {
     [K in keyof T as K extends symbol ? never : K]: T[K] extends RouteDefinition

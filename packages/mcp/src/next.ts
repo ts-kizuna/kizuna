@@ -1,6 +1,6 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import type { Routes } from '@ts-kizuna/core';
-import { type ApiWithRouter } from '@ts-kizuna/core/adapter';
+import { type ApiWithRouter, headersToObject } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
 type HttpHandler = (request: Request) => Promise<Response>;
@@ -70,6 +70,7 @@ export const createMcpEndpoint = (api: Routes & ApiWithRouter, options?: McpEndp
             handlerContext: {
                 request,
             },
+            credentialHeaders: headersToObject(request.headers),
         });
         const transport = new WebStandardStreamableHTTPServerTransport({
             sessionIdGenerator: undefined,

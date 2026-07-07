@@ -110,77 +110,28 @@ getUser: async ({ params, request }) => {
 },
 ```
 
-## Middleware
+## Guards
 
-Per-route middleware runs before the handler. Declare which routes it runs on with a `middleware` map on `createApi`, shaped like your routes. Authentication is just middleware that attaches data to `request`, which handlers then read.
-
-### Writing a guard
-
-A guard is the common case: a middleware that allows or rejects a request. `createGuard` wraps that check so you skip the `new Response()` boilerplate — call `deny(status, detail)` to reject, return to allow. The `route` argument is the matched route (its `path`, `method`, and `params`), handy for per-route decisions in a shared guard.
+One guard per identity. The credential arrives extracted and typed, alongside the native `request` — see the [Auth guide](/docs/auth).
 
 ```ts title="src/lib/guards.ts"
 import { createGuard } from '@ts-kizuna/next';
+import { contract } from '@shared/contract';
 
-export const authenticate = createGuard(async ({ request, deny }) => {
-    const session = await getSession(request);
+export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {
+    const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
     }
-    request.userId = session.userId;
-});
-
-export const requireAdmin = createGuard(({ request, deny }) => {
-    if (request.userRole !== 'admin') {
-        return deny(403, 'Forbidden');
-    }
-});
-
-export const requireMembership = createGuard(async ({ request, route, deny }) => {
-    const membership = await checkMembership(request.userId, route.params?.id);
-    if (!membership) {
-        return deny(403, 'Forbidden');
-    }
-    request.member = membership;
+    return {
+        userId: session.userId,
+    };
 });
 ```
 
-### Wiring middleware to routes
+## Middleware
 
-The map mirrors your routes. Every top-level group key must be present — use `[]` for public groups.
-
-```ts title="src/lib/middleware.ts"
-import { createMiddleware } from '@ts-kizuna/next';
-import { contract } from '@shared/contract';
-import { authenticate, requireAdmin, requireMembership } from './guards';
-
-export const middleware = createMiddleware(contract, {
-    // Group-level: applies to all routes under "users"
-    users: [authenticate],
-    // Group default with per-route override
-    members: {
-        '*': [authenticate, requireMembership],
-        listMembers: [authenticate],
-    },
-    // Multiple middleware compose left to right
-    admin: [authenticate, requireAdmin],
-    // Explicit public group
-    health: [],
-});
-```
-
-### Plugging into the API
-
-```ts title="src/lib/server.ts"
-import { createApi } from '@ts-kizuna/next';
-
-export const api = createApi({
-    contract,
-    router,
-    middleware,
-});
-```
-
-Properties set on `request` by guards are accessible in handlers via `{ request }`.
+For request-scoped values handlers need, use [`createRequestContext`](/docs/reference/create-request-context). For other middleware — logging, rate limiting, cache headers — use Next.js's own [middleware](https://nextjs.org/docs/app/building-your-application/routing/middleware), or the [`requestMiddleware`](#requestmiddleware) option to run middleware after route matching. Authentication belongs in [guards](#guards).
 
 ## Options
 
@@ -196,7 +147,7 @@ createNextEndpoints(api, {
 | Option               | Default | Description                                                                                                                                                  |
 | -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `basePath`           | `''`    | Path prefix to strip when matching incoming paths                                                                                                            |
-| `requestMiddleware`  | `[]`    | **Deprecated.** Use the `middleware` map via `createApi` instead.                                                                                            |
+| `requestMiddleware`  | `[]`    | Middleware run after route matching, before the handler — see [`requestMiddleware`](#requestmiddleware)                                                      |
 | `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                              |
 | `onError`            | —       | Map a thrown error into a response (inbound migration seam); return an `AdapterResult`/`Response` to override the default 500. Also settable on `createApi`. |
 
@@ -235,23 +186,20 @@ export const api = createApi({
 
 Returning `undefined` lets the default 500 flow run.
 
-## `requestMiddleware` (deprecated)
+## `requestMiddleware`
 
-> Use [`middleware`](#middleware) instead. `requestMiddleware` applies globally to all routes; `middleware` lets you declare per-route and per-group middleware that mirrors your routes.
-
-`requestMiddleware` applies a flat array of middleware to every matched route. It still works alongside `middleware` — global middleware runs after per-route middleware.
+`requestMiddleware` applies a flat array of middleware to every matched route, after route matching and before the handler. Each middleware receives `(request, route)` — the `route` is the matched route's `path` and `method` — and may return a `Response` to short-circuit.
 
 ## Type-safe request properties
 
-If your middleware sets custom properties on the request, use module augmentation to extend `NextRequest` so handlers can access them without casts:
+Auth data doesn't need request mutation — guards return typed context that handlers receive directly. But if non-auth middleware sets custom properties on the request, such as a request id, use module augmentation to extend `NextRequest` so handlers can access them without casts:
 
 ```ts title="types/next.d.ts"
 import 'next/server';
 
 declare module 'next/server' {
     interface NextRequest {
-        userId: string;
-        sessionId?: string | null;
+        requestId: string;
     }
 }
 ```
@@ -259,23 +207,8 @@ declare module 'next/server' {
 With the augmentation in place, both middleware and handlers are fully typed:
 
 ```ts
-requestMiddleware: [
-    async (request) => {
-        const session = await getSession(request);
-        if (!session) {
-            return new Response(null, {
-                status: 401,
-            });
-        }
-        request.userId = session.userId;
-        request.sessionId = session.id;
-    },
-],
-```
-
-```ts
 getUser: async ({ params, request }) => {
-    console.log(request.userId);
+    console.log(request.requestId);
     // ...
 },
 ```
@@ -302,5 +235,4 @@ uploadAvatar: async ({ body }) => {
 
 - [`createRouter`](/docs/reference/create-router)
 - [`createApi`](/docs/reference/create-api)
-- [`createMiddleware`](/docs/reference/create-middleware)
 - [`createGuard`](/docs/reference/create-guard)

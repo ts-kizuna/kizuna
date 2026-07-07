@@ -221,6 +221,23 @@ class APIClientTest {
     }
 
     @Test
+    fun testRequestContextHeaderReachesHandler() = runTest {
+        // The contract declares `analytics` request context sourced from the
+        // x-posthog-session-id header. A client sets it once on the constructor;
+        // the server resolves it and the handler echoes it back.
+        val baseUrl = System.getenv("API_BASE_URL") ?: "http://localhost:8765"
+        val contextClient = APIClient(baseUrl = baseUrl, requestContext = APIClient.RequestContext(xPosthogSessionId = "sess-kotlin-123"))
+        val response = contextClient.notifications.listEvents()
+        assertEquals("sess-kotlin-123", response.body.echo.sessionId)
+    }
+
+    @Test
+    fun testRequestContextOmittedWhenNotSet() = runTest {
+        val response = client.notifications.listEvents()
+        assertNull(response.body.echo.sessionId)
+    }
+
+    @Test
     fun testArchiveUserMultiStatus() = runTest {
         val created = client.users.createUser {
             body(

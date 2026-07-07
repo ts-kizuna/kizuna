@@ -1,5 +1,15 @@
 import type { z } from 'zod';
-import type { RouteDefinition, Routes, ValidationError, ValidationErrorFor, Contract, TagOptions } from '@ts-kizuna/core';
+import type {
+    RouteDefinition,
+    Routes,
+    ValidationError,
+    ValidationErrorFor,
+    Contract,
+    TagOptions,
+    RequestContextSchema,
+    RequestContextHeaderInputs,
+    SecurityScheme,
+} from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
 import { buildPath, isRouteDefinition } from '@ts-kizuna/core';
 
@@ -62,6 +72,28 @@ type ClientFn<R extends RouteDefinition, Codes extends string> =
 export type Client<T extends Routes, Codes extends string = never> = {
     [K in keyof T]: T[K] extends RouteDefinition ? ClientFn<T[K], Codes> : T[K] extends Routes ? Client<T[K], Codes> : never;
 };
+
+type UnionToIntersection<Union> = (Union extends unknown ? (distributed: Union) => void : never) extends (
+    intersected: infer Intersection
+) => void
+    ? Intersection
+    : never;
+
+/**
+ * Every header input the contract's request context declares, flattened. Set
+ * once on `createClient` under `requestContext` and sent with every request.
+ */
+type ContextHeaderInputs<Declarations> = string extends keyof Declarations
+    ? {}
+    : [keyof Declarations] extends [never]
+      ? {}
+      : UnionToIntersection<
+              {
+                  [Name in keyof Declarations]: RequestContextHeaderInputs<Declarations[Name]>;
+              }[keyof Declarations]
+          > extends infer Merged
+        ? { [Key in keyof Merged]: Merged[Key] }
+        : never;
 
 export interface RequestContext {
     url: string;
@@ -193,6 +225,9 @@ const buildClientTree = (router: Routes, config: ClientConfig): Record<string, u
  * validates its arguments and returns the typed response. The contract's custom
  * issue codes are carried through to `errors[].code` on `400` responses.
  *
+ * When the contract declares a request context with header bindings, pass their
+ * values under `requestContext`; the client sends them with every request.
+ *
  * @example
  * export const apiClient = createClient(contract, {
  *     baseUrl: 'https://api.example.com',
@@ -202,14 +237,30 @@ const buildClientTree = (router: Routes, config: ClientConfig): Record<string, u
  *     params: {
  *         id: '1',
  *     },
- *     body: {
- *         amount: 10,
- *     },
  * });
  */
-export function createClient<T extends Routes, Codes extends string = never>(
-    contract: Contract<T, Record<string, TagOptions>, Codes>,
-    config: ClientConfig
+export function createClient<
+    T extends Routes,
+    Codes extends string = never,
+    Schemes extends Record<string, SecurityScheme> = Record<string, never>,
+    RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
+>(
+    contract: Contract<T, Record<string, TagOptions>, Codes, Schemes, unknown, RequestContext>,
+    config: ClientConfig &
+        ({} extends ContextHeaderInputs<RequestContext>
+            ? { requestContext?: ContextHeaderInputs<RequestContext> }
+            : { requestContext: ContextHeaderInputs<RequestContext> })
 ): Client<T, Codes> {
-    return buildClientTree(contract.routes, config) as Client<T, Codes>;
+    const contextHeaders = (config as { requestContext?: Record<string, string | undefined> }).requestContext;
+    const resolvedConfig: ClientConfig = contextHeaders
+        ? {
+              ...config,
+              baseHeaders: {
+                  ...Object.fromEntries(Object.entries(contextHeaders).filter(([, value]) => value !== undefined)),
+                  ...(config.baseHeaders ?? {}),
+              } as Record<string, string>,
+          }
+        : config;
+
+    return buildClientTree(contract.routes, resolvedConfig) as Client<T, Codes>;
 }

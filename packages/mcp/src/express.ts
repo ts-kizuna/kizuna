@@ -60,6 +60,7 @@ export const createMcpEndpoint = (api: Routes & ApiWithRouter, app: AppLike, opt
                 req: request,
                 res: response,
             },
+            credentialHeaders: request.headers,
         });
         const transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: undefined,

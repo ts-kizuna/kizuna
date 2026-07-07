@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { kizuna, createTags, createRequestContext } from '@ts-kizuna/core';
 import { createClient } from './client.js';
 
 const { k } = kizuna({
@@ -608,5 +608,66 @@ describe('createClient — relative baseUrl', () => {
         });
 
         expect(receivedUrl).toBe('/api/users/1');
+    });
+});
+
+describe('requestContext on the client initializer', () => {
+    const analytics = createRequestContext({
+        headers: z.object({
+            'x-session-id': z.string().optional(),
+        }),
+        context: z.object({
+            sessionId: z.string().nullable(),
+        }),
+    });
+
+    const { k: ctxK } = kizuna({
+        requestContext: {
+            analytics,
+        },
+    });
+
+    const ctxContract = ctxK.contract({
+        routes: {
+            users: ctxK.routes({
+                listUsers: {
+                    method: 'GET',
+                    path: '/users',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            }),
+        },
+    });
+
+    it('sends requestContext values as headers on every request', async () => {
+        const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        const ctxClient = createClient(ctxContract, {
+            baseUrl: 'https://api.example.com',
+            fetch: fetchMock as unknown as typeof fetch,
+            requestContext: {
+                'x-session-id': 's1',
+            },
+        });
+        await ctxClient.users.listUsers();
+        const requestInit = (fetchMock.mock.calls[0] as unknown[])[1] as { headers: Headers };
+        expect(requestInit.headers.get('x-session-id')).toBe('s1');
+    });
+
+    it('omits undefined values', async () => {
+        const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        const ctxClient = createClient(ctxContract, {
+            baseUrl: 'https://api.example.com',
+            fetch: fetchMock as unknown as typeof fetch,
+            requestContext: {
+                'x-session-id': undefined,
+            },
+        });
+        await ctxClient.users.listUsers();
+        const requestInit = (fetchMock.mock.calls[0] as unknown[])[1] as { headers: Headers };
+        expect(requestInit.headers.get('x-session-id')).toBeNull();
     });
 });

@@ -1,0 +1,134 @@
+---
+title: createIdentity
+description: Define who can call your API — an OpenAPI security scheme, the context a passing guard provides, and the access fields routes may constrain.
+---
+
+An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/create-guard) provides to handlers), and an optional `access` schema (the fields the [`auth` map](/docs/reference/kizuna#the-auth-map) may constrain per route). Omit `context` for an authentication-only identity — a pure gate with no data to hand the handler. For the full walkthrough, see the [Auth guide](/docs/auth).
+
+<InstallTabs packageName="@ts-kizuna/core" />
+
+```ts
+import { createIdentity } from '@ts-kizuna/core';
+```
+
+## Builders
+
+One builder per authentication method, matching the OpenAPI security scheme types:
+
+| Builder                        | Credential source                            | OpenAPI scheme                       |
+| ------------------------------ | -------------------------------------------- | ------------------------------------ |
+| `createIdentity.bearer`        | `Authorization: Bearer <token>`              | `{ type: 'http', scheme: 'bearer' }` |
+| `createIdentity.apiKey`        | A named header, query parameter, or cookie   | `{ type: 'apiKey', name, in }`       |
+| `createIdentity.basic`         | `Authorization: Basic <base64>`, decoded     | `{ type: 'http', scheme: 'basic' }`  |
+| `createIdentity.oauth2`        | `Authorization: Bearer <token>`, with scopes | `{ type: 'oauth2', flows }`          |
+| `createIdentity.openIdConnect` | `Authorization: Bearer <token>`              | `{ type: 'openIdConnect', ... }`     |
+
+Every builder takes `context` (optional), `access` (optional), `description` (optional), and `scheme` (optional — identities sharing one credential set the same `scheme` name and emit a single OpenAPI scheme). Method-specific fields:
+
+| Builder                        | Extra fields                                  |
+| ------------------------------ | --------------------------------------------- |
+| `createIdentity.bearer`        | `bearerFormat?` (e.g. `'JWT'`)                |
+| `createIdentity.apiKey`        | `name`, `in: 'header' \| 'query' \| 'cookie'` |
+| `createIdentity.oauth2`        | `flows` (OpenAPI OAuth Flows object)          |
+| `createIdentity.openIdConnect` | `openIdConnectUrl`                            |
+
+## Example
+
+```ts title="src/identities.ts"
+import { z } from 'zod';
+import { createIdentity } from '@ts-kizuna/core';
+
+export const user = createIdentity.bearer({
+    context: z.object({
+        userId: z.string(),
+    }),
+});
+
+export const member = createIdentity.apiKey({
+    name: 'x-workspace-token',
+    in: 'header',
+    context: z.object({
+        workspaceUserId: z.string(),
+    }),
+    access: z.object({
+        role: z.enum(['owner', 'admin']),
+    }),
+});
+```
+
+## `context` vs `access`
+
+Both describe what the guard returns and the handler reads:
+
+- **`context`** — who the caller is. A guard must return it; handlers of secured routes receive it under the identity's name (`{ user }`, `{ member }`).
+- **`access`** — the fields the `auth` map may gate per route. Gating on `{ member: { role: 'owner' } }` enforces a 403 at runtime and narrows the handler's type — `member.role` is `'owner'`, not `'owner' | 'admin'`.
+
+Skip `access` for identities that never gate on fields; the auth map can still require them (`'user'`), it just can't constrain them.
+
+## Authentication-only identities
+
+Some identities are pure gates — an API key that only proves the caller is a known client, or a bearer token where "authenticated" is all the handler needs. These have no data to hand the handler, so omit `context` (and `access`) entirely:
+
+```ts title="src/identities.ts"
+export const apiConsumer = createIdentity.apiKey({
+    name: 'x-api-key',
+    in: 'header',
+});
+```
+
+Its [guard](/docs/reference/create-guard) returns nothing on success (or `deny(...)` to reject) — no `return {}` boilerplate:
+
+```ts
+export const requireApiKey = createGuard(contract, 'apiConsumer', ({ apiKey, deny }) => {
+    if (!apiKey || !(await isKnownKey(apiKey.value))) return deny(401, 'Unauthorized');
+});
+```
+
+A route secured only by a context-less identity gets no arg for it — the identity contributes nothing to the handler args.
+
+## Registering identities
+
+Pass identities to [`kizuna`](/docs/reference/kizuna) under `identities`. Their keys become the names everything else uses — auth map values, guard registrations, and handler context keys:
+
+```ts title="src/k.ts"
+import { kizuna } from '@ts-kizuna/core';
+import { tags } from './tags';
+import { user, member } from './identities';
+
+export const { k } = kizuna({
+    identities: {
+        user,
+        member,
+    },
+    tags,
+});
+```
+
+## Securing routes
+
+Routes never mention identities directly — the contract's `auth` map assigns them per group (or per route via a `'*'` cascade), keyed by the names above:
+
+```ts title="src/contract.ts"
+export const contract = k.contract({
+    routes,
+    auth: {
+        users: false,
+        health: false,
+        members: 'user',
+        workspace: {
+            '*': 'member',
+            deleteWorkspace: {
+                member: {
+                    role: 'owner',
+                },
+            },
+        },
+    },
+});
+```
+
+See the [`auth` map reference](/docs/reference/kizuna#the-auth-map) for every value form. From there, each identity needs exactly one [guard](/docs/reference/create-guard), registered on [`createApi`](/docs/reference/create-api).
+
+## OpenAPI emission
+
+[`generateOpenApi`](/docs/reference/generate-openapi) emits identities under `components.securitySchemes`, and each secured route references them in its `security` — with any OAuth scopes the auth map declares.

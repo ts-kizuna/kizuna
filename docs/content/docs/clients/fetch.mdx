@@ -107,6 +107,19 @@ const { body } = await apiClient.users.getUser({
 
 Routes without a `headers` schema accept an optional `headers?: Record<string, string>` for arbitrary request headers.
 
+## Auth
+
+When the contract secures routes with [identities](/docs/auth), send the credential in `baseHeaders` — the server's guards read it and return the typed `401`/`403` when it's missing or insufficient:
+
+```ts
+const apiClient = createClient(contract, {
+    baseUrl: 'https://api.example.com',
+    baseHeaders: {
+        Authorization: `Bearer ${token}`,
+    },
+});
+```
+
 ## Per-request fetch options
 
 Pass any `RequestInit` option via `fetchOptions`:

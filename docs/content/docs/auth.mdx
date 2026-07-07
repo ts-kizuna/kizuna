@@ -1,0 +1,232 @@
+---
+title: Auth
+description: Declare identities and per-route auth on the contract — runtime guards, typed handler context, OpenAPI security, and client access checks all follow.
+---
+
+Auth lives in the contract: **identities** say who can call your API, the **auth map** says which routes they can call. One declaration drives enforcement, handler types, the OpenAPI spec, and client access checks.
+
+```ts title="packages/contract/src/identities.ts"
+import { z } from 'zod';
+import { createIdentity } from '@ts-kizuna/core';
+
+export const user = createIdentity.bearer({
+    context: z.object({
+        userId: z.string(),
+    }),
+});
+```
+
+```ts title="packages/contract/src/k.ts"
+import { kizuna } from '@ts-kizuna/core';
+import { tags } from './tags';
+import { user } from './identities';
+
+export const { k } = kizuna({
+    identities: {
+        user,
+    },
+    tags,
+});
+```
+
+```ts title="packages/contract/src/contract.ts"
+import { k } from './k';
+import { routes } from './routes';
+
+export const contract = k.contract({
+    routes,
+    auth: {
+        health: false,
+        members: 'user',
+    },
+});
+```
+
+```ts title="src/lib/guards.ts"
+import { createGuard } from '@ts-kizuna/express';
+import { contract } from '@shared/contract';
+
+export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {
+    const session = bearer ? await verifySession(bearer.token) : undefined;
+    if (!session) {
+        return deny(401, 'Unauthorized');
+    }
+    return {
+        userId: session.userId,
+    };
+});
+```
+
+```ts title="src/lib/server.ts"
+import { createApi } from '@ts-kizuna/express';
+import { contract } from '@shared/contract';
+import { router } from './router';
+import { requireUser } from './guards';
+
+export const api = createApi({
+    contract,
+    router,
+    guards: {
+        user: requireUser,
+    },
+});
+```
+
+Every route under `members` now runs the guard, and its handler receives the guard's return — typed — under the identity's name:
+
+```ts
+members: {
+    listMembers: ({ user }) => ({
+        status: 200,
+        body: {
+            members: findMembersExcept(user.userId),
+        },
+    }),
+},
+```
+
+## Identities
+
+One builder per authentication method: `bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`. Each optionally takes `context` (what a guard returns and handlers receive) and `access` (fields the auth map may gate per route):
+
+```ts title="packages/contract/src/identities.ts"
+export const member = createIdentity.apiKey({
+    name: 'x-workspace-token',
+    in: 'header',
+    context: z.object({
+        workspaceUserId: z.string(),
+    }),
+    access: z.object({
+        role: z.enum(['owner', 'admin']),
+    }),
+});
+```
+
+Omit `context` for an authentication-only identity — a pure gate like an API key that only proves the caller is a known client. Its guard returns nothing on success (or `deny(...)`), and routes secured by it receive no handler arg for it:
+
+```ts title="packages/contract/src/identities.ts"
+export const apiConsumer = createIdentity.apiKey({
+    name: 'x-api-key',
+    in: 'header',
+});
+```
+
+All builders and their fields: [`createIdentity`](/docs/reference/create-identity).
+
+## The auth map
+
+Keyed by route group; every group must appear, so public is always an explicit `false`. Each entry is one of:
+
+| Value                             | Meaning                                                                       |
+| --------------------------------- | ----------------------------------------------------------------------------- |
+| `false`                           | Public — no auth                                                              |
+| `'user'`                          | Requires the `user` identity                                                  |
+| `{ member: { role: 'owner' } }`   | Access gate — requires `member` with `role` limited to a value (or an array)  |
+| `{ user: ['read:events'] }`       | Requires `user` with these oauth2 scopes                                      |
+| `{ user: true, member: { ... } }` | Multiple identities — all must pass                                           |
+| `{ '*': ..., routeKey: ... }`     | Cascade — `'*'` sets the group default, named keys override individual routes |
+
+```ts title="packages/contract/src/contract.ts"
+export const contract = k.contract({
+    routes,
+    auth: {
+        users: false,
+        health: false,
+        members: 'user',
+        workspace: {
+            '*': 'member',
+            deleteWorkspace: {
+                member: {
+                    role: 'owner',
+                },
+            },
+            transfer: {
+                member: {
+                    role: 'owner',
+                },
+            },
+        },
+    },
+});
+```
+
+A route entry inherits the `'*'` default and only states its delta — `deleteWorkspace` above keeps requiring `member`, tightened to `role: 'owner'`. Adding another identity (`{ user: true }`) requires both; `false` opts the route out. Identity names are type-checked, and `security` can't be written inline in `k.routes`.
+
+### Access gates
+
+`{ member: { role: 'owner' } }` rejects other roles with a `403` before the handler runs — and inside the handler, `member.role` narrows to `'owner'`. Array fields pass when they contain the value (`{ member: { permissions: 'invoicing' } }`):
+
+```ts
+workspace: {
+    deleteWorkspace: ({ member }) => ({
+        status: 200,
+        body: {
+            ok: member.role === 'owner',
+        },
+    }),
+},
+```
+
+A route requiring several identities receives all of them — `transfer: ({ body, user, member }) => ...`.
+
+## Guards
+
+One guard per identity — not per route. The credential arrives extracted and typed, along with the route's path `params`. For a request to `/workspaces/ws_42/members`, `params.workspaceId` is `'ws_42'` — so the guard can check not just that the token is valid, but that the caller belongs to that workspace:
+
+```ts title="src/lib/guards.ts"
+export const requireMember = createGuard(contract, 'member', async ({ apiKey, params, deny }) => {
+    const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
+    if (!membership) {
+        return deny(403, 'Forbidden');
+    }
+    return membership;
+});
+```
+
+The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes` — see [`createGuard`](/docs/reference/create-guard). For request-scoped values that gate nothing — analytics ids, loggers — use [`createRequestContext`](/docs/reference/create-request-context) instead.
+
+## What falls out for free
+
+### OpenAPI security
+
+[`generateOpenApi`](/docs/reference/generate-openapi) emits `securitySchemes` and per-route `security` from the auth map:
+
+```yaml
+# generated
+components:
+    securitySchemes:
+        member:
+            type: apiKey
+            name: x-workspace-token
+            in: header
+paths:
+    /workspace:
+        get:
+            security:
+                - member: []
+```
+
+### Client
+
+The [`createClient`](/docs/reference/create-client) client sends the credential in `baseHeaders`; the server's guards enforce the contract's auth and return the typed `401`/`403`:
+
+```ts
+const apiClient = createClient(contract, {
+    baseUrl,
+    baseHeaders: {
+        Authorization: `Bearer ${token}`,
+    },
+});
+```
+
+### MCP
+
+[MCP endpoints](/docs/mcp) run the same guards per tool call, reading credentials from the transport request's headers.
+
+## Reference
+
+- [`createIdentity`](/docs/reference/create-identity)
+- [`kizuna`](/docs/reference/kizuna#the-auth-map) — the auth map's value forms
+- [`createGuard`](/docs/reference/create-guard)
+- [`createApi`](/docs/reference/create-api)
+- [`createClient`](/docs/reference/create-client)

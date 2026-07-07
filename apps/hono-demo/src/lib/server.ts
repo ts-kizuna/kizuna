@@ -1,15 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import type { MiddlewareHandler } from 'hono';
-import { createApi, createGuard, type Router } from '@ts-kizuna/hono';
+import { createApi, createRequestContextResolver, createGuard, type Router } from '@ts-kizuna/hono';
 import { contract } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
-
-type DemoEnv = {
-    Variables: {
-        userId: string;
-        member: { workspaceUserId: string; role: 'owner' | 'admin' };
-    };
-};
 
 interface User {
     id: string;
@@ -43,26 +35,30 @@ const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | '
     ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
 ]);
 
-const requireUser: MiddlewareHandler<DemoEnv> = createGuard<DemoEnv>(({ c, deny }) => {
-    const auth = c.req.header('authorization');
-    const token = auth ? /^bearer\s+(.+)$/i.exec(auth)?.[1] : undefined;
-    const session = sessions.get(token ?? '');
+const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ c }) => ({
+    sessionId: c.req.header('x-posthog-session-id') ?? null,
+    distinctId: c.req.header('x-posthog-distinct-id') ?? null,
+}));
+
+const requireUser = createGuard(contract, 'user', ({ bearer, deny }) => {
+    const session = bearer ? sessions.get(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
     }
-    c.set('userId', session.userId);
+    return {
+        userId: session.userId,
+    };
 });
 
-const requireMember: MiddlewareHandler<DemoEnv> = createGuard<DemoEnv>(({ c, deny }) => {
-    const token = c.req.header('x-workspace-token');
-    const membership = token ? memberships.get(token) : undefined;
+const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) => {
+    const membership = apiKey ? memberships.get(apiKey.value) : undefined;
     if (!membership) {
         return deny(403, 'Forbidden');
     }
-    c.set('member', membership);
+    return membership;
 });
 
-const usersHandlers: Router<typeof contract, DemoEnv>['users'] = {
+const usersHandlers: Router<typeof contract>['users'] = {
     listUsers: ({ query }) => {
         const all = Array.from(users.values());
         const start = (query.page - 1) * query.limit;
@@ -221,8 +217,8 @@ const usersHandlers: Router<typeof contract, DemoEnv>['users'] = {
     }),
 };
 
-const notificationsHandlers: Router<typeof contract, DemoEnv>['notifications'] = {
-    listEvents: ({ query }) => {
+const notificationsHandlers: Router<typeof contract>['notifications'] = {
+    listEvents: ({ query, analytics }) => {
         return {
             status: 200,
             body: {
@@ -240,6 +236,7 @@ const notificationsHandlers: Router<typeof contract, DemoEnv>['notifications'] =
                     ids: query.ids ?? null,
                     label: query.label ?? null,
                     tagIds: query.tagIds ?? null,
+                    sessionId: analytics.sessionId,
                 },
             },
         };
@@ -266,7 +263,7 @@ const notificationsHandlers: Router<typeof contract, DemoEnv>['notifications'] =
     }),
 };
 
-const healthHandlers: Router<typeof contract, DemoEnv>['health'] = {
+const healthHandlers: Router<typeof contract>['health'] = {
     check: () => ({
         status: 200,
         body: {
@@ -285,20 +282,20 @@ const healthHandlers: Router<typeof contract, DemoEnv>['health'] = {
     }),
 };
 
-const membersHandlers: Router<typeof contract, DemoEnv>['members'] = {
-    listMembers: ({ c }) => ({
+const membersHandlers: Router<typeof contract>['members'] = {
+    listMembers: ({ user }) => ({
         status: 200,
         body: {
-            members: Array.from(users.values()).filter((candidate) => candidate.id !== c.get('userId')),
+            members: Array.from(users.values()).filter((candidate) => candidate.id !== user.userId),
         },
     }),
-    inviteMember: ({ body, c }) => {
+    inviteMember: ({ body, member }) => {
         const existing = Array.from(users.values()).find((candidate) => candidate.email === body.email);
         if (existing) {
             return {
                 status: 409,
                 body: {
-                    detail: `${body.email} is already a member (invite attempted by ${c.get('member').role}).`,
+                    detail: `${body.email} is already a member (invite attempted by ${member.role}).`,
                 },
             };
         }
@@ -315,22 +312,22 @@ const membersHandlers: Router<typeof contract, DemoEnv>['members'] = {
     },
 };
 
-const workspaceHandlers: Router<typeof contract, DemoEnv>['workspace'] = {
-    getWorkspace: ({ c }) => ({
+const workspaceHandlers: Router<typeof contract>['workspace'] = {
+    getWorkspace: ({ member }) => ({
         status: 200,
         body: {
-            id: c.get('member').workspaceUserId,
+            id: member.workspaceUserId,
             name: 'Demo Workspace',
         },
     }),
-    deleteWorkspace: ({ c }) => ({
+    deleteWorkspace: ({ member }) => ({
         status: 200,
         body: {
-            ok: c.get('member').role === 'owner',
+            ok: member.role === 'owner',
         },
     }),
-    transfer: ({ body, c }) => {
-        if (body.toUserId === c.get('userId') || c.get('member').role !== 'owner') {
+    transfer: ({ body, member }) => {
+        if (body.toUserId === member.workspaceUserId) {
             return {
                 status: 200,
                 body: {
@@ -348,7 +345,7 @@ const workspaceHandlers: Router<typeof contract, DemoEnv>['workspace'] = {
     },
 };
 
-export const api = createApi<typeof contract.routes, DemoEnv>({
+export const api = createApi({
     contract,
     router: {
         users: usersHandlers,
@@ -356,18 +353,12 @@ export const api = createApi<typeof contract.routes, DemoEnv>({
         health: healthHandlers,
         members: membersHandlers,
         workspace: workspaceHandlers,
-    } as Router<typeof contract, DemoEnv>,
-    middleware: {
-        users: [],
-        health: [],
-        notifications: [],
-        members: {
-            '*': [requireMember],
-            listMembers: [requireUser],
-        },
-        workspace: {
-            '*': [requireMember],
-            transfer: [requireUser, requireMember],
-        },
+    },
+    guards: {
+        user: requireUser,
+        member: requireMember,
+    },
+    requestContext: {
+        analytics: captureAnalytics,
     },
 });

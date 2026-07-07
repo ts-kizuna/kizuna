@@ -93,7 +93,18 @@ object API {
     }
 }
 
-class APIClient(private val baseUrl: String, private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
+class APIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
+
+    /** Values sent as headers on every request, from the contract's request context. */
+    data class RequestContext(
+        val xPosthogSessionId: String? = null,
+        val xPosthogDistinctId: String? = null
+    )
+
+    private val requestContextHeaders: Map<String, String> = buildMap {
+        if (requestContext.xPosthogSessionId != null) put("x-posthog-session-id", requestContext.xPosthogSessionId!!)
+        if (requestContext.xPosthogDistinctId != null) put("x-posthog-distinct-id", requestContext.xPosthogDistinctId!!)
+    }
 
     data class MultipartFile(
         val data: ByteArray,
@@ -558,7 +569,8 @@ class APIClient(private val baseUrl: String, private val client: OkHttpClient = 
             val kind: ResponseBodyEchoKind? = null,
             val ids: List<String>? = null,
             val label: String? = null,
-            val tagIds: List<String>? = null
+            val tagIds: List<String>? = null,
+            val sessionId: String? = null
         )
 
         @Serializable
@@ -757,18 +769,18 @@ class APIClient(private val baseUrl: String, private val client: OkHttpClient = 
         }
     }
 
-    val users = APIUsersClient(client, baseUrl, json, requestInterceptor, responseInterceptor)
+    val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
-    val health = APIHealthClient(client, baseUrl, json, requestInterceptor, responseInterceptor)
+    val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
-    val notifications = APINotificationsClient(client, baseUrl, json, requestInterceptor, responseInterceptor)
+    val notifications = APINotificationsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
-    val members = APIMembersClient(client, baseUrl, json, requestInterceptor, responseInterceptor)
+    val members = APIMembersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
-    val workspace = APIWorkspaceClient(client, baseUrl, json, requestInterceptor, responseInterceptor)
+    val workspace = APIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 }
 
-class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** List users with pagination */
     @Throws(APIClient.UsersListUsers.Failure::class)
@@ -790,6 +802,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -823,6 +836,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -853,6 +867,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -897,6 +912,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -934,6 +950,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestBuilder = requestBuilder.header("x-request-id", Kizuna.stringifyQueryValue(headers.xRequestId).joinToString(", "))
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
@@ -974,6 +991,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1016,6 +1034,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("DELETE", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1052,6 +1071,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("POST", ByteArray(0).toRequestBody(null))
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1093,6 +1113,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1129,6 +1150,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("POST", ByteArray(0).toRequestBody(null))
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         httpResponse.use {
@@ -1158,6 +1180,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1195,6 +1218,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("HEAD", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         httpResponse.use {
@@ -1224,6 +1248,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("OPTIONS", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1244,7 +1269,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     }
 }
 
-class APIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** Health check — exercises nested sub-client routing */
     @Throws(APIClient.HealthCheck.Failure::class)
@@ -1254,6 +1279,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1281,6 +1307,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1308,6 +1335,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1328,7 +1356,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
     }
 }
 
-class APINotificationsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APINotificationsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** Send a notification (discriminated by channel) */
     @Throws(APIClient.NotificationsSendNotification.Failure::class)
@@ -1342,6 +1370,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1402,6 +1431,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1440,6 +1470,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1485,6 +1516,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1511,7 +1543,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
     }
 }
 
-class APIMembersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIMembersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** List workspace members */
     @Throws(APIClient.MembersListMembers.Failure::class)
@@ -1521,6 +1553,7 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1553,6 +1586,7 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1585,7 +1619,7 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
     }
 }
 
-class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** Get workspace info */
     @Throws(APIClient.WorkspaceGetWorkspace.Failure::class)
@@ -1595,6 +1629,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1622,6 +1657,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("DELETE", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1641,7 +1677,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
         }
     }
 
-    /** Transfer ownership — requires both user and member(owner) */
+    /** Transfer ownership — owner-only via the auth map */
     @Throws(APIClient.WorkspaceTransfer.Failure::class)
     suspend fun transfer(build: APIClient.WorkspaceTransfer.Scope.() -> APIClient.WorkspaceTransfer.Args): APIClient.WorkspaceTransfer.Response {
         val args = APIClient.WorkspaceTransfer.Scope.build()
@@ -1654,6 +1690,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {

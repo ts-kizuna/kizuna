@@ -3,6 +3,12 @@ title: createMiddleware
 description: Declare per-route middleware in the same shape as your routes.
 ---
 
+<Callout type="warn">
+    **Deprecated.** Define authentication with identities and the contract's `auth` map, then pass `guards` to
+    [`createApi`](/docs/reference/create-api). See the [Authentication guide](/docs/auth) and [`createGuard`](/docs/reference/create-guard).
+    `createMiddleware` still works so existing projects keep compiling, but new code should use guards.
+</Callout>
+
 Declare per-route or per-group middleware that mirrors the routes structure. Every top-level group key must be present — use `[]` for public routes. TypeScript autocompletes the route keys and rejects keys that don't exist.
 
 <AdapterTabs functionName="createMiddleware" />
@@ -109,29 +115,6 @@ export const api = createApi({
 });
 ```
 
-## Using with `createGuard`
+## Prefer guards for access control
 
-Use [`createGuard`](/docs/reference/create-guard) to write access checks without `next()`/`res.json()` boilerplate, then assign them to routes here:
-
-```ts title="src/lib/middleware.ts"
-import { createMiddleware, createGuard } from '@ts-kizuna/hono';
-import { contract } from './contract';
-
-const requireMember = createGuard<AuthEnv>(async ({ c, deny }) => {
-    const user = c.get('user');
-    const membership = await checkMembership(user.id, c.req.param('id'));
-    if (!membership) {
-        return deny(403, 'Forbidden');
-    }
-    c.set('member', membership);
-});
-
-export const middleware = createMiddleware(contract, {
-    members: [requireMember],
-    workspace: [requireMember],
-    users: [],
-    health: [],
-});
-```
-
-See the [createGuard reference](/docs/reference/create-guard) for adapter-specific examples.
+For authentication and authorization, define identities and the contract's `auth` map and pass a guard per identity to [`createApi`](/docs/reference/create-api). Guards run before the handler, extract the request's credential for you, and merge their result into the typed handler args. See the [Authentication guide](/docs/auth) and the [`createGuard` reference](/docs/reference/create-guard). Reach for `createMiddleware` only for framework middleware that predates guards.

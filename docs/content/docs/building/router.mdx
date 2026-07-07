@@ -16,7 +16,7 @@ Each group lives in its own file, typed against its group in the contract with t
 import type { Router } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
 import type { contract } from './contract';
 
-export const users: Router<typeof contract.routes.users> = {
+export const users: Router<typeof contract>['users'] = {
     listUsers: async ({ query }) => {
         const found = await db.users.findMany({
             skip: (query.page - 1) * query.limit,
@@ -70,19 +70,55 @@ export const router = createRouter(contract, {
 });
 ```
 
+You can also type a single group inline by passing its key as the second argument — `createRouter(contract, 'users', { ... })` — instead of annotating with `Router`.
+
 ## Handler arguments
 
 Each handler receives an object with the validated inputs for that route:
 
-| Property     | Available when                       |
-| ------------ | ------------------------------------ |
-| `params`     | Route path has `:param` placeholders |
-| `query`      | Route has a `query` schema           |
-| `body`       | Route has a `body` schema            |
-| `headers`    | Route has a `headers` schema         |
-| `req`, `res` | Express adapter                      |
-| `c`          | Hono adapter                         |
-| `request`    | Next.js adapter                      |
+| Property            | Available when                                               |
+| ------------------- | ------------------------------------------------------------ |
+| `params`            | Route path has `:param` placeholders                         |
+| `query`             | Route has a `query` schema                                   |
+| `body`              | Route has a `body` schema                                    |
+| `headers`           | Route has a `headers` schema                                 |
+| `user`, `member`, … | Route is secured by that identity in the contract's auth map |
+| `req`, `res`        | Express adapter                                              |
+| `c`                 | Hono adapter                                                 |
+| `request`, `reply`  | Fastify adapter                                              |
+| `request`           | Next.js adapter                                              |
+
+## Identity context
+
+When the contract's [auth map](/docs/auth) secures a route, the handler receives the identity's context — whatever its guard returned — under the identity's name. There's nothing to look up or cast; the guard already ran, so the value is simply there, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/create-request-context) arrive the same way, on every route.
+
+```ts
+listMembers: ({ user }) => ({
+    status: 200,
+    body: {
+        members: findMembersExcept(user.userId),
+    },
+}),
+```
+
+A route requiring several identities receives all of them:
+
+```ts
+transfer: ({ body, user, member }) => {
+    // user.userId and member.workspaceUserId are both available and typed
+},
+```
+
+On routes with an [access gate](/docs/auth#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `member.role` is typed `'owner'` — the runtime check and the type agree by construction:
+
+```ts
+deleteWorkspace: ({ member }) => ({
+    status: 200,
+    body: {
+        ok: member.role === 'owner',
+    },
+}),
+```
 
 ## Return type
 
@@ -230,11 +266,13 @@ const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ par
 };
 
 // One group — what each split file exports
-const users: Router<typeof contract.routes.users> = { ... };
+const users: Router<typeof contract>['users'] = { ... };
 
 // Whole tree — pass straight to `createRouter` or `createApi`
-const router: Router<typeof contract.routes> = { ... };
+const router: Router<typeof contract> = { ... };
 ```
+
+Type `Router` against the contract, which carries the auth map and request context — so handlers of secured routes get their [identity context](#identity-context) and every handler gets its request-context values.
 
 ## Reference
 

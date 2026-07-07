@@ -61,6 +61,7 @@ export const fastifyKizunaMcp = async (app: FastifyInstance, options: McpEndpoin
                 request,
                 reply,
             },
+            credentialHeaders: request.headers,
         });
         const transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: undefined,

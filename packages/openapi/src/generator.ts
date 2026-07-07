@@ -19,7 +19,7 @@ import {
     resolveResponseContentType,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
-import { type Contract, type TagOptions, getStatusText } from '@ts-kizuna/core';
+import { type Contract, type SecurityRequirement, type TagOptions, getStatusText } from '@ts-kizuna/core';
 
 /**
  * The OpenAPI Specification version declared in the document's `openapi` field.
@@ -83,7 +83,6 @@ export interface OpenApiDocument {
     servers?: OpenApiServer[];
     paths: Record<string, Record<string, OpenApiOperation>>;
     tags?: OpenApiTag[];
-    security?: Array<Record<string, string[]>>;
     externalDocs?: OpenApiExternalDocs;
     components?: {
         securitySchemes?: Record<string, unknown>;
@@ -101,11 +100,7 @@ export interface GenerateOpenApiOptions {
     info: OpenApiInfo;
     servers?: OpenApiServer[];
     tags?: OpenApiTag[];
-    security?: Array<Record<string, string[]>>;
     externalDocs?: OpenApiExternalDocs;
-    components?: {
-        securitySchemes?: Record<string, unknown>;
-    };
     setOperationId?: boolean | 'concatenated-path';
     operationMapper?: (operation: OpenApiOperation, route: RouteDefinition, operationId: string) => OpenApiOperation;
 }
@@ -341,7 +336,7 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
             if (mergedTags.length > 0) {
                 operation.tags = mergedTags;
             }
-            if (route.security && route.security.length > 0) operation.security = route.security;
+            if (route.security && route.security.length > 0) operation.security = toOpenApiSecurity(route.security, contract);
             if (route.externalDocs) operation.externalDocs = route.externalDocs;
 
             const parameters: OpenApiParameter[] = [];
@@ -509,13 +504,13 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
 
             if (options.servers) document.servers = options.servers;
             if (options.tags) document.tags = options.tags;
-            if (options.security) document.security = options.security;
             if (options.externalDocs) document.externalDocs = options.externalDocs;
 
             const componentSchemas = buildComponentSchemas();
-            if (componentSchemas || options.components) {
+            const securitySchemes = buildSecuritySchemes(contract);
+            if (componentSchemas || securitySchemes) {
                 document.components = {
-                    ...(options.components ?? {}),
+                    ...(securitySchemes ? { securitySchemes } : {}),
                     ...(componentSchemas ? { schemas: componentSchemas } : {}),
                 };
             }
@@ -545,6 +540,33 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
         },
     };
 });
+
+/**
+ * Map a route's resolved `security` (scheme names / `{ scheme: scopes }` maps)
+ * to the OpenAPI `operation.security` shape — an array of `{ scheme: scopes }`.
+ */
+const toOpenApiSecurity = (security: readonly SecurityRequirement[], contract: Contract): Array<Record<string, string[]>> => {
+    const emittedName = (name: string): string => contract.securitySchemes?.[name]?.scheme ?? name;
+    return security.map((entry) =>
+        typeof entry === 'string'
+            ? { [emittedName(entry)]: [] }
+            : Object.fromEntries(Object.entries(entry).map(([scheme, scopes]) => [emittedName(scheme), [...(scopes ?? [])]]))
+    );
+};
+
+/**
+ * Build the `components.securitySchemes` object from the identities registered
+ * on the contract. Each contributes its OpenAPI definition under its name.
+ */
+const buildSecuritySchemes = (contract: Contract): Record<string, unknown> | undefined => {
+    const schemes = contract.securitySchemes;
+    if (!schemes || Object.keys(schemes).length === 0) return undefined;
+    const result: Record<string, unknown> = {};
+    for (const [name, scheme] of Object.entries(schemes)) {
+        result[scheme.scheme ?? name] = scheme.openapi;
+    }
+    return result;
+};
 
 const buildTagLookup = (contract: Contract): ReadonlyMap<string, TagOptions> => new Map(Object.entries(contract.tags?.tags ?? {}));
 

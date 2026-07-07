@@ -20,6 +20,7 @@ Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, pow
 
 - **Contract-first** — define request/response schemas once, share between server and client
 - **Type-safe everywhere** — full inference on both sides, no casting
+- **Typed auth** — identities and per-route auth declared on the contract
 - **RPC-like client** — call your API like a function, get fully typed responses back
 - **Adapters** — mount your API on Express, Fastify, Hono, or Next.js
 - **HTTP/REST** — follows HTTP and REST standards. RFC 9110 semantics, RFC 9457 Problem Details

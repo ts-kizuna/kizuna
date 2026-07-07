@@ -7,15 +7,32 @@ import {
     type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
     type ErrorFormatter,
+    type GuardMap,
+    type GuardRun,
+    type GuardDeny,
+    type GuardDenial,
+    type RequestContextMap,
+    type RequestContextRun,
     createAdapter,
-    resolveMiddleware,
     headersToObject,
     matchRoute,
     parseFetchBody,
+    resolveMiddleware,
     renderJsonResult,
-    problemDetails,
 } from '@ts-kizuna/core/adapter';
-import type { Contract, TagOptions } from '@ts-kizuna/core';
+import type { z } from 'zod';
+import type {
+    Contract,
+    TagOptions,
+    SecurityScheme,
+    HandlersFromAuth,
+    GuardSuccess,
+    CredentialOf,
+    GuardParams,
+    RequestContextSchema,
+    RequestContextHeaderValues,
+    RequestContextValues,
+} from '@ts-kizuna/core';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export interface NextHandlerContext {
@@ -28,11 +45,13 @@ export interface NextHandlerContext {
 export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, NextHandlerContext>;
 
 /**
- * The handler tree for a contract, typed against it.
+ * The handler tree for a contract, typed against it. Routes secured by the
+ * contract's `auth` map additionally receive each required identity's context
+ * in their handler args, under the identity's name.
  */
 export type Router<C> =
-    C extends Contract<infer R, infer _Tags, infer _Codes>
-        ? CoreRouter<R, NextHandlerContext>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext>
+        ? HandlersFromAuth<R, NextHandlerContext & RequestContextValues<RequestContext>, Schemes, Auth>
         : C extends Routes
           ? CoreRouter<C, NextHandlerContext>
           : never;
@@ -50,6 +69,9 @@ export type NextMiddlewareHandler = (request: NextRequest, route: NextMiddleware
 /**
  * Declare per-route middleware in the same shape as the contract's or group's routes.
  *
+ * @deprecated Define auth with identities + the contract's `auth` map and pass
+ * `guards` to `createApi`. See /docs/auth.
+ *
  * @example
  * export const middleware = createMiddleware(contract, {
  *     listUsers: [authenticate],
@@ -61,34 +83,93 @@ export const createMiddleware = <const R extends Routes>(
     map: MiddlewareMap<R, NextMiddlewareHandler>
 ): MiddlewareMap<R, NextMiddlewareHandler> => map;
 
-type Deny = (status: number, detail: string) => Response;
-
-const deny: Deny = (status, detail) =>
-    new Response(JSON.stringify(problemDetails(status, detail)), {
-        status,
-        headers: {
-            'content-type': 'application/problem+json',
-        },
-    });
+/**
+ * A guard per identity, keyed by name. Each receives the handler context, a
+ * `deny` helper, and the matched route's required scopes, and returns that
+ * identity's {@link GuardSuccess} (its context and access fields) or a `deny(...)`
+ * result. Keying by name lets each guard's return be typed against its own
+ * identity, so access values narrow without an annotation.
+ */
+type GuardFns<Schemes extends Record<string, SecurityScheme>, Params> = {
+    [Name in keyof Schemes]: (
+        args: NextHandlerContext &
+            CredentialOf<Schemes[Name]> & {
+                params: Params;
+                deny: GuardDeny;
+                scopes: string[];
+            }
+    ) => GuardSuccess<Schemes[Name]> | GuardDenial | Promise<GuardSuccess<Schemes[Name]> | GuardDenial>;
+};
 
 /**
- * Create a guard — a middleware that checks access before the handler runs. Call
- * `deny(status, detail)` to reject the request; return without calling it to allow.
+ * One guard per identity declared on the contract.
+ */
+export type GuardsForSchemes<Schemes extends Record<string, SecurityScheme>> = {
+    [Name in keyof Schemes]: GuardRun<NextHandlerContext>;
+};
+
+/**
+ * The resolver functions for the request context schemas declared on `kizuna`,
+ * keyed by name. Each runs on every route and returns its schema's value.
+ */
+export type RequestResolverFns<RequestContext extends Record<string, RequestContextSchema>> = {
+    [Name in keyof RequestContext]: (
+        args: NextHandlerContext & {
+            params: Record<string, string>;
+            headers: RequestContextHeaderValues<RequestContext[Name]>;
+        }
+    ) => z.output<RequestContext[Name]['context']> | Promise<z.output<RequestContext[Name]['context']>>;
+};
+
+/**
+ * Implement a request context provider declared on `kizuna` under `context`. It
+ * runs on every route — public ones included — and never denies; handlers read
+ * its value under the provider's name.
  *
  * @example
- * const requireAdmin = createGuard(async ({ request, deny }) => {
- *     if (request.headers.get('x-role') !== 'admin') return deny(403, 'Forbidden');
+ * export const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ request }) => ({
+ *     sessionId: request.headers.get('x-posthog-session-id'),
+ * }));
+ */
+export function createRequestContextResolver<
+    RequestContext extends Record<string, RequestContextSchema>,
+    const Name extends Extract<keyof RequestContext, string>,
+>(
+    _contract: Contract<Routes, Record<string, TagOptions>, string, Record<string, SecurityScheme>, unknown, RequestContext>,
+    _name: Name,
+    run: RequestResolverFns<RequestContext>[Name]
+): RequestContextRun<NextHandlerContext> {
+    return run as unknown as RequestContextRun<NextHandlerContext>;
+}
+
+/**
+ * Define a guard for an identity. It runs before the handlers of routes whose
+ * `auth` entry requires the identity. The argument carries the request context
+ * plus the credential the identity's method extracted (`bearer`, `apiKey`, or
+ * `basic` — `null` when absent), a `deny` helper, and the route's `scopes`.
+ * Return the identity's context and access fields to allow the request (read in
+ * handlers under the identity's name), or call `deny(status, detail)`.
+ *
+ * @example
+ * export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {
+ *     const session = bearer && (await verify(bearer.token));
+ *     if (!session) return deny(401, 'Unauthorized');
+ *     return {
+ *         userId: session.userId,
+ *     };
  * });
  */
-export function createGuard(
-    guard: (args: { request: NextRequest; route: NextMiddlewareRoute; deny: Deny }) => Promise<Response | void> | Response | void
-): NextMiddlewareHandler {
-    return async (request, route) => {
-        const result = await guard({ request, route, deny });
-        if (result instanceof Response) {
-            return result;
-        }
-    };
+export function createGuard<
+    const R extends Routes,
+    Schemes extends Record<string, SecurityScheme>,
+    Auth,
+    const Name extends Extract<keyof Schemes, string>,
+>(
+    _contract: Contract<R, Record<string, TagOptions>, string, Schemes, Auth>,
+    _identity: Name,
+    run: GuardFns<Schemes, GuardParams<R, Auth, Name>>[Name]
+): GuardRun<NextHandlerContext> {
+    return run as unknown as GuardRun<NextHandlerContext>;
 }
 
 export interface NextHandlerOptions {
@@ -107,8 +188,10 @@ export interface NextHandlerOptions {
     /**
      * Middleware functions that run after route matching but before the handler.
      * Each receives `(request, route)`; return a `Response` to short-circuit.
+     * Authentication belongs in a guard.
      *
-     * @deprecated Declare per-route middleware via `createMiddleware` and `createApi` instead.
+     * @deprecated Define auth with identities + the contract's `auth` map and pass
+     * `guards` to `createApi`. See /docs/auth.
      */
     requestMiddleware?: Array<NextMiddlewareHandler>;
     /**
@@ -132,8 +215,11 @@ export const handleNextRequest = async <T extends Routes>(
     request: NextRequest,
     routes: T,
     router: CoreRouter<T, NextHandlerContext>,
-    middlewareMap: MiddlewareMap<Routes, NextMiddlewareHandler> | undefined,
-    options?: NextHandlerOptions
+    options?: NextHandlerOptions,
+    guards?: GuardMap<NextHandlerContext>,
+    schemes?: Record<string, SecurityScheme>,
+    requestContext?: RequestContextMap<NextHandlerContext>,
+    middlewareMap?: MiddlewareMap<Routes, NextMiddlewareHandler>
 ): Promise<NextResponse> => {
     const url = new URL(request.url);
 
@@ -206,6 +292,9 @@ export const handleNextRequest = async <T extends Routes>(
                 router,
                 request: adapterRequest,
                 responseContext: {},
+                guards,
+                schemes,
+                requestContext,
                 responseValidation: options?.responseValidation,
             });
         }
@@ -228,6 +317,9 @@ export const handleNextRequest = async <T extends Routes>(
         router,
         request: adapterRequest,
         responseContext: {},
+        guards,
+        schemes,
+        requestContext,
         basePath: options?.basePath,
         responseValidation: options?.responseValidation,
     });

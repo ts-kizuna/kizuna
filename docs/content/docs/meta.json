@@ -4,6 +4,7 @@
         "quickstart",
         "---Documentation---",
         "building",
+        "auth",
         "adapters",
         "clients",
         "openapi",

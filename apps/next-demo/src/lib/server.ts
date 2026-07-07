@@ -1,12 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { createApi, createGuard, type NextMiddlewareHandler, type NextRequest, type Router } from '@ts-kizuna/next';
+import { createApi, createRequestContextResolver, createGuard, type Router } from '@ts-kizuna/next';
 import { contract } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
-
-type AuthedRequest = NextRequest & {
-    userId?: string;
-    member?: { workspaceUserId: string; role: 'owner' | 'admin' };
-};
 
 interface User {
     id: string;
@@ -40,39 +35,37 @@ const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | '
     ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
 ]);
 
-const requireUser: NextMiddlewareHandler = createGuard(({ request, deny }) => {
-    const auth = request.headers.get('authorization');
-    const token = auth ? /^bearer\s+(.+)$/i.exec(auth)?.[1] : undefined;
-    const session = sessions.get(token ?? '');
+const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ request }) => ({
+    sessionId: request.headers.get('x-posthog-session-id'),
+    distinctId: request.headers.get('x-posthog-distinct-id'),
+}));
+
+const requireUser = createGuard(contract, 'user', ({ bearer, deny }) => {
+    const session = bearer ? sessions.get(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
     }
-    (request as AuthedRequest).userId = session.userId;
+    return {
+        userId: session.userId,
+    };
 });
 
-const requireMember: NextMiddlewareHandler = createGuard(({ request, deny }) => {
-    const token = request.headers.get('x-workspace-token') ?? undefined;
-    const membership = token ? memberships.get(token) : undefined;
+const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) => {
+    const membership = apiKey ? memberships.get(apiKey.value) : undefined;
     if (!membership) {
         return deny(403, 'Forbidden');
     }
-    (request as AuthedRequest).member = membership;
+    return membership;
 });
 
 export const api = createApi({
     contract,
-    middleware: {
-        users: [],
-        health: [],
-        notifications: [],
-        members: {
-            '*': [requireMember],
-            listMembers: [requireUser],
-        },
-        workspace: {
-            '*': [requireMember],
-            transfer: [requireUser, requireMember],
-        },
+    guards: {
+        user: requireUser,
+        member: requireMember,
+    },
+    requestContext: {
+        analytics: captureAnalytics,
     },
     router: {
         users: {
@@ -265,7 +258,7 @@ export const api = createApi({
                     },
                 };
             },
-            listEvents: ({ query }) => {
+            listEvents: ({ query, analytics }) => {
                 return {
                     status: 200,
                     body: {
@@ -283,6 +276,7 @@ export const api = createApi({
                             ids: query.ids ?? null,
                             label: query.label ?? null,
                             tagIds: query.tagIds ?? null,
+                            sessionId: analytics.sessionId,
                         },
                     },
                 };
@@ -301,19 +295,19 @@ export const api = createApi({
             }),
         },
         members: {
-            listMembers: ({ request }) => ({
+            listMembers: ({ user }) => ({
                 status: 200,
                 body: {
-                    members: Array.from(users.values()).filter((candidate) => candidate.id !== (request as AuthedRequest).userId),
+                    members: Array.from(users.values()).filter((candidate) => candidate.id !== user.userId),
                 },
             }),
-            inviteMember: ({ body, request }) => {
+            inviteMember: ({ body, member }) => {
                 const existing = Array.from(users.values()).find((candidate) => candidate.email === body.email);
                 if (existing) {
                     return {
                         status: 409,
                         body: {
-                            detail: `${body.email} is already a member (invite attempted by ${(request as AuthedRequest).member?.role}).`,
+                            detail: `${body.email} is already a member (invite attempted by ${member.role}).`,
                         },
                     };
                 }
@@ -330,22 +324,21 @@ export const api = createApi({
             },
         },
         workspace: {
-            getWorkspace: ({ request }) => ({
+            getWorkspace: ({ member }) => ({
                 status: 200,
                 body: {
-                    id: (request as AuthedRequest).member?.workspaceUserId ?? '',
+                    id: member.workspaceUserId,
                     name: 'ts-kizuna workspace',
                 },
             }),
-            deleteWorkspace: ({ request }) => ({
+            deleteWorkspace: ({ member }) => ({
                 status: 200,
                 body: {
-                    ok: (request as AuthedRequest).member?.role === 'owner',
+                    ok: member.role === 'owner',
                 },
             }),
-            transfer: ({ body, request }) => {
-                const authed = request as AuthedRequest;
-                if (body.toUserId === authed.userId || authed.member?.role !== 'owner') {
+            transfer: ({ body, member }) => {
+                if (body.toUserId === member.workspaceUserId) {
                     return {
                         status: 200,
                         body: {

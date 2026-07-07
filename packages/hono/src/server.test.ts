@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { createMiddleware as createHonoMiddleware } from 'hono/factory';
 import { z } from 'zod';
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { createApi, createHonoEndpoints, createMiddleware, createRouter } from './server.js';
+import { createApi, createGuard, createHonoEndpoints, createMiddleware, createRouter } from './server.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -438,6 +438,111 @@ describe('Hono — handler context', () => {
         expect(response.status).toBe(200);
         const body = await response.json();
         expect(body.url).toContain('/echo');
+    });
+});
+
+describe('guards', () => {
+    const user = createIdentity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    });
+
+    const { k: securedK } = kizuna({
+        identities: {
+            user,
+        },
+    });
+
+    const securedRoutes = securedK.routes({
+        publicRoute: {
+            method: 'GET',
+            path: '/public',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+        whoAmI: {
+            method: 'GET',
+            path: '/who-am-i',
+            responses: {
+                200: z.object({
+                    userId: z.string(),
+                }),
+            },
+        },
+    });
+
+    const securedContract = securedK.contract({
+        routes: {
+            api: securedRoutes,
+        },
+        auth: {
+            api: {
+                '*': false,
+                whoAmI: 'user',
+            },
+        },
+    });
+
+    const requireUser = createGuard(securedContract, 'user', ({ bearer, deny }) => {
+        if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
+        return {
+            userId: '1',
+        };
+    });
+
+    const makeApp = () => {
+        const app = new Hono();
+        const api = createApi({
+            contract: securedContract,
+            router: {
+                api: {
+                    publicRoute: () => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    }),
+                    whoAmI: ({ user: currentUser }) => ({
+                        status: 200,
+                        body: {
+                            userId: currentUser.userId,
+                        },
+                    }),
+                },
+            },
+            guards: {
+                user: requireUser,
+            },
+        });
+        createHonoEndpoints(api, app);
+        return app;
+    };
+
+    it('serves a public route without credentials', async () => {
+        const response = await makeApp().request('/public');
+        expect(response.status).toBe(200);
+    });
+
+    it('denies a secured route without a credential', async () => {
+        const response = await makeApp().request('/who-am-i');
+        expect(response.status).toBe(401);
+        expect(response.headers.get('content-type')).toContain('application/problem+json');
+    });
+
+    it('passes the guard context to the handler', async () => {
+        const response = await makeApp().request('/who-am-i', {
+            headers: {
+                authorization: 'Bearer tok_ada',
+            },
+        });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            userId: '1',
+        });
     });
 });
 

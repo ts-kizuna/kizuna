@@ -173,7 +173,7 @@ import type { Router, RouteHandler } from '@ts-kizuna/express';
 import { contract } from './contract';
 
 // Whole handler tree
-const router: Router<typeof contract.routes> = { ... };
+const router: Router<typeof contract> = { ... };
 
 // Single route
 const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ params }) => { ... };

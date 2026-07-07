@@ -185,6 +185,10 @@ responses: {
 
 That's everything you need to define an API. The rest of this page is optional — reach for it when you need it.
 
+## Auth
+
+Auth is part of the contract too: you declare identities with [`createIdentity`](/docs/reference/create-identity), register them on `kizuna`, and give `k.contract` an `auth` map saying which routes require which identity. That one declaration drives runtime enforcement, typed handler context, the OpenAPI spec's security, and client-side access checks. The [Auth guide](/docs/auth) walks the whole pipeline.
+
 ## Going further
 
 ### Naming schemas with models

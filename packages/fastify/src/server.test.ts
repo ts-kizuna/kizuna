@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { createApi, fastifyKizuna, createMiddleware, createRouter, type FastifyPreHandler } from './server.js';
+import { createApi, createGuard, createMiddleware, fastifyKizuna, createRouter, type FastifyPreHandler } from './server.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -460,6 +460,125 @@ describe('Fastify — handler context', () => {
         expect(response.statusCode).toBe(200);
         const body = response.json();
         expect(body.url).toContain('/echo');
+    });
+});
+
+describe('guards', () => {
+    const user = createIdentity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    });
+
+    const { k: securedK } = kizuna({
+        identities: {
+            user,
+        },
+    });
+
+    const securedRoutes = securedK.routes({
+        publicRoute: {
+            method: 'GET',
+            path: '/public',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+        whoAmI: {
+            method: 'GET',
+            path: '/who-am-i',
+            responses: {
+                200: z.object({
+                    userId: z.string(),
+                }),
+            },
+        },
+    });
+
+    const securedContract = securedK.contract({
+        routes: {
+            api: securedRoutes,
+        },
+        auth: {
+            api: {
+                '*': false,
+                whoAmI: 'user',
+            },
+        },
+    });
+
+    const requireUser = createGuard(securedContract, 'user', ({ bearer, deny }) => {
+        if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
+        return {
+            userId: '1',
+        };
+    });
+
+    const makeApp = async () => {
+        const app = Fastify();
+        const api = createApi({
+            contract: securedContract,
+            router: {
+                api: {
+                    publicRoute: () => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    }),
+                    whoAmI: ({ user: currentUser }) => ({
+                        status: 200,
+                        body: {
+                            userId: currentUser.userId,
+                        },
+                    }),
+                },
+            },
+            guards: {
+                user: requireUser,
+            },
+        });
+        await app.register(fastifyKizuna, {
+            api,
+        });
+        await app.ready();
+        return app;
+    };
+
+    it('serves a public route without credentials', async () => {
+        const app = await makeApp();
+        const response = await app.inject({
+            method: 'GET',
+            url: '/public',
+        });
+        expect(response.statusCode).toBe(200);
+    });
+
+    it('denies a secured route without a credential', async () => {
+        const app = await makeApp();
+        const response = await app.inject({
+            method: 'GET',
+            url: '/who-am-i',
+        });
+        expect(response.statusCode).toBe(401);
+        expect(response.headers['content-type']).toContain('application/problem+json');
+    });
+
+    it('passes the guard context to the handler', async () => {
+        const app = await makeApp();
+        const response = await app.inject({
+            method: 'GET',
+            url: '/who-am-i',
+            headers: {
+                authorization: 'Bearer tok_ada',
+            },
+        });
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toEqual({
+            userId: '1',
+        });
     });
 });
 
