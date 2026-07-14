@@ -1,7 +1,6 @@
-import type { z } from 'zod';
 import { tagRoutes } from './routes.js';
 import { assembleContract, type Contract } from './contract.js';
-import { isRouteDefinition } from './handler-pipeline.js';
+import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { type TagSet, type TagOptions } from './tags.js';
 import type { Routes, RouteDefinition, SecurityRequirement, AccessGate, AuthoredRoutes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
@@ -224,10 +223,10 @@ export interface K<
     >(definition: {
         routes: R;
         auth: A & ValidAuthMap<A, R, Extract<keyof Identities, string>>;
-    }): Contract<R, Tags, Codes, Identities, A, RequestContext>;
+    }): Contract<RoutesWithHandlerContext<R, Identities, A, RequestContext>, Tags, Codes, Identities, A, RequestContext>;
     contract<const R extends Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>>(definition: {
         routes: R;
-    }): Contract<R, Tags, Codes, Identities, unknown, RequestContext>;
+    }): Contract<RoutesWithHandlerContext<R, Identities, unknown, RequestContext>, Tags, Codes, Identities, unknown, RequestContext>;
 }
 
 /**

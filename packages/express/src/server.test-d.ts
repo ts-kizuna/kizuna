@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import type { RouteDefinition } from '@ts-kizuna/core';
 import { z } from 'zod';
 import { kizuna, createTags, createIdentity, createRequestContext } from '@ts-kizuna/core';
-import { createApi, createRequestContextResolver, createGuard, createRouter } from './server.js';
+import { createApi, createRequestContextResolver, createGuard, createRouter, type RouteHandler } from './server.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -198,6 +198,33 @@ test('createRouter types a single group by key', () => {
                 },
             };
         },
+        ownerOnly: () => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        }),
+    });
+});
+
+test('a standalone RouteHandler carries the route auth its map resolves, and drops into the group router', () => {
+    const whoAmI: RouteHandler<typeof securedContract.routes.api.whoAmI> = ({ auth }) => {
+        expectTypeOf(auth.user).toEqualTypeOf<{ userId: string }>();
+        return {
+            status: 200,
+            body: {
+                userId: auth.user.userId,
+            },
+        };
+    };
+    createRouter(securedContract, 'api', {
+        publicRoute: () => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        }),
+        whoAmI,
         ownerOnly: () => ({
             status: 200,
             body: {
@@ -432,6 +459,21 @@ test('handlers receive typed request context on every route', () => {
                 };
             },
         },
+    });
+});
+
+test('a standalone RouteHandler carries request context', () => {
+    const publicRoute: RouteHandler<typeof contextContract.routes.api.publicRoute> = ({ requestContext }) => {
+        expectTypeOf(requestContext.analytics).toEqualTypeOf<{ sessionId: string | null }>();
+        return {
+            status: 200,
+            body: {
+                ok: true,
+            },
+        };
+    };
+    createRouter(contextContract, 'api', {
+        publicRoute,
     });
 });
 

@@ -85,6 +85,8 @@ members: {
 },
 ```
 
+Split into its own file, a handler keeps the typed `auth` via [`RouteHandler`](/docs/reference/create-router)`<typeof contract.routes.members.listMembers>`.
+
 ## Identities
 
 One builder per authentication method: `bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`. Each optionally takes `context` (what a guard returns and handlers receive) and `access` (fields the auth map may gate per route):

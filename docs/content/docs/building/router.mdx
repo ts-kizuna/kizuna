@@ -272,7 +272,7 @@ const users: Router<typeof contract>['users'] = { ... };
 const router: Router<typeof contract> = { ... };
 ```
 
-Type `Router` against the contract, which carries the auth map and request context — so handlers of secured routes get their [identity context](#identity-context) and every handler gets its request-context values.
+Type `Router` against the contract, which carries the auth map and request context — so handlers of secured routes get their [identity context](#identity-context) and every handler gets its request-context values. `RouteHandler` carries the same, nested groups included (`contract.routes.members.session.me`).
 
 ## Reference
 

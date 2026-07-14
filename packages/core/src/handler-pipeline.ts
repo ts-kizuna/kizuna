@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { ROUTES_TAG, type RouteDefinition, type Routes, type Method } from './types.js';
+import { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand, type RouteDefinition, type Routes, type Method } from './types.js';
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { IdentityAccess } from './identity.js';
@@ -149,7 +149,7 @@ export type HandlerArgs<R extends RouteDefinition> = {
 };
 
 export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = (
-    args: HandlerArgs<R> & HandlerContext
+    args: HandlerArgs<R> & HandlerContext & BrandedHandlerContext<R>
 ) => Promise<HandlerReturn<R>> | HandlerReturn<R>;
 
 export type Router<T extends Routes, HandlerContext = unknown> = {
@@ -345,6 +345,41 @@ export type HandlersFromAuth<R extends Routes, HandlerContext, Identities, Auth>
           ? GroupHandlers<R[Group], HandlerContext, Identities, Group extends keyof Auth ? Auth[Group] : false>
           : never;
 };
+
+/**
+ * A route's brand, skipped when the resolved context is empty.
+ */
+type RouteContextBrand<Context> = [keyof Context] extends [never] ? unknown : HandlerContextBrand<Context>;
+
+type GroupHandlerContextOverlay<G extends Routes, Identities, GroupAuth, ContractContext> = {
+    [Key in keyof G]: G[Key] extends RouteDefinition
+        ? RouteContextBrand<AuthArg<RouteAuthValue<GroupAuth, Key & string>, Identities> & ContractContext>
+        : G[Key] extends Routes
+          ? GroupHandlerContextOverlay<G[Key], Identities, SubgroupAuth<GroupAuth, Key & string>, ContractContext>
+          : unknown;
+};
+
+/**
+ * A contract's routes, each branded with the `auth` and `requestContext` its
+ * `auth`-map entry resolves to, read back by {@link RouteHandler}.
+ */
+export type RoutesWithHandlerContext<R extends Routes, Identities, Auth, RequestContext> = R & {
+    [Group in keyof R]: R[Group] extends RouteDefinition
+        ? RouteContextBrand<
+              AuthArg<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>, Identities> &
+                  RequestContextValues<RequestContext>
+          >
+        : R[Group] extends Routes
+          ? GroupHandlerContextOverlay<
+                R[Group],
+                Identities,
+                Group extends keyof Auth ? Auth[Group] : false,
+                RequestContextValues<RequestContext>
+            >
+          : unknown;
+};
+
+export type BrandedHandlerContext<R> = typeof HANDLER_CONTEXT_BRAND extends keyof R ? NonNullable<R[typeof HANDLER_CONTEXT_BRAND]> : {};
 
 export const isRouteDefinition = (value: unknown): value is RouteDefinition => {
     if (!value || typeof value !== 'object') return false;
