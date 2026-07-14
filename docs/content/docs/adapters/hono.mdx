@@ -192,6 +192,8 @@ const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ par
 const router: Router<typeof contract> = { ... };
 ```
 
+`RouteHandler` carries the route's `auth` and request context, nested groups included.
+
 ## Reference
 
 - [`createRouter`](/docs/reference/create-router)

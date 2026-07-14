@@ -169,8 +169,13 @@ Annotate a single handler, or the whole router at once:
 import type { RouteHandler, Router } from '@ts-kizuna/express';
 import { contract } from './contract';
 
-const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ params }) => {
-    // ...
+const deleteWorkspace: RouteHandler<typeof contract.routes.workspace.deleteWorkspace> = async ({ auth }) => {
+    return {
+        status: 200,
+        body: {
+            ok: auth.member.role === 'owner',
+        },
+    };
 };
 
 export const router: Router<typeof contract> = {
@@ -178,6 +183,6 @@ export const router: Router<typeof contract> = {
 };
 ```
 
-`Router<typeof contract>` types the full handler tree — including each secured route's identity context from the auth map — which you pass straight to `createApi`'s `router`. Use `RouteHandler` when you split a handler out into its own file.
+`RouteHandler` carries the route's `auth` and `requestContext`, nested groups included (`contract.routes.members.session.me`). `Router<typeof contract>` types the full tree, passed straight to `createApi`.
 
 See the [Router guide](/docs/building/router) for validation errors, error responses, and more.

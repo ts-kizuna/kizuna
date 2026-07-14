@@ -2,8 +2,14 @@ import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { kizuna } from './kizuna.js';
 import { createIdentity } from './identity.js';
-import { createRequestContext } from './request-context.js';
-import type { HandlersFromAuth, HandlerReturn, GuardSuccess, GuardParams } from './handler-pipeline.js';
+import type {
+    HandlersFromAuth,
+    HandlerReturn,
+    GuardSuccess,
+    GuardParams,
+    RouteHandler,
+    BrandedHandlerContext,
+} from './handler-pipeline.js';
 import type { RouteDefinition } from './types.js';
 
 const user = createIdentity.bearer({
@@ -336,4 +342,31 @@ test('GuardParams derives param names from the routes an identity secures', () =
     expectTypeOf<Params>().toEqualTypeOf<{ workspaceId?: string; id?: string }>();
     type NoParams = GuardParams<typeof paramContract.routes, NonNullable<typeof paramContract.auth>, 'user'>;
     expectTypeOf<NoParams>().toEqualTypeOf<Record<string, string>>();
+});
+
+test('a contract brands each route with the auth its map entry resolves to', () => {
+    expectTypeOf<BrandedHandlerContext<typeof nestedContract.routes.members.session.me>>().toEqualTypeOf<{
+        auth: { user: { userId: string } };
+    }>();
+});
+
+test('a route opted out in a nested cascade carries no branded auth', () => {
+    expectTypeOf<BrandedHandlerContext<typeof nestedContract.routes.members.session.login>>().toEqualTypeOf<{}>();
+});
+
+test('a branded route merges a subgroup AuthValue into the parent default', () => {
+    type Context = BrandedHandlerContext<typeof nestedContract.routes.members.events.list>;
+    expectTypeOf<Context['auth']['user']>().toEqualTypeOf<{ userId: string }>();
+    expectTypeOf<Context['auth']['member']['role']>().toEqualTypeOf<'owner'>();
+    expectTypeOf<Context['auth']['member']['workspaceUserId']>().toEqualTypeOf<string>();
+});
+
+test('a route straight from k.routes is unbranded', () => {
+    expectTypeOf<BrandedHandlerContext<typeof users.listUsers>>().toEqualTypeOf<{}>();
+});
+
+test('the standalone RouteHandler matches the Router tree it drops into', () => {
+    expectTypeOf<RouteHandler<typeof nestedContract.routes.members.session.me, {}>>().toEqualTypeOf<
+        NestedHandlers['members']['session']['me']
+    >();
 });
