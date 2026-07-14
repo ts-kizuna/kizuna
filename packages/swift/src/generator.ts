@@ -478,7 +478,11 @@ const emitNamedFactory = (
     });
 };
 
-const emitMemberwiseInit = (writer: SwiftWriter, fields: SwiftField[]): void => {
+const emitMemberwiseInit = (
+    writer: SwiftWriter,
+    fields: SwiftField[],
+    assignmentTarget: (field: SwiftField) => string = (field) => escapeKeyword(field.name)
+): void => {
     if (fields.length === 0) {
         writer.line('public init() {}');
         return;
@@ -491,7 +495,7 @@ const emitMemberwiseInit = (writer: SwiftWriter, fields: SwiftField[]): void => 
     if (params.length === 1) {
         writer.block(`public init(${params[0]})`, () => {
             for (const field of fields) {
-                writer.line(`self.${escapeKeyword(field.name)} = ${escapeKeyword(field.name)}`);
+                writer.line(`self.${assignmentTarget(field)} = ${escapeKeyword(field.name)}`);
             }
         });
         return;
@@ -503,9 +507,20 @@ const emitMemberwiseInit = (writer: SwiftWriter, fields: SwiftField[]): void => 
     }
     writer.block(')', () => {
         for (const field of fields) {
-            writer.line(`self.${escapeKeyword(field.name)} = ${escapeKeyword(field.name)}`);
+            writer.line(`self.${assignmentTarget(field)} = ${escapeKeyword(field.name)}`);
         }
     });
+};
+
+// Swift has no way to suppress deprecation warnings, so deprecated fields are emitted as
+// computed properties over private storage. Generated code only touches the storage.
+const deprecatedStorageName = (field: SwiftField, siblings: SwiftField[]): string => {
+    const takenNames = new Set(siblings.map((sibling) => sibling.name));
+    let storageName = `_${field.name}`;
+    while (takenNames.has(storageName)) {
+        storageName = `_${storageName}`;
+    }
+    return storageName;
 };
 
 const emitStringEnum = (writer: SwiftWriter, name: string, cases: string[], description?: string): void => {
@@ -570,7 +585,9 @@ const emitStruct = (
         type: resolveOwnedType(field.type),
     }));
 
-    const needsCodingKeys = !hasFile && type.fields.some((field) => field.name !== field.wireName || SWIFT_KEYWORDS.has(field.name));
+    const needsCodingKeys =
+        !hasFile &&
+        type.fields.some((field) => field.name !== field.wireName || SWIFT_KEYWORDS.has(field.name) || field.deprecated === true);
     writer.block(`public struct ${type.name}: ${conformances}`, () => {
         for (const [ownedName, owningStruct] of ownedTypeMap) {
             if (owningStruct !== lookupName) continue;
@@ -586,17 +603,24 @@ const emitStruct = (
             }
         }
         for (const field of type.fields) {
-            writer.docComment(field.description);
+            const fieldType = resolveFieldType(field.type, field.optional);
             if (field.deprecated) {
+                writer.line(`private let ${deprecatedStorageName(field, type.fields)}: ${fieldType}`);
+                writer.docComment(field.description);
                 writer.line(deprecatedAttribute(field.deprecationMessage));
+                writer.line(`public var ${escapeKeyword(field.name)}: ${fieldType} { ${deprecatedStorageName(field, type.fields)} }`);
+            } else {
+                writer.docComment(field.description);
+                writer.line(`public let ${escapeKeyword(field.name)}: ${fieldType}`);
             }
-            writer.line(`public let ${escapeKeyword(field.name)}: ${resolveFieldType(field.type, field.optional)}`);
         }
         if (needsCodingKeys) {
             writer.blank();
             writer.block('private enum CodingKeys: String, CodingKey', () => {
                 for (const field of type.fields) {
-                    if (field.name === field.wireName) {
+                    if (field.deprecated) {
+                        writer.line(`case ${deprecatedStorageName(field, type.fields)} = ${stringLiteral(field.wireName)}`);
+                    } else if (field.name === field.wireName) {
                         writer.line(`case ${escapeKeyword(field.name)}`);
                     } else {
                         writer.line(`case ${escapeKeyword(field.name)} = ${stringLiteral(field.wireName)}`);
@@ -605,7 +629,9 @@ const emitStruct = (
             });
         }
         writer.blank();
-        emitMemberwiseInit(writer, adjustedFields);
+        emitMemberwiseInit(writer, adjustedFields, (field) =>
+            field.deprecated ? deprecatedStorageName(field, type.fields) : escapeKeyword(field.name)
+        );
     });
 };
 

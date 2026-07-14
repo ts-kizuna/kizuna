@@ -966,7 +966,7 @@ describe('Swift generator — @available(*, deprecated)', () => {
     it('emits @available(*, deprecated) on a deprecated field in a response struct', () => {
         const output = generate({ getUser: deprecatedContract.routes.getUser });
         expect(output).toContain('@available(*, deprecated)');
-        expect(output).toContain('let email: String');
+        expect(output).toContain('public var email: String { _email }');
     });
 
     it('does not include message: on a bare @deprecated field', () => {
@@ -977,7 +977,20 @@ describe('Swift generator — @available(*, deprecated)', () => {
     it('emits @available(*, deprecated, message:) on a deprecated field with a message', () => {
         const output = generate({ getUserByIdV2: deprecatedContract.routes.getUserByIdV2 });
         expect(output).toContain('@available(*, deprecated, message: "use email_address instead")');
-        expect(output).toContain('let email: String');
+        expect(output).toContain('public var email: String { _email }');
+    });
+
+    it('stores a deprecated field in private storage and keeps the memberwise init parameter name', () => {
+        const output = generate({ getUser: deprecatedContract.routes.getUser });
+        expect(output).toContain('private let _email: String');
+        expect(output).toContain('self._email = email');
+        expect(output).not.toContain('self.email = email');
+        expect(output).not.toContain('public let email: String');
+    });
+
+    it('maps deprecated-field storage back to the wire name in CodingKeys', () => {
+        const output = generate({ getUser: deprecatedContract.routes.getUser });
+        expect(output).toContain('case _email = "email"');
     });
 });
 
