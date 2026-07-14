@@ -117,14 +117,14 @@ All builders and their fields: [`createIdentity`](/docs/reference/create-identit
 
 Keyed by route group; every group must appear, so public is always an explicit `false`. Each entry is one of:
 
-| Value                             | Meaning                                                                       |
-| --------------------------------- | ----------------------------------------------------------------------------- |
-| `false`                           | Public — no auth                                                              |
-| `'user'`                          | Requires the `user` identity                                                  |
-| `{ member: { role: 'owner' } }`   | Access gate — requires `member` with `role` limited to a value (or an array)  |
-| `{ user: ['read:events'] }`       | Requires `user` with these oauth2 scopes                                      |
-| `{ user: true, member: { ... } }` | Multiple identities — all must pass                                           |
-| `{ '*': ..., routeKey: ... }`     | Cascade — `'*'` sets the group default, named keys override individual routes |
+| Value                             | Meaning                                                                              |
+| --------------------------------- | ------------------------------------------------------------------------------------ |
+| `false`                           | Public — no auth                                                                     |
+| `'user'`                          | Requires the `user` identity                                                         |
+| `{ member: { role: 'owner' } }`   | Access gate — requires `member` with `role` limited to a value (or an array)         |
+| `{ user: ['read:events'] }`       | Requires `user` with these oauth2 scopes                                             |
+| `{ user: true, member: { ... } }` | Multiple identities — all must pass                                                  |
+| `{ '*': ..., login: false }`      | Cascade — `'*'` sets the group default, named keys override its routes and subgroups |
 
 ```ts title="packages/contract/src/contract.ts"
 export const contract = k.contract({
@@ -151,6 +151,21 @@ export const contract = k.contract({
 ```
 
 A route entry inherits the `'*'` default and only states its delta — `deleteWorkspace` above keeps requiring `member`, tightened to `role: 'owner'`. Adding another identity (`{ user: true }`) requires both; `false` opts the route out. Identity names are type-checked, and `security` can't be written inline in `k.routes`.
+
+### Nested groups
+
+A subgroup key covers its whole subtree, or nests its own cascade to opt out deeper. A key that matches nothing in the group is an error:
+
+```ts
+members: {
+    '*': 'user',
+    session: {
+        '*': 'user',
+        login: false,
+    },
+    invites: false,
+},
+```
 
 ### Access gates
 

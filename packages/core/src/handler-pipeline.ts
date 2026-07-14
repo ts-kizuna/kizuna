@@ -233,17 +233,32 @@ type AuthArg<Value, Identities> =
 type NormalizeAuthValue<Value> = Value extends false ? {} : Value extends string ? { [Name in Value]: true } : Value;
 
 /**
- * The auth value that applies to one route within a group's auth entry. A cascade
- * (`{ '*': default, routeKey: entry }`) merges the route's entry into the `'*'`
- * default — the route inherits the default's identities and refines or adds per
- * identity, and `false` opts it out. Any other value — a scheme name, `false`,
- * or a single constraint object — applies to every route in the group.
+ * An override merged into the `'*'` default: inherits its identities, refines or
+ * adds per identity; `false` opts out.
+ */
+type MergeAuthValues<Default, Override> = Override extends false
+    ? false
+    : Omit<NormalizeAuthValue<Default>, keyof NormalizeAuthValue<Override>> & NormalizeAuthValue<Override>;
+
+/**
+ * The auth value that applies to one route directly within a group's auth entry.
  */
 export type RouteAuthValue<GroupAuth, RouteKey extends string> = GroupAuth extends { '*': infer Default }
     ? RouteKey extends keyof GroupAuth
-        ? GroupAuth[RouteKey] extends false
-            ? false
-            : Omit<NormalizeAuthValue<Default>, keyof NormalizeAuthValue<GroupAuth[RouteKey]>> & NormalizeAuthValue<GroupAuth[RouteKey]>
+        ? MergeAuthValues<Default, GroupAuth[RouteKey]>
+        : Default
+    : GroupAuth;
+
+/**
+ * The group auth a subgroup resolves to within its parent's cascade: a nested
+ * cascade with the parent's `'*'` merged in, a merged AuthValue, or the parent's
+ * default when unnamed.
+ */
+type SubgroupAuth<GroupAuth, GroupKey extends string> = GroupAuth extends { '*': infer Default }
+    ? GroupKey extends keyof GroupAuth
+        ? GroupAuth[GroupKey] extends { '*': infer NestedDefault }
+            ? Omit<GroupAuth[GroupKey], '*'> & { '*': MergeAuthValues<Default, NestedDefault> }
+            : MergeAuthValues<Default, GroupAuth[GroupKey]>
         : Default
     : GroupAuth;
 
@@ -274,7 +289,7 @@ type GroupGuardedParamNames<G extends Routes, GroupAuthValue, Name extends strin
             ? keyof ExtractPathParams<G[Key]['path']> & string
             : never
         : G[Key] extends Routes
-          ? GroupGuardedParamNames<G[Key], GroupAuthValue, Name>
+          ? GroupGuardedParamNames<G[Key], SubgroupAuth<GroupAuthValue, Key>, Name>
           : never;
 }[keyof G & string];
 
@@ -305,7 +320,7 @@ type GroupHandlers<G extends Routes, HandlerContext, Identities, GroupAuth> = {
     [Key in keyof G as Key extends symbol ? never : Key]: G[Key] extends RouteDefinition
         ? RouteHandlerFromContext<G[Key], HandlerContext, AuthArg<RouteAuthValue<GroupAuth, Key & string>, Identities>>
         : G[Key] extends Routes
-          ? GroupHandlers<G[Key], HandlerContext, Identities, GroupAuth>
+          ? GroupHandlers<G[Key], HandlerContext, Identities, SubgroupAuth<GroupAuth, Key & string>>
           : never;
 };
 

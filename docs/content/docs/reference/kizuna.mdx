@@ -206,6 +206,19 @@ workspace: {
 
 Every route under `workspace` requires `member`; `deleteWorkspace` additionally gates on `role: 'owner'` — and inside its handler, `auth.member.role` is typed `'owner'`.
 
+Cascade keys name the group's own routes and subgroups. A subgroup key takes a value for its whole subtree, or its own nested cascade; a key that matches nothing in the group is an error.
+
+```ts
+members: {
+    '*': 'user',
+    session: {
+        '*': 'user',
+        login: false,
+    },
+    invites: false,
+},
+```
+
 `k.contract` resolves the map onto every route's `security` (and `accessGate` where fields are constrained), which the [guards](/docs/reference/create-guard), [router](/docs/reference/create-router) types, and [OpenAPI spec](/docs/reference/generate-openapi) all read.
 
 ### `k.auth`
