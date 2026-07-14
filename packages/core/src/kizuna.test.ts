@@ -53,6 +53,36 @@ const makeRoutes = () => {
 
 const routeOf = (routes: Routes, key: string): RouteDefinition => routes[key] as RouteDefinition;
 
+const makeNestedRoutes = () => {
+    const { k } = kizuna({
+        identities: {
+            user,
+            member,
+        },
+    });
+    return {
+        k,
+        members: k.routes({
+            session: {
+                login: routeDefinition('/auth/login'),
+                refresh: routeDefinition('/auth/refresh'),
+                me: routeDefinition('/auth/me'),
+            },
+            events: {
+                list: routeDefinition('/events'),
+                get: routeDefinition('/events/:eventId'),
+            },
+            invites: {
+                list: routeDefinition('/invites'),
+                get: routeDefinition('/invites/:inviteId'),
+            },
+        }),
+    };
+};
+
+const nestedRouteOf = (routes: Routes, groupKey: string, routeKey: string): RouteDefinition =>
+    routeOf(routes[groupKey] as Routes, routeKey);
+
 describe('k.contract auth resolution', () => {
     it('marks a group public with security: [] when auth is false', () => {
         const { k, users, workspace } = makeRoutes();
@@ -312,6 +342,26 @@ describe('cascade merging', () => {
         });
     });
 
+    it('rejects a cascade key that matches no route or subgroup in the group', () => {
+        const { k, users, workspace } = makeRoutes();
+        expect(() =>
+            // @ts-expect-error renameWorkspace is not a route in the group
+            k.contract({
+                routes: {
+                    users,
+                    workspace,
+                },
+                auth: {
+                    users: false,
+                    workspace: {
+                        '*': 'member',
+                        renameWorkspace: false,
+                    },
+                },
+            })
+        ).toThrow(/renameWorkspace/);
+    });
+
     it('false opts a route out of the default', () => {
         const { k, users, workspace } = makeRoutes();
         k.contract({
@@ -329,5 +379,160 @@ describe('cascade merging', () => {
         });
         expect(routeOf(workspace, 'getWorkspace').security).toEqual([]);
         expect(routeOf(workspace, 'deleteWorkspace').security).toEqual(['member']);
+    });
+});
+
+describe('nested group auth', () => {
+    it('applies an AuthValue on a subgroup key to that whole subtree', () => {
+        const { k, members } = makeNestedRoutes();
+        k.contract({
+            routes: {
+                members,
+            },
+            auth: {
+                members: {
+                    '*': 'user',
+                    invites: false,
+                },
+            },
+        });
+        expect(nestedRouteOf(members, 'invites', 'list').security).toEqual([]);
+        expect(nestedRouteOf(members, 'invites', 'get').security).toEqual([]);
+        expect(nestedRouteOf(members, 'events', 'list').security).toEqual(['user']);
+        expect(nestedRouteOf(members, 'session', 'login').security).toEqual(['user']);
+    });
+
+    it('recurses into a nested cascade on a subgroup key', () => {
+        const { k, members } = makeNestedRoutes();
+        k.contract({
+            routes: {
+                members,
+            },
+            auth: {
+                members: {
+                    '*': 'user',
+                    session: {
+                        '*': 'user',
+                        login: false,
+                        refresh: false,
+                    },
+                },
+            },
+        });
+        expect(nestedRouteOf(members, 'session', 'login').security).toEqual([]);
+        expect(nestedRouteOf(members, 'session', 'refresh').security).toEqual([]);
+        expect(nestedRouteOf(members, 'session', 'me').security).toEqual([
+            {
+                user: [],
+            },
+        ]);
+        expect(nestedRouteOf(members, 'events', 'list').security).toEqual(['user']);
+    });
+
+    it("merges a nested cascade's * into the parent group default", () => {
+        const { k, members } = makeNestedRoutes();
+        k.contract({
+            routes: {
+                members,
+            },
+            auth: {
+                members: {
+                    '*': 'user',
+                    events: {
+                        '*': {
+                            member: {
+                                role: 'owner',
+                            },
+                        },
+                        list: false,
+                    },
+                },
+            },
+        });
+        expect(nestedRouteOf(members, 'events', 'get').security).toEqual([
+            {
+                user: [],
+                member: [],
+            },
+        ]);
+        expect(nestedRouteOf(members, 'events', 'get').accessGate).toEqual({
+            member: {
+                role: 'owner',
+            },
+        });
+        expect(nestedRouteOf(members, 'events', 'list').security).toEqual([]);
+    });
+
+    it('merges an AuthValue on a subgroup key into the parent group default', () => {
+        const { k, members } = makeNestedRoutes();
+        k.contract({
+            routes: {
+                members,
+            },
+            auth: {
+                members: {
+                    '*': 'user',
+                    events: {
+                        member: {
+                            role: 'owner',
+                        },
+                    },
+                },
+            },
+        });
+        expect(nestedRouteOf(members, 'events', 'list').security).toEqual([
+            {
+                user: [],
+                member: [],
+            },
+        ]);
+        expect(nestedRouteOf(members, 'events', 'list').accessGate).toEqual({
+            member: {
+                role: 'owner',
+            },
+        });
+    });
+
+    it('does not match a cascade key against leaf routes in subgroups', () => {
+        const { k, members } = makeNestedRoutes();
+        expect(() =>
+            // @ts-expect-error list is not a route or subgroup directly in members
+            k.contract({
+                routes: {
+                    members,
+                },
+                auth: {
+                    members: {
+                        '*': 'user',
+                        list: false,
+                    },
+                },
+            })
+        ).toThrow(/list/);
+        expect(nestedRouteOf(members, 'events', 'list').security).not.toEqual([]);
+        expect(nestedRouteOf(members, 'invites', 'list').security).not.toEqual([]);
+    });
+
+    it('rejects a nested cascade on a route key', () => {
+        const { k, members } = makeNestedRoutes();
+        expect(() =>
+            // @ts-expect-error login is a route, not a group
+            k.contract({
+                routes: {
+                    members,
+                },
+                auth: {
+                    members: {
+                        '*': 'user',
+                        session: {
+                            '*': 'user',
+                            login: {
+                                '*': false,
+                            },
+                        },
+                    },
+                },
+            })
+        ).toThrow(/login/);
     });
 });

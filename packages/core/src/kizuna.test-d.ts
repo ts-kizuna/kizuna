@@ -183,6 +183,134 @@ test('resolved security on a route is the typed requirement shape', () => {
     >();
 });
 
+const members = k.routes({
+    session: {
+        login: {
+            method: 'POST',
+            path: '/auth/login',
+            ...okResponse,
+        },
+        me: {
+            method: 'GET',
+            path: '/auth/me',
+            ...okResponse,
+        },
+    },
+    events: {
+        list: {
+            method: 'GET',
+            path: '/events',
+            ...okResponse,
+        },
+        get: {
+            method: 'GET',
+            path: '/events/:eventId',
+            ...okResponse,
+        },
+    },
+    invites: {
+        list: {
+            method: 'GET',
+            path: '/invites',
+            ...okResponse,
+        },
+        get: {
+            method: 'GET',
+            path: '/invites/:inviteId',
+            ...okResponse,
+        },
+    },
+});
+
+const nestedContract = k.contract({
+    routes: {
+        members,
+    },
+    auth: {
+        members: {
+            '*': 'user',
+            session: {
+                '*': 'user',
+                login: false,
+            },
+            events: {
+                member: {
+                    role: 'owner',
+                },
+            },
+            invites: false,
+        },
+    },
+});
+
+type NestedHandlers = HandlersFromAuth<
+    typeof nestedContract.routes,
+    {},
+    NonNullable<typeof nestedContract.securitySchemes>,
+    NonNullable<typeof nestedContract.auth>
+>;
+
+test('a route opted out in a nested cascade receives no auth context', () => {
+    type Args = Parameters<NestedHandlers['members']['session']['login']>[0];
+    expectTypeOf<Args>().not.toHaveProperty('auth');
+});
+
+test('a route not named in a nested cascade inherits its merged * default', () => {
+    type Args = Parameters<NestedHandlers['members']['session']['me']>[0];
+    expectTypeOf<Args['auth']['user']>().toEqualTypeOf<{ userId: string }>();
+});
+
+test('an AuthValue on a subgroup key merges into the parent default across its subtree', () => {
+    type Args = Parameters<NestedHandlers['members']['events']['list']>[0];
+    expectTypeOf<Args['auth']['user']>().toEqualTypeOf<{ userId: string }>();
+    expectTypeOf<Args['auth']['member']['role']>().toEqualTypeOf<'owner'>();
+});
+
+test('a subgroup opted out with false is public despite sibling overrides for the same route keys', () => {
+    type Args = Parameters<NestedHandlers['members']['invites']['list']>[0];
+    expectTypeOf<Args>().not.toHaveProperty('auth');
+});
+
+test('the auth map rejects a cascade key that does not name a route or subgroup in the group', () => {
+    // @ts-expect-error list is a leaf route key, not directly in members
+    k.contract({
+        routes: {
+            members,
+        },
+        auth: {
+            members: {
+                '*': 'user',
+                list: false,
+            },
+        },
+    });
+});
+
+test('the auth map rejects a nested cascade on a route key', () => {
+    // @ts-expect-error login is a route, not a group
+    k.contract({
+        routes: {
+            members,
+        },
+        auth: {
+            members: {
+                '*': 'user',
+                session: {
+                    '*': 'user',
+                    login: {
+                        '*': false,
+                    },
+                },
+            },
+        },
+    });
+});
+
+test('GuardParams only derives params from the subgroups an identity secures', () => {
+    type MemberParams = GuardParams<typeof nestedContract.routes, NonNullable<typeof nestedContract.auth>, 'member'>;
+    expectTypeOf<MemberParams>().toEqualTypeOf<{ eventId?: string }>();
+});
+
 test('GuardParams derives param names from the routes an identity secures', () => {
     const paramRoutes = k.routes({
         getWorkspaceUser: {

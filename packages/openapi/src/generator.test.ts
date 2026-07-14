@@ -1525,6 +1525,73 @@ describe('security from the contract', () => {
         const plainSpec = generateJson(plain, baseConfig);
         expect(plainSpec.components?.securitySchemes).toBeUndefined();
     });
+
+    it('emits security resolved through a nested cascade', () => {
+        const { k: nestedK } = kizuna({
+            identities: {
+                user,
+            },
+        });
+        const members = nestedK.routes({
+            session: {
+                login: {
+                    method: 'POST',
+                    path: '/auth/login',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+                me: {
+                    method: 'GET',
+                    path: '/auth/me',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            },
+            events: {
+                listEvents: {
+                    method: 'GET',
+                    path: '/events',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            },
+        });
+        const nestedContract = nestedK.contract({
+            routes: {
+                members,
+            },
+            auth: {
+                members: {
+                    '*': 'user',
+                    session: {
+                        '*': 'user',
+                        login: false,
+                    },
+                },
+            },
+        });
+        const nestedSpec = generateJson(nestedContract, baseConfig);
+        expect(nestedSpec.paths['/auth/login']?.post?.security).toBeUndefined();
+        expect(nestedSpec.paths['/auth/me']?.get?.security).toEqual([
+            {
+                user: [],
+            },
+        ]);
+        expect(nestedSpec.paths['/events']?.get?.security).toEqual([
+            {
+                user: [],
+            },
+        ]);
+    });
 });
 
 describe('shared scheme names', () => {

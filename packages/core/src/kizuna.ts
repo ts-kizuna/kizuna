@@ -28,16 +28,64 @@ export type AuthValue<Id extends string = string> = Id | false | { [Name in Id]?
 
 /**
  * A group's entry in the `auth` map: one {@link AuthValue} for the whole group,
- * or a cascade object `{ '*': default, routeKey: override }` where the `'*'` key
- * sets the group default and named keys override individual routes.
+ * or a cascade `{ '*': default, key: override }` whose named keys are the
+ * group's own routes and subgroups — an {@link AuthValue}, or a nested cascade
+ * (an object with its own `'*'`) for a subgroup.
  */
-export type GroupAuth<Id extends string = string> = AuthValue<Id> | ({ '*': AuthValue<Id> } & { [route: string]: AuthValue<Id> });
+export type GroupAuth<Id extends string = string, Group = Routes> = Group extends RouteDefinition
+    ? AuthValue<Id>
+    : AuthValue<Id> | GroupAuthCascade<Id, Group>;
+
+/**
+ * The cascade form of {@link GroupAuth} when the group's shape isn't statically
+ * known.
+ */
+interface LooseGroupAuthCascade<Id extends string = string> {
+    '*': AuthValue<Id>;
+    [key: string]: AuthValue<Id> | LooseGroupAuthCascade<Id>;
+}
+
+/**
+ * The cascade form of {@link GroupAuth}.
+ */
+export type GroupAuthCascade<Id extends string = string, Group = Routes> = string extends keyof Group
+    ? LooseGroupAuthCascade<Id>
+    : {
+          '*': AuthValue<Id>;
+      } & {
+          [Key in keyof Group & string]?: GroupAuth<Id, Group[Key]>;
+      };
 
 /**
  * The `auth` map passed to `k.contract`: keyed by route group (every group must
- * appear), with values checked against the contract's identity names.
+ * appear), with values checked against the contract's identity names. The second
+ * parameter takes the routes type, or a union of group names for the unshaped form.
  */
-export type AuthMap<Id extends string = string, Groups extends string = string> = { [Group in Groups]: GroupAuth<Id> };
+export type AuthMap<Id extends string = string, GroupsOrRoutes = Record<string, Routes>> = [GroupsOrRoutes] extends [string]
+    ? { [Group in GroupsOrRoutes]: GroupAuth<Id> }
+    : { [Group in keyof GroupsOrRoutes & string]: GroupAuth<Id, GroupsOrRoutes[Group]> };
+
+/**
+ * Rechecks an inferred `auth` map against the routes, erroring on keys that
+ * plain assignability would let through as excess properties.
+ */
+export type ValidAuthMap<A, R, Id extends string> = {
+    [Group in keyof A]: Group extends keyof R ? ValidGroupAuth<A[Group], R[Group], Id> : never;
+};
+
+type ValidGroupAuth<Entry, Group, Id extends string> = Group extends RouteDefinition
+    ? Entry extends { '*': unknown }
+        ? never
+        : AuthValue<Id>
+    : Entry extends { '*': unknown }
+      ? {
+            [Key in keyof Entry]: Key extends '*'
+                ? AuthValue<Id>
+                : Key extends keyof Group
+                  ? ValidGroupAuth<Entry[Key], Group[Key], Id>
+                  : never;
+        }
+      : AuthValue<Id>;
 
 /**
  * Apply one {@link AuthValue} to a single route, setting its `security` and,
@@ -69,7 +117,7 @@ const resolveAuthValue = (route: RouteDefinition, value: AuthValue): void => {
     if (Object.keys(gate).length > 0) route.accessGate = gate;
 };
 
-const hasCascade = (value: GroupAuth): value is { '*': AuthValue } & Record<string, AuthValue> =>
+const hasCascade = (value: unknown): value is { '*': AuthValue } & Record<string, AuthValue | GroupAuth> =>
     typeof value === 'object' && value !== null && !Array.isArray(value) && '*' in value;
 
 const toIdentityMap = (value: AuthValue): Record<string, true | AccessConstraint | readonly string[]> => {
@@ -89,20 +137,45 @@ const mergeAuthValue = (groupDefault: AuthValue, override: AuthValue): AuthValue
 };
 
 /**
- * Resolve a group's {@link GroupAuth} across its routes, applying either the
- * cascade (`'*'` default merged with per-route entries) or a single value to
- * every route in the group.
+ * Resolve a group's {@link GroupAuth} across its subtree. Cascade keys address
+ * the group's own routes and subgroups; a key matching none would be a silent
+ * no-op, so it throws instead.
  */
-const applyGroupAuth = (group: Routes, groupAuth: GroupAuth): void => {
+const applyGroupAuth = (group: Routes, groupAuth: GroupAuth, path: string): void => {
     const cascade = hasCascade(groupAuth);
     const groupDefault = (cascade ? groupAuth['*'] : groupAuth) as AuthValue;
-    for (const [routeKey, value] of Object.entries(group)) {
+    if (cascade) {
+        for (const overrideKey of Object.keys(groupAuth)) {
+            if (overrideKey !== '*' && !(overrideKey in group)) {
+                throw new Error(`Auth cascade key '${overrideKey}' does not match a route or group directly under '${path}'.`);
+            }
+        }
+    }
+    for (const [key, value] of Object.entries(group)) {
+        const entry = cascade ? (groupAuth as Record<string, GroupAuth | undefined>)[key] : undefined;
         if (!isRouteDefinition(value)) {
-            applyGroupAuth(value as Routes, cascade ? groupAuth : groupDefault);
+            const subgroup = value as Routes;
+            const subPath = `${path}.${key}`;
+            if (entry === undefined) {
+                applyGroupAuth(subgroup, groupDefault, subPath);
+            } else if (hasCascade(entry)) {
+                applyGroupAuth(
+                    subgroup,
+                    {
+                        ...entry,
+                        '*': mergeAuthValue(groupDefault, entry['*']),
+                    },
+                    subPath
+                );
+            } else {
+                applyGroupAuth(subgroup, mergeAuthValue(groupDefault, entry as AuthValue), subPath);
+            }
             continue;
         }
-        const override = cascade ? (groupAuth as Record<string, AuthValue | undefined>)[routeKey] : undefined;
-        const routeAuth = override === undefined ? groupDefault : mergeAuthValue(groupDefault, override);
+        if (hasCascade(entry)) {
+            throw new Error(`Auth cascade key '${key}' under '${path}' targets a route; a nested cascade only applies to a group.`);
+        }
+        const routeAuth = entry === undefined ? groupDefault : mergeAuthValue(groupDefault, entry as AuthValue);
         resolveAuthValue(value as RouteDefinition, routeAuth);
     }
 };
@@ -135,10 +208,10 @@ export interface K<
      */
     auth<
         const R extends Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
-        const A extends AuthMap<Extract<keyof Identities, string>, Extract<keyof R, string>>,
+        const A extends AuthMap<Extract<keyof Identities, string>, R>,
     >(
         routes: R,
-        map: A
+        map: A & ValidAuthMap<A, R, Extract<keyof Identities, string>>
     ): A;
     /**
      * Assemble route groups into a contract. The `auth` map assigns each group
@@ -147,10 +220,10 @@ export interface K<
      */
     contract<
         const R extends Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
-        const A extends AuthMap<Extract<keyof Identities, string>, Extract<keyof R, string>>,
+        const A extends AuthMap<Extract<keyof Identities, string>, R>,
     >(definition: {
         routes: R;
-        auth: A;
+        auth: A & ValidAuthMap<A, R, Extract<keyof Identities, string>>;
     }): Contract<R, Tags, Codes, Identities, A, RequestContext>;
     contract<const R extends Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>>(definition: {
         routes: R;
@@ -197,13 +270,18 @@ export const kizuna = <
     const contract = (definition: { routes: Routes; auth?: Record<string, GroupAuth> }) => {
         const { routes: contractRoutes, auth } = definition;
         if (auth) {
+            for (const groupKey of Object.keys(auth)) {
+                if (!(groupKey in contractRoutes)) {
+                    throw new Error(`Auth map key '${groupKey}' does not match a route group in the contract.`);
+                }
+            }
             for (const [groupKey, group] of Object.entries(contractRoutes)) {
                 const groupAuth = auth[groupKey];
                 if (groupAuth === undefined || !group || typeof group !== 'object') continue;
                 if (isRouteDefinition(group)) {
                     resolveAuthValue(group, (hasCascade(groupAuth) ? groupAuth['*'] : groupAuth) as AuthValue);
                 } else {
-                    applyGroupAuth(group as Routes, groupAuth);
+                    applyGroupAuth(group as Routes, groupAuth, groupKey);
                 }
             }
         }
