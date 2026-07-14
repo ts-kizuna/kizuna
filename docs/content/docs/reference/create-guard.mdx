@@ -42,13 +42,14 @@ The return is checked against the identity's `context` and `access` schemas.
 
 ## Guard arguments
 
-| Property                                                   | Description                                                                                     |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `bearer` / `apiKey` / `basic` / `oauth2` / `openIdConnect` | The extracted credential, keyed by the identity's method. `null` when the request carried none. |
-| `params`                                                   | The matched route's path params — for guards that check access to the resource in the URL       |
-| `deny`                                                     | `(status, detail) => GuardDenial` — reject with a Problem Details response                      |
-| `scopes`                                                   | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes)             |
-| framework context                                          | The adapter's native request objects — see below                                                |
+| Property                                                   | Description                                                                                                                |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `bearer` / `apiKey` / `basic` / `oauth2` / `openIdConnect` | The extracted credential, keyed by the identity's method. `null` when the request carried none.                            |
+| `params`                                                   | The matched route's path params — for guards that check access to the resource in the URL                                  |
+| `headers`                                                  | The identity's declared [auth headers](/docs/reference/create-identity#auth-headers), validated and typed (`{}` when none) |
+| `deny`                                                     | `(status, detail) => GuardDenial` — reject with a Problem Details response                                                 |
+| `scopes`                                                   | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes)                                        |
+| framework context                                          | The adapter's native request objects — see below                                                                           |
 
 The credential key matches the identity's builder, so a `createIdentity.bearer` guard destructures `{ bearer }` and a `createIdentity.apiKey` guard destructures `{ apiKey }`:
 
@@ -85,6 +86,25 @@ export const requireMember = createGuard(contract, 'member', async ({ bearer, pa
 ```
 
 `params` is typed from the contract: its keys are the param names of the routes this identity secures, each `string | undefined` since one guard runs across all of them.
+
+## Auth headers
+
+When the identity declares [`headers`](/docs/reference/create-identity#auth-headers), the guard receives them as `headers`, already validated and typed from the schema — no reaching into the raw request:
+
+```ts
+export const authenticate = createGuard(contract, 'member', async ({ bearer, headers, deny }) => {
+    const slug = headers['x-workspace-id']; // string | undefined, validated
+    const session = bearer && (await verifySession(bearer.token));
+    if (!session) {
+        return deny(401, 'Unauthorized');
+    }
+    return {
+        workspaceUserId: session.userId,
+    };
+});
+```
+
+An identity that declares no `headers` gives its guard `headers: {}`. A request whose headers fail the schema is rejected with a `400` before the guard runs.
 
 ## Returning context and access
 

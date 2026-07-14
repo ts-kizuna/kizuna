@@ -23,7 +23,7 @@ One builder per authentication method, matching the OpenAPI security scheme type
 | `createIdentity.oauth2`        | `Authorization: Bearer <token>`, with scopes | `{ type: 'oauth2', flows }`          |
 | `createIdentity.openIdConnect` | `Authorization: Bearer <token>`              | `{ type: 'openIdConnect', ... }`     |
 
-Every builder takes `context` (optional), `access` (optional), `description` (optional), and `scheme` (optional — identities sharing one credential set the same `scheme` name and emit a single OpenAPI scheme). Method-specific fields:
+Every builder takes `context` (optional), `access` (optional), `headers` (optional — auxiliary auth headers the guard receives, see [Auth headers](#auth-headers)), `description` (optional), and `scheme` (optional — identities sharing one credential set the same `scheme` name and emit a single OpenAPI scheme). Method-specific fields:
 
 | Builder                        | Extra fields                                  |
 | ------------------------------ | --------------------------------------------- |
@@ -64,6 +64,24 @@ Both describe what the guard returns and the handler reads:
 - **`access`** — the fields the `auth` map may gate per route. Gating on `{ member: { role: 'owner' } }` enforces a 403 at runtime and narrows the handler's type — `auth.member.role` is `'owner'`, not `'owner' | 'admin'`.
 
 Skip `access` for identities that never gate on fields; the auth map can still require them (`'user'`), it just can't constrain them.
+
+## Auth headers
+
+Some authentication depends on extra headers — a tenant selector, a workspace slug. Declare them with `headers` and the runtime extracts, validates, and passes them into the [guard](/docs/reference/create-guard) as `headers`, typed from the schema, so the guard never reaches into the raw request:
+
+```ts title="src/identities.ts"
+export const member = createIdentity.bearer({
+    context: z.object({
+        workspaceUserId: z.string(),
+    }),
+    headers: z.object({
+        'x-workspace-id': z.string().optional(),
+        'x-workspace-region': z.string().optional(),
+    }),
+});
+```
+
+A request whose headers fail the schema is rejected with a `400` before the guard runs. These are auth inputs — distinct from [request context](/docs/reference/create-request-context) (ambient, never gating) and from a route's own `headers` schema (which handlers receive). Each declared header is emitted as an `in: header` parameter on the routes the identity secures.
 
 ## Authentication-only identities
 

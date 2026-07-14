@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
-import { createIdentity } from './identity.js';
+import { createIdentity, type HeadersOf } from './identity.js';
 import { isSecurityScheme, type ContextOf } from './security-scheme.js';
 
 const context = z.object({
@@ -114,6 +114,28 @@ describe('identity builders', () => {
         const gate = createIdentity.bearer({});
         expect(gate.context).toBeUndefined();
         expectTypeOf<ContextOf<typeof gate>>().toEqualTypeOf<{}>();
+    });
+
+    it('carries the headers schema when declared', () => {
+        const headers = z.object({
+            'x-workspace-id': z.string().optional(),
+        });
+        const member = createIdentity.bearer({
+            context,
+            headers,
+        });
+        expect(member.headers).toBe(headers);
+        expectTypeOf<HeadersOf<typeof member>>().toEqualTypeOf<{
+            'x-workspace-id'?: string | undefined;
+        }>();
+    });
+
+    it('HeadersOf is `{}` when the identity declares no headers', () => {
+        const user = createIdentity.bearer({
+            context,
+        });
+        expect(user.headers).toBeUndefined();
+        expectTypeOf<HeadersOf<typeof user>>().toEqualTypeOf<{}>();
     });
 });
 

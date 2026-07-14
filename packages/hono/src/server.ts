@@ -35,6 +35,7 @@ import type {
     HandlersFromAuth,
     GuardSuccess,
     CredentialOf,
+    HeadersOf,
     GuardParams,
     RequestContextSchema,
     RequestContextHeaderValues,
@@ -137,6 +138,7 @@ type GuardFns<Schemes extends Record<string, SecurityScheme>, Params, E extends 
         args: HonoHandlerContext<E> &
             CredentialOf<Schemes[Name]> & {
                 params: Params;
+                headers: HeadersOf<Schemes[Name]>;
                 deny: GuardDeny;
                 scopes: string[];
             }

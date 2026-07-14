@@ -17,7 +17,7 @@ import { parsePath } from './path-params.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
-import { isVoidSchema, isBinarySchema } from './zod-internals.js';
+import { isVoidSchema, isBinarySchema, readObjectShape } from './zod-internals.js';
 import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
 
 export type { RouteDefinition, Routes, Method } from './types.js';
@@ -82,7 +82,8 @@ export const isGuardDenial = (value: unknown): value is GuardDenial => typeof va
 /**
  * The runtime behavior of a guard. It receives one object: the adapter's handler
  * context (e.g. `req`/`res`) plus the credential the identity's method extracted
- * from the request (or `null` if absent), a `deny` helper, and the matched
+ * from the request (or `null` if absent), the identity's validated auth
+ * `headers`, a `deny` helper, and the matched
  * route's required `scopes`. It returns the context the scheme provides (nested
  * under `auth`, keyed by the identity's name in the handler args) or `deny(...)` to reject.
  */
@@ -90,6 +91,7 @@ export type GuardRun<HandlerContext = unknown> = (
     args: HandlerContext &
         Credential & {
             params: Record<string, string>;
+            headers: Record<string, unknown>;
             deny: GuardDeny;
             scopes: string[];
         }
@@ -373,6 +375,19 @@ export const extractCredential = (scheme: SecurityScheme, request: AdapterReques
     return { bearer: token };
 };
 
+/**
+ * The header values an identity's `headers` schema declares, read off the request.
+ */
+const collectAuthHeaders = (headersSchema: z.ZodType, request: AdapterRequest<unknown>): Record<string, string | undefined> => {
+    const rawHeaders = (request.headers ?? {}) as Record<string, string | string[] | undefined>;
+    const shape = readObjectShape(headersSchema) ?? {};
+    const collected: Record<string, string | undefined> = {};
+    for (const name of Object.keys(shape)) {
+        collected[name] = getHeaderValue(rawHeaders[name.toLowerCase()]);
+    }
+    return collected;
+};
+
 export interface Adapter<NativeRequest, NativeResponse, HandlerContext, ResponseContext> {
     handle: <T extends Routes>(args: HandleArgs<NativeRequest, HandlerContext, ResponseContext, T>) => Promise<NativeResponse>;
     eachRoute: <T extends Routes>(
@@ -551,10 +566,28 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             }
             const schemeDefinition = schemes?.[scheme];
             const credential = schemeDefinition ? extractCredential(schemeDefinition, request as AdapterRequest<unknown>) : {};
+            let headers: Record<string, unknown> = {};
+            if (schemeDefinition?.headers) {
+                const parsed = schemeDefinition.headers.safeParse(
+                    collectAuthHeaders(schemeDefinition.headers, request as AdapterRequest<unknown>)
+                );
+                if (!parsed.success) {
+                    return {
+                        kind: 'guard-denied',
+                        status: 400,
+                        detail: formatValidationError({
+                            stage: 'headers',
+                            issues: parsed.error.issues,
+                        }).detail,
+                    };
+                }
+                headers = parsed.data as Record<string, unknown>;
+            }
             const guardResult = await guard({
                 ...(handlerContext as Record<string, unknown>),
                 ...credential,
                 params,
+                headers,
                 deny: guardDeny,
                 scopes,
             } as Parameters<typeof guard>[0]);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import request from 'supertest';
 import { z } from 'zod';
@@ -861,6 +861,113 @@ describe('guards', () => {
         });
     });
 });
+
+describe('guards — auth headers', () => {
+    const member = createIdentity.bearer({
+        context: z.object({
+            workspaceUserId: z.string(),
+            workspaceId: z.string(),
+            region: z.string().nullable(),
+        }),
+        headers: z.object({
+            'x-workspace-id': z.string(),
+            'x-workspace-region': z.string().optional(),
+        }),
+    });
+
+    const { k: securedK } = kizuna({
+        identities: {
+            member,
+        },
+    });
+
+    const securedRoutes = securedK.routes({
+        whoAmI: {
+            method: 'GET',
+            path: '/who-am-i',
+            responses: {
+                200: z.object({
+                    workspaceUserId: z.string(),
+                    workspaceId: z.string(),
+                    region: z.string().nullable(),
+                }),
+            },
+        },
+    });
+
+    const securedContract = securedK.contract({
+        routes: {
+            api: securedRoutes,
+        },
+        auth: {
+            api: 'member',
+        },
+    });
+
+    const makeApp = () => {
+        const app = express();
+        app.use(express.json());
+        const requireMember = createGuard(securedContract, 'member', ({ bearer, headers, deny }) => {
+            if (!bearer) return deny(401, 'Unauthorized');
+            expectTypeOf(headers).toEqualTypeOf<{
+                'x-workspace-id': string;
+                'x-workspace-region'?: string | undefined;
+            }>();
+            return {
+                workspaceUserId: '1',
+                workspaceId: headers['x-workspace-id'],
+                region: headers['x-workspace-region'] ?? null,
+            };
+        });
+        const api = createApi({
+            contract: securedContract,
+            router: {
+                api: {
+                    whoAmI: ({ auth }) => ({
+                        status: 200,
+                        body: {
+                            workspaceUserId: auth.member.workspaceUserId,
+                            workspaceId: auth.member.workspaceId,
+                            region: auth.member.region,
+                        },
+                    }),
+                },
+            },
+            guards: {
+                member: requireMember,
+            },
+        });
+        createExpressEndpoints(api, app);
+        return app;
+    };
+
+    it('passes validated headers to the guard', async () => {
+        const response = await request(makeApp())
+            .get('/who-am-i')
+            .set('authorization', 'Bearer tok_ada')
+            .set('x-workspace-id', 'ws_ada')
+            .set('x-workspace-region', 'east');
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({
+            workspaceUserId: '1',
+            workspaceId: 'ws_ada',
+            region: 'east',
+        });
+    });
+
+    it('omits an optional header as undefined', async () => {
+        const response = await request(makeApp()).get('/who-am-i').set('authorization', 'Bearer tok_ada').set('x-workspace-id', 'ws_ada');
+        expect(response.status).toBe(200);
+        expect(response.body.region).toBeNull();
+    });
+
+    it('denies with 400 when a required header is missing', async () => {
+        const response = await request(makeApp()).get('/who-am-i').set('authorization', 'Bearer tok_ada');
+        expect(response.status).toBe(400);
+        expect(response.headers['content-type']).toContain('application/problem+json');
+    });
+});
+
 describe('Express integration — middleware map', () => {
     const middlewareContractRoutes = k.routes('api', {
         publicRoute: {

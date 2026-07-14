@@ -33,6 +33,7 @@ import type {
     HandlersFromAuth,
     GuardSuccess,
     CredentialOf,
+    HeadersOf,
     GuardParams,
     RequestContextSchema,
     RequestContextHeaderValues,
@@ -142,6 +143,7 @@ type GuardFns<Schemes extends Record<string, SecurityScheme>, Params> = {
         args: FastifyHandlerContext &
             CredentialOf<Schemes[Name]> & {
                 params: Params;
+                headers: HeadersOf<Schemes[Name]>;
                 deny: GuardDeny;
                 scopes: string[];
             }

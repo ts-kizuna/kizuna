@@ -242,6 +242,78 @@ test('createGuard types the credential by identity kind and checks the return', 
     createGuard(securedContract, 'admin', () => ({}));
 });
 
+const headerScopedIdentity = createIdentity.bearer({
+    context: z.object({
+        workspaceUserId: z.string(),
+    }),
+    headers: z.object({
+        'x-workspace-id': z.string(),
+        'x-workspace-region': z.string().optional(),
+    }),
+});
+
+const { k: headerScopedK } = kizuna({
+    identities: {
+        member: headerScopedIdentity,
+        user: userIdentity,
+    },
+});
+
+const headerScopedContract = headerScopedK.contract({
+    routes: {
+        api: headerScopedK.routes({
+            scoped: {
+                method: 'GET',
+                path: '/scoped',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+            plain: {
+                method: 'GET',
+                path: '/plain',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        }),
+    },
+    auth: {
+        api: {
+            '*': false,
+            scoped: 'member',
+            plain: 'user',
+        },
+    },
+});
+
+test('a guard receives auth headers typed from the identity schema', () => {
+    createGuard(headerScopedContract, 'member', ({ headers, deny }) => {
+        expectTypeOf(headers).toEqualTypeOf<{
+            'x-workspace-id': string;
+            'x-workspace-region'?: string | undefined;
+        }>();
+        void deny;
+        return {
+            workspaceUserId: headers['x-workspace-id'],
+        };
+    });
+});
+
+test('an identity with no headers schema gives its guard `headers: {}`', () => {
+    createGuard(headerScopedContract, 'user', ({ headers, deny }) => {
+        expectTypeOf(headers).toEqualTypeOf<{}>();
+        void deny;
+        return {
+            userId: '1',
+        };
+    });
+});
+
 test('createApi requires a complete guard map when guards are provided', () => {
     const guardFn = createGuard(securedContract, 'user', ({ deny }) => deny(401, 'Unauthorized'));
     createApi({

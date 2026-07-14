@@ -80,6 +80,11 @@ export interface SecurityScheme<ContextSchema extends z.ZodType | undefined = z.
      * identity — a pure gate with no data to hand the handler.
      */
     readonly context: ContextSchema;
+    /**
+     * Schema for the auxiliary auth headers the runtime extracts, validates, and
+     * passes into the guard.
+     */
+    readonly headers?: z.ZodType | undefined;
 }
 
 /**

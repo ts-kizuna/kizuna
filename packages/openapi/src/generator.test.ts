@@ -1527,6 +1527,83 @@ describe('security from the contract', () => {
     });
 });
 
+describe('identity auth headers', () => {
+    const member = createIdentity.bearer({
+        context: z.object({
+            workspaceUserId: z.string(),
+        }),
+        headers: z.object({
+            'x-workspace-id': z.string(),
+            'x-workspace-region': z.string().optional(),
+        }),
+    });
+
+    const makeContract = () => {
+        const { k: securedK } = kizuna({
+            identities: {
+                member,
+            },
+        });
+        const routes = securedK.routes({
+            scoped: {
+                method: 'GET',
+                path: '/scoped',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+            open: {
+                method: 'GET',
+                path: '/open',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        });
+        return securedK.contract({
+            routes: {
+                api: routes,
+            },
+            auth: {
+                api: {
+                    '*': false,
+                    scoped: 'member',
+                },
+            },
+        });
+    };
+
+    const spec = generateJson(makeContract(), baseConfig);
+
+    it('emits the identity headers as header parameters on the secured route', () => {
+        const parameters = spec.paths['/scoped']?.get?.parameters;
+        expect(parameters).toContainEqual({
+            name: 'x-workspace-id',
+            in: 'header',
+            required: true,
+            schema: {
+                type: 'string',
+            },
+        });
+        expect(parameters).toContainEqual({
+            name: 'x-workspace-region',
+            in: 'header',
+            required: false,
+            schema: {
+                type: 'string',
+            },
+        });
+    });
+
+    it('does not emit the auth headers on a route the identity does not secure', () => {
+        expect(spec.paths['/open']?.get?.parameters).toBeUndefined();
+    });
+});
+
 describe('shared scheme names', () => {
     it('emits one securitySchemes entry for identities sharing a scheme', () => {
         const admin = createIdentity.bearer({

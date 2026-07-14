@@ -18,6 +18,7 @@ export {
     type CredentialOf,
     type AccessOf,
     type IdentityAccess,
+    type HeadersOf,
     type BearerCredential,
     type BasicCredential,
     type ApiKeyCredential,

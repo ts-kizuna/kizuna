@@ -369,17 +369,30 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                 }
             }
 
-            if (route.headers) {
-                const headersSchema = toJsonSchema(route.headers, 'input');
+            const emittedHeaderNames = new Set<string>();
+            const addHeaderParameters = (schema: z.ZodType): void => {
+                const headersSchema = toJsonSchema(schema, 'input');
                 const headerProperties = (headersSchema.properties ?? {}) as Record<string, Record<string, unknown>>;
                 const headerRequired = (headersSchema.required ?? []) as string[];
                 for (const [name, valueSchema] of Object.entries(headerProperties)) {
+                    if (emittedHeaderNames.has(name)) continue;
+                    emittedHeaderNames.add(name);
                     parameters.push({
                         name,
                         in: 'header',
                         required: headerRequired.includes(name),
                         schema: valueSchema,
                     });
+                }
+            };
+
+            if (route.headers) addHeaderParameters(route.headers);
+
+            for (const entry of route.security ?? []) {
+                const schemeNames = typeof entry === 'string' ? [entry] : Object.keys(entry);
+                for (const schemeName of schemeNames) {
+                    const identityHeaders = contract.securitySchemes?.[schemeName]?.headers;
+                    if (identityHeaders) addHeaderParameters(identityHeaders);
                 }
             }
 

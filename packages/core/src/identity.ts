@@ -57,6 +57,7 @@ export interface Identity<
     ContextSchema extends z.ZodType | undefined = z.ZodType | undefined,
     AccessSchema extends z.ZodType | undefined = z.ZodType | undefined,
     CredentialType extends Credential = Credential,
+    HeadersSchema extends z.ZodType | undefined = z.ZodType | undefined,
 > extends SecurityScheme<ContextSchema> {
     /**
      * Schema for the fields the `auth` map may constrain
@@ -64,6 +65,11 @@ export interface Identity<
      * identity's name. `undefined` when the identity declares no access fields.
      */
     readonly access: AccessSchema;
+    /**
+     * Schema for the auxiliary auth headers passed into the guard, typed.
+     * `undefined` when the identity declares none.
+     */
+    readonly headers: HeadersSchema;
     /**
      * Phantom marker carrying the {@link Credential} the method extracts. Never
      * present at runtime.
@@ -96,26 +102,45 @@ export type AccessOf<Id> =
  */
 export type IdentityAccess<Id> = [AccessOf<Id>] extends [never] ? {} : AccessOf<Id>;
 
+/**
+ * The auxiliary auth headers an identity's guard receives: the `z.output` of its
+ * `headers` schema, or `{}` when it declares none.
+ */
+export type HeadersOf<Id> =
+    Id extends Identity<z.ZodType | undefined, z.ZodType | undefined, Credential, infer HeadersSchema>
+        ? HeadersSchema extends z.ZodType
+            ? z.output<HeadersSchema>
+            : {}
+        : {};
+
 const make = <
     ContextSchema extends z.ZodType | undefined,
     AccessSchema extends z.ZodType | undefined,
     CredentialType extends Credential = { bearer: BearerCredential | null },
+    HeadersSchema extends z.ZodType | undefined = undefined,
 >(
     openapi: OpenApiSecuritySchemeObject,
     context: ContextSchema,
     access: AccessSchema,
-    scheme: string | undefined
-): Identity<ContextSchema, AccessSchema, CredentialType> => ({
+    scheme: string | undefined,
+    headers: HeadersSchema
+): Identity<ContextSchema, AccessSchema, CredentialType, HeadersSchema> => ({
     __brand: 'SecurityScheme',
     openapi,
     context,
     access,
     scheme,
+    headers,
 });
 
-interface BearerConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+interface BearerConfig<
+    ContextSchema extends z.ZodType | undefined,
+    AccessSchema extends z.ZodType | undefined,
+    HeadersSchema extends z.ZodType | undefined,
+> {
     context?: ContextSchema;
     access?: AccessSchema;
+    headers?: HeadersSchema;
     bearerFormat?: string;
     description?: string;
     scheme?: string;
@@ -124,6 +149,7 @@ interface BearerConfig<ContextSchema extends z.ZodType | undefined, AccessSchema
 interface ApiKeyConfig<
     ContextSchema extends z.ZodType | undefined,
     AccessSchema extends z.ZodType | undefined,
+    HeadersSchema extends z.ZodType | undefined,
     Name extends string,
     In extends 'header' | 'query' | 'cookie',
 > {
@@ -131,29 +157,45 @@ interface ApiKeyConfig<
     in: In;
     context?: ContextSchema;
     access?: AccessSchema;
+    headers?: HeadersSchema;
     description?: string;
     scheme?: string;
 }
 
-interface BasicConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+interface BasicConfig<
+    ContextSchema extends z.ZodType | undefined,
+    AccessSchema extends z.ZodType | undefined,
+    HeadersSchema extends z.ZodType | undefined,
+> {
     context?: ContextSchema;
     access?: AccessSchema;
+    headers?: HeadersSchema;
     description?: string;
     scheme?: string;
 }
 
-interface OAuth2Config<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+interface OAuth2Config<
+    ContextSchema extends z.ZodType | undefined,
+    AccessSchema extends z.ZodType | undefined,
+    HeadersSchema extends z.ZodType | undefined,
+> {
     flows: OAuthFlows;
     context?: ContextSchema;
     access?: AccessSchema;
+    headers?: HeadersSchema;
     description?: string;
     scheme?: string;
 }
 
-interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+interface OpenIdConnectConfig<
+    ContextSchema extends z.ZodType | undefined,
+    AccessSchema extends z.ZodType | undefined,
+    HeadersSchema extends z.ZodType | undefined,
+> {
     openIdConnectUrl: string;
     context?: ContextSchema;
     access?: AccessSchema;
+    headers?: HeadersSchema;
     description?: string;
     scheme?: string;
 }
@@ -183,54 +225,76 @@ interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined, Acces
  * });
  */
 export const createIdentity = {
-    bearer: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
-        config: BearerConfig<ContextSchema, AccessSchema>
-    ): Identity<ContextSchema, AccessSchema, { bearer: BearerCredential | null }> =>
-        make<ContextSchema, AccessSchema, { bearer: BearerCredential | null }>(
+    bearer: <
+        ContextSchema extends z.ZodType | undefined = undefined,
+        AccessSchema extends z.ZodType | undefined = undefined,
+        HeadersSchema extends z.ZodType | undefined = undefined,
+    >(
+        config: BearerConfig<ContextSchema, AccessSchema, HeadersSchema>
+    ): Identity<ContextSchema, AccessSchema, { bearer: BearerCredential | null }, HeadersSchema> =>
+        make<ContextSchema, AccessSchema, { bearer: BearerCredential | null }, HeadersSchema>(
             { type: 'http', scheme: 'bearer', bearerFormat: config.bearerFormat, description: config.description },
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
+            config.scheme,
+            config.headers as HeadersSchema
         ),
     apiKey: <
         ContextSchema extends z.ZodType | undefined = undefined,
         AccessSchema extends z.ZodType | undefined = undefined,
+        HeadersSchema extends z.ZodType | undefined = undefined,
         const Name extends string = string,
         const In extends 'header' | 'query' | 'cookie' = 'header' | 'query' | 'cookie',
     >(
-        config: ApiKeyConfig<ContextSchema, AccessSchema, Name, In>
-    ): Identity<ContextSchema, AccessSchema, { apiKey: ApiKeyCredential<In, Name> | null }> =>
-        make<ContextSchema, AccessSchema, { apiKey: ApiKeyCredential<In, Name> | null }>(
+        config: ApiKeyConfig<ContextSchema, AccessSchema, HeadersSchema, Name, In>
+    ): Identity<ContextSchema, AccessSchema, { apiKey: ApiKeyCredential<In, Name> | null }, HeadersSchema> =>
+        make<ContextSchema, AccessSchema, { apiKey: ApiKeyCredential<In, Name> | null }, HeadersSchema>(
             { type: 'apiKey', name: config.name, in: config.in, description: config.description },
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
+            config.scheme,
+            config.headers as HeadersSchema
         ),
-    basic: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
-        config: BasicConfig<ContextSchema, AccessSchema>
-    ): Identity<ContextSchema, AccessSchema, { basic: BasicCredential | null }> =>
-        make<ContextSchema, AccessSchema, { basic: BasicCredential | null }>(
+    basic: <
+        ContextSchema extends z.ZodType | undefined = undefined,
+        AccessSchema extends z.ZodType | undefined = undefined,
+        HeadersSchema extends z.ZodType | undefined = undefined,
+    >(
+        config: BasicConfig<ContextSchema, AccessSchema, HeadersSchema>
+    ): Identity<ContextSchema, AccessSchema, { basic: BasicCredential | null }, HeadersSchema> =>
+        make<ContextSchema, AccessSchema, { basic: BasicCredential | null }, HeadersSchema>(
             { type: 'http', scheme: 'basic', description: config.description },
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
+            config.scheme,
+            config.headers as HeadersSchema
         ),
-    oauth2: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
-        config: OAuth2Config<ContextSchema, AccessSchema>
-    ): Identity<ContextSchema, AccessSchema, { oauth2: BearerCredential | null }> =>
-        make<ContextSchema, AccessSchema, { oauth2: BearerCredential | null }>(
+    oauth2: <
+        ContextSchema extends z.ZodType | undefined = undefined,
+        AccessSchema extends z.ZodType | undefined = undefined,
+        HeadersSchema extends z.ZodType | undefined = undefined,
+    >(
+        config: OAuth2Config<ContextSchema, AccessSchema, HeadersSchema>
+    ): Identity<ContextSchema, AccessSchema, { oauth2: BearerCredential | null }, HeadersSchema> =>
+        make<ContextSchema, AccessSchema, { oauth2: BearerCredential | null }, HeadersSchema>(
             { type: 'oauth2', flows: config.flows, description: config.description },
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
+            config.scheme,
+            config.headers as HeadersSchema
         ),
-    openIdConnect: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
-        config: OpenIdConnectConfig<ContextSchema, AccessSchema>
-    ): Identity<ContextSchema, AccessSchema, { openIdConnect: BearerCredential | null }> =>
-        make<ContextSchema, AccessSchema, { openIdConnect: BearerCredential | null }>(
+    openIdConnect: <
+        ContextSchema extends z.ZodType | undefined = undefined,
+        AccessSchema extends z.ZodType | undefined = undefined,
+        HeadersSchema extends z.ZodType | undefined = undefined,
+    >(
+        config: OpenIdConnectConfig<ContextSchema, AccessSchema, HeadersSchema>
+    ): Identity<ContextSchema, AccessSchema, { openIdConnect: BearerCredential | null }, HeadersSchema> =>
+        make<ContextSchema, AccessSchema, { openIdConnect: BearerCredential | null }, HeadersSchema>(
             { type: 'openIdConnect', openIdConnectUrl: config.openIdConnectUrl, description: config.description },
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
+            config.scheme,
+            config.headers as HeadersSchema
         ),
 };
