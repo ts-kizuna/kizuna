@@ -14,6 +14,8 @@ Required:
   --namespace-name <name>  Public enum wrapping all generated types (e.g. MyAPI).
 
 Optional:
+  --camel-case             Convert wire field names to camelCase properties with CodingKeys.
+                           Default: keep wire names verbatim.
   --export <name>          Export name when none is suffixed. Default: contract.
 `;
 
@@ -41,6 +43,9 @@ const main = async (): Promise<void> => {
             'namespace-name': {
                 type: 'string',
             },
+            'camel-case': {
+                type: 'boolean',
+            },
             export: {
                 type: 'string',
             },
@@ -59,6 +64,7 @@ const main = async (): Promise<void> => {
     writeKizunaDeprecations([{ contract, contractPath }], resolve(process.cwd(), '.kizuna'));
     const swiftSource = generateSwiftClient(contract, {
         namespaceName,
+        camelCaseProperties: values['camel-case'],
     });
 
     const outputPath = resolve(process.cwd(), outArg);

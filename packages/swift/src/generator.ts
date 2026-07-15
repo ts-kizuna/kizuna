@@ -38,6 +38,14 @@ import {
 
 export interface SwiftConfig {
     namespaceName: string;
+    /**
+     * Convert wire field names to camelCase properties, mapping the wire name
+     * back via `CodingKeys`. When off, names are kept verbatim so the generated
+     * types mirror the wire shape.
+     *
+     * @default false
+     */
+    camelCaseProperties?: boolean;
 }
 
 interface BodyDescriptor {
@@ -153,7 +161,7 @@ const buildRouteMethod = (
             // Always emit the struct for type clarity, but call sites use flat params (file fields → MultipartFile)
             mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
             const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
-            const multipartFields = objectShapeKeys(route.body as z.ZodType);
+            const multipartFields = objectShapeKeys(route.body as z.ZodType, registry.camelCaseProperties);
             bodyDescriptor = {
                 kind: 'multipart',
                 flattened,
@@ -1691,9 +1699,9 @@ const emitClient = (
  *   - `namespaceName` — the actor class. Defaults to `APIClient`.
  */
 export const generateSwiftClient = (contract: Contract, options: SwiftConfig): string => {
-    const { namespaceName } = options;
+    const { namespaceName, camelCaseProperties = false } = options;
 
-    const registry = new TypeRegistry();
+    const registry = new TypeRegistry(camelCaseProperties);
     const partition = swiftGenerator(contract, {
         namespaceName,
         registry,

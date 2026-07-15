@@ -13,13 +13,20 @@ description: Generate a native Swift client from your routes with the ts-kizuna-
 ts-kizuna-swift generate --contract src/contract.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
 ```
 
-| Flag               | Description                                                     |
-| ------------------ | --------------------------------------------------------------- |
-| `--contract`       | Path to the TypeScript file default-exporting your `k.contract` |
-| `--output`         | Output path for the generated `.swift` file                     |
-| `--namespace-name` | Public enum wrapping all generated types (e.g. `API`)           |
+| Flag               | Description                                                      |
+| ------------------ | ---------------------------------------------------------------- |
+| `--contract`       | Path to the TypeScript file default-exporting your `k.contract`  |
+| `--output`         | Output path for the generated `.swift` file                      |
+| `--namespace-name` | Public enum wrapping all generated types (e.g. `API`)            |
+| `--camel-case`     | Convert wire field names to camelCase properties with CodingKeys |
 
 The CLI reads the contract at runtime using `jiti` — no build step needed. Add the generated file to your Xcode project or Swift package as a regular source file.
+
+### Property naming
+
+By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. The types mirror the wire shape, so it's easy to see what came from the API.
+
+Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `CodingKeys`.
 
 ## Usage
 
