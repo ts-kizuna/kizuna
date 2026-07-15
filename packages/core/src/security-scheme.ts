@@ -64,8 +64,10 @@ export interface SecurityScheme<ContextSchema extends z.ZodType | undefined = z.
     readonly __brand: 'SecurityScheme';
     /**
      * The OpenAPI Security Scheme Object emitted under `components.securitySchemes`.
+     * `undefined` for a `custom` identity, which emits no scheme (only an
+     * `x-kizuna-guarded` extension).
      */
-    readonly openapi: OpenApiSecuritySchemeObject;
+    readonly openapi?: OpenApiSecuritySchemeObject;
     /**
      * The name this identity is emitted under in `components.securitySchemes`.
      * Identities sharing a credential (one bearer token, several policies) set

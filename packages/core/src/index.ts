@@ -15,6 +15,7 @@ export {
     createIdentity,
     type Identity,
     type Credential,
+    type NoCredential,
     type CredentialOf,
     type AccessOf,
     type IdentityAccess,

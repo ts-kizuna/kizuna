@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createRequestContextResolver, createGuard } from '@ts-kizuna/express';
 import type { Router } from '@ts-kizuna/express';
-import { contract } from '@ts-kizuna-demo/shared';
+import { contract, sessions, memberships, inviteTokens, inviteEmails } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
 
 interface User {
@@ -26,16 +26,6 @@ users.set('2', {
 
 const archivedUsers = new Set<string>();
 
-const sessions = new Map<string, { userId: string }>([
-    ['tok_ada', { userId: '1' }],
-    ['tok_linus', { userId: '2' }],
-]);
-
-const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | 'admin' }>([
-    ['wst_owner', { workspaceUserId: '1', role: 'owner' }],
-    ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
-]);
-
 export const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ headers }) => ({
     sessionId: headers['x-posthog-session-id'] ?? null,
     distinctId: headers['x-posthog-distinct-id'] ?? null,
@@ -57,6 +47,16 @@ export const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) 
         return deny(403, 'Forbidden');
     }
     return membership;
+});
+
+export const requireInviteToken = createGuard(contract, 'inviteToken', ({ params, deny }) => {
+    const inviteId = params.token ? inviteTokens.get(params.token) : undefined;
+    if (!inviteId) {
+        return deny(404, 'Not found');
+    }
+    return {
+        inviteId,
+    };
 });
 
 export const router: Router<typeof contract> = {
@@ -342,5 +342,20 @@ export const router: Router<typeof contract> = {
                 },
             };
         },
+    },
+    invites: {
+        getInvite: ({ auth }) => ({
+            status: 200,
+            body: {
+                inviteId: auth.inviteToken.inviteId,
+                email: inviteEmails.get(auth.inviteToken.inviteId) ?? 'unknown@example.com',
+            },
+        }),
+        acceptInvite: ({ auth }) => ({
+            status: 201,
+            body: {
+                userId: `usr_${auth.inviteToken.inviteId}`,
+            },
+        }),
     },
 };

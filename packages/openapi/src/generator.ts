@@ -68,6 +68,11 @@ export interface OpenApiOperation {
     deprecated?: boolean;
     tags?: string[];
     security?: Array<Record<string, string[]>>;
+    /**
+     * The `custom` schemes guarding this operation. They emit no `security`
+     * requirement, so this marks the operation as protected, not public.
+     */
+    'x-kizuna-guarded'?: string[];
     externalDocs?: OpenApiExternalDocs;
     parameters?: OpenApiParameter[];
     requestBody?: {
@@ -336,7 +341,12 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
             if (mergedTags.length > 0) {
                 operation.tags = mergedTags;
             }
-            if (route.security && route.security.length > 0) operation.security = toOpenApiSecurity(route.security, contract);
+            if (route.security && route.security.length > 0) {
+                const emittedSecurity = toOpenApiSecurity(route.security, contract);
+                if (emittedSecurity.length > 0) operation.security = emittedSecurity;
+                const customGuards = customGuardsFor(route.security, contract);
+                if (customGuards.length > 0) operation['x-kizuna-guarded'] = customGuards;
+            }
             if (route.externalDocs) operation.externalDocs = route.externalDocs;
 
             const parameters: OpenApiParameter[] = [];
@@ -542,16 +552,49 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
 });
 
 /**
+ * Whether a scheme is a `custom` identity: registered, but with no OpenAPI scheme
+ * to emit. Dropped from `security`, surfaced under `x-kizuna-guarded`.
+ */
+const isCustomScheme = (name: string, contract: Contract): boolean => {
+    const scheme = contract.securitySchemes?.[name];
+    return scheme !== undefined && scheme.openapi === undefined;
+};
+
+/**
  * Map a route's resolved `security` (scheme names / `{ scheme: scopes }` maps)
- * to the OpenAPI `operation.security` shape — an array of `{ scheme: scopes }`.
+ * to the OpenAPI `operation.security` shape. Any `custom` scheme is dropped (see
+ * {@link isCustomScheme}); a requirement object left empty is omitted.
  */
 const toOpenApiSecurity = (security: readonly SecurityRequirement[], contract: Contract): Array<Record<string, string[]>> => {
     const emittedName = (name: string): string => contract.securitySchemes?.[name]?.scheme ?? name;
-    return security.map((entry) =>
-        typeof entry === 'string'
-            ? { [emittedName(entry)]: [] }
-            : Object.fromEntries(Object.entries(entry).map(([scheme, scopes]) => [emittedName(scheme), [...(scopes ?? [])]]))
-    );
+    const result: Array<Record<string, string[]>> = [];
+    for (const entry of security) {
+        if (typeof entry === 'string') {
+            if (!isCustomScheme(entry, contract)) result.push({ [emittedName(entry)]: [] });
+            continue;
+        }
+        const describable = Object.entries(entry).filter(([scheme]) => !isCustomScheme(scheme, contract));
+        if (describable.length > 0) {
+            result.push(Object.fromEntries(describable.map(([scheme, scopes]) => [emittedName(scheme), [...(scopes ?? [])]])));
+        }
+    }
+    return result;
+};
+
+/**
+ * The `custom` schemes guarding a route, in their registered names, for the
+ * `x-kizuna-guarded` extension.
+ */
+const customGuardsFor = (security: readonly SecurityRequirement[], contract: Contract): string[] => {
+    const emittedName = (name: string): string => contract.securitySchemes?.[name]?.scheme ?? name;
+    const names: string[] = [];
+    for (const entry of security) {
+        const schemeNames = typeof entry === 'string' ? [entry] : Object.keys(entry);
+        for (const name of schemeNames) {
+            if (isCustomScheme(name, contract) && !names.includes(emittedName(name))) names.push(emittedName(name));
+        }
+    }
+    return names;
 };
 
 /**
@@ -563,9 +606,11 @@ const buildSecuritySchemes = (contract: Contract): Record<string, unknown> | und
     if (!schemes || Object.keys(schemes).length === 0) return undefined;
     const result: Record<string, unknown> = {};
     for (const [name, scheme] of Object.entries(schemes)) {
+        // A `custom` identity has no OpenAPI scheme to emit.
+        if (!scheme.openapi) continue;
         result[scheme.scheme ?? name] = scheme.openapi;
     }
-    return result;
+    return Object.keys(result).length > 0 ? result : undefined;
 };
 
 const buildTagLookup = (contract: Contract): ReadonlyMap<string, TagOptions> => new Map(Object.entries(contract.tags?.tags ?? {}));

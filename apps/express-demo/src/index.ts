@@ -4,7 +4,7 @@ import { createApi, createExpressEndpoints } from '@ts-kizuna/express';
 import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '@ts-kizuna-demo/shared';
 
-import { router, requireUser, requireMember, captureAnalytics } from './lib/server';
+import { router, requireUser, requireMember, requireInviteToken, captureAnalytics } from './lib/server';
 
 const app = express();
 app.use(express.json());
@@ -15,6 +15,7 @@ const api = createApi({
     guards: {
         user: requireUser,
         member: requireMember,
+        inviteToken: requireInviteToken,
     },
     requestContext: {
         analytics: captureAnalytics,

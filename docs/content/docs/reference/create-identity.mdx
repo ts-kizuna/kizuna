@@ -22,6 +22,7 @@ One builder per authentication method, matching the OpenAPI security scheme type
 | `createIdentity.basic`         | `Authorization: Basic <base64>`, decoded     | `{ type: 'http', scheme: 'basic' }`  |
 | `createIdentity.oauth2`        | `Authorization: Bearer <token>`, with scopes | `{ type: 'oauth2', flows }`          |
 | `createIdentity.openIdConnect` | `Authorization: Bearer <token>`              | `{ type: 'openIdConnect', ... }`     |
+| `createIdentity.custom`        | Read by the guard (e.g. a path segment)      | none — emits `x-kizuna-guarded`      |
 
 Every builder takes `context` (optional), `access` (optional), `description` (optional), and `scheme` (optional — identities sharing one credential set the same `scheme` name and emit a single OpenAPI scheme). Method-specific fields:
 
@@ -85,6 +86,36 @@ export const requireApiKey = createGuard(contract, 'apiConsumer', ({ apiKey, den
 ```
 
 A route secured only by a context-less identity gets no arg for it — the identity contributes nothing to the handler args.
+
+## Custom identities
+
+Some credentials don't fit any OpenAPI security scheme. A capability URL is the common case: you email or SMS a link like `/invites/:token`, and the path token _is_ the credential. OpenAPI's `apiKey` can't describe it — its `in` allows only `header`, `query`, and `cookie`, and there is no `path` option — so declaring one would emit a scheme a generated client would act on incorrectly.
+
+`createIdentity.custom` is the escape hatch. It has no OpenAPI scheme; its guard reads the credential itself from wherever it lives:
+
+```ts title="src/identities.ts"
+export const inviteToken = createIdentity.custom({
+    context: z.object({
+        inviteId: z.string(),
+    }),
+});
+```
+
+```ts
+export const requireInviteToken = createGuard(contract, 'inviteToken', ({ params, deny }) => {
+    const inviteId = await resolveInvite(params.token);
+    if (!inviteId) return deny(404, 'Not found');
+    return {
+        inviteId,
+    };
+});
+```
+
+The guard receives the usual `{ params, deny, scopes }` (plus your framework's handler context) with no credential key, since there is nothing for the runtime to pre-extract. Everything else is ordinary typed auth: the identity registers under `identities`, the `auth` map references it, handlers read `auth.inviteToken.inviteId`, and `access` gates work as usual.
+
+Because it emits no `security`, a custom-guarded route would otherwise look public in the spec. To keep the distinction honest, [`generateOpenApi`](/docs/reference/generate-openapi) marks the operation with an `x-kizuna-guarded` extension listing the custom identities — so a genuinely public route (no `security`, no extension) stays distinguishable from one protected out-of-band.
+
+Reach for `custom` only when the credential is truly inexpressible. A token belongs in `bearer`, a signature header in `apiKey`; mutual TLS has its own OpenAPI type.
 
 ## Registering identities
 

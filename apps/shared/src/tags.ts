@@ -18,4 +18,8 @@ export const tags = createTags({
     workspace: {
         title: 'Workspace',
     },
+    invites: {
+        title: 'Invites',
+        description: 'Invite capability URLs, guarded by a path-token custom identity',
+    },
 });

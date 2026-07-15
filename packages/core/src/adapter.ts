@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import type { RouteDefinition, Routes, Method } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
-import type { Credential } from './identity.js';
+import type { Credential, NoCredential } from './identity.js';
 import {
     type RouteHandler,
     type Router,
@@ -335,8 +335,10 @@ export const gatePermits = (value: unknown, allowed: unknown): boolean => {
  * `basic`, or the bearer token for everything else. The credential is `null`
  * when it is absent or malformed.
  */
-export const extractCredential = (scheme: SecurityScheme, request: AdapterRequest<unknown>): Credential => {
+export const extractCredential = (scheme: SecurityScheme, request: AdapterRequest<unknown>): Credential | NoCredential => {
     const openapi = scheme.openapi;
+    // A custom identity has no scheme to read from; its guard reads the credential itself.
+    if (!openapi) return {};
     const headers = (request.headers ?? {}) as Record<string, string | string[] | undefined>;
 
     if (openapi.type === 'apiKey') {

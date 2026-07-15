@@ -370,6 +370,10 @@ public actor APIClient {
         APIWorkspaceClient(_actor: self)
     }
 
+    public var invites: APIInvitesClient {
+        APIInvitesClient(_actor: self)
+    }
+
     public enum UsersListUsers {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -1302,6 +1306,102 @@ public actor APIClient {
             case badRequest(APIClient.ValidationError)
         }
     }
+
+    public enum InvitesGetInvite {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let inviteId: String
+            public let email: String
+
+            public init(
+                inviteId: String,
+                email: String
+            ) {
+                self.inviteId = inviteId
+                self.email = email
+            }
+        }
+
+        public struct Params: Sendable {
+            public let token: String
+
+            public init(token: String) {
+                self.token = token
+            }
+
+            public static func params(token: String) -> Self {
+                .init(token: token)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case notFound(API.ProblemDetails)
+        }
+    }
+
+    public enum InvitesAcceptInvite {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let name: String
+
+            public init(name: String) {
+                self.name = name
+            }
+        }
+
+        public struct Response201: Codable, Sendable, Equatable {
+            public let userId: String
+
+            public init(userId: String) {
+                self.userId = userId
+            }
+        }
+
+        public struct Params: Sendable {
+            public let token: String
+
+            public init(token: String) {
+                self.token = token
+            }
+
+            public static func params(token: String) -> Self {
+                .init(token: token)
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(name: String) -> Self {
+                .init(payload: Input(name: name))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response201
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case cancelled
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case notFound(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
+        }
+    }
 }
 
 public struct APIUsersClient: Sendable {
@@ -1892,6 +1992,63 @@ public struct APIWorkspaceClient: Sendable {
             throw APIClient.WorkspaceTransfer.Failure.badRequest(payload)
         default:
             throw APIClient.WorkspaceTransfer.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct APIInvitesClient: Sendable {
+    private let _actor: APIClient
+
+    init(_actor: APIClient) {
+        self._actor = _actor
+    }
+
+    /// Resolve an invite by its capability-URL token, guarded by a custom path-token identity
+    public func getInvite(_ params: APIClient.InvitesGetInvite.Params) async throws(APIClient.InvitesGetInvite.Failure) -> APIClient.InvitesGetInvite.Result {
+        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
+        var path = "/invites/:token"
+        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.InvitesGetInvite.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.InvitesGetInvite.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.InvitesGetInvite.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
+            return APIClient.InvitesGetInvite.Result(body: body)
+        case 404:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
+            throw APIClient.InvitesGetInvite.Failure.notFound(payload)
+        default:
+            throw APIClient.InvitesGetInvite.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Accept an invite via the capability URL
+    public func acceptInvite(_ params: APIClient.InvitesAcceptInvite.Params, _ body: APIClient.InvitesAcceptInvite.Body) async throws(APIClient.InvitesAcceptInvite.Failure) -> APIClient.InvitesAcceptInvite.Result {
+        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
+        var path = "/invites/:token/accept"
+        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
+        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.InvitesAcceptInvite.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        request.httpMethod = "POST"
+        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.InvitesAcceptInvite.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.InvitesAcceptInvite.Failure.self)
+        switch statusCode {
+        case 201:
+            let body = try Kizuna.decode(APIClient.InvitesAcceptInvite.Response201.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
+            return APIClient.InvitesAcceptInvite.Result(body: body)
+        case 404:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
+            throw APIClient.InvitesAcceptInvite.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
+            throw APIClient.InvitesAcceptInvite.Failure.badRequest(payload)
+        default:
+            throw APIClient.InvitesAcceptInvite.Failure.unexpectedStatus(statusCode, data)
         }
     }
 }

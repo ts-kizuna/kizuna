@@ -45,6 +45,12 @@ export type Credential =
     | { basic: BasicCredential | null }
     | { apiKey: ApiKeyCredential | null };
 
+/**
+ * The empty credential a `custom` identity carries. Its guard receives no
+ * credential key and reads the credential itself (e.g. `params.token`).
+ */
+export type NoCredential = Record<never, never>;
+
 declare const CREDENTIAL: unique symbol;
 
 /**
@@ -56,7 +62,7 @@ declare const CREDENTIAL: unique symbol;
 export interface Identity<
     ContextSchema extends z.ZodType | undefined = z.ZodType | undefined,
     AccessSchema extends z.ZodType | undefined = z.ZodType | undefined,
-    CredentialType extends Credential = Credential,
+    CredentialType extends Credential | NoCredential = Credential,
 > extends SecurityScheme<ContextSchema> {
     /**
      * Schema for the fields the `auth` map may constrain
@@ -99,9 +105,9 @@ export type IdentityAccess<Id> = [AccessOf<Id>] extends [never] ? {} : AccessOf<
 const make = <
     ContextSchema extends z.ZodType | undefined,
     AccessSchema extends z.ZodType | undefined,
-    CredentialType extends Credential = { bearer: BearerCredential | null },
+    CredentialType extends Credential | NoCredential = { bearer: BearerCredential | null },
 >(
-    openapi: OpenApiSecuritySchemeObject,
+    openapi: OpenApiSecuritySchemeObject | undefined,
     context: ContextSchema,
     access: AccessSchema,
     scheme: string | undefined
@@ -158,12 +164,21 @@ interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined, Acces
     scheme?: string;
 }
 
+interface CustomConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+    context?: ContextSchema;
+    access?: AccessSchema;
+    description?: string;
+    scheme?: string;
+}
+
 /**
  * Builders that define an identity by its authentication mechanism: `bearer`,
- * `apiKey`, `basic`, `oauth2`, and `openIdConnect`. Each takes, optionally, the
- * `context` a passing guard returns and the `access` fields the `auth` map may
- * constrain. Omit `context` for an authentication-only identity — a pure gate
- * whose guard returns nothing on success and contributes no handler args.
+ * `apiKey`, `basic`, `oauth2`, `openIdConnect`, and `custom` (a credential no
+ * OpenAPI security scheme can express, such as a capability-URL path token).
+ * Each takes, optionally, the `context` a passing guard returns and the `access`
+ * fields the `auth` map may constrain. Omit `context` for an authentication-only
+ * identity — a pure gate whose guard returns nothing on success and contributes
+ * no handler args.
  *
  * @example
  * const user = createIdentity.bearer({
@@ -229,6 +244,29 @@ export const createIdentity = {
     ): Identity<ContextSchema, AccessSchema, { openIdConnect: BearerCredential | null }> =>
         make<ContextSchema, AccessSchema, { openIdConnect: BearerCredential | null }>(
             { type: 'openIdConnect', openIdConnectUrl: config.openIdConnectUrl, description: config.description },
+            config.context as ContextSchema,
+            config.access as AccessSchema,
+            config.scheme
+        ),
+    /**
+     * An identity whose credential no OpenAPI scheme can express, such as a
+     * capability-URL token in a path segment. The guard reads the credential
+     * itself (e.g. `params.token`); the route emits no scheme, only an
+     * `x-kizuna-guarded` extension. Use `bearer` for a token or `apiKey` for a
+     * header; reach for `custom` only when neither fits.
+     *
+     * @example
+     * const inviteToken = createIdentity.custom({
+     *     context: z.object({
+     *         inviteId: z.string(),
+     *     }),
+     * });
+     */
+    custom: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
+        config: CustomConfig<ContextSchema, AccessSchema>
+    ): Identity<ContextSchema, AccessSchema, NoCredential> =>
+        make<ContextSchema, AccessSchema, NoCredential>(
+            undefined,
             config.context as ContextSchema,
             config.access as AccessSchema,
             config.scheme

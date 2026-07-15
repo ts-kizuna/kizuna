@@ -93,6 +93,8 @@ paths:
                 - member: []
 ```
 
+A [`custom`](/docs/reference/create-identity#custom-identities) identity is the exception: OpenAPI can't describe its credential, so it emits no `securityScheme` and no `security`. Its routes instead carry an `x-kizuna-guarded` extension, keeping a protected-out-of-band route distinct from a public one.
+
 Because the spec and the runtime [guards](/docs/reference/create-guard) both derive from the auth map, documented security is enforced security — there is nothing to keep in sync.
 
 See the [OpenAPI guide](/docs/openapi) for Scalar integration, writing specs to disk, and breaking change detection.
