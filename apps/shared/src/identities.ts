@@ -24,6 +24,7 @@ export const member = createIdentity.apiKey({
     }),
     access: z.object({
         role: z.enum(['owner', 'admin']),
+        permissions: z.array(z.string()).optional(),
     }),
 });
 

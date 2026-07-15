@@ -196,6 +196,8 @@ workspace: {
 
 A route requiring several identities receives all of them under `auth` — `transfer: ({ body, auth }) => ...`.
 
+When a gated field is expensive to resolve, mark it `.optional()` and resolve it only where a route gates it — the guard reads `gatedFields` to know when. See [`createGuard`](/docs/reference/create-guard#resolving-a-field-only-when-its-gated).
+
 ## Guards
 
 One guard per identity — not per route. The credential arrives extracted and typed, along with the route's path `params`. For a request to `/workspaces/ws_42/members`, `params.workspaceId` is `'ws_42'` — so the guard can check not just that the token is valid, but that the caller belongs to that workspace:

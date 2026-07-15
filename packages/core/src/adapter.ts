@@ -82,9 +82,10 @@ export const isGuardDenial = (value: unknown): value is GuardDenial => typeof va
 /**
  * The runtime behavior of a guard. It receives one object: the adapter's handler
  * context (e.g. `req`/`res`) plus the credential the identity's method extracted
- * from the request (or `null` if absent), a `deny` helper, and the matched
- * route's required `scopes`. It returns the context the scheme provides (nested
- * under `auth`, keyed by the identity's name in the handler args) or `deny(...)` to reject.
+ * from the request (or `null` if absent), a `deny` helper, the matched route's
+ * required `scopes`, and the access fields it gates (`gatedFields`). It returns the
+ * context the scheme provides (nested under `auth`, keyed by the identity's name in
+ * the handler args) or `deny(...)` to reject.
  */
 export type GuardRun<HandlerContext = unknown> = (
     args: HandlerContext &
@@ -92,6 +93,7 @@ export type GuardRun<HandlerContext = unknown> = (
             params: Record<string, string>;
             deny: GuardDeny;
             scopes: string[];
+            gatedFields: string[];
         }
 ) => Promise<Record<string, unknown> | GuardDenial | void> | Record<string, unknown> | GuardDenial | void;
 
@@ -559,6 +561,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 params,
                 deny: guardDeny,
                 scopes,
+                gatedFields: Object.keys(route.accessGate?.[scheme] ?? {}),
             } as Parameters<typeof guard>[0]);
             if (isGuardDenial(guardResult)) {
                 return {

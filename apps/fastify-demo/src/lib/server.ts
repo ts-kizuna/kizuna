@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createRequestContextResolver, createGuard, createApi, type Router } from '@ts-kizuna/fastify';
 import { getHeaderValue } from '@ts-kizuna/core';
-import { contract, sessions, memberships, inviteTokens, inviteEmails } from '@ts-kizuna-demo/shared';
+import { contract, sessions, memberships, loadPermissions, inviteTokens, inviteEmails } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
 
 interface User {
@@ -41,12 +41,16 @@ const requireUser = createGuard(contract, 'user', ({ bearer, deny }) => {
     };
 });
 
-const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) => {
+const requireMember = createGuard(contract, 'member', async ({ apiKey, gatedFields, deny }) => {
     const membership = apiKey ? memberships.get(apiKey.value) : undefined;
     if (!membership) {
         return deny(403, 'Forbidden');
     }
-    return membership;
+    return {
+        workspaceUserId: membership.workspaceUserId,
+        role: membership.role,
+        permissions: gatedFields.includes('permissions') ? await loadPermissions(membership.workspaceUserId) : undefined,
+    };
 });
 
 const requireInviteToken = createGuard(contract, 'inviteToken', ({ params, deny }) => {

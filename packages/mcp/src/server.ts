@@ -199,6 +199,7 @@ const runGuards = async (
             params,
             deny: guardDeny,
             scopes,
+            gatedFields: Object.keys(route.accessGate?.[scheme] ?? {}),
         } as Parameters<typeof guard>[0]);
         if (isGuardDenial(guardResult)) {
             return {

@@ -48,6 +48,7 @@ The return is checked against the identity's `context` and `access` schemas.
 | `params`                                                   | The matched route's path params — for guards that check access to the resource in the URL       |
 | `deny`                                                     | `(status, detail) => GuardDenial` — reject with a Problem Details response                      |
 | `scopes`                                                   | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes)             |
+| `gatedFields`                                              | The `access` fields the matched route gates (`string[]`) — resolve expensive fields on demand   |
 | framework context                                          | The adapter's native request objects — see below                                                |
 
 The credential key matches the identity's builder, so a `createIdentity.bearer` guard destructures `{ bearer }` and a `createIdentity.apiKey` guard destructures `{ apiKey }`:
@@ -102,6 +103,25 @@ export const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) 
 
 Gated routes (`{ member: { role: 'owner' } }`) need no changes here — kizuna checks the returned fields against the gate and responds `403` itself.
 
+### Resolving a field only when it's gated
+
+When an `access` field is expensive to resolve, mark it `.optional()` and resolve it only on routes that gate it. `gatedFields` holds the fields the matched route constrains, so the guard skips the work everywhere else:
+
+```ts
+export const requireMember = createGuard(contract, 'member', async ({ apiKey, gatedFields, deny }) => {
+    const membership = apiKey ? await findMembership(apiKey.value) : undefined;
+    if (!membership) {
+        return deny(403, 'Forbidden');
+    }
+    if (gatedFields.includes('permissions')) {
+        return { ...membership, permissions: await loadPermissions(membership.id) };
+    }
+    return membership;
+});
+```
+
+kizuna still enforces the gate on the returned value — `gatedFields` only tells the guard what to resolve. A guard that omits a gated field is denied `403`.
+
 An [authentication-only identity](/docs/reference/create-identity#authentication-only-identities) has no `context` or `access`, so its guard returns nothing on success — no `return {}` boilerplate — or `deny(...)` to reject:
 
 ```ts
@@ -114,7 +134,7 @@ export const requireApiKey = createGuard(contract, 'apiConsumer', async ({ apiKe
 
 ## Framework context
 
-The credential, `deny`, and `scopes` arguments are the same everywhere; each adapter adds its native request objects:
+The credential, `deny`, `scopes`, and `gatedFields` arguments are the same everywhere; each adapter adds its native request objects:
 
 | Adapter | Context            |
 | ------- | ------------------ |

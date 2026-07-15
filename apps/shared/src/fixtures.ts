@@ -8,6 +8,14 @@ export const memberships = new Map<string, { workspaceUserId: string; role: 'own
     ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
 ]);
 
+const permissionsByUser = new Map<string, string[]>([
+    ['1', ['transfer', 'export']],
+    ['2', ['export']],
+]);
+
+// Stands in for an expensive lookup a real app would hit a database for.
+export const loadPermissions = async (workspaceUserId: string): Promise<string[]> => permissionsByUser.get(workspaceUserId) ?? [];
+
 export const inviteTokens = new Map<string, string>([['inv_9x2k7q', 'invite_1']]);
 
 export const inviteEmails = new Map<string, string>([['invite_1', 'grace@example.com']]);

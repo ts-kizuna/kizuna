@@ -33,6 +33,7 @@ import type {
     HandlersFromAuth,
     GuardSuccess,
     CredentialOf,
+    IdentityAccess,
     GuardParams,
     RequestContextSchema,
     RequestContextHeaderValues,
@@ -148,6 +149,7 @@ type GuardFns<Schemes extends Record<string, SecurityScheme>, Params> = {
                 params: Params;
                 deny: GuardDeny;
                 scopes: string[];
+                gatedFields: Array<keyof IdentityAccess<Schemes[Name]> & string>;
             }
     ) => [keyof GuardSuccess<Schemes[Name]>] extends [never]
         ? void | GuardDenial | Promise<void | GuardDenial>
@@ -199,7 +201,9 @@ export function createRequestContextResolver<
  * Define a guard for an identity. It runs before the handlers of routes whose
  * `auth` entry requires the identity. The argument carries the request context
  * plus the credential the identity's method extracted (`bearer`, `apiKey`, or
- * `basic` — `null` when absent), a `deny` helper, and the route's `scopes`.
+ * `basic` — `null` when absent), a `deny` helper, the route's `scopes`, and the
+ * access fields it gates (`gatedFields`) so expensive fields can be resolved only
+ * when a route constrains them.
  * Return the identity's context and access fields to allow the request (read in
  * handlers under `auth`, keyed by the identity's name), or call `deny(status, detail)`.
  *

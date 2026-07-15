@@ -22,7 +22,7 @@ export const auth = k.auth(routes, {
         },
         transfer: {
             member: {
-                role: 'owner',
+                permissions: 'transfer',
             },
         },
     },

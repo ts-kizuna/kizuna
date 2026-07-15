@@ -66,6 +66,8 @@ Both describe what the guard returns and the handler reads:
 
 Skip `access` for identities that never gate on fields; the auth map can still require them (`'user'`), it just can't constrain them.
 
+When an access field is expensive to resolve, mark it `.optional()`. A guard can then resolve it only on routes that gate it, via the `gatedFields` argument — see [`createGuard`](/docs/reference/create-guard#resolving-a-field-only-when-its-gated).
+
 ## Authentication-only identities
 
 Some identities are pure gates — an API key that only proves the caller is a known client, or a bearer token where "authenticated" is all the handler needs. These have no data to hand the handler, so omit `context` (and `access`) entirely:

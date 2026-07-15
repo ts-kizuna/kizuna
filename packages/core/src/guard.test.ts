@@ -673,7 +673,7 @@ describe('custom identity guard', () => {
         });
         expect(results[0]?.kind).toBe('success');
         // The guard receives exactly the framework args, with no credential key.
-        expect(receivedKeys?.sort()).toEqual(['deny', 'params', 'scopes']);
+        expect(receivedKeys?.sort()).toEqual(['deny', 'gatedFields', 'params', 'scopes']);
         expect(received).toEqual({
             inviteId: 'invite-for-inv_1',
         });
@@ -700,5 +700,89 @@ describe('custom identity guard', () => {
             status: 404,
             detail: 'Not found',
         });
+    });
+});
+
+describe('gatedFields', () => {
+    const router = {
+        items: {
+            listItems: okHandler,
+            getSecret: okHandler,
+            ownerOnly: okHandler,
+            scoped: okHandler,
+        },
+    };
+
+    it("passes the matched route's gated field names to the guard", async () => {
+        const contract = makeContract();
+        const { adapter, results } = makeAdapter();
+        let received: string[] | undefined;
+        await adapter.handle({
+            routes: contract.routes,
+            router,
+            request: makeRequest('/owner-only', {
+                'x-workspace-token': 'wst_owner',
+            }),
+            responseContext: {},
+            guards: {
+                member: ({ gatedFields }) => {
+                    received = gatedFields;
+                    return {
+                        workspaceUserId: '1',
+                        role: 'owner',
+                    };
+                },
+            } as GuardMap<Record<string, never>>,
+            schemes: contract.securitySchemes,
+        });
+        expect(results[0]?.kind).toBe('success');
+        expect(received).toEqual(['role']);
+    });
+
+    it('passes no gated fields on a route with no access constraint', async () => {
+        const contract = makeContract();
+        const { adapter, results } = makeAdapter();
+        let received: string[] | undefined;
+        await adapter.handle({
+            routes: contract.routes,
+            router,
+            request: makeRequest('/secret', {
+                authorization: 'Bearer tok',
+            }),
+            responseContext: {},
+            guards: {
+                user: ({ gatedFields }) => {
+                    received = gatedFields;
+                    return {
+                        userId: '1',
+                    };
+                },
+            } as GuardMap<Record<string, never>>,
+            schemes: contract.securitySchemes,
+        });
+        expect(results[0]?.kind).toBe('success');
+        expect(received).toEqual([]);
+    });
+
+    it('denies 403 when the guard omits a gated field', async () => {
+        const contract = makeContract();
+        const { adapter, results } = makeAdapter();
+        await adapter.handle({
+            routes: contract.routes,
+            router,
+            request: makeRequest('/owner-only', {
+                'x-workspace-token': 'wst_owner',
+            }),
+            responseContext: {},
+            guards: {
+                // Omits `role`, which the route gates on — the runtime still enforces it.
+                member: () => ({
+                    workspaceUserId: '1',
+                }),
+            } as GuardMap<Record<string, never>>,
+            schemes: contract.securitySchemes,
+        });
+        expect(results[0]?.kind).toBe('guard-denied');
+        expect((results[0] as { status: number }).status).toBe(403);
     });
 });
