@@ -153,7 +153,7 @@ class APIClientTest {
 
     @Test
     fun testSendNotificationEmail() = runTest {
-        val event = API.NotificationEvent.Email(
+        val event = API.EmailEvent(
             to = "alice@example.com",
             subject = "Hello"
         )
@@ -167,7 +167,7 @@ class APIClientTest {
 
     @Test
     fun testSendNotificationSms() = runTest {
-        val event = API.NotificationEvent.Sms(
+        val event = API.SmsEvent(
             phone = "+1234567890",
             text = "Hi there"
         )

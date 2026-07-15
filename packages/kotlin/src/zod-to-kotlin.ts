@@ -31,6 +31,18 @@ export interface KotlinDataClass {
     name: string;
     fields: KotlinField[];
     description?: string;
+    /**
+     * The sealed interface this class implements as a discriminated-union member.
+     */
+    sealedParent?: string;
+    /**
+     * The discriminator value that selects this member.
+     */
+    serialName?: string;
+    /**
+     * The discriminator field to omit from the emitted class.
+     */
+    discriminatorWireName?: string;
 }
 
 export interface KotlinEnumClass {
@@ -48,6 +60,8 @@ export interface KotlinSealedClass {
         caseName: string;
         literal: string;
         payloadType: string;
+        // Anonymous members nest inside the interface; named models emit top-level.
+        nested: boolean;
     }>;
     description?: string;
 }
@@ -69,6 +83,10 @@ export class TypeRegistry {
 
     has(name: string): boolean {
         return this.types.has(name);
+    }
+
+    get(name: string): KotlinType | undefined {
+        return this.types.get(name);
     }
 
     add(type: KotlinType): void {
@@ -192,11 +210,24 @@ export const mapType = (
                         caseName: sanitizeCaseName(literal),
                         literal,
                         payloadType: variantResult.expression,
+                        nested: variantId === undefined,
                     });
                 }
             }
             for (const variant of variants) {
-                registry.markSealedVariantPayload(variant.payloadType);
+                if (variant.nested) {
+                    registry.markSealedVariantPayload(variant.payloadType);
+                    continue;
+                }
+                const payload = registry.get(variant.payloadType);
+                if (payload?.kind === 'data-class') {
+                    registry.replace({
+                        ...payload,
+                        sealedParent: enumName,
+                        serialName: variant.literal,
+                        discriminatorWireName: discriminated.discriminator,
+                    });
+                }
             }
             registry.replace({
                 kind: 'sealed-class',
