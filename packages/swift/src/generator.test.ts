@@ -286,6 +286,41 @@ describe('Swift generator — keyword property CodingKeys', () => {
     });
 });
 
+describe('Swift generator — camelCaseProperties option', () => {
+    const contract = k.contract({
+        routes: k.routes('api', {
+            getStats: {
+                method: 'GET',
+                path: '/stats',
+                responses: {
+                    200: z.object({
+                        total_count: z.int(),
+                        page_size: z.int(),
+                    }),
+                },
+            },
+        }),
+    });
+
+    it('keeps wire names verbatim by default', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public let total_count: Int');
+        expect(output).not.toContain('case totalCount');
+    });
+
+    it('converts to camelCase with CodingKeys when enabled', () => {
+        const output = generateSwiftClient(contract, {
+            ...baseConfig,
+            camelCaseProperties: true,
+        });
+        expect(output).toContain('public let totalCount: Int');
+        expect(output).toContain('public let pageSize: Int');
+        expect(output).toContain('case totalCount = "total_count"');
+        expect(output).toContain('case pageSize = "page_size"');
+        expect(output).not.toContain('public let total_count');
+    });
+});
+
 describe('Swift generator — Void error responses', () => {
     it('emits a bare enum case and a direct throw for a Void error status', () => {
         const contractRoutes = k.routes('api', {

@@ -39,8 +39,11 @@ export interface KotlinConfig {
      */
     packageName?: string;
     /**
-     * Convert wire field names to camelCase properties with `@SerialName`.
-     * Off by default: names are kept verbatim to mirror the wire shape.
+     * Convert wire field names to camelCase properties, mapping the wire name
+     * back via `@SerialName`. When off, names are kept verbatim so the generated
+     * types mirror the wire shape.
+     *
+     * @default false
      */
     camelCaseProperties?: boolean;
 }

@@ -12,6 +12,7 @@ import {
     readObjectShape,
     unwrapOptionalWrappers,
     toPascalCase,
+    toCamelCase,
     sanitizeFieldName,
     sanitizeIdentifier,
 } from '@ts-kizuna/core/generator';
@@ -67,6 +68,8 @@ export class TypeRegistry {
     private readonly explicitIds = new Set<string>();
     public usesAnyCodable = false;
 
+    constructor(public readonly camelCaseProperties = false) {}
+
     has(name: string): boolean {
         return this.types.has(name);
     }
@@ -106,6 +109,17 @@ export class TypeRegistry {
     }
 }
 
+/**
+ * The Swift property name for a wire key: verbatim, or camelCased under
+ * `camelCaseProperties`.
+ */
+const propertyName = (key: string, camelCase: boolean): string => {
+    if (!camelCase) return sanitizeFieldName(key);
+    const camel = toCamelCase(key);
+    if (!camel) return 'field';
+    return /^[0-9]/.test(camel) ? `_${camel}` : camel;
+};
+
 const objectFields = (
     schema: z.core.$ZodType,
     registry: TypeRegistry,
@@ -122,7 +136,7 @@ const objectFields = (
         const childHint = `${hint}${toPascalCase(key)}`;
         const fieldPath = pathPrefix ? `${pathPrefix}.${key}` : key;
         const result = mapType(value, registry, childHint, deprecatedPaths, fieldPath, deprecationSchemas);
-        const swiftName = sanitizeFieldName(key);
+        const swiftName = propertyName(key, registry.camelCaseProperties);
         const previousWireName = seen.get(swiftName);
         if (previousWireName !== undefined && previousWireName !== key) {
             throw new Error(
@@ -469,9 +483,9 @@ export const objectFieldCount = (schema: z.core.$ZodType): number => {
     return Object.keys(readObjectShape(schema) ?? {}).length;
 };
 
-export const objectShapeKeys = (schema: z.core.$ZodType): Array<{ name: string; wireName: string; isFile: boolean }> => {
+export const objectShapeKeys = (schema: z.core.$ZodType, camelCase = false): Array<{ name: string; wireName: string; isFile: boolean }> => {
     return Object.entries(readObjectShape(schema) ?? {}).map(([key, value]) => ({
-        name: sanitizeFieldName(key),
+        name: propertyName(key, camelCase),
         wireName: key,
         isFile: isFileSchema(value),
     }));
