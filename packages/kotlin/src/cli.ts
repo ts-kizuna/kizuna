@@ -15,6 +15,8 @@ Required:
 
 Optional:
   --package <name>         Package declaration for the generated file (e.g. com.example.api).
+  --camel-case             Convert wire field names to camelCase properties with @SerialName.
+                           Default: keep wire names verbatim.
   --export <name>          Export name when none is suffixed. Default: contract.
 `;
 
@@ -45,6 +47,9 @@ const main = async (): Promise<void> => {
             package: {
                 type: 'string',
             },
+            'camel-case': {
+                type: 'boolean',
+            },
             export: {
                 type: 'string',
             },
@@ -64,6 +69,7 @@ const main = async (): Promise<void> => {
     const kotlinSource = generateKotlinClient(contract, {
         namespaceName,
         packageName: values.package,
+        camelCaseProperties: values['camel-case'],
     });
 
     const outputPath = resolve(process.cwd(), outArg);

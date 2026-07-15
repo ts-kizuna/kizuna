@@ -13,15 +13,22 @@ description: Generate a native Kotlin client from your contract with the ts-kizu
 ts-kizuna-kotlin generate --contract src/contract.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
 ```
 
-| Flag               | Description                                                                    |
-| ------------------ | ------------------------------------------------------------------------------ |
-| `--contract`       | Path to the TypeScript file that exports the contract                          |
-| `--out`            | Output path for the generated `.kt` file                                       |
-| `--namespace-name` | Object wrapping all generated types (e.g. `API`)                               |
-| `--package`        | Optional package declaration for the generated file (e.g. `com.example.api`)   |
-| `--export`         | Export name to read when none is suffixed on `--contract`. Default: `contract` |
+| Flag               | Description                                                                     |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `--contract`       | Path to the TypeScript file that exports the contract                           |
+| `--out`            | Output path for the generated `.kt` file                                        |
+| `--namespace-name` | Object wrapping all generated types (e.g. `API`)                                |
+| `--package`        | Optional package declaration for the generated file (e.g. `com.example.api`)    |
+| `--camel-case`     | Convert wire field names to camelCase properties, mapped back via `@SerialName` |
+| `--export`         | Export name to read when none is suffixed on `--contract`. Default: `contract`  |
 
 The CLI reads the contract at runtime — no build step needed. Add the generated file to your Kotlin project as a regular source file. Pass `--package` so the file declares a package matching its directory (Android/JVM projects expect this).
+
+### Property naming
+
+By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. The types mirror the wire shape, so it's easy to see what came from the API. The generated file carries a `@file:Suppress("PropertyName", "ConstructorParameterNaming")` header so the Kotlin naming inspection doesn't flag those underscores.
+
+Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `@SerialName`. The suppression header is then omitted.
 
 ## Usage
 

@@ -909,6 +909,43 @@ describe('Kotlin generator — @SerialName for wire names', () => {
         expect(output).toContain('val first_name: String');
         expect(output).toContain('val last_name: String');
         expect(output).not.toContain('@SerialName');
+        // Verbatim wire names are intentional; the file is exempt from the naming inspection.
+        expect(output).toContain('@file:Suppress("PropertyName", "ConstructorParameterNaming")');
+    });
+});
+
+describe('Kotlin generator — camelCaseProperties option', () => {
+    const contract = k.contract({
+        routes: {
+            getStats: {
+                method: 'GET',
+                path: '/stats',
+                responses: {
+                    200: z.object({
+                        total_count: z.int(),
+                        page_size: z.int(),
+                    }),
+                },
+            },
+        },
+    });
+
+    it('keeps wire names verbatim by default', () => {
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val total_count: Int');
+        expect(output).not.toContain('@SerialName');
+    });
+
+    it('converts to camelCase with @SerialName when enabled', () => {
+        const output = generateKotlinClient(contract, {
+            ...baseConfig,
+            camelCaseProperties: true,
+        });
+        expect(output).toContain('@SerialName("total_count") val totalCount: Int');
+        expect(output).toContain('@SerialName("page_size") val pageSize: Int');
+        expect(output).not.toContain('val total_count');
+        // camelCase output has no underscores to flag, so the suppression header is dropped.
+        expect(output).not.toContain('@file:Suppress');
     });
 });
 
@@ -1200,7 +1237,7 @@ describe('Kotlin generator — package declaration', () => {
             namespaceName: 'TestAPI',
             packageName: 'com.example.api',
         });
-        expect(output.split('\n').slice(0, 4)).toContain('package com.example.api');
+        expect(output.split('\n').slice(0, 6)).toContain('package com.example.api');
     });
 
     it('omits the package declaration when packageName is absent', () => {
