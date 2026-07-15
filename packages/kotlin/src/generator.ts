@@ -393,7 +393,7 @@ const optionalize = (type: string, optional: boolean): string => {
     return type.endsWith('?') ? type : `${type}?`;
 };
 
-const KOTLIN_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Long', 'Boolean', 'Instant', 'Unit']);
+const KOTLIN_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Long', 'Boolean', 'Instant', 'LocalDate', 'Unit']);
 
 const resolveType = (
     typeName: string,
@@ -703,6 +703,36 @@ const emitConstructorClass = (writer: KotlinWriter, declaration: string, params:
     }
 };
 
+/**
+ * Emit `equals`/`hashCode` overrides for a data class holding a `ByteArray`.
+ * Kotlin's generated members compare arrays by reference, so structural equality
+ * needs `contentEquals`/`contentHashCode` on the byte fields.
+ */
+const emitByteArrayEquality = (writer: KotlinWriter, typeName: string, fields: Array<{ name: string; isByteArray: boolean }>): void => {
+    writer.blank();
+    writer.block('override fun equals(other: Any?): Boolean', () => {
+        writer.line('if (this === other) return true');
+        writer.line('if (javaClass != other?.javaClass) return false');
+        writer.line(`other as ${typeName}`);
+        for (const field of fields) {
+            const name = escapeKeyword(field.name);
+            writer.line(
+                field.isByteArray ? `if (!${name}.contentEquals(other.${name})) return false` : `if (${name} != other.${name}) return false`
+            );
+        }
+        writer.line('return true');
+    });
+    writer.blank();
+    writer.block('override fun hashCode(): Int', () => {
+        fields.forEach((field, index) => {
+            const name = escapeKeyword(field.name);
+            const value = field.isByteArray ? `${name}.contentHashCode()` : `${name}.hashCode()`;
+            writer.line(index === 0 ? `var result = ${value}` : `result = 31 * result + ${value}`);
+        });
+        writer.line('return result');
+    });
+};
+
 const isVoidSuccessMethod = (method: RouteMethod): boolean => method.successReturnType === 'Unit';
 
 /**
@@ -765,10 +795,10 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
                 writer.line(`data class ${caseName}(val body: ${resolved}) : Failure()`);
             }
         }
-        writer.line('data class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")');
-        writer.line(
-            'data class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)'
-        );
+        // Plain classes, not data classes: these are thrown exceptions, never compared by value.
+        // (A `data class` holding a `ByteArray` would also trip the `ArrayInDataClass` inspection.)
+        writer.line('class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")');
+        writer.line('class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)');
     });
 };
 
@@ -1084,7 +1114,7 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
         }
     }
 
-    writer.line(`var path = ${stringLiteral(method.pathTemplate)}`);
+    writer.line(`${method.pathParams.length > 0 ? 'var' : 'val'} path = ${stringLiteral(method.pathTemplate)}`);
     for (const field of pathParamFields(method)) {
         const accessor = groupMemberAccessor('params', field);
         writer.line(`path = path.replace(${stringLiteral(`:${field.name}`)}, Kizuna.encodePathSegment(${accessor}))`);
@@ -1111,11 +1141,13 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
     }
 
     if (hasBody) {
-        writer.line('var requestBody: RequestBody? = null');
+        writer.line('val requestBody: RequestBody');
         emitBodyEncoding(writer, method, context);
     }
 
-    writer.line('var requestBuilder = Request.Builder()');
+    // `requestBuilder` is only reassigned when request-context or per-request headers are applied below.
+    const builderReassigned = context.requestContextFields.length > 0 || method.headers.length > 0;
+    writer.line(`${builderReassigned ? 'var' : 'val'} requestBuilder = Request.Builder()`);
     writer.line('    .url(urlBuilder.build())');
     if (hasBody) {
         writer.line(`    .method(${stringLiteral(method.method)}, requestBody)`);
@@ -1155,17 +1187,15 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
         writer.line(
             'val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }'
         );
-        writer.line('val statusCode = httpResponse.code');
-
-        writer.line('when (statusCode) {');
+        writer.line('when (val statusCode = httpResponse.code) {');
         writer.indent(() => {
             for (const successResponse of method.successResponses) {
+                if (isVoidSuccess) {
+                    writer.line(`${successResponse.status} -> {}`);
+                    continue;
+                }
                 writer.line(`${successResponse.status} -> {`);
                 writer.indent(() => {
-                    if (isVoidSuccess) {
-                        writer.line('Unit');
-                        return;
-                    }
                     const resolved = resolveType(successResponse.type, method.operationName, context);
                     writer.block('try', () => {
                         writer.line(`val payload = json.decodeFromString<${resolved}>(data.decodeToString())`);
@@ -1390,6 +1420,15 @@ const emitClient = (
                     'val filename: String',
                     'val mimeType: String = "application/octet-stream"',
                 ]);
+                writer.appendToLastLine(' {');
+                writer.indent(() => {
+                    emitByteArrayEquality(writer, 'MultipartFile', [
+                        { name: 'data', isByteArray: true },
+                        { name: 'filename', isByteArray: false },
+                        { name: 'mimeType', isByteArray: false },
+                    ]);
+                });
+                writer.line('}');
             }
             const hasValidation = allMethods.some((method) => method.errorCases.some((candidate) => candidate.type === 'ValidationError'));
             if (hasValidation) {
@@ -1464,11 +1503,18 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     const writer = new KotlinWriter();
     writer.line('// Generated by @ts-kizuna/kotlin. Do not edit by hand.');
     writer.blank();
-    // Verbatim wire names keep underscores; exempt the file from the naming inspection.
-    if (!camelCaseProperties) {
-        writer.line('@file:Suppress("PropertyName", "ConstructorParameterNaming")');
-        writer.blank();
-    }
+    // Suppress inspections that fight the generator's conventions: brand terms (SpellCheckingInspection),
+    // library APIs only external modules call (unused), and generator style (Redundant*). Verbatim wire
+    // names add the snake_case naming inspections; camelCase mode maps them via @SerialName instead.
+    const suppressions = [
+        ...(camelCaseProperties ? [] : ['PropertyName', 'LocalVariableName', 'ConstructorParameterNaming']),
+        'SpellCheckingInspection',
+        'unused',
+        'RedundantVisibilityModifier',
+        'RedundantUnitReturnType',
+    ];
+    writer.line(`@file:Suppress(${suppressions.map((name) => `"${name}"`).join(', ')})`);
+    writer.blank();
     if (packageName) {
         writer.line(`package ${packageName}`);
         writer.blank();
@@ -1476,6 +1522,7 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     writer.line('import kotlinx.serialization.*');
     writer.line('import kotlinx.serialization.json.*');
     writer.line('import kotlinx.datetime.Instant');
+    writer.line('import kotlinx.datetime.LocalDate');
     writer.line('import okhttp3.*');
     writer.line('import okhttp3.MediaType.Companion.toMediaType');
     writer.line('import okhttp3.RequestBody.Companion.toRequestBody');
