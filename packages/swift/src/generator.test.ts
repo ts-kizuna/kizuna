@@ -1292,6 +1292,58 @@ describe('Swift generator — grouped request components (params/body/query/head
         expect(output).toContain('public static func sms(phone: String) ->');
         expect(output).toContain('channel: "email"');
     });
+
+    it('emits union members as top-level structs so direct field references resolve', () => {
+        const Video = createModel({
+            title: 'Video',
+            schema: z.object({
+                encodingStatus: z.enum(['encoding', 'encoded', 'failed']),
+                url: z.string(),
+            }),
+        });
+        const ImageAttachment = createModel({
+            title: 'ImageAttachment',
+            schema: z.object({ kind: z.literal('image'), url: z.string(), order: z.string() }),
+        });
+        const VideoAttachment = createModel({
+            title: 'VideoAttachment',
+            schema: Video.extend({ kind: z.literal('video'), order: z.string() }),
+        });
+        const Attachment = createModel({
+            title: 'Attachment',
+            schema: z.discriminatedUnion('kind', [ImageAttachment, VideoAttachment]),
+        });
+        const contract = k.contract({
+            routes: k.routes('api', {
+                getMessage: {
+                    method: 'GET',
+                    path: '/messages/:id',
+                    responses: {
+                        200: createModel({
+                            title: 'Message',
+                            schema: z.object({
+                                attachments: z.array(Attachment),
+                                images: z.array(ImageAttachment),
+                            }),
+                        }),
+                    },
+                },
+            }),
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        // Members are top-level structs; the enum cases wrap them by title.
+        expect(output).toContain('public enum Attachment');
+        expect(output).toContain('public struct ImageAttachment');
+        expect(output).toContain('public struct VideoAttachment');
+        expect(output).toContain('case image(ImageAttachment)');
+        expect(output).toContain('case video(VideoAttachment)');
+        // A member used directly as a field must reference the emitted member type.
+        expect(output).toContain('public let images: [ImageAttachment]');
+        // The member's inline enum nests under it, referenced by the same name.
+        expect(output).toContain('public enum EncodingStatus');
+        expect(output).toContain('public let encodingStatus: EncodingStatus');
+        expect(output).not.toContain('VideoAttachmentEncodingStatus');
+    });
 });
 
 describe('Swift generator — positional request groups (required-first, single signature)', () => {

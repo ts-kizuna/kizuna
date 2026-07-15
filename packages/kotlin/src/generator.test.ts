@@ -961,6 +961,88 @@ describe('Kotlin generator — discriminated union', () => {
         expect(output).toContain('@SerialName("email")');
         expect(output).toContain('@SerialName("sms")');
     });
+
+    it('emits a nested enum class for an inline z.enum, matching the field reference', () => {
+        const contract = k.contract({
+            routes: {
+                getVideo: {
+                    method: 'GET',
+                    path: '/videos/:id',
+                    responses: {
+                        200: createModel({
+                            title: 'Video',
+                            schema: z.object({
+                                encodingStatus: z.enum(['encoding', 'encoded', 'failed']),
+                                url: z.string(),
+                            }),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        // The inline enum nests under its owner and the field references the same name.
+        expect(output).toContain('val encodingStatus: EncodingStatus');
+        expect(output).toContain('enum class EncodingStatus');
+        // No dangling reference to an enum that was never emitted.
+        expect(output).not.toContain('VideoEncodingStatus');
+    });
+
+    it('emits union members under their model title so direct field references resolve', () => {
+        const Video = createModel({
+            title: 'Video',
+            schema: z.object({
+                encodingStatus: z.enum(['encoding', 'encoded', 'failed']),
+                url: z.string(),
+            }),
+        });
+        const ImageAttachment = createModel({
+            title: 'ImageAttachment',
+            schema: z.object({ kind: z.literal('image'), url: z.string(), order: z.string() }),
+        });
+        const VideoAttachment = createModel({
+            title: 'VideoAttachment',
+            schema: Video.extend({ kind: z.literal('video'), order: z.string() }),
+        });
+        const Attachment = createModel({
+            title: 'Attachment',
+            schema: z.discriminatedUnion('kind', [ImageAttachment, VideoAttachment]),
+        });
+        const contract = k.contract({
+            routes: {
+                getMessage: {
+                    method: 'GET',
+                    path: '/messages/:id',
+                    responses: {
+                        200: createModel({
+                            title: 'Message',
+                            schema: z.object({
+                                attachments: z.array(Attachment),
+                                images: z.array(ImageAttachment),
+                            }),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        // Members are top-level data classes named after their title, implementing the sealed
+        // interface — never nested under the discriminant literal.
+        expect(output).toContain('sealed interface Attachment');
+        expect(output).toContain('data class ImageAttachment(');
+        expect(output).toContain('data class VideoAttachment(');
+        expect(output).toContain(') : Attachment');
+        expect(output).toContain('@SerialName("image")');
+        expect(output).toContain('@SerialName("video")');
+        // The direct field reference resolves to the emitted member type.
+        expect(output).toContain('val images: List<ImageAttachment>');
+        // The member's inline enum nests under it, referenced by the same name.
+        expect(output).toContain('val encodingStatus: EncodingStatus');
+        expect(output).toContain('enum class EncodingStatus');
+        expect(output).not.toContain('VideoAttachmentEncodingStatus');
+        // The discriminator field is dropped; kotlinx derives it from @SerialName.
+        expect(output).not.toContain('val kind: String');
+    });
 });
 
 describe('Kotlin generator — imports', () => {

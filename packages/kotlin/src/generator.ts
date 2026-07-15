@@ -526,7 +526,10 @@ const emitDataClass = (
     registryName?: string
 ): void => {
     const lookupName = registryName ?? type.name;
-    const hasFile = type.fields.some((field) => field.isFile);
+    const baseFields = type.discriminatorWireName
+        ? type.fields.filter((field) => field.wireName !== type.discriminatorWireName)
+        : type.fields;
+    const hasFile = baseFields.some((field) => field.isFile);
 
     const resolveOwnedType = (raw: string): string => {
         const optional = raw.endsWith('?');
@@ -539,13 +542,16 @@ const emitDataClass = (
         return optional ? `${resolved}?` : resolved;
     };
 
-    const adjustedFields = type.fields.map((field) => ({
+    const adjustedFields = baseFields.map((field) => ({
         ...field,
         type: resolveOwnedType(field.type),
     }));
 
-    const needsSerialName = !hasFile && type.fields.some((field) => field.name !== field.wireName || KOTLIN_KEYWORDS.has(field.name));
+    const needsSerialName = !hasFile && baseFields.some((field) => field.name !== field.wireName || KOTLIN_KEYWORDS.has(field.name));
 
+    if (type.serialName !== undefined) {
+        writer.line(`@SerialName(${stringLiteral(type.serialName)})`);
+    }
     if (!hasFile) {
         writer.line('@Serializable');
     }
@@ -578,6 +584,10 @@ const emitDataClass = (
         writer.line(')');
     }
 
+    if (type.sealedParent !== undefined) {
+        writer.appendToLastLine(` : ${type.sealedParent}`);
+    }
+
     if (hasOwnedTypes) {
         writer.appendToLastLine(' {');
         writer.indent(() => {
@@ -597,8 +607,15 @@ const emitSealedClass = (writer: KotlinWriter, type: Extract<KotlinType, { kind:
     writer.line(`@OptIn(ExperimentalSerializationApi::class)`);
     writer.line(`@JsonClassDiscriminator(${stringLiteral(type.discriminator)})`);
     writer.line('@Serializable');
+
+    const nestedVariants = type.variants.filter((variant) => variant.nested);
+    if (nestedVariants.length === 0) {
+        writer.line(`sealed interface ${type.name}`);
+        return;
+    }
+
     writer.block(`sealed interface ${type.name}`, () => {
-        for (const variant of type.variants) {
+        for (const variant of nestedVariants) {
             const payloadType = registry.all().find((candidate) => candidate.name === variant.payloadType);
             writer.line(`@SerialName(${stringLiteral(variant.literal)})`);
             writer.line('@Serializable');
