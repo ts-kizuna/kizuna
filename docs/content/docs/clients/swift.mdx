@@ -69,12 +69,12 @@ try await client.sendNotification(
 
 ## Generated client
 
-The generated file exports a typed actor with methods for each route and sub-clients for grouped routes. Each request group is a nested struct with a group-named factory:
+The generated file exports a `Sendable` client with methods for each route and sub-clients for grouped routes. It's a plain `final class` — everything is immutable `let` storage set at init, so it's safe to share across tasks without an actor hop per request. Each request group is a nested struct with a group-named factory:
 
 ```swift title="APIClient.swift"
 import Foundation
 
-public actor APIClient {
+public final class APIClient: Sendable {
     public let baseURL: URL
     public let session: URLSession
 
