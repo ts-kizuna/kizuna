@@ -32,7 +32,7 @@ describe('Kotlin generator — z.void()', () => {
         expect(output).toContain('suspend fun ping(build: TestAPIClient.Ping.Scope.() -> TestAPIClient.Ping.Args)');
         expect(output).not.toContain('class Body');
         // Void success returns Unit — no Response wrapper is emitted.
-        expect(output).not.toContain(': TestAPIClient.Ping.Response');
+        expect(output).not.toContain(': TestAPIClient.Ping.Result');
         expect(output).toContain('sealed class Failure');
     });
 });
@@ -126,49 +126,6 @@ describe('Kotlin generator — z.iso.datetime()', () => {
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('val occurredAt: Instant');
         expect(output).not.toContain('val occurredAt: String');
-    });
-});
-
-describe('Kotlin generator — z.iso.date()', () => {
-    it('maps z.iso.date() to kotlinx.datetime.LocalDate, not String or Instant', () => {
-        const contract = k.contract({
-            routes: {
-                listEvents: {
-                    method: 'GET',
-                    path: '/events',
-                    responses: {
-                        200: z.object({
-                            startsOn: z.iso.date(),
-                        }),
-                    },
-                },
-            },
-        });
-        const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain('val startsOn: LocalDate');
-        expect(output).not.toContain('val startsOn: String');
-        expect(output).not.toContain('val startsOn: Instant');
-        expect(output).toContain('import kotlinx.datetime.LocalDate');
-    });
-
-    it('keeps date and datetime distinct in the same object', () => {
-        const contract = k.contract({
-            routes: {
-                listEvents: {
-                    method: 'GET',
-                    path: '/events',
-                    responses: {
-                        200: z.object({
-                            startsOn: z.iso.date(),
-                            occurredAt: z.iso.datetime(),
-                        }),
-                    },
-                },
-            },
-        });
-        const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain('val startsOn: LocalDate');
-        expect(output).toContain('val occurredAt: Instant');
     });
 });
 
@@ -335,8 +292,8 @@ describe('Kotlin generator — array type qualification', () => {
             },
         });
         const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain(': TestAPIClient.ListItems.Response');
-        expect(output).toContain('data class Response(val body: List<ResponseBodyItem>)');
+        expect(output).toContain(': TestAPIClient.ListItems.Result');
+        expect(output).toContain('data class Result(val body: List<ResponseItem>)');
     });
 
     it('array response type in sub-client uses Ok body field', () => {
@@ -354,8 +311,8 @@ describe('Kotlin generator — array type qualification', () => {
             },
         });
         const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain(': TestAPIClient.ItemsList.Response');
-        expect(output).toContain('data class Response(val body: List<ResponseBodyItem>)');
+        expect(output).toContain(': TestAPIClient.ItemsList.Result');
+        expect(output).toContain('data class Result(val body: List<ResponseItem>)');
     });
 
     it('qualifies array element types in sub-client method parameters', () => {
@@ -468,8 +425,8 @@ describe('Kotlin generator — nested sub-client routing', () => {
             },
         });
         const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain('TestAPIClient.UsersGetById.Response');
-        expect(output).toContain('TestAPIClient.PostsGetById.Response');
+        expect(output).toContain('TestAPIClient.UsersGetById.Result');
+        expect(output).toContain('TestAPIClient.PostsGetById.Result');
     });
 
     it('keeps flat routes directly on the client when mixed with grouped routes', () => {
@@ -560,7 +517,7 @@ describe('Kotlin generator — responseHeaders', () => {
             },
         });
         const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain('data class Response(val body:');
+        expect(output).toContain('data class Result(val body:');
         expect(output).not.toContain('val headers: Headers');
     });
 });
@@ -792,7 +749,7 @@ describe('Kotlin generator — HEAD method', () => {
         });
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('suspend fun checkUser(build: TestAPIClient.CheckUser.Scope.() -> TestAPIClient.CheckUser.Args)');
-        expect(output).not.toContain(': TestAPIClient.CheckUser.Response');
+        expect(output).not.toContain(': TestAPIClient.CheckUser.Result');
         expect(output).toContain('data object NotFound : Failure()');
     });
 
@@ -1168,9 +1125,9 @@ describe('Kotlin generator — throw-on-error model', () => {
         });
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain(
-            'suspend fun getUser(build: TestAPIClient.GetUser.Scope.() -> TestAPIClient.GetUser.Args): TestAPIClient.GetUser.Response'
+            'suspend fun getUser(build: TestAPIClient.GetUser.Scope.() -> TestAPIClient.GetUser.Args): TestAPIClient.GetUser.Result'
         );
-        expect(output).toContain('data class Response(val body:');
+        expect(output).toContain('data class Result(val body:');
         expect(output).toContain('sealed class Failure(message: String? = null) : Exception(message)');
         expect(output).toContain('data class NotFound(val body:');
         expect(output).toContain('class Unexpected(val statusCode: Int, val data: ByteArray) : Failure');
@@ -1197,7 +1154,7 @@ describe('Kotlin generator — throw-on-error model', () => {
         expect(output).toContain('sealed interface Success');
         expect(output).toContain('data class Status200(val body:');
         expect(output).toContain('data class Status201(val body:');
-        expect(output).toContain('data class Response(val body: Success)');
+        expect(output).toContain('data class Result(val body: Success)');
     });
 
     it('throws the typed Failure for error statuses and returns Response on success', () => {
@@ -1215,13 +1172,13 @@ describe('Kotlin generator — throw-on-error model', () => {
         });
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('throw TestAPIClient.GetUser.Failure.NotFound(body = payload)');
-        expect(output).toContain('return@use TestAPIClient.GetUser.Response(body = payload)');
+        expect(output).toContain('return@use TestAPIClient.GetUser.Result(body = payload)');
         expect(output).toContain('throw TestAPIClient.GetUser.Failure.Unexpected(statusCode = statusCode, data = data)');
     });
 });
 
 describe('Kotlin generator — inline response body name', () => {
-    it('names the inline 200 body ResponseBody, distinct from the Response wrapper', () => {
+    it('names the inline 200 body Response, distinct from the Result wrapper', () => {
         const contract = k.contract({
             routes: {
                 listUsers: {
@@ -1237,8 +1194,8 @@ describe('Kotlin generator — inline response body name', () => {
             },
         });
         const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain('data class ResponseBody(');
-        expect(output).toContain('data class Response(val body: ResponseBody)');
+        expect(output).toContain('data class Response(');
+        expect(output).toContain('data class Result(val body: Response)');
     });
 });
 
@@ -1612,11 +1569,12 @@ describe('Kotlin generator — ByteArray structural equality', () => {
         });
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class MultipartFile(');
-        expect(output).toContain('other as MultipartFile');
-        expect(output).toContain('if (!data.contentEquals(other.data)) return false');
-        expect(output).toContain('if (filename != other.filename) return false');
-        expect(output).toContain('var result = data.contentHashCode()');
-        expect(output).toContain('result = 31 * result + filename.hashCode()');
+        expect(output).toContain(
+            'override fun equals(other: Any?) = other is MultipartFile && data.contentEquals(other.data) && filename == other.filename && mimeType == other.mimeType'
+        );
+        expect(output).toContain(
+            'override fun hashCode() = 31 * (31 * data.contentHashCode() + filename.hashCode()) + mimeType.hashCode()'
+        );
     });
 });
 

@@ -7,7 +7,6 @@ package com.kizuna.demo
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDate
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -115,23 +114,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         val filename: String,
         val mimeType: String = "application/octet-stream"
     ) {
-
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
-            other as MultipartFile
-            if (!data.contentEquals(other.data)) return false
-            if (filename != other.filename) return false
-            if (mimeType != other.mimeType) return false
-            return true
-        }
-
-        override fun hashCode(): Int {
-            var result = data.contentHashCode()
-            result = 31 * result + filename.hashCode()
-            result = 31 * result + mimeType.hashCode()
-            return result
-        }
+        override fun equals(other: Any?) = other is MultipartFile && data.contentEquals(other.data) && filename == other.filename && mimeType == other.mimeType
+        override fun hashCode() = 31 * (31 * data.contentHashCode() + filename.hashCode()) + mimeType.hashCode()
     }
 
     @Serializable
@@ -153,7 +137,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object UsersListUsers {
 
         @Serializable
-        data class ResponseBody(
+        data class Response(
             val users: List<API.User>,
             val total: Double
         )
@@ -173,7 +157,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterQuery internal constructor(override val query: Query?) : Args
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: APIClient.ValidationError) : Failure()
@@ -184,7 +168,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
     object UsersExportUsers {
 
-        data class Response(val body: String)
+        data class Result(val body: String)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -206,7 +190,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterParams internal constructor(override val params: Params) : Args
 
-        data class Response(val body: JsonElement)
+        data class Result(val body: JsonElement)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
@@ -218,7 +202,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object UsersSearchUsers {
 
         @Serializable
-        data class ResponseBody(
+        data class Response(
             val users: List<API.User>,
             val nextCursor: Double? = null
         )
@@ -239,7 +223,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterQuery internal constructor(override val query: Query) : Args
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: APIClient.ValidationError) : Failure()
@@ -269,7 +253,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterHeaders internal constructor(override val params: Params, override val headers: Headers) : Args
 
-        data class Response(
+        data class Result(
             val body: API.User,
             val headers: Headers
         ) {
@@ -303,7 +287,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterBody internal constructor(override val body: Body) : Args
 
-        data class Response(val body: API.User)
+        data class Result(val body: API.User)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: API.ProblemDetails) : Failure()
@@ -316,7 +300,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object UsersDeleteUser {
 
         @Serializable
-        data class ResponseBody(val success: Boolean)
+        data class Response(val success: Boolean)
 
         data class Params(val id: String)
 
@@ -330,7 +314,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterParams internal constructor(override val params: Params) : Args
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
@@ -342,7 +326,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object UsersArchiveUser {
 
         @Serializable
-        data class ResponseBody(
+        data class Response(
             val alreadyArchived: Boolean,
             val userId: String
         )
@@ -366,11 +350,11 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         class AfterParams internal constructor(override val params: Params) : Args
 
         sealed interface Success {
-            data class Status200(val body: ResponseBody) : Success
+            data class Status200(val body: Response) : Success
             data class Status201(val body: Response201) : Success
         }
 
-        data class Response(val body: Success)
+        data class Result(val body: Success)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -386,7 +370,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         )
 
         @Serializable
-        data class ResponseBody(
+        data class Response(
             val size: Double,
             val userId: String
         )
@@ -406,7 +390,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterBody internal constructor(override val body: Body) : Args
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: APIClient.ValidationError) : Failure()
@@ -439,13 +423,13 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object UsersGetMyWork {
 
         @Serializable
-        data class ResponseBody(
+        data class Response(
             val items: List<String>,
-            val contentType: ResponseBodyContentType
+            val contentType: ResponseContentType
         )
 
         @Serializable
-        enum class ResponseBodyContentType(override val wireValue: String) : KizunaQueryValue {
+        enum class ResponseContentType(override val wireValue: String) : KizunaQueryValue {
             @SerialName("image/jpeg") IMAGE_JPEG("image/jpeg"),
             @SerialName("text-plain") TEXT_PLAIN("text-plain"),
             @SerialName("video.mp4") VIDEO_MP4("video.mp4"),
@@ -453,11 +437,11 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
 
         sealed interface Success {
-            data class Status200(val body: ResponseBody) : Success
+            data class Status200(val body: Response) : Success
             data class Status204(val body: Unit) : Success
         }
 
-        data class Response(val body: Success)
+        data class Result(val body: Success)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -468,7 +452,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object UsersCheckUser {
 
         @Serializable
-        data class ResponseBody(val exists: Boolean)
+        data class Response(val exists: Boolean)
 
         data class Params(val id: String)
 
@@ -492,9 +476,9 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object UsersDescribeUsers {
 
         @Serializable
-        data class ResponseBody(val allow: String)
+        data class Response(val allow: String)
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -505,9 +489,9 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object HealthCheck {
 
         @Serializable
-        data class ResponseBody(val ok: Boolean)
+        data class Response(val ok: Boolean)
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -518,9 +502,9 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object HealthVersion {
 
         @Serializable
-        data class ResponseBody(val version: String)
+        data class Response(val version: String)
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -531,12 +515,12 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object HealthHistory {
 
         @Serializable
-        data class ResponseBodyItem(
+        data class ResponseItem(
             val ok: Boolean,
             val checkedAt: Instant
         )
 
-        data class Response(val body: List<ResponseBodyItem>)
+        data class Result(val body: List<ResponseItem>)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -561,7 +545,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterBody internal constructor(override val body: Body) : Args
 
-        data class Response(val body: Response202)
+        data class Result(val body: Response202)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: APIClient.ValidationError) : Failure()
@@ -580,15 +564,15 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
 
         @Serializable
-        data class ResponseBody(
+        data class Response(
             val events: List<API.EventRecord>,
-            val echo: ResponseBodyEcho
+            val echo: ResponseEcho
         )
 
         @Serializable
-        data class ResponseBodyEcho(
+        data class ResponseEcho(
             val since: Instant? = null,
-            val kind: ResponseBodyEchoKind? = null,
+            val kind: ResponseEchoKind? = null,
             val ids: List<String>? = null,
             val label: String? = null,
             val tagIds: List<String>? = null,
@@ -596,7 +580,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         )
 
         @Serializable
-        enum class ResponseBodyEchoKind(override val wireValue: String) : KizunaQueryValue {
+        enum class ResponseEchoKind(override val wireValue: String) : KizunaQueryValue {
             @SerialName("login") LOGIN("login"),
             @SerialName("logout") LOGOUT("logout"),
             @SerialName("signup") SIGNUP("signup")
@@ -620,7 +604,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterQuery internal constructor(override val query: Query?) : Args
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: APIClient.ValidationError) : Failure()
@@ -639,7 +623,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         /** Validation result */
         @Serializable
-        data class ResponseBody(val status: String)
+        data class Response(val status: String)
 
         data class Body(
             val default: String,
@@ -656,7 +640,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterBody internal constructor(override val body: Body) : Args
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: API.ProblemDetails) : Failure()
@@ -670,7 +654,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object NotificationsWebhook {
 
         @Serializable
-        data class ResponseBody(val received: Boolean)
+        data class Response(val received: Boolean)
 
         data class Body(val payload: JsonElement)
 
@@ -684,7 +668,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterBody internal constructor(override val body: Body) : Args
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: APIClient.ValidationError) : Failure()
@@ -696,9 +680,9 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object MembersListMembers {
 
         @Serializable
-        data class ResponseBody(val members: List<API.User>)
+        data class Response(val members: List<API.User>)
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -723,7 +707,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterBody internal constructor(override val body: Body) : Args
 
-        data class Response(val body: API.User)
+        data class Result(val body: API.User)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class Conflict(val body: API.ProblemDetails) : Failure()
@@ -736,12 +720,12 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object WorkspaceGetWorkspace {
 
         @Serializable
-        data class ResponseBody(
+        data class Response(
             val id: String,
             val name: String
         )
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -752,9 +736,9 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object WorkspaceDeleteWorkspace {
 
         @Serializable
-        data class ResponseBody(val ok: Boolean)
+        data class Response(val ok: Boolean)
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -768,7 +752,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class Input(val toUserId: String)
 
         @Serializable
-        data class ResponseBody(val ok: Boolean)
+        data class Response(val ok: Boolean)
 
         data class Body(val toUserId: String)
 
@@ -782,7 +766,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterBody internal constructor(override val body: Body) : Args
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: APIClient.ValidationError) : Failure()
@@ -794,7 +778,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object InvitesGetInvite {
 
         @Serializable
-        data class ResponseBody(
+        data class Response(
             val inviteId: String,
             val email: String
         )
@@ -811,7 +795,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterParams internal constructor(override val params: Params) : Args
 
-        data class Response(val body: ResponseBody)
+        data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
@@ -847,7 +831,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         class AfterBody internal constructor(override val params: Params, override val body: Body) : Args
 
-        data class Response(val body: Response201)
+        data class Result(val body: Response201)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
@@ -874,7 +858,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
 
     /** List users with pagination */
     @Throws(APIClient.UsersListUsers.Failure::class)
-    suspend fun listUsers(build: APIClient.UsersListUsers.Scope.() -> APIClient.UsersListUsers.Args = { query() }): APIClient.UsersListUsers.Response {
+    suspend fun listUsers(build: APIClient.UsersListUsers.Scope.() -> APIClient.UsersListUsers.Args = { query() }): APIClient.UsersListUsers.Result {
         val args = APIClient.UsersListUsers.Scope.build()
         val query = args.query ?: APIClient.UsersListUsers.Query()
         val path = "/users"
@@ -901,8 +885,8 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.UsersListUsers.ResponseBody>(data.decodeToString())
-                        return@use APIClient.UsersListUsers.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.UsersListUsers.Response>(data.decodeToString())
+                        return@use APIClient.UsersListUsers.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersListUsers.Failure.Decoding(error, statusCode, data) }
                 }
@@ -919,7 +903,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
 
     /** Export users as CSV — exercises a non-JSON (text/csv) raw response body */
     @Throws(APIClient.UsersExportUsers.Failure::class)
-    suspend fun exportUsers(): APIClient.UsersExportUsers.Response {
+    suspend fun exportUsers(): APIClient.UsersExportUsers.Result {
         val path = "/users/export"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
@@ -935,7 +919,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                 200 -> {
                     try {
                         val payload = json.decodeFromString<String>(data.decodeToString())
-                        return@use APIClient.UsersExportUsers.Response(body = payload)
+                        return@use APIClient.UsersExportUsers.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersExportUsers.Failure.Decoding(error, statusCode, data) }
                 }
@@ -946,7 +930,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
 
     /** Download a user badge — exercises a binary (BinarySchema) response body */
     @Throws(APIClient.UsersUserBadge.Failure::class)
-    suspend fun userBadge(build: APIClient.UsersUserBadge.Scope.() -> APIClient.UsersUserBadge.Args): APIClient.UsersUserBadge.Response {
+    suspend fun userBadge(build: APIClient.UsersUserBadge.Scope.() -> APIClient.UsersUserBadge.Args): APIClient.UsersUserBadge.Result {
         val args = APIClient.UsersUserBadge.Scope.build()
         val params = args.params
         var path = "/users/:id/badge"
@@ -965,7 +949,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                 200 -> {
                     try {
                         val payload = json.decodeFromString<JsonElement>(data.decodeToString())
-                        return@use APIClient.UsersUserBadge.Response(body = payload)
+                        return@use APIClient.UsersUserBadge.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
                 }
@@ -982,7 +966,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
 
     /** Search users — required coerced limit and cursor */
     @Throws(APIClient.UsersSearchUsers.Failure::class)
-    suspend fun searchUsers(build: APIClient.UsersSearchUsers.Scope.() -> APIClient.UsersSearchUsers.Args): APIClient.UsersSearchUsers.Response {
+    suspend fun searchUsers(build: APIClient.UsersSearchUsers.Scope.() -> APIClient.UsersSearchUsers.Args): APIClient.UsersSearchUsers.Result {
         val args = APIClient.UsersSearchUsers.Scope.build()
         val query = args.query
         val path = "/users/search"
@@ -1008,8 +992,8 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.UsersSearchUsers.ResponseBody>(data.decodeToString())
-                        return@use APIClient.UsersSearchUsers.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.UsersSearchUsers.Response>(data.decodeToString())
+                        return@use APIClient.UsersSearchUsers.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersSearchUsers.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1026,7 +1010,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
 
     /** Get a user by id */
     @Throws(APIClient.UsersGetUser.Failure::class)
-    suspend fun getUser(build: APIClient.UsersGetUser.Scope.() -> APIClient.UsersGetUser.Args): APIClient.UsersGetUser.Response {
+    suspend fun getUser(build: APIClient.UsersGetUser.Scope.() -> APIClient.UsersGetUser.Args): APIClient.UsersGetUser.Result {
         val args = APIClient.UsersGetUser.Scope.build()
         val params = args.params
         val headers = args.headers
@@ -1048,7 +1032,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     try {
                         val payload = json.decodeFromString<API.User>(data.decodeToString())
                         val xRequestId = httpResponse.header("x-request-id")
-                        return@use APIClient.UsersGetUser.Response(body = payload, headers = APIClient.UsersGetUser.Response.Headers(xRequestId = xRequestId))
+                        return@use APIClient.UsersGetUser.Result(body = payload, headers = APIClient.UsersGetUser.Result.Headers(xRequestId = xRequestId))
                     }
                     catch (error: Exception) { throw APIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1065,7 +1049,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
 
     /** Create a user */
     @Throws(APIClient.UsersCreateUser.Failure::class)
-    suspend fun createUser(build: APIClient.UsersCreateUser.Scope.() -> APIClient.UsersCreateUser.Args): APIClient.UsersCreateUser.Response {
+    suspend fun createUser(build: APIClient.UsersCreateUser.Scope.() -> APIClient.UsersCreateUser.Args): APIClient.UsersCreateUser.Result {
         val args = APIClient.UsersCreateUser.Scope.build()
         val body = args.body
         val path = "/users"
@@ -1086,7 +1070,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                 201 -> {
                     try {
                         val payload = json.decodeFromString<API.User>(data.decodeToString())
-                        return@use APIClient.UsersCreateUser.Response(body = payload)
+                        return@use APIClient.UsersCreateUser.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersCreateUser.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1109,7 +1093,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     /** Delete a user */
     @Deprecated("Deprecated")
     @Throws(APIClient.UsersDeleteUser.Failure::class)
-    suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.UsersDeleteUser.Args): APIClient.UsersDeleteUser.Response {
+    suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.UsersDeleteUser.Args): APIClient.UsersDeleteUser.Result {
         val args = APIClient.UsersDeleteUser.Scope.build()
         val params = args.params
         var path = "/users/:id"
@@ -1127,8 +1111,8 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.UsersDeleteUser.ResponseBody>(data.decodeToString())
-                        return@use APIClient.UsersDeleteUser.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.UsersDeleteUser.Response>(data.decodeToString())
+                        return@use APIClient.UsersDeleteUser.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1145,7 +1129,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
 
     /** Archive a user — first call returns 201, subsequent calls 200 */
     @Throws(APIClient.UsersArchiveUser.Failure::class)
-    suspend fun archiveUser(build: APIClient.UsersArchiveUser.Scope.() -> APIClient.UsersArchiveUser.Args): APIClient.UsersArchiveUser.Response {
+    suspend fun archiveUser(build: APIClient.UsersArchiveUser.Scope.() -> APIClient.UsersArchiveUser.Args): APIClient.UsersArchiveUser.Result {
         val args = APIClient.UsersArchiveUser.Scope.build()
         val params = args.params
         var path = "/users/:id/archive"
@@ -1163,15 +1147,15 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.UsersArchiveUser.ResponseBody>(data.decodeToString())
-                        return@use APIClient.UsersArchiveUser.Response(body = APIClient.UsersArchiveUser.Success.Status200(payload))
+                        val payload = json.decodeFromString<APIClient.UsersArchiveUser.Response>(data.decodeToString())
+                        return@use APIClient.UsersArchiveUser.Result(body = APIClient.UsersArchiveUser.Success.Status200(payload))
                     }
                     catch (error: Exception) { throw APIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
                 }
                 201 -> {
                     try {
                         val payload = json.decodeFromString<APIClient.UsersArchiveUser.Response201>(data.decodeToString())
-                        return@use APIClient.UsersArchiveUser.Response(body = APIClient.UsersArchiveUser.Success.Status201(payload))
+                        return@use APIClient.UsersArchiveUser.Result(body = APIClient.UsersArchiveUser.Success.Status201(payload))
                     }
                     catch (error: Exception) { throw APIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1182,7 +1166,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
 
     /** Upload an avatar image */
     @Throws(APIClient.UsersUploadAvatar.Failure::class)
-    suspend fun uploadAvatar(build: APIClient.UsersUploadAvatar.Scope.() -> APIClient.UsersUploadAvatar.Args): APIClient.UsersUploadAvatar.Response {
+    suspend fun uploadAvatar(build: APIClient.UsersUploadAvatar.Scope.() -> APIClient.UsersUploadAvatar.Args): APIClient.UsersUploadAvatar.Result {
         val args = APIClient.UsersUploadAvatar.Scope.build()
         val body = args.body
         val path = "/avatar"
@@ -1204,8 +1188,8 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.UsersUploadAvatar.ResponseBody>(data.decodeToString())
-                        return@use APIClient.UsersUploadAvatar.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.UsersUploadAvatar.Response>(data.decodeToString())
+                        return@use APIClient.UsersUploadAvatar.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersUploadAvatar.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1252,7 +1236,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
 
     /** List work items — exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers */
     @Throws(APIClient.UsersGetMyWork.Failure::class)
-    suspend fun getMyWork(): APIClient.UsersGetMyWork.Response {
+    suspend fun getMyWork(): APIClient.UsersGetMyWork.Result {
         val path = "/work"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
@@ -1267,15 +1251,15 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.UsersGetMyWork.ResponseBody>(data.decodeToString())
-                        return@use APIClient.UsersGetMyWork.Response(body = APIClient.UsersGetMyWork.Success.Status200(payload))
+                        val payload = json.decodeFromString<APIClient.UsersGetMyWork.Response>(data.decodeToString())
+                        return@use APIClient.UsersGetMyWork.Result(body = APIClient.UsersGetMyWork.Success.Status200(payload))
                     }
                     catch (error: Exception) { throw APIClient.UsersGetMyWork.Failure.Decoding(error, statusCode, data) }
                 }
                 204 -> {
                     try {
                         val payload = json.decodeFromString<Unit>(data.decodeToString())
-                        return@use APIClient.UsersGetMyWork.Response(body = APIClient.UsersGetMyWork.Success.Status204(payload))
+                        return@use APIClient.UsersGetMyWork.Result(body = APIClient.UsersGetMyWork.Success.Status204(payload))
                     }
                     catch (error: Exception) { throw APIClient.UsersGetMyWork.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1316,7 +1300,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
 
     /** Describe allowed operations — exercises OPTIONS routing */
     @Throws(APIClient.UsersDescribeUsers.Failure::class)
-    suspend fun describeUsers(): APIClient.UsersDescribeUsers.Response {
+    suspend fun describeUsers(): APIClient.UsersDescribeUsers.Result {
         val path = "/users/describe"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
@@ -1331,8 +1315,8 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.UsersDescribeUsers.ResponseBody>(data.decodeToString())
-                        return@use APIClient.UsersDescribeUsers.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.UsersDescribeUsers.Response>(data.decodeToString())
+                        return@use APIClient.UsersDescribeUsers.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersDescribeUsers.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1346,7 +1330,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
 
     /** Health check — exercises nested sub-client routing */
     @Throws(APIClient.HealthCheck.Failure::class)
-    suspend fun check(): APIClient.HealthCheck.Response {
+    suspend fun check(): APIClient.HealthCheck.Result {
         val path = "/health"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
@@ -1361,8 +1345,8 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.HealthCheck.ResponseBody>(data.decodeToString())
-                        return@use APIClient.HealthCheck.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.HealthCheck.Response>(data.decodeToString())
+                        return@use APIClient.HealthCheck.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.HealthCheck.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1373,7 +1357,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
 
     /** Version — exercises second method in a sub-client group */
     @Throws(APIClient.HealthVersion.Failure::class)
-    suspend fun version(): APIClient.HealthVersion.Response {
+    suspend fun version(): APIClient.HealthVersion.Result {
         val path = "/health/version"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
@@ -1388,8 +1372,8 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.HealthVersion.ResponseBody>(data.decodeToString())
-                        return@use APIClient.HealthVersion.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.HealthVersion.Response>(data.decodeToString())
+                        return@use APIClient.HealthVersion.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.HealthVersion.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1400,7 +1384,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
 
     /** Health history — exercises array return type qualification */
     @Throws(APIClient.HealthHistory.Failure::class)
-    suspend fun history(): APIClient.HealthHistory.Response {
+    suspend fun history(): APIClient.HealthHistory.Result {
         val path = "/health/history"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
@@ -1415,8 +1399,8 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<List<APIClient.HealthHistory.ResponseBodyItem>>(data.decodeToString())
-                        return@use APIClient.HealthHistory.Response(body = payload)
+                        val payload = json.decodeFromString<List<APIClient.HealthHistory.ResponseItem>>(data.decodeToString())
+                        return@use APIClient.HealthHistory.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.HealthHistory.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1430,7 +1414,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
 
     /** Send a notification (discriminated by channel) */
     @Throws(APIClient.NotificationsSendNotification.Failure::class)
-    suspend fun sendNotification(build: APIClient.NotificationsSendNotification.Scope.() -> APIClient.NotificationsSendNotification.Args): APIClient.NotificationsSendNotification.Response {
+    suspend fun sendNotification(build: APIClient.NotificationsSendNotification.Scope.() -> APIClient.NotificationsSendNotification.Args): APIClient.NotificationsSendNotification.Result {
         val args = APIClient.NotificationsSendNotification.Scope.build()
         val body = args.body
         val path = "/notifications"
@@ -1450,7 +1434,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
                 202 -> {
                     try {
                         val payload = json.decodeFromString<APIClient.NotificationsSendNotification.Response202>(data.decodeToString())
-                        return@use APIClient.NotificationsSendNotification.Response(body = payload)
+                        return@use APIClient.NotificationsSendNotification.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.NotificationsSendNotification.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1467,7 +1451,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
 
     /** List events — exercises Date / enum / array query params */
     @Throws(APIClient.NotificationsListEvents.Failure::class)
-    suspend fun listEvents(build: APIClient.NotificationsListEvents.Scope.() -> APIClient.NotificationsListEvents.Args = { query() }): APIClient.NotificationsListEvents.Response {
+    suspend fun listEvents(build: APIClient.NotificationsListEvents.Scope.() -> APIClient.NotificationsListEvents.Args = { query() }): APIClient.NotificationsListEvents.Result {
         val args = APIClient.NotificationsListEvents.Scope.build()
         val query = args.query ?: APIClient.NotificationsListEvents.Query()
         val path = "/events"
@@ -1509,8 +1493,8 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.NotificationsListEvents.ResponseBody>(data.decodeToString())
-                        return@use APIClient.NotificationsListEvents.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.NotificationsListEvents.Response>(data.decodeToString())
+                        return@use APIClient.NotificationsListEvents.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.NotificationsListEvents.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1527,7 +1511,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
 
     /** Validate contract — exercises generator bug coverage */
     @Throws(APIClient.NotificationsValidateConfig.Failure::class)
-    suspend fun validateConfig(build: APIClient.NotificationsValidateConfig.Scope.() -> APIClient.NotificationsValidateConfig.Args): APIClient.NotificationsValidateConfig.Response {
+    suspend fun validateConfig(build: APIClient.NotificationsValidateConfig.Scope.() -> APIClient.NotificationsValidateConfig.Args): APIClient.NotificationsValidateConfig.Result {
         val args = APIClient.NotificationsValidateConfig.Scope.build()
         val body = args.body
         val path = "/contract/validate"
@@ -1547,8 +1531,8 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.NotificationsValidateConfig.ResponseBody>(data.decodeToString())
-                        return@use APIClient.NotificationsValidateConfig.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.NotificationsValidateConfig.Response>(data.decodeToString())
+                        return@use APIClient.NotificationsValidateConfig.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.NotificationsValidateConfig.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1573,7 +1557,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
 
     /** Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen */
     @Throws(APIClient.NotificationsWebhook.Failure::class)
-    suspend fun webhook(build: APIClient.NotificationsWebhook.Scope.() -> APIClient.NotificationsWebhook.Args): APIClient.NotificationsWebhook.Response {
+    suspend fun webhook(build: APIClient.NotificationsWebhook.Scope.() -> APIClient.NotificationsWebhook.Args): APIClient.NotificationsWebhook.Result {
         val args = APIClient.NotificationsWebhook.Scope.build()
         val body = args.body
         val path = "/webhook"
@@ -1592,8 +1576,8 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.NotificationsWebhook.ResponseBody>(data.decodeToString())
-                        return@use APIClient.NotificationsWebhook.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.NotificationsWebhook.Response>(data.decodeToString())
+                        return@use APIClient.NotificationsWebhook.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.NotificationsWebhook.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1613,7 +1597,7 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
 
     /** List workspace members */
     @Throws(APIClient.MembersListMembers.Failure::class)
-    suspend fun listMembers(): APIClient.MembersListMembers.Response {
+    suspend fun listMembers(): APIClient.MembersListMembers.Result {
         val path = "/workspace/members"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
@@ -1628,8 +1612,8 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.MembersListMembers.ResponseBody>(data.decodeToString())
-                        return@use APIClient.MembersListMembers.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.MembersListMembers.Response>(data.decodeToString())
+                        return@use APIClient.MembersListMembers.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.MembersListMembers.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1640,7 +1624,7 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
 
     /** Invite a member to the workspace */
     @Throws(APIClient.MembersInviteMember.Failure::class)
-    suspend fun inviteMember(build: APIClient.MembersInviteMember.Scope.() -> APIClient.MembersInviteMember.Args): APIClient.MembersInviteMember.Response {
+    suspend fun inviteMember(build: APIClient.MembersInviteMember.Scope.() -> APIClient.MembersInviteMember.Args): APIClient.MembersInviteMember.Result {
         val args = APIClient.MembersInviteMember.Scope.build()
         val body = args.body
         val path = "/workspace/members"
@@ -1661,7 +1645,7 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
                 201 -> {
                     try {
                         val payload = json.decodeFromString<API.User>(data.decodeToString())
-                        return@use APIClient.MembersInviteMember.Response(body = payload)
+                        return@use APIClient.MembersInviteMember.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1687,7 +1671,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
 
     /** Get workspace info */
     @Throws(APIClient.WorkspaceGetWorkspace.Failure::class)
-    suspend fun getWorkspace(): APIClient.WorkspaceGetWorkspace.Response {
+    suspend fun getWorkspace(): APIClient.WorkspaceGetWorkspace.Result {
         val path = "/workspace"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
@@ -1702,8 +1686,8 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.WorkspaceGetWorkspace.ResponseBody>(data.decodeToString())
-                        return@use APIClient.WorkspaceGetWorkspace.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.WorkspaceGetWorkspace.Response>(data.decodeToString())
+                        return@use APIClient.WorkspaceGetWorkspace.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1714,7 +1698,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
 
     /** Delete the workspace — owner-only via the auth map */
     @Throws(APIClient.WorkspaceDeleteWorkspace.Failure::class)
-    suspend fun deleteWorkspace(): APIClient.WorkspaceDeleteWorkspace.Response {
+    suspend fun deleteWorkspace(): APIClient.WorkspaceDeleteWorkspace.Result {
         val path = "/workspace"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
@@ -1729,8 +1713,8 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.WorkspaceDeleteWorkspace.ResponseBody>(data.decodeToString())
-                        return@use APIClient.WorkspaceDeleteWorkspace.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.WorkspaceDeleteWorkspace.Response>(data.decodeToString())
+                        return@use APIClient.WorkspaceDeleteWorkspace.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1741,7 +1725,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
 
     /** Transfer ownership — owner-only via the auth map */
     @Throws(APIClient.WorkspaceTransfer.Failure::class)
-    suspend fun transfer(build: APIClient.WorkspaceTransfer.Scope.() -> APIClient.WorkspaceTransfer.Args): APIClient.WorkspaceTransfer.Response {
+    suspend fun transfer(build: APIClient.WorkspaceTransfer.Scope.() -> APIClient.WorkspaceTransfer.Args): APIClient.WorkspaceTransfer.Result {
         val args = APIClient.WorkspaceTransfer.Scope.build()
         val body = args.body
         val path = "/workspace/transfer"
@@ -1761,8 +1745,8 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.WorkspaceTransfer.ResponseBody>(data.decodeToString())
-                        return@use APIClient.WorkspaceTransfer.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.WorkspaceTransfer.Response>(data.decodeToString())
+                        return@use APIClient.WorkspaceTransfer.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1782,7 +1766,7 @@ class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: St
 
     /** Resolve an invite by its capability-URL token, guarded by a custom path-token identity */
     @Throws(APIClient.InvitesGetInvite.Failure::class)
-    suspend fun getInvite(build: APIClient.InvitesGetInvite.Scope.() -> APIClient.InvitesGetInvite.Args): APIClient.InvitesGetInvite.Response {
+    suspend fun getInvite(build: APIClient.InvitesGetInvite.Scope.() -> APIClient.InvitesGetInvite.Args): APIClient.InvitesGetInvite.Result {
         val args = APIClient.InvitesGetInvite.Scope.build()
         val params = args.params
         var path = "/invites/:token"
@@ -1800,8 +1784,8 @@ class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: St
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.InvitesGetInvite.ResponseBody>(data.decodeToString())
-                        return@use APIClient.InvitesGetInvite.Response(body = payload)
+                        val payload = json.decodeFromString<APIClient.InvitesGetInvite.Response>(data.decodeToString())
+                        return@use APIClient.InvitesGetInvite.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
                 }
@@ -1818,7 +1802,7 @@ class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: St
 
     /** Accept an invite via the capability URL */
     @Throws(APIClient.InvitesAcceptInvite.Failure::class)
-    suspend fun acceptInvite(build: APIClient.InvitesAcceptInvite.Scope.() -> APIClient.InvitesAcceptInvite.Args): APIClient.InvitesAcceptInvite.Response {
+    suspend fun acceptInvite(build: APIClient.InvitesAcceptInvite.Scope.() -> APIClient.InvitesAcceptInvite.Args): APIClient.InvitesAcceptInvite.Result {
         val args = APIClient.InvitesAcceptInvite.Scope.build()
         val params = args.params
         val body = args.body
@@ -1841,7 +1825,7 @@ class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: St
                 201 -> {
                     try {
                         val payload = json.decodeFromString<APIClient.InvitesAcceptInvite.Response201>(data.decodeToString())
-                        return@use APIClient.InvitesAcceptInvite.Response(body = payload)
+                        return@use APIClient.InvitesAcceptInvite.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                 }

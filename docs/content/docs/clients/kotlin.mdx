@@ -64,7 +64,7 @@ val created = client.users.createUser {
 }
 ```
 
-Each method returns the success body directly on its `Response` (no unwrapping, no casting) and **throws** a typed `Failure` for any error status. The happy path just reads `response.body`:
+Each method returns a `Result` holding the decoded `body` (no unwrapping, no casting) and **throws** a typed `Failure` for any error status. The happy path just reads `response.body`:
 
 ```kotlin
 println(page.body.users)
@@ -125,11 +125,11 @@ class APIClient(
         object Scope {
             fun query(page: Int? = null, limit: Int? = null): AfterQuery = ...
         }
-        // AfterQuery, Response, Success, Failure ...
+        // AfterQuery, Response, Result, Success, Failure ...
     }
 
     @Throws(UsersListUsers.Failure::class)
-    suspend fun listUsers(build: APIClient.UsersListUsers.Scope.() -> APIClient.UsersListUsers.Args = { query() }): APIClient.UsersListUsers.Response {
+    suspend fun listUsers(build: APIClient.UsersListUsers.Scope.() -> APIClient.UsersListUsers.Args = { query() }): APIClient.UsersListUsers.Result {
         // ...
     }
 }
@@ -153,7 +153,7 @@ val client = APIClient(
 
 ## Handling responses
 
-Success returns a `Response` with the decoded `body` (and `headers` when the route declares them). Routes with multiple success codes give you a sealed `Success` to `when` over; void routes return `Unit`.
+Success returns a `Result` with the decoded `body` (and `headers` when the route declares them). Routes with multiple success codes give you a sealed `Success` to `when` over; void routes return `Unit`.
 
 Errors **throw** a sealed `Failure` with one named subtype per declared status (`NotFound`, `BadRequest`, …) carrying its typed `body`, plus `Unexpected(statusCode, data)` for undeclared statuses and `Decoding(cause, statusCode, data)` for bodies that don't parse. Catch one subtype, or `when` over the sealed class — the compiler lists every case:
 
