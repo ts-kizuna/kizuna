@@ -311,9 +311,8 @@ export const mapType = (
         }
         case 'string': {
             const isDatetime = def.format === 'datetime' || def.checks?.some((check) => check.format === 'datetime');
-            const isDate = def.format === 'date' || def.checks?.some((check) => check.format === 'date');
             return {
-                expression: isDatetime ? 'Instant' : isDate ? 'LocalDate' : 'String',
+                expression: isDatetime ? 'Instant' : 'String',
                 optional: false,
             };
         }

@@ -213,8 +213,7 @@ const buildRouteMethod = (
 
     for (const [statusKey, responseValue] of Object.entries(route.responses)) {
         const status = Number(statusKey);
-        // `Body` suffix avoids colliding with the sealed `Response` interface in the operation object.
-        const responseHint = `${baseHint}Response${status === 200 ? 'Body' : status}`;
+        const responseHint = `${baseHint}Response${status === 200 ? '' : status}`;
         const bodySchema = resolveResponseBody(responseValue);
         const result = mapType(bodySchema as z.ZodType, registry, responseHint, fieldPaths, `responses.${statusKey}`, deprecationSchemas);
         const typeExpression = result.expression;
@@ -393,7 +392,7 @@ const optionalize = (type: string, optional: boolean): string => {
     return type.endsWith('?') ? type : `${type}?`;
 };
 
-const KOTLIN_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Long', 'Boolean', 'Instant', 'LocalDate', 'Unit']);
+const KOTLIN_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Long', 'Boolean', 'Instant', 'Unit']);
 
 const resolveType = (
     typeName: string,
@@ -703,34 +702,21 @@ const emitConstructorClass = (writer: KotlinWriter, declaration: string, params:
     }
 };
 
-/**
- * Emit `equals`/`hashCode` overrides for a data class holding a `ByteArray`.
- * Kotlin's generated members compare arrays by reference, so structural equality
- * needs `contentEquals`/`contentHashCode` on the byte fields.
- */
+// A `data class` compares `ByteArray` fields by reference; override with content-based equality.
 const emitByteArrayEquality = (writer: KotlinWriter, typeName: string, fields: Array<{ name: string; isByteArray: boolean }>): void => {
-    writer.blank();
-    writer.block('override fun equals(other: Any?): Boolean', () => {
-        writer.line('if (this === other) return true');
-        writer.line('if (javaClass != other?.javaClass) return false');
-        writer.line(`other as ${typeName}`);
-        for (const field of fields) {
-            const name = escapeKeyword(field.name);
-            writer.line(
-                field.isByteArray ? `if (!${name}.contentEquals(other.${name})) return false` : `if (${name} != other.${name}) return false`
-            );
-        }
-        writer.line('return true');
+    const equalsTerms = fields.map((field) => {
+        const name = escapeKeyword(field.name);
+        return field.isByteArray ? `${name}.contentEquals(other.${name})` : `${name} == other.${name}`;
     });
-    writer.blank();
-    writer.block('override fun hashCode(): Int', () => {
-        fields.forEach((field, index) => {
-            const name = escapeKeyword(field.name);
-            const value = field.isByteArray ? `${name}.contentHashCode()` : `${name}.hashCode()`;
-            writer.line(index === 0 ? `var result = ${value}` : `result = 31 * result + ${value}`);
-        });
-        writer.line('return result');
-    });
+    writer.line(`override fun equals(other: Any?) = other is ${typeName} && ${equalsTerms.join(' && ')}`);
+    const hashExpression = fields.reduce((accumulator, field, index) => {
+        const name = escapeKeyword(field.name);
+        const term = field.isByteArray ? `${name}.contentHashCode()` : `${name}.hashCode()`;
+        if (index === 0) return term;
+        // Parenthesize only a compound accumulator; `*` already binds tighter than `+`.
+        return `31 * ${index === 1 ? accumulator : `(${accumulator})`} + ${term}`;
+    }, '');
+    writer.line(`override fun hashCode() = ${hashExpression}`);
 };
 
 const isVoidSuccessMethod = (method: RouteMethod): boolean => method.successReturnType === 'Unit';
@@ -738,9 +724,9 @@ const isVoidSuccessMethod = (method: RouteMethod): boolean => method.successRetu
 /**
  * Emit the per-operation result types for the throw-on-error model:
  *
- *   - `Response` — returned on success, exposing `body` (and `headers`). Omitted for
+ *   - `Result` — returned on success, exposing `body` (and `headers`). Omitted for
  *     void-success routes, which return `Unit`.
- *   - `Success` — a sealed sum of the success statuses, used as `Response.body` when a
+ *   - `Success` — a sealed sum of the success statuses, used as `Result.body` when a
  *     route has more than one success status.
  *   - `Failure` — a sealed `Exception` thrown for declared error statuses, decode
  *     failures, and any unexpected status.
@@ -767,9 +753,9 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
         writer.blank();
         const params = [`val body: ${bodyType}`];
         if (hasHeaders) params.push('val headers: Headers');
-        emitConstructorClass(writer, 'data class Response', params);
+        emitConstructorClass(writer, 'data class Result', params);
 
-        // Nested in `Response` so `Response.Headers` doesn't collide with the request `Headers` group.
+        // Nested in `Result` so `Result.Headers` doesn't collide with the request `Headers` group.
         if (hasHeaders) {
             const headerParams = method.resultHeaderFields.map((field) => {
                 const rawType = resolveType(field.type, method.operationName, context, 'operation-object');
@@ -795,8 +781,6 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
                 writer.line(`data class ${caseName}(val body: ${resolved}) : Failure()`);
             }
         }
-        // Plain classes, not data classes: these are thrown exceptions, never compared by value.
-        // (A `data class` holding a `ByteArray` would also trip the `ArrayInDataClass` inspection.)
         writer.line('class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")');
         writer.line('class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)');
     });
@@ -1145,7 +1129,6 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
         emitBodyEncoding(writer, method, context);
     }
 
-    // `requestBuilder` is only reassigned when request-context or per-request headers are applied below.
     const builderReassigned = context.requestContextFields.length > 0 || method.headers.length > 0;
     writer.line(`${builderReassigned ? 'var' : 'val'} requestBuilder = Request.Builder()`);
     writer.line('    .url(urlBuilder.build())');
@@ -1208,10 +1191,10 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
                                 .map((field) => `${escapeKeyword(field.name)} = ${escapeKeyword(field.name)}`)
                                 .join(', ');
                             writer.line(
-                                `return@use ${operationRef}.Response(body = ${bodyExpr}, headers = ${operationRef}.Response.Headers(${headersArgs}))`
+                                `return@use ${operationRef}.Result(body = ${bodyExpr}, headers = ${operationRef}.Result.Headers(${headersArgs}))`
                             );
                         } else {
-                            writer.line(`return@use ${operationRef}.Response(body = ${bodyExpr})`);
+                            writer.line(`return@use ${operationRef}.Result(body = ${bodyExpr})`);
                         }
                     });
                     writer.line(`catch (error: Exception) { throw ${failureRef}.Decoding(error, statusCode, data) }`);
@@ -1274,11 +1257,11 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
     writer.line('}');
 };
 
-const responseRef = (method: RouteMethod, context: EmitContext): string => `${context.clientName}.${method.operationName}.Response`;
+const resultRef = (method: RouteMethod, context: EmitContext): string => `${context.clientName}.${method.operationName}.Result`;
 
 const buildMethodSignature = (method: RouteMethod, context: EmitContext): string => {
     const params = buildMethodParameters(method, context);
-    const returnType = isVoidSuccessMethod(method) ? '' : `: ${responseRef(method, context)}`;
+    const returnType = isVoidSuccessMethod(method) ? '' : `: ${resultRef(method, context)}`;
     return `suspend fun ${escapeKeyword(method.name)}(${params.join(', ')})${returnType}`;
 };
 
@@ -1503,9 +1486,7 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     const writer = new KotlinWriter();
     writer.line('// Generated by @ts-kizuna/kotlin. Do not edit by hand.');
     writer.blank();
-    // Suppress inspections that fight the generator's conventions: brand terms (SpellCheckingInspection),
-    // library APIs only external modules call (unused), and generator style (Redundant*). Verbatim wire
-    // names add the snake_case naming inspections; camelCase mode maps them via @SerialName instead.
+    // Snake_case naming inspections only apply to verbatim wire names; the rest always apply.
     const suppressions = [
         ...(camelCaseProperties ? [] : ['PropertyName', 'LocalVariableName', 'ConstructorParameterNaming']),
         'SpellCheckingInspection',
@@ -1522,7 +1503,6 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     writer.line('import kotlinx.serialization.*');
     writer.line('import kotlinx.serialization.json.*');
     writer.line('import kotlinx.datetime.Instant');
-    writer.line('import kotlinx.datetime.LocalDate');
     writer.line('import okhttp3.*');
     writer.line('import okhttp3.MediaType.Companion.toMediaType');
     writer.line('import okhttp3.RequestBody.Companion.toRequestBody');

@@ -186,7 +186,7 @@ class APIClientTest {
                 kind = APIClient.NotificationsListEvents.QueryKind.LOGIN,
             )
         }
-        assertEquals(APIClient.NotificationsListEvents.ResponseBodyEchoKind.LOGIN, response.body.echo.kind)
+        assertEquals(APIClient.NotificationsListEvents.ResponseEchoKind.LOGIN, response.body.echo.kind)
     }
 
     @Test
