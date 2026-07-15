@@ -26,9 +26,9 @@ The CLI reads the contract at runtime — no build step needed. Add the generate
 
 ### Property naming
 
-By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. The types mirror the wire shape, so it's easy to see what came from the API. The generated file carries a `@file:Suppress("PropertyName", "ConstructorParameterNaming")` header so the Kotlin naming inspection doesn't flag those underscores.
+By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. The types mirror the wire shape, so it's easy to see what came from the API. A `@file:Suppress(...)` header keeps the IDE green: the snake_case naming inspections (`PropertyName`, `LocalVariableName`, `ConstructorParameterNaming`) for the verbatim names, plus a few that always apply — `SpellCheckingInspection` for brand terms, `unused` for methods only your own code calls, and the `Redundant*` style inspections.
 
-Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `@SerialName`. The suppression header is then omitted.
+Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `@SerialName`. The naming inspections drop out of the header then — there are no underscores left to flag — while the rest stay.
 
 ## Usage
 

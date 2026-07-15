@@ -84,6 +84,17 @@ When changing any exported function, type, or option in `packages/*/src/`, check
 - `pnpm test:types` — type-level tests only (`*.test-d.ts`).
 - `pnpm -r typecheck` — `tsc --noEmit` across all packages. Always pair with `pnpm test` before declaring something done.
 - `pnpm build` — rebuild all packages. Required before typechecking after changing cross-package exports.
+- `pnpm --filter @ts-kizuna-demo/kotlin test` — Kotlin end-to-end (starts express-demo, compiles the generated client, runs `./gradlew test`). Not part of `pnpm test`.
+
+## Compiling the Kotlin demo
+
+The Kotlin demo (`apps/kotlin-demo/kotlin`) verifies that generated `@ts-kizuna/kotlin` output actually compiles. Its Gradle (8.10.2, `jvmToolchain(17)`) **rejects JDK 26** with a cryptic `What went wrong: 26.0.1` error, so run it with JDK 17:
+
+```
+JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home" ./gradlew compileKotlin
+```
+
+`openjdk@17` is available via Homebrew (`brew install openjdk@17`). The same `JAVA_HOME` is needed for the `test` script above.
 
 # Formatting
 

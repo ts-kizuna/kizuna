@@ -129,6 +129,49 @@ describe('Kotlin generator — z.iso.datetime()', () => {
     });
 });
 
+describe('Kotlin generator — z.iso.date()', () => {
+    it('maps z.iso.date() to kotlinx.datetime.LocalDate, not String or Instant', () => {
+        const contract = k.contract({
+            routes: {
+                listEvents: {
+                    method: 'GET',
+                    path: '/events',
+                    responses: {
+                        200: z.object({
+                            startsOn: z.iso.date(),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val startsOn: LocalDate');
+        expect(output).not.toContain('val startsOn: String');
+        expect(output).not.toContain('val startsOn: Instant');
+        expect(output).toContain('import kotlinx.datetime.LocalDate');
+    });
+
+    it('keeps date and datetime distinct in the same object', () => {
+        const contract = k.contract({
+            routes: {
+                listEvents: {
+                    method: 'GET',
+                    path: '/events',
+                    responses: {
+                        200: z.object({
+                            startsOn: z.iso.date(),
+                            occurredAt: z.iso.datetime(),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val startsOn: LocalDate');
+        expect(output).toContain('val occurredAt: Instant');
+    });
+});
+
 describe('Kotlin generator — z.pipe() and z.string().transform()', () => {
     it('resolves z.string().pipe(z.coerce.number()) to Double', () => {
         const contract = k.contract({
@@ -909,8 +952,10 @@ describe('Kotlin generator — @SerialName for wire names', () => {
         expect(output).toContain('val first_name: String');
         expect(output).toContain('val last_name: String');
         expect(output).not.toContain('@SerialName');
-        // Verbatim wire names are intentional; the file is exempt from the naming inspection.
-        expect(output).toContain('@file:Suppress("PropertyName", "ConstructorParameterNaming")');
+        // Verbatim wire names are intentional; the file is exempt from the snake_case naming inspections.
+        expect(output).toContain(
+            '@file:Suppress("PropertyName", "LocalVariableName", "ConstructorParameterNaming", "SpellCheckingInspection", "unused", "RedundantVisibilityModifier", "RedundantUnitReturnType")'
+        );
     });
 });
 
@@ -944,8 +989,12 @@ describe('Kotlin generator — camelCaseProperties option', () => {
         expect(output).toContain('@SerialName("total_count") val totalCount: Int');
         expect(output).toContain('@SerialName("page_size") val pageSize: Int');
         expect(output).not.toContain('val total_count');
-        // camelCase output has no underscores to flag, so the suppression header is dropped.
-        expect(output).not.toContain('@file:Suppress');
+        // camelCase output has no underscores to flag, so the naming inspections are dropped —
+        // but the brand/library/redundancy suppressions still apply.
+        expect(output).toContain(
+            '@file:Suppress("SpellCheckingInspection", "unused", "RedundantVisibilityModifier", "RedundantUnitReturnType")'
+        );
+        expect(output).not.toContain('PropertyName');
     });
 });
 
@@ -1124,7 +1173,7 @@ describe('Kotlin generator — throw-on-error model', () => {
         expect(output).toContain('data class Response(val body:');
         expect(output).toContain('sealed class Failure(message: String? = null) : Exception(message)');
         expect(output).toContain('data class NotFound(val body:');
-        expect(output).toContain('data class Unexpected(val statusCode: Int, val data: ByteArray) : Failure');
+        expect(output).toContain('class Unexpected(val statusCode: Int, val data: ByteArray) : Failure');
         expect(output).toContain('@Throws(TestAPIClient.GetUser.Failure::class)');
         // No sealed Response / Ok / getOrThrow in the throw model.
         expect(output).not.toContain('sealed interface Response');
@@ -1514,5 +1563,125 @@ describe('Kotlin generator — request context', () => {
         const output = generateKotlinClient(plainContract, baseConfig);
         expect(output).not.toContain('RequestContext');
         expect(output).not.toContain('requestContextHeaders');
+    });
+});
+
+describe('Kotlin generator — ByteArray structural equality', () => {
+    it('emits Failure.Unexpected/Decoding as plain classes, not data classes (no per-op boilerplate)', () => {
+        const contract = k.contract({
+            routes: {
+                getUser: {
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: {
+                        200: z.object({
+                            name: z.string(),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        // Thrown exceptions are never compared by value, so they stay plain classes —
+        // no `data`, no ByteArray equals/hashCode boilerplate, no ArrayInDataClass warning.
+        expect(output).toContain('class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")');
+        expect(output).toContain(
+            'class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)'
+        );
+        expect(output).not.toContain('data class Unexpected');
+        expect(output).not.toContain('data class Decoding');
+    });
+
+    it('overrides equals/hashCode on MultipartFile', () => {
+        const contract = k.contract({
+            routes: {
+                upload: {
+                    method: 'POST',
+                    path: '/upload',
+                    contentType: 'multipart/form-data',
+                    body: z.object({
+                        file: z.instanceof(File),
+                    }),
+                    responses: {
+                        201: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('data class MultipartFile(');
+        expect(output).toContain('other as MultipartFile');
+        expect(output).toContain('if (!data.contentEquals(other.data)) return false');
+        expect(output).toContain('if (filename != other.filename) return false');
+        expect(output).toContain('var result = data.contentHashCode()');
+        expect(output).toContain('result = 31 * result + filename.hashCode()');
+    });
+});
+
+describe('Kotlin generator — emitted-syntax cleanups', () => {
+    it('inlines the status code into the when expression', () => {
+        const contract = k.contract({
+            routes: {
+                getUser: {
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: {
+                        200: z.object({
+                            name: z.string(),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('when (val statusCode = httpResponse.code) {');
+        expect(output).not.toContain('val statusCode = httpResponse.code\n');
+    });
+
+    it('declares path as val when the route has no path params, var when it does', () => {
+        const contract = k.contract({
+            routes: {
+                listUsers: {
+                    method: 'GET',
+                    path: '/users',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+                getUser: {
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: {
+                        200: z.object({
+                            name: z.string(),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val path = "/users"');
+        expect(output).toContain('var path = "/users/:id"');
+    });
+
+    it('emits an empty success branch for void-success routes', () => {
+        const contract = k.contract({
+            routes: {
+                remove: {
+                    method: 'DELETE',
+                    path: '/users/:id',
+                    responses: {
+                        204: z.void(),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('204 -> {}');
+        expect(output).not.toContain('204 -> {\n');
     });
 });
