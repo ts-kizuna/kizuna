@@ -608,3 +608,97 @@ describe('guard params and array gates', () => {
         expect((results[0] as { status: number }).status).toBe(403);
     });
 });
+
+describe('custom identity guard', () => {
+    const inviteToken = createIdentity.custom({
+        context: z.object({
+            inviteId: z.string(),
+        }),
+    });
+
+    const { k: inviteK } = kizuna({
+        identities: {
+            inviteToken,
+        },
+    });
+
+    const inviteContract = inviteK.contract({
+        routes: {
+            invites: inviteK.routes({
+                getInvite: {
+                    method: 'GET',
+                    path: '/invites/:token',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            }),
+        },
+        auth: {
+            invites: 'inviteToken',
+        },
+    });
+
+    it('extracts no credential for a custom identity', () => {
+        expect(extractCredential(inviteToken, makeRequest('/invites/tok'))).toEqual({});
+    });
+
+    it('runs the guard with the path params and no credential key', async () => {
+        const { adapter, results } = makeAdapter();
+        let receivedKeys: string[] | undefined;
+        let received: unknown;
+        await adapter.handle({
+            routes: inviteContract.routes,
+            router: {
+                invites: {
+                    getInvite: (args: Record<string, unknown>) => {
+                        received = (args.auth as Record<string, unknown>).inviteToken;
+                        return okHandler();
+                    },
+                },
+            },
+            request: makeRequest('/invites/inv_1'),
+            responseContext: {},
+            guards: {
+                inviteToken: (args: Record<string, unknown>) => {
+                    receivedKeys = Object.keys(args);
+                    return {
+                        inviteId: `invite-for-${(args.params as Record<string, string>).token}`,
+                    };
+                },
+            } as GuardMap<Record<string, never>>,
+            schemes: inviteContract.securitySchemes,
+        });
+        expect(results[0]?.kind).toBe('success');
+        // The guard receives exactly the framework args, with no credential key.
+        expect(receivedKeys?.sort()).toEqual(['deny', 'params', 'scopes']);
+        expect(received).toEqual({
+            inviteId: 'invite-for-inv_1',
+        });
+    });
+
+    it('denies 404 on an unknown token', async () => {
+        const { adapter, results } = makeAdapter();
+        await adapter.handle({
+            routes: inviteContract.routes,
+            router: {
+                invites: {
+                    getInvite: okHandler,
+                },
+            },
+            request: makeRequest('/invites/nope'),
+            responseContext: {},
+            guards: {
+                inviteToken: ({ deny }) => deny(404, 'Not found'),
+            } as GuardMap<Record<string, never>>,
+            schemes: inviteContract.securitySchemes,
+        });
+        expect(results[0]).toEqual({
+            kind: 'guard-denied',
+            status: 404,
+            detail: 'Not found',
+        });
+    });
+});

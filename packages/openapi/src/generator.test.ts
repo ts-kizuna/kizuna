@@ -1664,3 +1664,107 @@ describe('shared scheme names', () => {
         ]);
     });
 });
+
+describe('custom identities (no OpenAPI scheme)', () => {
+    const user = createIdentity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    });
+
+    const inviteToken = createIdentity.custom({
+        context: z.object({
+            inviteId: z.string(),
+        }),
+    });
+
+    const makeContract = () => {
+        const { k: customK } = kizuna({
+            identities: {
+                user,
+                inviteToken,
+            },
+        });
+        const routes = customK.routes({
+            getInvite: {
+                method: 'GET',
+                path: '/invites/:token',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+            mixed: {
+                method: 'GET',
+                path: '/mixed/:token',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+            open: {
+                method: 'GET',
+                path: '/open',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        });
+        return customK.contract({
+            routes: {
+                api: routes,
+            },
+            auth: {
+                api: {
+                    '*': false,
+                    getInvite: 'inviteToken',
+                    mixed: {
+                        user: true,
+                        inviteToken: true,
+                    },
+                },
+            },
+        });
+    };
+
+    const spec = generateJson(makeContract(), baseConfig);
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+
+    it('emits no securityScheme for a custom identity', () => {
+        expect(spec.components?.securitySchemes).toEqual({
+            user: {
+                type: 'http',
+                scheme: 'bearer',
+            },
+        });
+    });
+
+    it('marks a custom-only route with x-kizuna-guarded and no security', () => {
+        const operation = spec.paths['/invites/{token}']?.get;
+        expect(operation?.security).toBeUndefined();
+        expect(operation?.['x-kizuna-guarded']).toEqual(['inviteToken']);
+    });
+
+    it('emits security for the describable scheme and x-kizuna-guarded for the custom one', () => {
+        const operation = spec.paths['/mixed/{token}']?.get;
+        expect(operation?.security).toEqual([
+            {
+                user: [],
+            },
+        ]);
+        expect(operation?.['x-kizuna-guarded']).toEqual(['inviteToken']);
+    });
+
+    it('leaves a public route without security or x-kizuna-guarded', () => {
+        const operation = spec.paths['/open']?.get;
+        expect(operation?.security).toBeUndefined();
+        expect(operation?.['x-kizuna-guarded']).toBeUndefined();
+    });
+});

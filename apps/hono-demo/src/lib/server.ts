@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createApi, createRequestContextResolver, createGuard, type Router } from '@ts-kizuna/hono';
-import { contract } from '@ts-kizuna-demo/shared';
+import { contract, sessions, memberships, inviteTokens, inviteEmails } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
 
 interface User {
@@ -25,16 +25,6 @@ users.set('2', {
 
 const archivedUsers = new Set<string>();
 
-const sessions = new Map<string, { userId: string }>([
-    ['tok_ada', { userId: '1' }],
-    ['tok_linus', { userId: '2' }],
-]);
-
-const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | 'admin' }>([
-    ['wst_owner', { workspaceUserId: '1', role: 'owner' }],
-    ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
-]);
-
 const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ c }) => ({
     sessionId: c.req.header('x-posthog-session-id') ?? null,
     distinctId: c.req.header('x-posthog-distinct-id') ?? null,
@@ -56,6 +46,16 @@ const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) => {
         return deny(403, 'Forbidden');
     }
     return membership;
+});
+
+const requireInviteToken = createGuard(contract, 'inviteToken', ({ params, deny }) => {
+    const inviteId = params.token ? inviteTokens.get(params.token) : undefined;
+    if (!inviteId) {
+        return deny(404, 'Not found');
+    }
+    return {
+        inviteId,
+    };
 });
 
 const usersHandlers: Router<typeof contract>['users'] = {
@@ -345,6 +345,22 @@ const workspaceHandlers: Router<typeof contract>['workspace'] = {
     },
 };
 
+const invitesHandlers: Router<typeof contract>['invites'] = {
+    getInvite: ({ auth }) => ({
+        status: 200,
+        body: {
+            inviteId: auth.inviteToken.inviteId,
+            email: inviteEmails.get(auth.inviteToken.inviteId) ?? 'unknown@example.com',
+        },
+    }),
+    acceptInvite: ({ auth }) => ({
+        status: 201,
+        body: {
+            userId: `usr_${auth.inviteToken.inviteId}`,
+        },
+    }),
+};
+
 export const api = createApi({
     contract,
     router: {
@@ -353,10 +369,12 @@ export const api = createApi({
         health: healthHandlers,
         members: membersHandlers,
         workspace: workspaceHandlers,
+        invites: invitesHandlers,
     },
     guards: {
         user: requireUser,
         member: requireMember,
+        inviteToken: requireInviteToken,
     },
     requestContext: {
         analytics: captureAnalytics,

@@ -26,3 +26,13 @@ export const member = createIdentity.apiKey({
         role: z.enum(['owner', 'admin']),
     }),
 });
+
+/**
+ * An invite capability URL (`/invites/:token`) whose path token is the credential.
+ * No OpenAPI scheme can express a path segment, so it uses `custom`.
+ */
+export const inviteToken = createIdentity.custom({
+    context: z.object({
+        inviteId: z.string(),
+    }),
+});

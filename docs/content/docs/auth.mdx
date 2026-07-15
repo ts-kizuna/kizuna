@@ -89,7 +89,7 @@ Split into its own file, a handler keeps the typed `auth` via [`RouteHandler`](/
 
 ## Identities
 
-One builder per authentication method: `bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`. Each optionally takes `context` (what a guard returns and handlers receive) and `access` (fields the auth map may gate per route):
+One builder per authentication method: `bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`, and `custom`. Each optionally takes `context` (what a guard returns and handlers receive) and `access` (fields the auth map may gate per route):
 
 ```ts title="packages/contract/src/identities.ts"
 export const member = createIdentity.apiKey({
@@ -113,7 +113,17 @@ export const apiConsumer = createIdentity.apiKey({
 });
 ```
 
-All builders and their fields: [`createIdentity`](/docs/reference/create-identity).
+When the credential doesn't fit any OpenAPI scheme — a capability-URL token in a path segment, say — use `custom`. Its guard reads the credential itself, and the route stays explicitly guarded instead of falling back to `false`:
+
+```ts title="packages/contract/src/identities.ts"
+export const inviteToken = createIdentity.custom({
+    context: z.object({
+        inviteId: z.string(),
+    }),
+});
+```
+
+All builders and their fields, including how `custom` shows up in the spec: [`createIdentity`](/docs/reference/create-identity).
 
 ## The auth map
 
@@ -222,6 +232,8 @@ paths:
             security:
                 - member: []
 ```
+
+A `custom` identity has no scheme to emit, so its routes carry an `x-kizuna-guarded` extension instead of `security` — enough to tell a protected-out-of-band route from a public one.
 
 ### Client
 

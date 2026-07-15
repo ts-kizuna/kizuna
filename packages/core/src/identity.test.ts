@@ -82,6 +82,17 @@ describe('identity builders', () => {
         });
     });
 
+    it('custom carries no OpenAPI scheme', () => {
+        const inviteToken = createIdentity.custom({
+            context: z.object({
+                inviteId: z.string(),
+            }),
+        });
+        expect(inviteToken.openapi).toBeUndefined();
+        expect(inviteToken.context).toBeDefined();
+        expect(isSecurityScheme(inviteToken)).toBe(true);
+    });
+
     it('carries the access schema when declared', () => {
         const access = z.object({
             role: z.enum(['owner', 'admin']),

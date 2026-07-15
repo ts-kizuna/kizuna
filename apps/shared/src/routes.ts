@@ -486,10 +486,40 @@ export const notificationsRoutes = k.routes('notifications', {
     },
 });
 
+export const inviteRoutes = k.routes('invites', {
+    getInvite: {
+        method: 'GET',
+        path: '/invites/:token',
+        responses: {
+            200: z.object({
+                inviteId: z.string(),
+                email: z.email(),
+            }),
+            404: ProblemDetailsSchema,
+        },
+        summary: 'Resolve an invite by its capability-URL token, guarded by a custom path-token identity',
+    },
+    acceptInvite: {
+        method: 'POST',
+        path: '/invites/:token/accept',
+        body: z.object({
+            name: z.string(),
+        }),
+        responses: {
+            201: z.object({
+                userId: z.string(),
+            }),
+            404: ProblemDetailsSchema,
+        },
+        summary: 'Accept an invite via the capability URL',
+    },
+});
+
 export const routes = {
     users: usersRoutes,
     health: healthRoutes,
     notifications: notificationsRoutes,
     members: workspaceMembers,
     workspace: workspaceInfo,
+    invites: inviteRoutes,
 };

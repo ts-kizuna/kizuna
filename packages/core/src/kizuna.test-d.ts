@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { kizuna } from './kizuna.js';
-import { createIdentity } from './identity.js';
+import { createIdentity, type CredentialOf } from './identity.js';
 import type {
     HandlersFromAuth,
     HandlerReturn,
@@ -369,4 +369,52 @@ test('the standalone RouteHandler matches the Router tree it drops into', () => 
     expectTypeOf<RouteHandler<typeof nestedContract.routes.members.session.me, {}>>().toEqualTypeOf<
         NestedHandlers['members']['session']['me']
     >();
+});
+
+const inviteToken = createIdentity.custom({
+    context: z.object({
+        inviteId: z.string(),
+    }),
+});
+
+const { k: inviteK } = kizuna({
+    identities: {
+        inviteToken,
+    },
+});
+
+const inviteContract = inviteK.contract({
+    routes: {
+        invites: inviteK.routes({
+            getInvite: {
+                method: 'GET',
+                path: '/invites/:token',
+                ...okResponse,
+            },
+        }),
+    },
+    auth: {
+        invites: 'inviteToken',
+    },
+});
+
+type InviteHandlers = HandlersFromAuth<
+    typeof inviteContract.routes,
+    {},
+    NonNullable<typeof inviteContract.securitySchemes>,
+    NonNullable<typeof inviteContract.auth>
+>;
+
+test('a custom identity carries no credential key to its guard', () => {
+    expectTypeOf<CredentialOf<typeof inviteToken>>().toEqualTypeOf<{}>();
+});
+
+test('a custom-guarded route hands its context to the handler by name', () => {
+    type Args = Parameters<InviteHandlers['invites']['getInvite']>[0];
+    expectTypeOf<Args['auth']['inviteToken']>().toEqualTypeOf<{ inviteId: string }>();
+});
+
+test('a custom identity derives its guard params from the routes it secures', () => {
+    type Params = GuardParams<typeof inviteContract.routes, NonNullable<typeof inviteContract.auth>, 'inviteToken'>;
+    expectTypeOf<Params>().toEqualTypeOf<{ token?: string }>();
 });
