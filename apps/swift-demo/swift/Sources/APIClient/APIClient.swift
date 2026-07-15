@@ -218,7 +218,7 @@ public enum API {
     }
 }
 
-public actor APIClient {
+public final class APIClient: Sendable {
 
     /// Values sent as headers on every request, from the contract's request context.
     public struct RequestContext: Sendable, Equatable {
@@ -278,62 +278,58 @@ public actor APIClient {
         }
     }
 
-    public struct AnyCodable: Codable, Sendable, Equatable {
-        public let value: Foundation.Data?
-        public init(value: Foundation.Data? = nil) { self.value = value }
+    /// A decoded JSON value of unknown shape. Codable and correctly Equatable by structure.
+    public enum JSONValue: Codable, Sendable, Equatable {
+        case null
+        case bool(Bool)
+        case int(Int)
+        case double(Double)
+        case string(String)
+        case array([JSONValue])
+        case object([String: JSONValue])
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.singleValueContainer()
-            if container.decodeNil() { self.value = nil; return }
-            let raw = try JSONSerialization.data(withJSONObject: try container.decode(CodableValue.self).rawValue, options: [])
-            self.value = raw
+            if container.decodeNil() {
+                self = .null
+            } else if let value = try? container.decode(Bool.self) {
+                self = .bool(value)
+            } else if let value = try? container.decode(Int.self) {
+                self = .int(value)
+            } else if let value = try? container.decode(Double.self) {
+                self = .double(value)
+            } else if let value = try? container.decode(String.self) {
+                self = .string(value)
+            } else if let value = try? container.decode([JSONValue].self) {
+                self = .array(value)
+            } else if let value = try? container.decode([String: JSONValue].self) {
+                self = .object(value)
+            } else {
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported JSON value")
+            }
         }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.singleValueContainer()
-            if let value = value, let object = try? JSONSerialization.jsonObject(with: value) {
-                try container.encode(CodableValue(rawValue: object))
-            } else {
-                try container.encodeNil()
-            }
-        }
-        public static func == (lhs: AnyCodable, rhs: AnyCodable) -> Bool { lhs.value == rhs.value }
-
-        private struct CodableValue: Codable {
-            let rawValue: Any
-            init(rawValue: Any) { self.rawValue = rawValue }
-            init(from decoder: Decoder) throws {
-                let container = try decoder.singleValueContainer()
-                if container.decodeNil() { self.rawValue = NSNull(); return }
-                if let value = try? container.decode(Bool.self) { self.rawValue = value; return }
-                if let value = try? container.decode(Int.self) { self.rawValue = value; return }
-                if let value = try? container.decode(Double.self) { self.rawValue = value; return }
-                if let value = try? container.decode(String.self) { self.rawValue = value; return }
-                if let value = try? container.decode([CodableValue].self) { self.rawValue = value.map(\.rawValue); return }
-                if let value = try? container.decode([String: CodableValue].self) { self.rawValue = value.mapValues(\.rawValue); return }
-                self.rawValue = NSNull()
-            }
-            func encode(to encoder: Encoder) throws {
-                var container = encoder.singleValueContainer()
-                switch rawValue {
-                case is NSNull: try container.encodeNil()
-                case let value as Bool: try container.encode(value)
-                case let value as Int: try container.encode(value)
-                case let value as Double: try container.encode(value)
-                case let value as String: try container.encode(value)
-                case let value as [Any]: try container.encode(value.map(CodableValue.init(rawValue:)))
-                case let value as [String: Any]: try container.encode(value.mapValues(CodableValue.init(rawValue:)))
-                default: try container.encodeNil()
-                }
+            switch self {
+            case .null: try container.encodeNil()
+            case .bool(let value): try container.encode(value)
+            case .int(let value): try container.encode(value)
+            case .double(let value): try container.encode(value)
+            case .string(let value): try container.encode(value)
+            case .array(let value): try container.encode(value)
+            case .object(let value): try container.encode(value)
             }
         }
     }
     public let baseURL: URL
     public let session: URLSession
-    public nonisolated let timeout: TimeInterval
-    nonisolated let requestContextHeaders: [String: String]
-    public var requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?
-    public var responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?
-    private let encoder: JSONEncoder
-    private let decoder: JSONDecoder
+    public let timeout: TimeInterval
+    let requestContextHeaders: [String: String]
+    public let requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?
+    public let responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?
+    let encoder: JSONEncoder
+    let decoder: JSONDecoder
 
     public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, requestContext: RequestContext = RequestContext(), requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil) {
         self.baseURL = baseURL
@@ -346,32 +342,28 @@ public actor APIClient {
         self.decoder = Kizuna.makeJSONDecoder()
     }
 
-    func _kizunaContext() -> (URL, URLSession, JSONEncoder, JSONDecoder, (@Sendable (inout URLRequest) async throws -> Void)?, (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, TimeInterval, [String: String]) {
-        return (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders)
-    }
-
     public var users: APIUsersClient {
-        APIUsersClient(_actor: self)
+        APIUsersClient(client: self)
     }
 
     public var health: APIHealthClient {
-        APIHealthClient(_actor: self)
+        APIHealthClient(client: self)
     }
 
     public var notifications: APINotificationsClient {
-        APINotificationsClient(_actor: self)
+        APINotificationsClient(client: self)
     }
 
     public var members: APIMembersClient {
-        APIMembersClient(_actor: self)
+        APIMembersClient(client: self)
     }
 
     public var workspace: APIWorkspaceClient {
-        APIWorkspaceClient(_actor: self)
+        APIWorkspaceClient(client: self)
     }
 
     public var invites: APIInvitesClient {
-        APIInvitesClient(_actor: self)
+        APIInvitesClient(client: self)
     }
 
     public enum UsersListUsers {
@@ -411,11 +403,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
@@ -426,11 +424,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: String
+
+            public init(body: String) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
         }
@@ -452,11 +456,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Foundation.Data
+
+            public init(body: Foundation.Data) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
@@ -504,11 +514,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
@@ -548,11 +564,18 @@ public actor APIClient {
             public struct Headers: Sendable {
                 public let xRequestId: String?
             }
+
+            public init(body: API.User, headers: Headers) {
+                self.body = body
+                self.headers = headers
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
@@ -580,11 +603,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: API.User
+
+            public init(body: API.User) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(API.ProblemDetails)
@@ -616,11 +645,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
@@ -674,11 +709,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Success
+
+            public init(body: Success) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
         }
@@ -734,11 +775,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
@@ -761,7 +808,9 @@ public actor APIClient {
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
@@ -797,11 +846,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Success
+
+            public init(body: Success) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
         }
@@ -831,7 +886,9 @@ public actor APIClient {
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
@@ -850,11 +907,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
         }
@@ -872,11 +935,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
         }
@@ -894,11 +963,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
         }
@@ -921,11 +996,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: [ResponseItem]
+
+            public init(body: [ResponseItem]) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
         }
@@ -955,11 +1036,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response202
+
+            public init(body: Response202) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
@@ -1052,11 +1139,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
@@ -1109,11 +1202,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(API.ProblemDetails)
@@ -1133,24 +1232,30 @@ public actor APIClient {
         }
 
         public struct Body: Sendable {
-            public let payload: APIClient.AnyCodable
+            public let payload: APIClient.JSONValue
 
-            public init(payload: APIClient.AnyCodable) {
+            public init(payload: APIClient.JSONValue) {
                 self.payload = payload
             }
 
-            public static func body(_ value: APIClient.AnyCodable) -> Self {
+            public static func body(_ value: APIClient.JSONValue) -> Self {
                 .init(payload: value)
             }
         }
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
@@ -1169,11 +1274,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
         }
@@ -1203,11 +1314,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: API.User
+
+            public init(body: API.User) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case conflict(API.ProblemDetails)
@@ -1232,11 +1349,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
         }
@@ -1254,11 +1377,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
         }
@@ -1296,11 +1425,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
@@ -1336,11 +1471,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
@@ -1391,11 +1532,17 @@ public actor APIClient {
 
         public struct Result: Sendable {
             public let body: Response201
+
+            public init(body: Response201) {
+                self.body = body
+            }
         }
 
         public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
             case requestFailed(Swift.Error)
+            case invalidRequest
             case cancelled
+            case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
@@ -1405,30 +1552,29 @@ public actor APIClient {
 }
 
 public struct APIUsersClient: Sendable {
-    private let _actor: APIClient
+    private let client: APIClient
 
-    init(_actor: APIClient) {
-        self._actor = _actor
+    init(client: APIClient) {
+        self.client = client
     }
 
     /// List users with pagination
     public func listUsers(_ query: APIClient.UsersListUsers.Query = .query()) async throws(APIClient.UsersListUsers.Failure) -> APIClient.UsersListUsers.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/users"
         var queryItems: [URLQueryItem] = []
         queryItems += Kizuna.queryItems(name: "page", value: query.page)
         queryItems += Kizuna.queryItems(name: "limit", value: query.limit)
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: queryItems, failure: APIClient.UsersListUsers.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: APIClient.UsersListUsers.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersListUsers.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersListUsers.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.UsersListUsers.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersListUsers.Failure.self)
+            let body = try Kizuna.decode(APIClient.UsersListUsers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersListUsers.Failure.self)
             return APIClient.UsersListUsers.Result(body: body)
         case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersListUsers.Failure.self)
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersListUsers.Failure.self)
             throw APIClient.UsersListUsers.Failure.badRequest(payload)
         default:
             throw APIClient.UsersListUsers.Failure.unexpectedStatus(statusCode, data)
@@ -1437,13 +1583,12 @@ public struct APIUsersClient: Sendable {
 
     /// Export users as CSV — exercises a non-JSON (text/csv) raw response body
     public func exportUsers() async throws(APIClient.UsersExportUsers.Failure) -> APIClient.UsersExportUsers.Result {
-        let (baseURL, session, _, _, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/users/export"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersExportUsers.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersExportUsers.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersExportUsers.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersExportUsers.Failure.self)
         switch statusCode {
         case 200:
             let body = String(decoding: data, as: UTF8.self)
@@ -1455,20 +1600,19 @@ public struct APIUsersClient: Sendable {
 
     /// Download a user badge — exercises a binary (BinarySchema) response body
     public func userBadge(_ params: APIClient.UsersUserBadge.Params) async throws(APIClient.UsersUserBadge.Failure) -> APIClient.UsersUserBadge.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         var path = "/users/:id/badge"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersUserBadge.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersUserBadge.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersUserBadge.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersUserBadge.Failure.self)
         switch statusCode {
         case 200:
             let body = data
             return APIClient.UsersUserBadge.Result(body: body)
         case 404:
-            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersUserBadge.Failure.self)
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserBadge.Failure.self)
             throw APIClient.UsersUserBadge.Failure.notFound(payload)
         default:
             throw APIClient.UsersUserBadge.Failure.unexpectedStatus(statusCode, data)
@@ -1477,23 +1621,22 @@ public struct APIUsersClient: Sendable {
 
     /// Search users — required coerced limit and cursor
     public func searchUsers(_ query: APIClient.UsersSearchUsers.Query) async throws(APIClient.UsersSearchUsers.Failure) -> APIClient.UsersSearchUsers.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/users/search"
         var queryItems: [URLQueryItem] = []
         queryItems += Kizuna.queryItems(name: "q", value: query.q)
         queryItems += Kizuna.queryItems(name: "limit", value: query.limit)
         queryItems += Kizuna.queryItems(name: "cursor", value: query.cursor)
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: queryItems, failure: APIClient.UsersSearchUsers.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: APIClient.UsersSearchUsers.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersSearchUsers.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersSearchUsers.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.UsersSearchUsers.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersSearchUsers.Failure.self)
+            let body = try Kizuna.decode(APIClient.UsersSearchUsers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersSearchUsers.Failure.self)
             return APIClient.UsersSearchUsers.Result(body: body)
         case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersSearchUsers.Failure.self)
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersSearchUsers.Failure.self)
             throw APIClient.UsersSearchUsers.Failure.badRequest(payload)
         default:
             throw APIClient.UsersSearchUsers.Failure.unexpectedStatus(statusCode, data)
@@ -1502,22 +1645,21 @@ public struct APIUsersClient: Sendable {
 
     /// Get a user by id
     public func getUser(_ params: APIClient.UsersGetUser.Params, _ headers: APIClient.UsersGetUser.Headers) async throws(APIClient.UsersGetUser.Failure) -> APIClient.UsersGetUser.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         var path = "/users/:id"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersGetUser.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersGetUser.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         Kizuna.setHeader(&request, name: "x-request-id", value: headers.xRequestId)
-        let (data, statusCode, httpResponse) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersGetUser.Failure.self)
+        let (data, statusCode, httpResponse) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersGetUser.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(API.User.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersGetUser.Failure.self)
-            let xRequestId = httpResponse?.value(forHTTPHeaderField: "x-request-id")
+            let body = try Kizuna.decode(API.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersGetUser.Failure.self)
+            let xRequestId = httpResponse.value(forHTTPHeaderField: "x-request-id")
             return APIClient.UsersGetUser.Result(body: body, headers: .init(xRequestId: xRequestId))
         case 404:
-            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersGetUser.Failure.self)
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersGetUser.Failure.self)
             throw APIClient.UsersGetUser.Failure.notFound(payload)
         default:
             throw APIClient.UsersGetUser.Failure.unexpectedStatus(statusCode, data)
@@ -1526,27 +1668,23 @@ public struct APIUsersClient: Sendable {
 
     /// Create a user
     public func createUser(_ body: APIClient.UsersCreateUser.Body) async throws(APIClient.UsersCreateUser.Failure) -> APIClient.UsersCreateUser.Result {
-        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/users"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersCreateUser.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersCreateUser.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.UsersCreateUser.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersCreateUser.Failure.self)
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.UsersCreateUser.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersCreateUser.Failure.self)
         switch statusCode {
         case 201:
-            let body = try Kizuna.decode(API.User.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersCreateUser.Failure.self)
+            let body = try Kizuna.decode(API.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersCreateUser.Failure.self)
             return APIClient.UsersCreateUser.Result(body: body)
         case 400:
-            if let payload = try? decoder.decode(API.ProblemDetails.self, from: data) {
-                throw APIClient.UsersCreateUser.Failure.badRequest(payload)
-            }
-            if let payload = try? decoder.decode(APIClient.ValidationError.self, from: data) {
-                throw APIClient.UsersCreateUser.Failure.validationError(payload)
-            }
-            throw APIClient.UsersCreateUser.Failure.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status 400")), statusCode: statusCode, data: data)
+            throw Kizuna.firstError(statusCode: statusCode, data: data, [
+                { (try? client.decoder.decode(API.ProblemDetails.self, from: data)).map(APIClient.UsersCreateUser.Failure.badRequest) },
+                { (try? client.decoder.decode(APIClient.ValidationError.self, from: data)).map(APIClient.UsersCreateUser.Failure.validationError) },
+            ])
         default:
             throw APIClient.UsersCreateUser.Failure.unexpectedStatus(statusCode, data)
         }
@@ -1555,20 +1693,19 @@ public struct APIUsersClient: Sendable {
     /// Delete a user
     @available(*, deprecated)
     public func deleteUser(_ params: APIClient.UsersDeleteUser.Params) async throws(APIClient.UsersDeleteUser.Failure) -> APIClient.UsersDeleteUser.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         var path = "/users/:id"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersDeleteUser.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersDeleteUser.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "DELETE"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersDeleteUser.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersDeleteUser.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.UsersDeleteUser.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersDeleteUser.Failure.self)
+            let body = try Kizuna.decode(APIClient.UsersDeleteUser.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersDeleteUser.Failure.self)
             return APIClient.UsersDeleteUser.Result(body: body)
         case 404:
-            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersDeleteUser.Failure.self)
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersDeleteUser.Failure.self)
             throw APIClient.UsersDeleteUser.Failure.notFound(payload)
         default:
             throw APIClient.UsersDeleteUser.Failure.unexpectedStatus(statusCode, data)
@@ -1577,20 +1714,19 @@ public struct APIUsersClient: Sendable {
 
     /// Archive a user — first call returns 201, subsequent calls 200
     public func archiveUser(_ params: APIClient.UsersArchiveUser.Params) async throws(APIClient.UsersArchiveUser.Failure) -> APIClient.UsersArchiveUser.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         var path = "/users/:id/archive"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersArchiveUser.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersArchiveUser.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersArchiveUser.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersArchiveUser.Failure.self)
         switch statusCode {
         case 200:
-            let payload = try Kizuna.decode(APIClient.UsersArchiveUser.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersArchiveUser.Failure.self)
+            let payload = try Kizuna.decode(APIClient.UsersArchiveUser.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersArchiveUser.Failure.self)
             return APIClient.UsersArchiveUser.Result(body: .status200(payload))
         case 201:
-            let payload = try Kizuna.decode(APIClient.UsersArchiveUser.Response201.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersArchiveUser.Failure.self)
+            let payload = try Kizuna.decode(APIClient.UsersArchiveUser.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersArchiveUser.Failure.self)
             return APIClient.UsersArchiveUser.Result(body: .status201(payload))
         default:
             throw APIClient.UsersArchiveUser.Failure.unexpectedStatus(statusCode, data)
@@ -1599,24 +1735,23 @@ public struct APIUsersClient: Sendable {
 
     /// Upload an avatar image
     public func uploadAvatar(_ body: APIClient.UsersUploadAvatar.Body) async throws(APIClient.UsersUploadAvatar.Failure) -> APIClient.UsersUploadAvatar.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/avatar"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersUploadAvatar.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersUploadAvatar.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         var multipart = Kizuna.MultipartBuilder()
         multipart.appendFile(name: "file", file: body.file)
         multipart.appendField(name: "userId", value: String(describing: body.userId))
         request.httpBody = multipart.finalize()
         request.setValue(multipart.contentType, forHTTPHeaderField: "Content-Type")
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersUploadAvatar.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersUploadAvatar.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.UsersUploadAvatar.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersUploadAvatar.Failure.self)
+            let body = try Kizuna.decode(APIClient.UsersUploadAvatar.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUploadAvatar.Failure.self)
             return APIClient.UsersUploadAvatar.Result(body: body)
         case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersUploadAvatar.Failure.self)
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUploadAvatar.Failure.self)
             throw APIClient.UsersUploadAvatar.Failure.badRequest(payload)
         default:
             throw APIClient.UsersUploadAvatar.Failure.unexpectedStatus(statusCode, data)
@@ -1625,19 +1760,18 @@ public struct APIUsersClient: Sendable {
 
     /// Ping a user — exercises z.void() body and response
     public func pingUser(_ params: APIClient.UsersPingUser.Params) async throws(APIClient.UsersPingUser.Failure) {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         var path = "/users/:id/ping"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersPingUser.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersPingUser.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersPingUser.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersPingUser.Failure.self)
         switch statusCode {
         case 204:
             return
         case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersPingUser.Failure.self)
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersPingUser.Failure.self)
             throw APIClient.UsersPingUser.Failure.badRequest(payload)
         default:
             throw APIClient.UsersPingUser.Failure.unexpectedStatus(statusCode, data)
@@ -1646,16 +1780,15 @@ public struct APIUsersClient: Sendable {
 
     /// List work items — exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers
     public func getMyWork() async throws(APIClient.UsersGetMyWork.Failure) -> APIClient.UsersGetMyWork.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/work"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersGetMyWork.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersGetMyWork.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersGetMyWork.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersGetMyWork.Failure.self)
         switch statusCode {
         case 200:
-            let payload = try Kizuna.decode(APIClient.UsersGetMyWork.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersGetMyWork.Failure.self)
+            let payload = try Kizuna.decode(APIClient.UsersGetMyWork.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersGetMyWork.Failure.self)
             return APIClient.UsersGetMyWork.Result(body: .status200(payload))
         case 204:
             return APIClient.UsersGetMyWork.Result(body: .status204)
@@ -1666,19 +1799,18 @@ public struct APIUsersClient: Sendable {
 
     /// Check user existence — exercises HEAD body stripping
     public func checkUser(_ params: APIClient.UsersCheckUser.Params) async throws(APIClient.UsersCheckUser.Failure) {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         var path = "/users/:id/check"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersCheckUser.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersCheckUser.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "HEAD"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersCheckUser.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersCheckUser.Failure.self)
         switch statusCode {
         case 200:
             return
         case 404:
-            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersCheckUser.Failure.self)
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersCheckUser.Failure.self)
             throw APIClient.UsersCheckUser.Failure.notFound(payload)
         default:
             throw APIClient.UsersCheckUser.Failure.unexpectedStatus(statusCode, data)
@@ -1687,16 +1819,15 @@ public struct APIUsersClient: Sendable {
 
     /// Describe allowed operations — exercises OPTIONS routing
     public func describeUsers() async throws(APIClient.UsersDescribeUsers.Failure) -> APIClient.UsersDescribeUsers.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/users/describe"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.UsersDescribeUsers.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersDescribeUsers.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "OPTIONS"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.UsersDescribeUsers.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersDescribeUsers.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.UsersDescribeUsers.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.UsersDescribeUsers.Failure.self)
+            let body = try Kizuna.decode(APIClient.UsersDescribeUsers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersDescribeUsers.Failure.self)
             return APIClient.UsersDescribeUsers.Result(body: body)
         default:
             throw APIClient.UsersDescribeUsers.Failure.unexpectedStatus(statusCode, data)
@@ -1705,24 +1836,23 @@ public struct APIUsersClient: Sendable {
 }
 
 public struct APIHealthClient: Sendable {
-    private let _actor: APIClient
+    private let client: APIClient
 
-    init(_actor: APIClient) {
-        self._actor = _actor
+    init(client: APIClient) {
+        self.client = client
     }
 
     /// Health check — exercises nested sub-client routing
     public func check() async throws(APIClient.HealthCheck.Failure) -> APIClient.HealthCheck.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/health"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.HealthCheck.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.HealthCheck.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.HealthCheck.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.HealthCheck.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.HealthCheck.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.HealthCheck.Failure.self)
+            let body = try Kizuna.decode(APIClient.HealthCheck.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.HealthCheck.Failure.self)
             return APIClient.HealthCheck.Result(body: body)
         default:
             throw APIClient.HealthCheck.Failure.unexpectedStatus(statusCode, data)
@@ -1731,16 +1861,15 @@ public struct APIHealthClient: Sendable {
 
     /// Version — exercises second method in a sub-client group
     public func version() async throws(APIClient.HealthVersion.Failure) -> APIClient.HealthVersion.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/health/version"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.HealthVersion.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.HealthVersion.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.HealthVersion.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.HealthVersion.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.HealthVersion.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.HealthVersion.Failure.self)
+            let body = try Kizuna.decode(APIClient.HealthVersion.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.HealthVersion.Failure.self)
             return APIClient.HealthVersion.Result(body: body)
         default:
             throw APIClient.HealthVersion.Failure.unexpectedStatus(statusCode, data)
@@ -1749,16 +1878,15 @@ public struct APIHealthClient: Sendable {
 
     /// Health history — exercises array return type qualification
     public func history() async throws(APIClient.HealthHistory.Failure) -> APIClient.HealthHistory.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/health/history"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.HealthHistory.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.HealthHistory.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.HealthHistory.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.HealthHistory.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode([APIClient.HealthHistory.ResponseItem].self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.HealthHistory.Failure.self)
+            let body = try Kizuna.decode([APIClient.HealthHistory.ResponseItem].self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.HealthHistory.Failure.self)
             return APIClient.HealthHistory.Result(body: body)
         default:
             throw APIClient.HealthHistory.Failure.unexpectedStatus(statusCode, data)
@@ -1767,29 +1895,28 @@ public struct APIHealthClient: Sendable {
 }
 
 public struct APINotificationsClient: Sendable {
-    private let _actor: APIClient
+    private let client: APIClient
 
-    init(_actor: APIClient) {
-        self._actor = _actor
+    init(client: APIClient) {
+        self.client = client
     }
 
     /// Send a notification (discriminated by channel)
     public func sendNotification(_ body: APIClient.NotificationsSendNotification.Body) async throws(APIClient.NotificationsSendNotification.Failure) -> APIClient.NotificationsSendNotification.Result {
-        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/notifications"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.NotificationsSendNotification.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.NotificationsSendNotification.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.NotificationsSendNotification.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.NotificationsSendNotification.Failure.self)
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.NotificationsSendNotification.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.NotificationsSendNotification.Failure.self)
         switch statusCode {
         case 202:
-            let body = try Kizuna.decode(APIClient.NotificationsSendNotification.Response202.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsSendNotification.Failure.self)
+            let body = try Kizuna.decode(APIClient.NotificationsSendNotification.Response202.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotificationsSendNotification.Failure.self)
             return APIClient.NotificationsSendNotification.Result(body: body)
         case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsSendNotification.Failure.self)
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotificationsSendNotification.Failure.self)
             throw APIClient.NotificationsSendNotification.Failure.badRequest(payload)
         default:
             throw APIClient.NotificationsSendNotification.Failure.unexpectedStatus(statusCode, data)
@@ -1798,7 +1925,6 @@ public struct APINotificationsClient: Sendable {
 
     /// List events — exercises Date / enum / array query params
     public func listEvents(_ query: APIClient.NotificationsListEvents.Query = .query()) async throws(APIClient.NotificationsListEvents.Failure) -> APIClient.NotificationsListEvents.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/events"
         var queryItems: [URLQueryItem] = []
         queryItems += Kizuna.queryItems(name: "since", value: query.since)
@@ -1806,17 +1932,17 @@ public struct APINotificationsClient: Sendable {
         queryItems += Kizuna.queryItems(name: "ids", value: query.ids)
         queryItems += Kizuna.queryItems(name: "label", value: query.label)
         queryItems += Kizuna.queryItems(name: "tagIds", value: query.tagIds)
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: queryItems, failure: APIClient.NotificationsListEvents.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: APIClient.NotificationsListEvents.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.NotificationsListEvents.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.NotificationsListEvents.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.NotificationsListEvents.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsListEvents.Failure.self)
+            let body = try Kizuna.decode(APIClient.NotificationsListEvents.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotificationsListEvents.Failure.self)
             return APIClient.NotificationsListEvents.Result(body: body)
         case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsListEvents.Failure.self)
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotificationsListEvents.Failure.self)
             throw APIClient.NotificationsListEvents.Failure.badRequest(payload)
         default:
             throw APIClient.NotificationsListEvents.Failure.unexpectedStatus(statusCode, data)
@@ -1825,27 +1951,23 @@ public struct APINotificationsClient: Sendable {
 
     /// Validate contract — exercises generator bug coverage
     public func validateConfig(_ body: APIClient.NotificationsValidateConfig.Body) async throws(APIClient.NotificationsValidateConfig.Failure) -> APIClient.NotificationsValidateConfig.Result {
-        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/contract/validate"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.NotificationsValidateConfig.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.NotificationsValidateConfig.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.NotificationsValidateConfig.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.NotificationsValidateConfig.Failure.self)
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.NotificationsValidateConfig.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.NotificationsValidateConfig.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.NotificationsValidateConfig.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsValidateConfig.Failure.self)
+            let body = try Kizuna.decode(APIClient.NotificationsValidateConfig.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotificationsValidateConfig.Failure.self)
             return APIClient.NotificationsValidateConfig.Result(body: body)
         case 400:
-            if let payload = try? decoder.decode(API.ProblemDetails.self, from: data) {
-                throw APIClient.NotificationsValidateConfig.Failure.badRequest(payload)
-            }
-            if let payload = try? decoder.decode(APIClient.ValidationError.self, from: data) {
-                throw APIClient.NotificationsValidateConfig.Failure.validationError(payload)
-            }
-            throw APIClient.NotificationsValidateConfig.Failure.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status 400")), statusCode: statusCode, data: data)
+            throw Kizuna.firstError(statusCode: statusCode, data: data, [
+                { (try? client.decoder.decode(API.ProblemDetails.self, from: data)).map(APIClient.NotificationsValidateConfig.Failure.badRequest) },
+                { (try? client.decoder.decode(APIClient.ValidationError.self, from: data)).map(APIClient.NotificationsValidateConfig.Failure.validationError) },
+            ])
         case 401:
             throw APIClient.NotificationsValidateConfig.Failure.unauthorized
         default:
@@ -1855,21 +1977,20 @@ public struct APINotificationsClient: Sendable {
 
     /// Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen
     public func webhook(_ body: APIClient.NotificationsWebhook.Body) async throws(APIClient.NotificationsWebhook.Failure) -> APIClient.NotificationsWebhook.Result {
-        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/webhook"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.NotificationsWebhook.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.NotificationsWebhook.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.NotificationsWebhook.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.NotificationsWebhook.Failure.self)
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.NotificationsWebhook.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.NotificationsWebhook.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.NotificationsWebhook.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsWebhook.Failure.self)
+            let body = try Kizuna.decode(APIClient.NotificationsWebhook.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotificationsWebhook.Failure.self)
             return APIClient.NotificationsWebhook.Result(body: body)
         case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.NotificationsWebhook.Failure.self)
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotificationsWebhook.Failure.self)
             throw APIClient.NotificationsWebhook.Failure.badRequest(payload)
         default:
             throw APIClient.NotificationsWebhook.Failure.unexpectedStatus(statusCode, data)
@@ -1878,24 +1999,23 @@ public struct APINotificationsClient: Sendable {
 }
 
 public struct APIMembersClient: Sendable {
-    private let _actor: APIClient
+    private let client: APIClient
 
-    init(_actor: APIClient) {
-        self._actor = _actor
+    init(client: APIClient) {
+        self.client = client
     }
 
     /// List workspace members
     public func listMembers() async throws(APIClient.MembersListMembers.Failure) -> APIClient.MembersListMembers.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/workspace/members"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.MembersListMembers.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.MembersListMembers.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.MembersListMembers.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.MembersListMembers.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.MembersListMembers.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.MembersListMembers.Failure.self)
+            let body = try Kizuna.decode(APIClient.MembersListMembers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersListMembers.Failure.self)
             return APIClient.MembersListMembers.Result(body: body)
         default:
             throw APIClient.MembersListMembers.Failure.unexpectedStatus(statusCode, data)
@@ -1904,24 +2024,23 @@ public struct APIMembersClient: Sendable {
 
     /// Invite a member to the workspace
     public func inviteMember(_ body: APIClient.MembersInviteMember.Body) async throws(APIClient.MembersInviteMember.Failure) -> APIClient.MembersInviteMember.Result {
-        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/workspace/members"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.MembersInviteMember.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.MembersInviteMember.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.MembersInviteMember.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.MembersInviteMember.Failure.self)
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.MembersInviteMember.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.MembersInviteMember.Failure.self)
         switch statusCode {
         case 201:
-            let body = try Kizuna.decode(API.User.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
+            let body = try Kizuna.decode(API.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
             return APIClient.MembersInviteMember.Result(body: body)
         case 409:
-            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
             throw APIClient.MembersInviteMember.Failure.conflict(payload)
         case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
             throw APIClient.MembersInviteMember.Failure.badRequest(payload)
         default:
             throw APIClient.MembersInviteMember.Failure.unexpectedStatus(statusCode, data)
@@ -1930,24 +2049,23 @@ public struct APIMembersClient: Sendable {
 }
 
 public struct APIWorkspaceClient: Sendable {
-    private let _actor: APIClient
+    private let client: APIClient
 
-    init(_actor: APIClient) {
-        self._actor = _actor
+    init(client: APIClient) {
+        self.client = client
     }
 
     /// Get workspace info
     public func getWorkspace() async throws(APIClient.WorkspaceGetWorkspace.Failure) -> APIClient.WorkspaceGetWorkspace.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/workspace"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceGetWorkspace.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceGetWorkspace.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.WorkspaceGetWorkspace.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.WorkspaceGetWorkspace.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.WorkspaceGetWorkspace.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.WorkspaceGetWorkspace.Failure.self)
+            let body = try Kizuna.decode(APIClient.WorkspaceGetWorkspace.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceGetWorkspace.Failure.self)
             return APIClient.WorkspaceGetWorkspace.Result(body: body)
         default:
             throw APIClient.WorkspaceGetWorkspace.Failure.unexpectedStatus(statusCode, data)
@@ -1956,16 +2074,15 @@ public struct APIWorkspaceClient: Sendable {
 
     /// Delete the workspace — owner-only via the auth map
     public func deleteWorkspace() async throws(APIClient.WorkspaceDeleteWorkspace.Failure) -> APIClient.WorkspaceDeleteWorkspace.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/workspace"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "DELETE"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.WorkspaceDeleteWorkspace.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
+            let body = try Kizuna.decode(APIClient.WorkspaceDeleteWorkspace.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
             return APIClient.WorkspaceDeleteWorkspace.Result(body: body)
         default:
             throw APIClient.WorkspaceDeleteWorkspace.Failure.unexpectedStatus(statusCode, data)
@@ -1974,21 +2091,20 @@ public struct APIWorkspaceClient: Sendable {
 
     /// Transfer ownership — owner-only via the auth map
     public func transfer(_ body: APIClient.WorkspaceTransfer.Body) async throws(APIClient.WorkspaceTransfer.Failure) -> APIClient.WorkspaceTransfer.Result {
-        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         let path = "/workspace/transfer"
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceTransfer.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceTransfer.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.WorkspaceTransfer.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.WorkspaceTransfer.Failure.self)
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.WorkspaceTransfer.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.WorkspaceTransfer.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.WorkspaceTransfer.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.WorkspaceTransfer.Failure.self)
+            let body = try Kizuna.decode(APIClient.WorkspaceTransfer.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceTransfer.Failure.self)
             return APIClient.WorkspaceTransfer.Result(body: body)
         case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.WorkspaceTransfer.Failure.self)
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceTransfer.Failure.self)
             throw APIClient.WorkspaceTransfer.Failure.badRequest(payload)
         default:
             throw APIClient.WorkspaceTransfer.Failure.unexpectedStatus(statusCode, data)
@@ -1997,28 +2113,27 @@ public struct APIWorkspaceClient: Sendable {
 }
 
 public struct APIInvitesClient: Sendable {
-    private let _actor: APIClient
+    private let client: APIClient
 
-    init(_actor: APIClient) {
-        self._actor = _actor
+    init(client: APIClient) {
+        self.client = client
     }
 
     /// Resolve an invite by its capability-URL token, guarded by a custom path-token identity
     public func getInvite(_ params: APIClient.InvitesGetInvite.Params) async throws(APIClient.InvitesGetInvite.Failure) -> APIClient.InvitesGetInvite.Result {
-        let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         var path = "/invites/:token"
         path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.InvitesGetInvite.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.InvitesGetInvite.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.InvitesGetInvite.Failure.self)
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.InvitesGetInvite.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.InvitesGetInvite.Response.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
+            let body = try Kizuna.decode(APIClient.InvitesGetInvite.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
             return APIClient.InvitesGetInvite.Result(body: body)
         case 404:
-            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
             throw APIClient.InvitesGetInvite.Failure.notFound(payload)
         default:
             throw APIClient.InvitesGetInvite.Failure.unexpectedStatus(statusCode, data)
@@ -2027,25 +2142,24 @@ public struct APIInvitesClient: Sendable {
 
     /// Accept an invite via the capability URL
     public func acceptInvite(_ params: APIClient.InvitesAcceptInvite.Params, _ body: APIClient.InvitesAcceptInvite.Body) async throws(APIClient.InvitesAcceptInvite.Failure) -> APIClient.InvitesAcceptInvite.Result {
-        let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout, requestContextHeaders) = await _actor._kizunaContext()
         var path = "/invites/:token/accept"
         path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
-        let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: [], failure: APIClient.InvitesAcceptInvite.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.InvitesAcceptInvite.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
-        for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: APIClient.InvitesAcceptInvite.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.InvitesAcceptInvite.Failure.self)
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.InvitesAcceptInvite.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.InvitesAcceptInvite.Failure.self)
         switch statusCode {
         case 201:
-            let body = try Kizuna.decode(APIClient.InvitesAcceptInvite.Response201.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
+            let body = try Kizuna.decode(APIClient.InvitesAcceptInvite.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
             return APIClient.InvitesAcceptInvite.Result(body: body)
         case 404:
-            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
             throw APIClient.InvitesAcceptInvite.Failure.notFound(payload)
         case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
             throw APIClient.InvitesAcceptInvite.Failure.badRequest(payload)
         default:
             throw APIClient.InvitesAcceptInvite.Failure.unexpectedStatus(statusCode, data)
@@ -2053,42 +2167,36 @@ public struct APIInvitesClient: Sendable {
     }
 }
 
-private protocol KizunaFailure: Swift.Error {
+public protocol KizunaFailure: Swift.Error {
     static func requestFailed(_ error: Swift.Error) -> Self
+    static var invalidRequest: Self { get }
     static var cancelled: Self { get }
+    static var invalidResponse: Self { get }
     static func unexpectedStatus(_ status: Int, _ data: Foundation.Data) -> Self
 }
 
-private protocol KizunaDecodableFailure: KizunaFailure {
+public protocol KizunaDecodableFailure: KizunaFailure {
     static func decoding(_ error: Swift.Error, statusCode: Int, data: Foundation.Data) -> Self
 }
 
 private enum Kizuna {
-    nonisolated(unsafe) static let iso8601Formatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-
-    nonisolated(unsafe) static let iso8601FractionalFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
     @Sendable static func decodeDate(_ decoder: Decoder) throws -> Date {
         let container = try decoder.singleValueContainer()
         let raw = try container.decode(String.self)
-        if let date = iso8601FractionalFormatter.date(from: raw) { return date }
-        if let date = iso8601Formatter.date(from: raw) { return date }
+        if let date = try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)) { return date }
+        if let date = try? Date(raw, strategy: Date.ISO8601FormatStyle()) { return date }
         throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ISO8601 date: \(raw)")
+    }
+
+    static func encodeDate(_ date: Date) -> String {
+        date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
     }
 
     static func makeJSONEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .custom { date, encoder in
             var container = encoder.singleValueContainer()
-            try container.encode(iso8601FractionalFormatter.string(from: date))
+            try container.encode(encodeDate(date))
         }
         return encoder
     }
@@ -2116,7 +2224,7 @@ private enum Kizuna {
     static func stringifyQueryValue(_ value: Any) -> [String] {
         switch value {
         case let date as Date:
-            return [iso8601Formatter.string(from: date)]
+            return [encodeDate(date)]
         case let array as [Any]:
             return array.flatMap { stringifyQueryValue($0) }
         case let raw as any RawRepresentable where raw.rawValue is CustomStringConvertible:
@@ -2140,10 +2248,10 @@ private enum Kizuna {
 
     static func makeURL<Failure: KizunaFailure>(baseURL: URL, path: String, queryItems: [URLQueryItem], failure: Failure.Type) throws(Failure) -> URL {
         guard var components = URLComponents(url: appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
-            throw Failure.unexpectedStatus(-1, Data())
+            throw Failure.invalidRequest
         }
         if !queryItems.isEmpty { components.queryItems = queryItems }
-        guard let url = components.url else { throw Failure.unexpectedStatus(-1, Data()) }
+        guard let url = components.url else { throw Failure.invalidRequest }
         return url
     }
 
@@ -2152,7 +2260,7 @@ private enum Kizuna {
         catch { throw Failure.requestFailed(error) }
     }
 
-    static func send<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (Foundation.Data, Int, HTTPURLResponse?) {
+    static func send<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (Foundation.Data, Int, HTTPURLResponse) {
         if let requestMiddleware {
             do { try await requestMiddleware(&request) }
             catch is CancellationError { throw Failure.cancelled }
@@ -2164,13 +2272,20 @@ private enum Kizuna {
         catch is CancellationError { throw Failure.cancelled }
         catch { throw Failure.requestFailed(error) }
         if let responseMiddleware { await responseMiddleware(request, data, response) }
-        let typed = response as? HTTPURLResponse
-        return (data, typed?.statusCode ?? -1, typed)
+        guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }
+        return (data, httpResponse.statusCode, httpResponse)
     }
 
     static func decode<Value: Decodable, Failure: KizunaDecodableFailure>(_ type: Value.Type, from data: Foundation.Data, using decoder: JSONDecoder, statusCode: Int, failure: Failure.Type) throws(Failure) -> Value {
         do { return try decoder.decode(Value.self, from: data) }
         catch { throw Failure.decoding(error, statusCode: statusCode, data: data) }
+    }
+
+    static func firstError<Failure: KizunaDecodableFailure>(statusCode: Int, data: Foundation.Data, _ attempts: [() -> Failure?]) -> Failure {
+        for attempt in attempts {
+            if let failure = attempt() { return failure }
+        }
+        return Failure.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status \(statusCode)")), statusCode: statusCode, data: data)
     }
 
     struct MultipartBuilder {

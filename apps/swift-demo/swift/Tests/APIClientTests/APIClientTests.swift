@@ -399,8 +399,10 @@ final class APIClientTests: XCTestCase {
     }
 
     func testWebhookAnyCodableBody() async throws {
-        let json = try JSONSerialization.data(withJSONObject: ["event": "test", "count": 42])
-        let payload = APIClient.AnyCodable(value: json)
+        let payload = APIClient.JSONValue.object([
+            "event": .string("test"),
+            "count": .int(42),
+        ])
         let result = try await client.notifications.webhook(.body(payload))
         XCTAssertTrue(result.body.received)
     }

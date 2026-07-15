@@ -234,7 +234,7 @@ describe('Swift generator — namespace wrapper', () => {
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public enum TestAPI {');
         expect(output).toContain('    public struct Error:');
-        expect(output).toContain('public actor TestAPIClient');
+        expect(output).toContain('public final class TestAPIClient: Sendable');
     });
 
     it('uses Swift.Error and Foundation.Data inside the namespace to avoid shadowing', () => {
@@ -529,7 +529,7 @@ describe('Swift generator — nested sub-client routing', () => {
         });
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public struct TestAPIUsersClient: Sendable');
-        expect(output).toContain('private let _actor: TestAPIClient');
+        expect(output).toContain('private let client: TestAPIClient');
         expect(output).toContain('public var users: TestAPIUsersClient');
     });
 
@@ -584,7 +584,7 @@ describe('Swift generator — nested sub-client routing', () => {
         expect(output).toContain('TestAPIClient.PostsGetById.Failure');
     });
 
-    it('injects _kizunaContext() into sub-client methods and accesses actor state', () => {
+    it('sub-client methods forward to the held client without an actor hop', () => {
         const contractRoutes = k.routes('api', {
             health: {
                 check: {
@@ -609,18 +609,13 @@ describe('Swift generator — nested sub-client routing', () => {
             routes: contractRoutes,
         });
         const output = generateSwiftClient(contract, baseConfig);
-        expect(output).toContain('func _kizunaContext()');
-        // GET method (no body) uses _ for the unused encoder slot
-        expect(output).toContain(
-            'let (baseURL, session, _, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()'
-        );
-        // POST method (has body) uses encoder
-        expect(output).toContain(
-            'let (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout) = await _actor._kizunaContext()'
-        );
+        // The body reads client state directly through the held reference — no local rebind, no await.
+        expect(output).toContain('init(client: TestAPIClient)');
+        expect(output).toContain('baseURL: client.baseURL');
+        expect(output).toContain('using: client.encoder');
     });
 
-    it('keeps flat routes directly on the actor when mixed with grouped routes', () => {
+    it('keeps flat routes directly on the client when mixed with grouped routes', () => {
         const contractRoutes = k.routes('api', {
             ping: {
                 method: 'GET',
@@ -703,7 +698,7 @@ describe('Swift generator — responseHeaders', () => {
         });
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('let (data, statusCode, httpResponse) = try await Kizuna.send(&request');
-        expect(output).toContain('httpResponse?.value(forHTTPHeaderField: "x-request-id")');
+        expect(output).toContain('httpResponse.value(forHTTPHeaderField: "x-request-id")');
         expect(output).toContain('return TestAPIClient.GetUser.Result(body: body, headers: .init(xRequestId: xRequestId))');
     });
 
@@ -725,7 +720,7 @@ describe('Swift generator — responseHeaders', () => {
         expect(output).toContain('public struct Result: Sendable');
         expect(output).toContain('public let body:');
         expect(output).not.toContain('public let headers: Headers');
-        expect(output).not.toContain('httpResponse');
+        // this method discards the response object — it binds `_`, not a local `httpResponse`
         expect(output).toContain('let (data, statusCode, _) = try await Kizuna.send(&request');
         expect(output).toContain('return TestAPIClient.Ping.Result(body: body)');
     });
@@ -1201,10 +1196,11 @@ describe('Swift generator — automatic validation error', () => {
         });
         const output = generateSwiftClient(contract, baseConfig);
         // The body POST adds an automatic validation 400, so 400 is a grouped case with
-        // multiple candidate types. Each is attempted with `try?`; the matching case is
-        // thrown outside any catch, so it can never be swallowed by the next attempt.
-        expect(output).toMatch(
-            /if let payload = try\? decoder\.decode\(TestAPIClient\.CreateUser\.Response400\.self, from: data\) \{\s*\n\s*throw TestAPIClient\.CreateUser\.Failure\.badRequest\(payload\)/
+        // multiple candidate types. Each is a `Kizuna.firstError` attempt: the first `try?`
+        // that decodes wins and its typed Failure is returned, never swallowed.
+        expect(output).toContain('throw Kizuna.firstError(statusCode: statusCode, data: data, [');
+        expect(output).toContain(
+            '{ (try? decoder.decode(TestAPIClient.CreateUser.Response400.self, from: data)).map(TestAPIClient.CreateUser.Failure.badRequest) },'
         );
         expect(output).not.toContain('catch let error as TestAPIClient.CreateUser.Failure');
         expect(output).not.toContain('} catch {}');
@@ -1465,7 +1461,7 @@ describe('Swift generator — request context', () => {
         expect(output).toContain('public struct RequestContext: Sendable, Equatable');
         expect(output).toContain('requestContext: RequestContext,');
         expect(output).toContain('self.requestContextHeaders = requestContext.headerFields');
-        expect(output).toContain('for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }');
+        expect(output).toContain('for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }');
         expect(output).toContain('fields["x-tenant"] = xTenant');
         expect(output).toContain('if let xSessionId { fields["x-session-id"] = xSessionId }');
     });
@@ -1487,5 +1483,141 @@ describe('Swift generator — request context', () => {
         const output = generateSwiftClient(plainContract, baseConfig);
         expect(output).not.toContain('RequestContext');
         expect(output).not.toContain('requestContextHeaders');
+    });
+});
+
+describe('Swift generator — Sendable client', () => {
+    const contract = k.contract({
+        routes: k.routes('api', {
+            ping: {
+                method: 'GET',
+                path: '/ping',
+                responses: {
+                    200: z.object({ ok: z.boolean() }),
+                },
+            },
+        }),
+    });
+
+    it('emits a Sendable final class with immutable middleware storage', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public final class TestAPIClient: Sendable');
+        expect(output).toContain('public let requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?');
+        expect(output).toContain('public let responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?');
+    });
+});
+
+describe('Swift generator — date handling', () => {
+    const contract = k.contract({
+        routes: k.routes('api', {
+            events: {
+                method: 'GET',
+                path: '/events',
+                query: z.object({ since: z.iso.datetime() }),
+                responses: {
+                    200: z.object({ at: z.iso.datetime() }),
+                },
+            },
+        }),
+    });
+
+    it('uses Date.ISO8601FormatStyle for encoding and decoding', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true))');
+        expect(output).toContain('date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))');
+    });
+
+    it('encodes query-param dates through the same fractional-seconds helper as body dates', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('case let date as Date:');
+        expect(output).toContain('return [encodeDate(date)]');
+    });
+});
+
+describe('Swift generator — JSONValue', () => {
+    const contract = k.contract({
+        routes: k.routes('api', {
+            webhook: {
+                method: 'POST',
+                path: '/webhook',
+                body: z.any(),
+                responses: {
+                    200: z.object({ received: z.boolean() }),
+                },
+            },
+        }),
+    });
+
+    it('emits a natively-Codable JSONValue enum for unknown payloads', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public enum JSONValue: Codable, Sendable, Equatable');
+        expect(output).toContain('case object([String: JSONValue])');
+        expect(output).toContain('case array([JSONValue])');
+    });
+});
+
+describe('Swift generator — failure surface', () => {
+    const contract = k.contract({
+        routes: k.routes('api', {
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: z.object({ id: z.string() }),
+                },
+            },
+        }),
+    });
+
+    it('emits public failure protocols so apps can handle the shared cases generically', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public protocol KizunaFailure: Swift.Error');
+        expect(output).toContain('public protocol KizunaDecodableFailure: KizunaFailure');
+    });
+
+    it('represents URL and response construction failures with dedicated cases', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('case invalidRequest');
+        expect(output).toContain('case invalidResponse');
+        expect(output).toContain('guard let url = components.url else { throw Failure.invalidRequest }');
+        expect(output).toContain('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
+    });
+});
+
+describe('Swift generator — Result init', () => {
+    it('emits a public init(body:) so consumers can construct results for tests and mocks', () => {
+        const contract = k.contract({
+            routes: k.routes('api', {
+                getUser: {
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: {
+                        200: z.object({ id: z.string() }),
+                    },
+                },
+            }),
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public struct Result: Sendable');
+        expect(output).toMatch(/public init\(body: [^)]+\) \{\s*\n\s*self\.body = body/);
+    });
+
+    it('includes headers in the public init when the route returns response headers', () => {
+        const contract = k.contract({
+            routes: k.routes('api', {
+                getUser: {
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: {
+                        200: {
+                            body: z.object({ id: z.string() }),
+                            headers: z.object({ 'x-request-id': z.string().optional() }),
+                        },
+                    },
+                },
+            }),
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toMatch(/public init\(body: [^,]+, headers: Headers\) \{/);
     });
 });

@@ -762,7 +762,7 @@ const resolveType = (
     }
 
     if (base === 'AnyCodable') {
-        const qualified = `${clientName}.AnyCodable`;
+        const qualified = `${clientName}.JSONValue`;
         return optional ? `${qualified}?` : qualified;
     }
 
@@ -821,8 +821,9 @@ const emitResultStruct = (writer: SwiftWriter, method: RouteMethod, context: Emi
         const bodyType = method.successSumEnumName
             ? 'Success'
             : resolveType(method.successReturnType, method.operationName, context, 'operation-enum');
+        const hasHeaders = method.resultHeaderFields.length > 0;
         writer.line(`public let body: ${bodyType}`);
-        if (method.resultHeaderFields.length > 0) {
+        if (hasHeaders) {
             writer.line('public let headers: Headers');
             writer.blank();
             writer.block('public struct Headers: Sendable', () => {
@@ -830,6 +831,17 @@ const emitResultStruct = (writer: SwiftWriter, method: RouteMethod, context: Emi
                     const rawType = resolveType(field.type, method.operationName, context, 'operation-enum');
                     writer.line(`public let ${escapeKeyword(field.name)}: ${optionalize(rawType, field.optional)}`);
                 }
+            });
+        }
+        writer.blank();
+        if (hasHeaders) {
+            writer.block(`public init(body: ${bodyType}, headers: Headers)`, () => {
+                writer.line('self.body = body');
+                writer.line('self.headers = headers');
+            });
+        } else {
+            writer.block(`public init(body: ${bodyType})`, () => {
+                writer.line('self.body = body');
             });
         }
     });
@@ -887,7 +899,7 @@ const emitBodyType = (writer: SwiftWriter, method: RouteMethod, context: EmitCon
 
     const payloadType = body.structName
         ? resolveType(body.structName, operationName, context, 'operation-enum')
-        : `${context.clientName}.AnyCodable`;
+        : `${context.clientName}.JSONValue`;
     writer.block('public struct Body: Sendable', () => {
         writer.line(`public let payload: ${payloadType}`);
         writer.blank();
@@ -923,7 +935,9 @@ const emitFailureEnum = (writer: SwiftWriter, method: RouteMethod, context: Emit
     const failureProtocol = hasDecodedResponse ? 'KizunaDecodableFailure' : 'KizunaFailure';
     writer.block(`public enum Failure: Swift.Error, Sendable, ${failureProtocol}`, () => {
         writer.line('case requestFailed(Swift.Error)');
+        writer.line('case invalidRequest');
         writer.line('case cancelled');
+        writer.line('case invalidResponse');
         if (hasDecodedResponse) {
             writer.line('case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)');
         }
@@ -956,45 +970,41 @@ const emitSuccessSumEnum = (writer: SwiftWriter, method: RouteMethod, context: E
 
 const emitKizunaFailureProtocols = (writer: SwiftWriter): void => {
     writer.blank();
-    writer.block('private protocol KizunaFailure: Swift.Error', () => {
+    writer.block('public protocol KizunaFailure: Swift.Error', () => {
         writer.line('static func requestFailed(_ error: Swift.Error) -> Self');
+        writer.line('static var invalidRequest: Self { get }');
         writer.line('static var cancelled: Self { get }');
+        writer.line('static var invalidResponse: Self { get }');
         writer.line('static func unexpectedStatus(_ status: Int, _ data: Foundation.Data) -> Self');
     });
     writer.blank();
-    writer.block('private protocol KizunaDecodableFailure: KizunaFailure', () => {
+    writer.block('public protocol KizunaDecodableFailure: KizunaFailure', () => {
         writer.line('static func decoding(_ error: Swift.Error, statusCode: Int, data: Foundation.Data) -> Self');
     });
 };
 
-const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean; clientName: string }): void => {
+const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean; multiError: boolean; clientName: string }): void => {
     writer.blank();
     writer.block('private enum Kizuna', () => {
-        writer.line('nonisolated(unsafe) static let iso8601Formatter: ISO8601DateFormatter = {');
-        writer.line('    let formatter = ISO8601DateFormatter()');
-        writer.line('    formatter.formatOptions = [.withInternetDateTime]');
-        writer.line('    return formatter');
-        writer.line('}()');
-        writer.blank();
-        writer.line('nonisolated(unsafe) static let iso8601FractionalFormatter: ISO8601DateFormatter = {');
-        writer.line('    let formatter = ISO8601DateFormatter()');
-        writer.line('    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]');
-        writer.line('    return formatter');
-        writer.line('}()');
-        writer.blank();
         writer.block('@Sendable static func decodeDate(_ decoder: Decoder) throws -> Date', () => {
             writer.line('let container = try decoder.singleValueContainer()');
             writer.line('let raw = try container.decode(String.self)');
-            writer.line('if let date = iso8601FractionalFormatter.date(from: raw) { return date }');
-            writer.line('if let date = iso8601Formatter.date(from: raw) { return date }');
+            writer.line(
+                'if let date = try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)) { return date }'
+            );
+            writer.line('if let date = try? Date(raw, strategy: Date.ISO8601FormatStyle()) { return date }');
             writer.line('throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ISO8601 date: \\(raw)")');
+        });
+        writer.blank();
+        writer.block('static func encodeDate(_ date: Date) -> String', () => {
+            writer.line('date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))');
         });
         writer.blank();
         writer.block('static func makeJSONEncoder() -> JSONEncoder', () => {
             writer.line('let encoder = JSONEncoder()');
             writer.line('encoder.dateEncodingStrategy = .custom { date, encoder in');
             writer.line('    var container = encoder.singleValueContainer()');
-            writer.line('    try container.encode(iso8601FractionalFormatter.string(from: date))');
+            writer.line('    try container.encode(encodeDate(date))');
             writer.line('}');
             writer.line('return encoder');
         });
@@ -1022,7 +1032,7 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
         writer.block('static func stringifyQueryValue(_ value: Any) -> [String]', () => {
             writer.line('switch value {');
             writer.line('case let date as Date:');
-            writer.line('    return [iso8601Formatter.string(from: date)]');
+            writer.line('    return [encodeDate(date)]');
             writer.line('case let array as [Any]:');
             writer.line('    return array.flatMap { stringifyQueryValue($0) }');
             writer.line('case let raw as any RawRepresentable where raw.rawValue is CustomStringConvertible:');
@@ -1048,10 +1058,10 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
             'static func makeURL<Failure: KizunaFailure>(baseURL: URL, path: String, queryItems: [URLQueryItem], failure: Failure.Type) throws(Failure) -> URL',
             () => {
                 writer.line('guard var components = URLComponents(url: appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {');
-                writer.line('    throw Failure.unexpectedStatus(-1, Data())');
+                writer.line('    throw Failure.invalidRequest');
                 writer.line('}');
                 writer.line('if !queryItems.isEmpty { components.queryItems = queryItems }');
-                writer.line('guard let url = components.url else { throw Failure.unexpectedStatus(-1, Data()) }');
+                writer.line('guard let url = components.url else { throw Failure.invalidRequest }');
                 writer.line('return url');
             }
         );
@@ -1065,7 +1075,7 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
         );
         writer.blank();
         writer.block(
-            'static func send<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (Foundation.Data, Int, HTTPURLResponse?)',
+            'static func send<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (Foundation.Data, Int, HTTPURLResponse)',
             () => {
                 writer.line('if let requestMiddleware {');
                 writer.line('    do { try await requestMiddleware(&request) }');
@@ -1078,8 +1088,8 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
                 writer.line('catch is CancellationError { throw Failure.cancelled }');
                 writer.line('catch { throw Failure.requestFailed(error) }');
                 writer.line('if let responseMiddleware { await responseMiddleware(request, data, response) }');
-                writer.line('let typed = response as? HTTPURLResponse');
-                writer.line('return (data, typed?.statusCode ?? -1, typed)');
+                writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
+                writer.line('return (data, httpResponse.statusCode, httpResponse)');
             }
         );
         writer.blank();
@@ -1090,6 +1100,22 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
                 writer.line('catch { throw Failure.decoding(error, statusCode: statusCode, data: data) }');
             }
         );
+        if (options.multiError) {
+            // One status code, several candidate body types: return the first attempt that produces a
+            // failure, else a `.decoding` error carrying the raw payload.
+            writer.blank();
+            writer.block(
+                'static func firstError<Failure: KizunaDecodableFailure>(statusCode: Int, data: Foundation.Data, _ attempts: [() -> Failure?]) -> Failure',
+                () => {
+                    writer.line('for attempt in attempts {');
+                    writer.line('    if let failure = attempt() { return failure }');
+                    writer.line('}');
+                    writer.line(
+                        'return Failure.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status \\(statusCode)")), statusCode: statusCode, data: data)'
+                    );
+                }
+            );
+        }
         if (options.multipart) {
             writer.blank();
             writer.block('struct MultipartBuilder', () => {
@@ -1213,22 +1239,26 @@ const decodeBodyStatement = (
     name: string,
     resolvedType: string,
     response: { isRaw: boolean; isBinary: boolean },
-    failure: string
+    failure: string,
+    receiver = ''
 ): string => {
     if (response.isBinary) return `    let ${name} = data`;
     if (response.isRaw) return `    let ${name} = String(decoding: data, as: UTF8.self)`;
-    return `    let ${name} = try Kizuna.decode(${resolvedType}.self, from: data, using: decoder, statusCode: statusCode, failure: ${failure}.self)`;
+    return `    let ${name} = try Kizuna.decode(${resolvedType}.self, from: data, using: ${receiver}decoder, statusCode: statusCode, failure: ${failure}.self)`;
 };
 
-/**
- * Whether the method body references the `JSONDecoder`. Only non-raw decoded
- * responses go through it; raw (non-JSON) bodies are read as UTF-8 strings.
- */
-const methodUsesDecoder = (method: RouteMethod): boolean =>
-    method.successResponses.some((response) => response.type !== 'Void' && !response.isRaw) ||
-    method.errorCases.some((errorCase) => errorCase.type !== 'Void' && !errorCase.isRaw);
+// Whether any status code maps to more than one error body type — the case that needs `Kizuna.firstError`.
+const hasMultiErrorGroup = (method: RouteMethod): boolean => {
+    const counts = new Map<number, number>();
+    for (const errorCase of method.errorCases) {
+        counts.set(errorCase.status, (counts.get(errorCase.status) ?? 0) + 1);
+    }
+    return [...counts.values()].some((count) => count > 1);
+};
 
-const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitContext): void => {
+// `receiver` prefixes the stored properties the body reads (baseURL, session, encoder, …): empty inside the
+// client itself, `client.` inside a sub-client struct that forwards to its parent client.
+const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitContext, receiver = ''): void => {
     const failure = failureRef(method, context);
     const pathDecl = method.pathParams.length > 0 ? 'var' : 'let';
     writer.line(`${pathDecl} path = ${stringLiteral(method.pathTemplate)}`);
@@ -1250,16 +1280,16 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
     }
 
     writer.line(
-        `let url = try Kizuna.makeURL(baseURL: baseURL, path: path, queryItems: ${queryItemsExpression}, failure: ${failure}.self)`
+        `let url = try Kizuna.makeURL(baseURL: ${receiver}baseURL, path: path, queryItems: ${queryItemsExpression}, failure: ${failure}.self)`
     );
-    writer.line('var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: timeout)');
+    writer.line(`var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: ${receiver}timeout)`);
     writer.line(`request.httpMethod = ${stringLiteral(method.method)}`);
     if (context.requestContextFields.length > 0) {
-        writer.line('for (name, value) in requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }');
+        writer.line(`for (name, value) in ${receiver}requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }`);
     }
 
     if (method.body) {
-        emitBodyEncoding(writer, method, context);
+        emitBodyEncoding(writer, method, context, receiver);
     }
 
     for (const field of method.headers) {
@@ -1269,7 +1299,7 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
 
     const responseBinding = method.resultHeaderFields.length > 0 ? 'httpResponse' : '_';
     writer.line(
-        `let (data, statusCode, ${responseBinding}) = try await Kizuna.send(&request, session: session, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: ${failure}.self)`
+        `let (data, statusCode, ${responseBinding}) = try await Kizuna.send(&request, session: ${receiver}session, requestMiddleware: ${receiver}requestMiddleware, responseMiddleware: ${receiver}responseMiddleware, failure: ${failure}.self)`
     );
 
     writer.line('switch statusCode {');
@@ -1286,7 +1316,7 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                 if (resolved === 'Void') {
                     for (const field of successResponse.responseHeaders) {
                         writer.line(
-                            `    let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
+                            `    let ${escapeKeyword(field.name)} = httpResponse.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
                         );
                     }
                     if (hasHeaders) {
@@ -1297,10 +1327,10 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                         writer.line(`    return ${qualifiedResult}(body: .status${successResponse.status})`);
                     }
                 } else {
-                    writer.line(decodeBodyStatement('payload', resolved, successResponse, failure));
+                    writer.line(decodeBodyStatement('payload', resolved, successResponse, failure, receiver));
                     for (const field of successResponse.responseHeaders) {
                         writer.line(
-                            `    let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
+                            `    let ${escapeKeyword(field.name)} = httpResponse.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
                         );
                     }
                     if (hasHeaders) {
@@ -1313,10 +1343,10 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                 }
             } else {
                 const resolved = resolveType(successResponse.type, method.operationName, context);
-                writer.line(decodeBodyStatement('body', resolved, successResponse, failure));
+                writer.line(decodeBodyStatement('body', resolved, successResponse, failure, receiver));
                 for (const field of successResponse.responseHeaders) {
                     writer.line(
-                        `    let ${escapeKeyword(field.name)} = httpResponse?.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
+                        `    let ${escapeKeyword(field.name)} = httpResponse.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
                     );
                 }
                 if (hasHeaders) {
@@ -1346,27 +1376,25 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                 writer.line(`    throw ${failure}.${escapeKeyword(firstCase.caseName)}`);
             } else {
                 const resolved = resolveType(firstCase.type, method.operationName, context);
-                writer.line(decodeBodyStatement('payload', resolved, firstCase, failure));
+                writer.line(decodeBodyStatement('payload', resolved, firstCase, failure, receiver));
                 writer.line(`    throw ${failure}.${escapeKeyword(firstCase.caseName)}(payload)`);
             }
         } else {
+            writer.line(`    throw Kizuna.firstError(statusCode: statusCode, data: data, [`);
             for (const errorCase of cases) {
+                const caseRef = `${failure}.${escapeKeyword(errorCase.caseName)}`;
                 if (errorCase.type === 'Void') {
-                    writer.line(`    throw ${failure}.${escapeKeyword(errorCase.caseName)}`);
+                    writer.line(`        { ${caseRef} },`);
                 } else if (errorCase.isBinary) {
-                    writer.line(`    throw ${failure}.${escapeKeyword(errorCase.caseName)}(data)`);
+                    writer.line(`        { ${caseRef}(data) },`);
                 } else if (errorCase.isRaw) {
-                    writer.line('    throw ' + `${failure}.${escapeKeyword(errorCase.caseName)}(String(decoding: data, as: UTF8.self))`);
+                    writer.line(`        { ${caseRef}(String(decoding: data, as: UTF8.self)) },`);
                 } else {
                     const resolved = resolveType(errorCase.type, method.operationName, context);
-                    writer.line(`    if let payload = try? decoder.decode(${resolved}.self, from: data) {`);
-                    writer.line(`        throw ${failure}.${escapeKeyword(errorCase.caseName)}(payload)`);
-                    writer.line('    }');
+                    writer.line(`        { (try? ${receiver}decoder.decode(${resolved}.self, from: data)).map(${caseRef}) },`);
                 }
             }
-            writer.line(
-                `    throw ${failure}.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status ${status}")), statusCode: statusCode, data: data)`
-            );
+            writer.line('    ])');
         }
     }
     writer.line('default:');
@@ -1412,26 +1440,17 @@ const emitSubClientMethod = (writer: SwiftWriter, method: RouteMethod, context: 
         writer.line(deprecatedAttribute(method.deprecationMessage));
     }
     writer.block(buildMethodSignature(method, context), () => {
-        const encoderSlot =
-            method.body && (method.body.kind === 'json-flat' || method.body.kind === 'json-struct' || method.body.kind === 'union')
-                ? 'encoder'
-                : '_';
-        const decoderSlot = methodUsesDecoder(method) ? 'decoder' : '_';
-        const contextSlot = context.requestContextFields.length > 0 ? ', requestContextHeaders' : '';
-        writer.line(
-            `let (baseURL, session, ${encoderSlot}, ${decoderSlot}, requestMiddleware, responseMiddleware, timeout${contextSlot}) = await _actor._kizunaContext()`
-        );
-        emitMethodBody(writer, method, context);
+        emitMethodBody(writer, method, context, 'client.');
     });
 };
 
-const emitSubClientStruct = (writer: SwiftWriter, group: RouteGroup, actorName: string, context: EmitContext): void => {
+const emitSubClientStruct = (writer: SwiftWriter, group: RouteGroup, clientName: string, context: EmitContext): void => {
     writer.blank();
     writer.block(`public struct ${group.structName}: Sendable`, () => {
-        writer.line(`private let _actor: ${actorName}`);
+        writer.line(`private let client: ${clientName}`);
         writer.blank();
-        writer.block(`init(_actor: ${actorName})`, () => {
-            writer.line('self._actor = _actor');
+        writer.block(`init(client: ${clientName})`, () => {
+            writer.line('self.client = client');
         });
         for (const method of group.methods) {
             writer.blank();
@@ -1440,7 +1459,7 @@ const emitSubClientStruct = (writer: SwiftWriter, group: RouteGroup, actorName: 
     });
 };
 
-const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: EmitContext): void => {
+const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: EmitContext, receiver = ''): void => {
     if (!method.body) return;
     const body = method.body;
     const failure = failureRef(method, context);
@@ -1467,7 +1486,7 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
         return;
     }
     // Object / non-object / union bodies: the `Body` group wraps the Codable payload.
-    writer.line(`try Kizuna.encodeBody(&request, value: body.payload, using: encoder, failure: ${failure}.self)`);
+    writer.line(`try Kizuna.encodeBody(&request, value: body.payload, using: ${receiver}encoder, failure: ${failure}.self)`);
 };
 
 const emitClient = (
@@ -1487,7 +1506,7 @@ const emitClient = (
     const contextRequired = contextFields.some((field) => !field.optional);
 
     writer.blank();
-    writer.block(`public actor ${clientName}`, () => {
+    writer.block(`public final class ${clientName}: Sendable`, () => {
         if (contextFields.length > 0) {
             writer.blank();
             writer.docComment("Values sent as headers on every request, from the contract's request context.");
@@ -1567,71 +1586,61 @@ const emitClient = (
         }
         if (config.anyCodable) {
             writer.blank();
-            writer.block('public struct AnyCodable: Codable, Sendable, Equatable', () => {
-                writer.line('public let value: Foundation.Data?');
-                writer.line('public init(value: Foundation.Data? = nil) { self.value = value }');
+            writer.docComment('A decoded JSON value of unknown shape. Codable and correctly Equatable by structure.');
+            writer.block('public enum JSONValue: Codable, Sendable, Equatable', () => {
+                writer.line('case null');
+                writer.line('case bool(Bool)');
+                writer.line('case int(Int)');
+                writer.line('case double(Double)');
+                writer.line('case string(String)');
+                writer.line('case array([JSONValue])');
+                writer.line('case object([String: JSONValue])');
+                writer.blank();
                 writer.block('public init(from decoder: Decoder) throws', () => {
                     writer.line('let container = try decoder.singleValueContainer()');
-                    writer.line('if container.decodeNil() { self.value = nil; return }');
-                    writer.line(
-                        'let raw = try JSONSerialization.data(withJSONObject: try container.decode(CodableValue.self).rawValue, options: [])'
-                    );
-                    writer.line('self.value = raw');
-                });
-                writer.block('public func encode(to encoder: Encoder) throws', () => {
-                    writer.line('var container = encoder.singleValueContainer()');
-                    writer.line('if let value = value, let object = try? JSONSerialization.jsonObject(with: value) {');
-                    writer.line('    try container.encode(CodableValue(rawValue: object))');
+                    writer.line('if container.decodeNil() {');
+                    writer.line('    self = .null');
+                    writer.line('} else if let value = try? container.decode(Bool.self) {');
+                    writer.line('    self = .bool(value)');
+                    writer.line('} else if let value = try? container.decode(Int.self) {');
+                    writer.line('    self = .int(value)');
+                    writer.line('} else if let value = try? container.decode(Double.self) {');
+                    writer.line('    self = .double(value)');
+                    writer.line('} else if let value = try? container.decode(String.self) {');
+                    writer.line('    self = .string(value)');
+                    writer.line('} else if let value = try? container.decode([JSONValue].self) {');
+                    writer.line('    self = .array(value)');
+                    writer.line('} else if let value = try? container.decode([String: JSONValue].self) {');
+                    writer.line('    self = .object(value)');
                     writer.line('} else {');
-                    writer.line('    try container.encodeNil()');
+                    writer.line('    throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported JSON value")');
                     writer.line('}');
                 });
-                writer.line('public static func == (lhs: AnyCodable, rhs: AnyCodable) -> Bool { lhs.value == rhs.value }');
                 writer.blank();
-                writer.block('private struct CodableValue: Codable', () => {
-                    writer.line('let rawValue: Any');
-                    writer.line('init(rawValue: Any) { self.rawValue = rawValue }');
-                    writer.block('init(from decoder: Decoder) throws', () => {
-                        writer.line('let container = try decoder.singleValueContainer()');
-                        writer.line('if container.decodeNil() { self.rawValue = NSNull(); return }');
-                        writer.line('if let value = try? container.decode(Bool.self) { self.rawValue = value; return }');
-                        writer.line('if let value = try? container.decode(Int.self) { self.rawValue = value; return }');
-                        writer.line('if let value = try? container.decode(Double.self) { self.rawValue = value; return }');
-                        writer.line('if let value = try? container.decode(String.self) { self.rawValue = value; return }');
-                        writer.line(
-                            'if let value = try? container.decode([CodableValue].self) { self.rawValue = value.map(\\.rawValue); return }'
-                        );
-                        writer.line(
-                            'if let value = try? container.decode([String: CodableValue].self) { self.rawValue = value.mapValues(\\.rawValue); return }'
-                        );
-                        writer.line('self.rawValue = NSNull()');
-                    });
-                    writer.block('func encode(to encoder: Encoder) throws', () => {
-                        writer.line('var container = encoder.singleValueContainer()');
-                        writer.line('switch rawValue {');
-                        writer.line('case is NSNull: try container.encodeNil()');
-                        writer.line('case let value as Bool: try container.encode(value)');
-                        writer.line('case let value as Int: try container.encode(value)');
-                        writer.line('case let value as Double: try container.encode(value)');
-                        writer.line('case let value as String: try container.encode(value)');
-                        writer.line('case let value as [Any]: try container.encode(value.map(CodableValue.init(rawValue:)))');
-                        writer.line('case let value as [String: Any]: try container.encode(value.mapValues(CodableValue.init(rawValue:)))');
-                        writer.line('default: try container.encodeNil()');
-                        writer.line('}');
-                    });
+                writer.block('public func encode(to encoder: Encoder) throws', () => {
+                    writer.line('var container = encoder.singleValueContainer()');
+                    writer.line('switch self {');
+                    writer.line('case .null: try container.encodeNil()');
+                    writer.line('case .bool(let value): try container.encode(value)');
+                    writer.line('case .int(let value): try container.encode(value)');
+                    writer.line('case .double(let value): try container.encode(value)');
+                    writer.line('case .string(let value): try container.encode(value)');
+                    writer.line('case .array(let value): try container.encode(value)');
+                    writer.line('case .object(let value): try container.encode(value)');
+                    writer.line('}');
                 });
             });
         }
         writer.line('public let baseURL: URL');
         writer.line('public let session: URLSession');
-        writer.line('public nonisolated let timeout: TimeInterval');
+        writer.line('public let timeout: TimeInterval');
         if (contextFields.length > 0) {
-            writer.line('nonisolated let requestContextHeaders: [String: String]');
+            writer.line('let requestContextHeaders: [String: String]');
         }
-        writer.line('public var requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?');
-        writer.line('public var responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?');
-        writer.line('private let encoder: JSONEncoder');
-        writer.line('private let decoder: JSONDecoder');
+        writer.line('public let requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?');
+        writer.line('public let responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?');
+        writer.line('let encoder: JSONEncoder');
+        writer.line('let decoder: JSONDecoder');
         writer.blank();
         const contextInitParam =
             contextFields.length > 0 ? `, requestContext: RequestContext${contextRequired ? '' : ' = RequestContext()'}` : '';
@@ -1652,22 +1661,10 @@ const emitClient = (
         );
 
         if (groups.length > 0) {
-            writer.blank();
-            const contextTupleType = contextFields.length > 0 ? ', [String: String]' : '';
-            const contextTupleValue = contextFields.length > 0 ? ', requestContextHeaders' : '';
-            writer.block(
-                `func _kizunaContext() -> (URL, URLSession, JSONEncoder, JSONDecoder, (@Sendable (inout URLRequest) async throws -> Void)?, (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, TimeInterval${contextTupleType})`,
-                () => {
-                    writer.line(
-                        `return (baseURL, session, encoder, decoder, requestMiddleware, responseMiddleware, timeout${contextTupleValue})`
-                    );
-                }
-            );
-
             for (const group of groups) {
                 writer.blank();
                 writer.block(`public var ${escapeKeyword(group.propertyName)}: ${group.structName}`, () => {
-                    writer.line(`${group.structName}(_actor: self)`);
+                    writer.line(`${group.structName}(client: self)`);
                 });
             }
         }
@@ -1721,6 +1718,7 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
     writer.blank();
 
     const usesMultipart = allMethods.some((method) => method.body?.kind === 'multipart');
+    const usesMultiError = allMethods.some(hasMultiErrorGroup);
 
     // Split registry types:
     //   - operation-local → per-operation enum inside the actor
@@ -1787,6 +1785,7 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
 
     emitKizunaNamespace(writer, {
         multipart: usesMultipart,
+        multiError: usesMultiError,
         clientName,
     });
 
