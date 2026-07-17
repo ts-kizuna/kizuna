@@ -6,4 +6,8 @@ export const apiClient = createClient(contract, {
     requestContext: {
         'x-posthog-session-id': process.env.POSTHOG_SESSION_ID,
     },
+    auth: {
+        user: () => process.env.SESSION_TOKEN ?? null,
+        member: () => process.env.WORKSPACE_TOKEN ?? null,
+    },
 });

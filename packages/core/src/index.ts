@@ -5,7 +5,18 @@ export * from './routes.js';
 export * from './handler-pipeline.js';
 export * from './route-matcher.js';
 export { createModel, type ModelOptions } from './model.js';
-export { type ApiDefinition, type ErrorFormatter, API_META, getHeaderValue } from './adapter.js';
+export { type ApiDefinition, type ErrorFormatter, API_META, getHeaderValue, resolveSecurityRequirements } from './adapter.js';
+export {
+    placeCredential,
+    resolveSchemePlacements,
+    describeSchemePlacement,
+    type SchemePlacement,
+    type CredentialSink,
+    type CredentialValue,
+    type CredentialInput,
+    type CredentialProvider,
+    type ClientAuth,
+} from './credential-placement.js';
 export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
 export { isValidationError, type ValidationError, type ValidationErrorFor, type ValidationIssueCode } from './validation-error.js';
 export { isProblemDetails } from './error-response.js';

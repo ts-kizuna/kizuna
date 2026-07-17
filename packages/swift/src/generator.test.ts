@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags, createModel, createRequestContext, type Contract } from '@ts-kizuna/core';
+import { kizuna, createTags, createModel, createRequestContext, createIdentity, type Contract } from '@ts-kizuna/core';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateSwiftClient } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
@@ -1619,5 +1619,111 @@ describe('Swift generator — Result init', () => {
         });
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toMatch(/public init\(body: [^,]+, headers: Headers\) \{/);
+    });
+});
+
+describe('Swift generator — typed auth', () => {
+    const authKizuna = kizuna({
+        identities: {
+            user: createIdentity.bearer({
+                context: z.object({ userId: z.string() }),
+            }),
+            member: createIdentity.apiKey({
+                name: 'x-workspace-token',
+                in: 'header',
+            }),
+            queryKey: createIdentity.apiKey({
+                name: 'api_key',
+                in: 'query',
+            }),
+            admin: createIdentity.basic({
+                context: z.object({ adminId: z.string() }),
+            }),
+            inviteToken: createIdentity.custom({
+                context: z.object({ inviteId: z.string() }),
+            }),
+        },
+        tags: createTags({ api: 'API' }),
+    });
+    const authK = authKizuna.k;
+
+    const authRoutes = authK.routes('api', {
+        bearerRoute: {
+            method: 'GET',
+            path: '/bearer',
+            responses: { 200: z.object({ ok: z.boolean() }) },
+        },
+        headerRoute: {
+            method: 'GET',
+            path: '/header',
+            responses: { 200: z.object({ ok: z.boolean() }) },
+        },
+        queryRoute: {
+            method: 'GET',
+            path: '/query',
+            responses: { 200: z.object({ ok: z.boolean() }) },
+        },
+        basicRoute: {
+            method: 'GET',
+            path: '/basic',
+            responses: { 200: z.object({ ok: z.boolean() }) },
+        },
+        inviteRoute: {
+            method: 'GET',
+            path: '/invites/:token',
+            responses: { 200: z.object({ ok: z.boolean() }) },
+        },
+    });
+
+    const authContract = authK.contract({
+        routes: authRoutes,
+        auth: authK.auth(authRoutes, {
+            bearerRoute: 'user',
+            headerRoute: 'member',
+            queryRoute: 'queryKey',
+            basicRoute: 'admin',
+            inviteRoute: 'inviteToken',
+        }),
+    });
+
+    const output = generateSwiftClient(authContract, baseConfig);
+
+    it('emits an AuthProviders struct typed per scheme', () => {
+        expect(output).toContain('public struct AuthProviders: Sendable');
+        expect(output).toContain('public var user: (@Sendable () async -> String?)?');
+        expect(output).toContain('public var member: (@Sendable () async -> String?)?');
+        expect(output).toContain('public var admin: (@Sendable () async -> (username: String, password: String)?)?');
+    });
+
+    it('adds an auth property and init parameter', () => {
+        expect(output).toContain('public let auth: AuthProviders');
+        expect(output).toContain('auth: AuthProviders = AuthProviders()');
+    });
+
+    it('excludes custom identities from the providers', () => {
+        expect(output).not.toContain('public var inviteToken:');
+    });
+
+    it('attaches a bearer token as an Authorization header', () => {
+        expect(output).toContain('if let provider = auth.user, let credential = await provider() {');
+        expect(output).toContain('authHeaders["Authorization"] = "Bearer \\(credential)"');
+    });
+
+    it('attaches an apiKey to its declared header', () => {
+        expect(output).toContain('authHeaders["x-workspace-token"] = credential');
+    });
+
+    it('attaches an apiKey to the query string', () => {
+        expect(output).toContain('authQueryItems.append(URLQueryItem(name: "api_key", value: credential))');
+        expect(output).toContain('queryItems += authQueryItems');
+    });
+
+    it('encodes basic credentials', () => {
+        expect(output).toContain('Data("\\(credential.username):\\(credential.password)".utf8).base64EncodedString()');
+    });
+
+    it('does not inject a credential on a custom-guarded route', () => {
+        // inviteToken is custom → no provider lookup emitted for it
+        expect(output).not.toContain('auth.inviteToken');
     });
 });

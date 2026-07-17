@@ -363,4 +363,22 @@ class APIClientTest {
             }
         }
     }
+
+    @Test
+    fun testAuthProviderAttachesBearerToken() = runTest {
+        val baseUrl = System.getenv("API_BASE_URL") ?: "http://localhost:8765"
+        val authed = APIClient(baseUrl = baseUrl, auth = APIClient.Auth(user = { "tok_ada" }))
+        val response = authed.members.listMembers()
+        assertTrue(response.body.members.isNotEmpty())
+    }
+
+    @Test
+    fun testMissingCredentialSurfacesUnauthorized() = runTest {
+        val baseUrl = System.getenv("API_BASE_URL") ?: "http://localhost:8765"
+        val authed = APIClient(baseUrl = baseUrl, auth = APIClient.Auth(user = { null }))
+        val failure = assertFailsWith<APIClient.MembersListMembers.Failure.Unexpected> {
+            authed.members.listMembers()
+        }
+        assertEquals(401, failure.statusCode)
+    }
 }

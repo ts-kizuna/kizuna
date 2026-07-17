@@ -301,11 +301,11 @@ describe('end-to-end: typed client → secured Express route', () => {
         server?.close();
     });
 
-    it('round-trips with the credential in baseHeaders', async () => {
+    it('round-trips with the credential from an auth provider', async () => {
         const client = createClient(securedContract, {
             baseUrl,
-            baseHeaders: {
-                authorization: 'Bearer tok_ada',
+            auth: {
+                user: () => 'tok_ada',
             },
         });
         const response = await client.api.whoAmI();
@@ -315,9 +315,12 @@ describe('end-to-end: typed client → secured Express route', () => {
         }
     });
 
-    it('surfaces the typed 401 without a credential', async () => {
+    it('surfaces the typed 401 when the provider yields no credential', async () => {
         const client = createClient(securedContract, {
             baseUrl,
+            auth: {
+                user: () => null,
+            },
         });
         const response = await client.api.whoAmI();
         expect(response.status).toBe(401);

@@ -432,6 +432,29 @@ final class APIClientTests: XCTestCase {
             }
         }
     }
+
+    func testAuthProviderAttachesBearerToken() async throws {
+        let raw = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? "http://localhost:8000"
+        let url = URL(string: raw)!
+        let authed = APIClient(baseURL: url, auth: APIClient.AuthProviders(user: { "tok_ada" }))
+        let response = try await authed.members.listMembers()
+        XCTAssertGreaterThanOrEqual(response.body.members.count, 1)
+    }
+
+    func testMissingCredentialSurfacesUnauthorized() async throws {
+        let raw = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? "http://localhost:8000"
+        let url = URL(string: raw)!
+        let noToken: @Sendable () async -> String? = { nil }
+        let authed = APIClient(baseURL: url, auth: APIClient.AuthProviders(user: noToken))
+        do {
+            _ = try await authed.members.listMembers()
+            XCTFail("expected the request to fail without a credential")
+        } catch .unexpectedStatus(let status, _) {
+            XCTAssertEqual(status, 401)
+        } catch {
+            XCTFail("expected .unexpectedStatus(401), got \(error)")
+        }
+    }
 }
 
 private actor MiddlewareCounter {

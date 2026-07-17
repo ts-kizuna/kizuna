@@ -9,9 +9,13 @@ import type {
     RequestContextSchema,
     RequestContextHeaderInputs,
     SecurityScheme,
+    CredentialSink,
+    CredentialValue,
+    CredentialProvider,
+    ClientAuth,
 } from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
-import { buildPath, isRouteDefinition } from '@ts-kizuna/core';
+import { buildPath, isRouteDefinition, placeCredential, resolveSecurityRequirements } from '@ts-kizuna/core';
 
 type ResponseUnion<R extends RouteDefinition> = {
     [S in keyof R['responses']]: {
@@ -110,6 +114,38 @@ export interface ClientConfig {
     onRequest?: (context: RequestContext) => void | Promise<void>;
 }
 
+interface ResolvedClientConfig extends ClientConfig {
+    auth?: Record<string, CredentialProvider<CredentialValue>>;
+    securitySchemes?: Record<string, SecurityScheme>;
+}
+
+const applyCredentials = async (
+    route: RouteDefinition,
+    config: ResolvedClientConfig,
+    headers: Record<string, string>,
+    query: Record<string, string>
+): Promise<void> => {
+    const { auth, securitySchemes } = config;
+    if (!auth || !securitySchemes || !route.security?.length) return;
+    const sink: CredentialSink = {
+        header: (name, value) => {
+            if (name.toLowerCase() === 'cookie' && headers['Cookie']) headers['Cookie'] = `${headers['Cookie']}; ${value}`;
+            else headers[name] = value;
+        },
+        query: (name, value) => {
+            query[name] = value;
+        },
+    };
+    for (const { scheme } of resolveSecurityRequirements(route)) {
+        const identity = securitySchemes[scheme];
+        const provider = auth[scheme];
+        if (!identity || !provider) continue;
+        const value = await provider();
+        if (value === null || value === undefined) continue;
+        placeCredential(identity, value, sink);
+    }
+};
+
 const buildFormData = (body: Record<string, unknown>): FormData => {
     const formData = new FormData();
     for (const [key, entry] of Object.entries(body)) {
@@ -145,7 +181,7 @@ const buildQueryString = (query: Record<string, unknown>): string => {
     return result.length > 0 ? `?${result}` : '';
 };
 
-const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
+const buildRouteFn = (route: RouteDefinition, config: ResolvedClientConfig) => {
     return async (
         args: {
             params?: Record<string, string | number | bigint | Date>;
@@ -155,9 +191,14 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
             fetchOptions?: RequestInit;
         } = {}
     ) => {
-        const url = config.baseUrl + buildPath(route.path, args.params) + (args.query ? buildQueryString(args.query) : '');
+        const authHeaders: Record<string, string> = {};
+        const authQuery: Record<string, string> = {};
+        await applyCredentials(route, config, authHeaders, authQuery);
+        const query = { ...(args.query ?? {}), ...authQuery };
+        const url = config.baseUrl + buildPath(route.path, args.params) + buildQueryString(query);
         const headers: Record<string, string> = {
             ...(config.baseHeaders ?? {}),
+            ...authHeaders,
             ...(args.headers ?? {}),
         };
         let body: string | FormData | URLSearchParams | undefined;
@@ -207,7 +248,7 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
     };
 };
 
-const buildClientTree = (router: Routes, config: ClientConfig): Record<string, unknown> => {
+const buildClientTree = (router: Routes, config: ResolvedClientConfig): Record<string, unknown> => {
     const result: Record<string, unknown> = {};
     for (const key of Object.keys(router)) {
         const node = router[key];
@@ -228,9 +269,18 @@ const buildClientTree = (router: Routes, config: ClientConfig): Record<string, u
  * When the contract declares a request context with header bindings, pass their
  * values under `requestContext`; the client sends them with every request.
  *
+ * When the contract secures routes with [identities](/docs/auth), register a
+ * credential provider per identity under `auth`; the client attaches each route's
+ * credential where the identity declares it. Providers are optional — supply the
+ * ones this client holds; a scheme with no provider is not sent and the server
+ * returns its typed `401`/`403`.
+ *
  * @example
  * export const apiClient = createClient(contract, {
  *     baseUrl: 'https://api.example.com',
+ *     auth: {
+ *         user: () => getBearerToken(),
+ *     },
  * });
  *
  * const { status, body } = await apiClient.orders.pay({
@@ -249,18 +299,23 @@ export function createClient<
     config: ClientConfig &
         ({} extends ContextHeaderInputs<RequestContext>
             ? { requestContext?: ContextHeaderInputs<RequestContext> }
-            : { requestContext: ContextHeaderInputs<RequestContext> })
+            : { requestContext: ContextHeaderInputs<RequestContext> }) & { auth?: ClientAuth<Schemes> }
 ): Client<T, Codes> {
     const contextHeaders = (config as { requestContext?: Record<string, string | undefined> }).requestContext;
-    const resolvedConfig: ClientConfig = contextHeaders
-        ? {
-              ...config,
-              baseHeaders: {
-                  ...Object.fromEntries(Object.entries(contextHeaders).filter(([, value]) => value !== undefined)),
-                  ...(config.baseHeaders ?? {}),
-              } as Record<string, string>,
-          }
-        : config;
+    const auth = (config as { auth?: Record<string, CredentialProvider<CredentialValue>> }).auth;
+    const resolvedConfig: ResolvedClientConfig = {
+        ...(contextHeaders
+            ? {
+                  ...config,
+                  baseHeaders: {
+                      ...Object.fromEntries(Object.entries(contextHeaders).filter(([, value]) => value !== undefined)),
+                      ...(config.baseHeaders ?? {}),
+                  } as Record<string, string>,
+              }
+            : config),
+        auth,
+        securitySchemes: contract.securitySchemes,
+    };
 
     return buildClientTree(contract.routes, resolvedConfig) as Client<T, Codes>;
 }

@@ -24,7 +24,7 @@ import {
     type Routes,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
-import type { Contract } from '@ts-kizuna/core';
+import { resolveSchemePlacements, describeSchemePlacement, type Contract, type SchemePlacement } from '@ts-kizuna/core';
 import { SwiftWriter, stringLiteral } from './emit.js';
 import {
     TypeRegistry,
@@ -65,6 +65,7 @@ interface RouteMethod {
     pathParams: string[];
     pathTemplate: string;
     method: string;
+    security: string[];
     body?: BodyDescriptor;
     query: SwiftField[];
     headers: SwiftField[];
@@ -113,6 +114,7 @@ interface EmitContext {
     registry: TypeRegistry;
     // Header fields from the contract's request context declarations; empty when none.
     requestContextFields: SwiftField[];
+    authSchemes: Map<string, SchemePlacement>;
 }
 
 const buildRouteMethod = (
@@ -283,6 +285,12 @@ const buildRouteMethod = (
 
     const resultWrapperName = successReturnType !== 'Void' ? 'Result' : undefined;
 
+    const security: string[] = [];
+    for (const entry of route.security ?? []) {
+        if (typeof entry === 'string') security.push(entry);
+        else for (const name of Object.keys(entry)) if (!security.includes(name)) security.push(name);
+    }
+
     return {
         name: methodName,
         operationName: baseHint,
@@ -293,6 +301,7 @@ const buildRouteMethod = (
         pathParams,
         pathTemplate: route.path,
         method: route.method,
+        security,
         body: bodyDescriptor,
         query: queryFields,
         headers: headerFields,
@@ -1258,6 +1267,30 @@ const hasMultiErrorGroup = (method: RouteMethod): boolean => {
 
 // `receiver` prefixes the stored properties the body reads (baseURL, session, encoder, …): empty inside the
 // client itself, `client.` inside a sub-client struct that forwards to its parent client.
+const emitAuthPlacement = (writer: SwiftWriter, placement: SchemePlacement, receiver: string): void => {
+    writer.line(`if let provider = ${receiver}auth.${escapeKeyword(placement.name)}, let credential = await provider() {`);
+    switch (placement.kind) {
+        case 'bearer':
+            writer.line('    authHeaders["Authorization"] = "Bearer \\(credential)"');
+            break;
+        case 'basic':
+            writer.line(
+                '    authHeaders["Authorization"] = "Basic " + Data("\\(credential.username):\\(credential.password)".utf8).base64EncodedString()'
+            );
+            break;
+        case 'apiKeyHeader':
+            writer.line(`    authHeaders[${stringLiteral(placement.parameterName!)}] = credential`);
+            break;
+        case 'apiKeyCookie':
+            writer.line(`    authHeaders["Cookie"] = "${placement.parameterName}=\\(credential)"`);
+            break;
+        case 'apiKeyQuery':
+            writer.line(`    authQueryItems.append(URLQueryItem(name: ${stringLiteral(placement.parameterName!)}, value: credential))`);
+            break;
+    }
+    writer.line('}');
+};
+
 const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitContext, receiver = ''): void => {
     const failure = failureRef(method, context);
     const pathDecl = method.pathParams.length > 0 ? 'var' : 'let';
@@ -1269,13 +1302,25 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
         );
     }
 
+    const placements = method.security
+        .map((name) => context.authSchemes.get(name))
+        .filter((placement): placement is SchemePlacement => placement !== undefined);
+    const hasAuthHeaders = placements.some((placement) => placement.kind !== 'apiKeyQuery');
+    const hasAuthQuery = placements.some((placement) => placement.kind === 'apiKeyQuery');
+    if (placements.length > 0) {
+        if (hasAuthHeaders) writer.line('var authHeaders: [String: String] = [:]');
+        if (hasAuthQuery) writer.line('var authQueryItems: [URLQueryItem] = []');
+        for (const placement of placements) emitAuthPlacement(writer, placement, receiver);
+    }
+
     let queryItemsExpression = '[]';
-    if (method.query.length > 0) {
+    if (method.query.length > 0 || hasAuthQuery) {
         writer.line('var queryItems: [URLQueryItem] = []');
         for (const field of method.query) {
             const accessor = groupMemberAccessor('query', field);
             writer.line(`queryItems += Kizuna.queryItems(name: ${stringLiteral(field.wireName)}, value: ${accessor})`);
         }
+        if (hasAuthQuery) writer.line('queryItems += authQueryItems');
         queryItemsExpression = 'queryItems';
     }
 
@@ -1286,6 +1331,9 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
     writer.line(`request.httpMethod = ${stringLiteral(method.method)}`);
     if (context.requestContextFields.length > 0) {
         writer.line(`for (name, value) in ${receiver}requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }`);
+    }
+    if (hasAuthHeaders) {
+        writer.line(`for (name, value) in authHeaders { request.setValue(value, forHTTPHeaderField: name) }`);
     }
 
     if (method.body) {
@@ -1489,6 +1537,9 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
     writer.line(`try Kizuna.encodeBody(&request, value: body.payload, using: ${receiver}encoder, failure: ${failure}.self)`);
 };
 
+const authProviderType = (placement: SchemePlacement): string =>
+    placement.kind === 'basic' ? '(@Sendable () async -> (username: String, password: String)?)?' : '(@Sendable () async -> String?)?';
+
 const emitClient = (
     writer: SwiftWriter,
     config: { clientName: string; anyCodable: boolean },
@@ -1536,6 +1587,26 @@ const emitClient = (
                         }
                     }
                     writer.line('return fields');
+                });
+            });
+        }
+        const authSchemes = [...context.authSchemes.values()];
+        if (authSchemes.length > 0) {
+            writer.blank();
+            writer.docComment("A credential provider per identity, attached to each route from the contract's auth map.");
+            writer.block('public struct AuthProviders: Sendable', () => {
+                for (const placement of authSchemes) {
+                    writer.docComment(describeSchemePlacement(placement));
+                    writer.line(`public var ${escapeKeyword(placement.name)}: ${authProviderType(placement)}`);
+                }
+                writer.blank();
+                const initParams = authSchemes
+                    .map((placement) => `${escapeKeyword(placement.name)}: ${authProviderType(placement)} = nil`)
+                    .join(', ');
+                writer.block(`public init(${initParams})`, () => {
+                    for (const placement of authSchemes) {
+                        writer.line(`self.${escapeKeyword(placement.name)} = ${escapeKeyword(placement.name)}`);
+                    }
                 });
             });
         }
@@ -1637,6 +1708,9 @@ const emitClient = (
         if (contextFields.length > 0) {
             writer.line('let requestContextHeaders: [String: String]');
         }
+        if (authSchemes.length > 0) {
+            writer.line('public let auth: AuthProviders');
+        }
         writer.line('public let requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?');
         writer.line('public let responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?');
         writer.line('let encoder: JSONEncoder');
@@ -1644,14 +1718,18 @@ const emitClient = (
         writer.blank();
         const contextInitParam =
             contextFields.length > 0 ? `, requestContext: RequestContext${contextRequired ? '' : ' = RequestContext()'}` : '';
+        const authInitParam = authSchemes.length > 0 ? ', auth: AuthProviders = AuthProviders()' : '';
         writer.block(
-            `public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30${contextInitParam}, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil)`,
+            `public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30${contextInitParam}${authInitParam}, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil)`,
             () => {
                 writer.line('self.baseURL = baseURL');
                 writer.line('self.session = session');
                 writer.line('self.timeout = timeout');
                 if (contextFields.length > 0) {
                     writer.line('self.requestContextHeaders = requestContext.headerFields');
+                }
+                if (authSchemes.length > 0) {
+                    writer.line('self.auth = auth');
                 }
                 writer.line('self.requestMiddleware = requestMiddleware');
                 writer.line('self.responseMiddleware = responseMiddleware');
@@ -1761,6 +1839,8 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
         requestContextFields.push(...collectObjectFields(headersSchema, registry, 'RequestContext', undefined, 'headers', undefined));
     }
 
+    const authSchemes = resolveSchemePlacements(contract.securitySchemes);
+
     const context: EmitContext = {
         namespaceName,
         clientName,
@@ -1769,6 +1849,7 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
         ownedTypeMap,
         registry,
         requestContextFields,
+        authSchemes,
     };
 
     writer.block(`public enum ${namespaceName}`, () => {

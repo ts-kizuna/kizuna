@@ -238,6 +238,19 @@ public final class APIClient: Sendable {
         }
     }
 
+    /// A credential provider per identity, attached to each route from the contract's auth map.
+    public struct AuthProviders: Sendable {
+        /// Bearer token, sent as the `Authorization: Bearer` header.
+        public var user: (@Sendable () async -> String?)?
+        /// API key, sent as the `x-workspace-token` header.
+        public var member: (@Sendable () async -> String?)?
+
+        public init(user: (@Sendable () async -> String?)? = nil, member: (@Sendable () async -> String?)? = nil) {
+            self.user = user
+            self.member = member
+        }
+    }
+
     public struct MultipartFile: Sendable, Equatable {
         public let data: Foundation.Data
         public let filename: String
@@ -326,16 +339,18 @@ public final class APIClient: Sendable {
     public let session: URLSession
     public let timeout: TimeInterval
     let requestContextHeaders: [String: String]
+    public let auth: AuthProviders
     public let requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?
     public let responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?
     let encoder: JSONEncoder
     let decoder: JSONDecoder
 
-    public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, requestContext: RequestContext = RequestContext(), requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil) {
+    public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, requestContext: RequestContext = RequestContext(), auth: AuthProviders = AuthProviders(), requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil) {
         self.baseURL = baseURL
         self.session = session
         self.timeout = timeout
         self.requestContextHeaders = requestContext.headerFields
+        self.auth = auth
         self.requestMiddleware = requestMiddleware
         self.responseMiddleware = responseMiddleware
         self.encoder = Kizuna.makeJSONEncoder()
@@ -2008,10 +2023,15 @@ public struct APIMembersClient: Sendable {
     /// List workspace members
     public func listMembers() async throws(APIClient.MembersListMembers.Failure) -> APIClient.MembersListMembers.Result {
         let path = "/workspace/members"
+        var authHeaders: [String: String] = [:]
+        if let provider = client.auth.user, let credential = await provider() {
+            authHeaders["Authorization"] = "Bearer \(credential)"
+        }
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.MembersListMembers.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in authHeaders { request.setValue(value, forHTTPHeaderField: name) }
         let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.MembersListMembers.Failure.self)
         switch statusCode {
         case 200:
@@ -2025,10 +2045,18 @@ public struct APIMembersClient: Sendable {
     /// Invite a member to the workspace
     public func inviteMember(_ body: APIClient.MembersInviteMember.Body) async throws(APIClient.MembersInviteMember.Failure) -> APIClient.MembersInviteMember.Result {
         let path = "/workspace/members"
+        var authHeaders: [String: String] = [:]
+        if let provider = client.auth.user, let credential = await provider() {
+            authHeaders["Authorization"] = "Bearer \(credential)"
+        }
+        if let provider = client.auth.member, let credential = await provider() {
+            authHeaders["x-workspace-token"] = credential
+        }
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.MembersInviteMember.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in authHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.MembersInviteMember.Failure.self)
         let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.MembersInviteMember.Failure.self)
@@ -2058,10 +2086,15 @@ public struct APIWorkspaceClient: Sendable {
     /// Get workspace info
     public func getWorkspace() async throws(APIClient.WorkspaceGetWorkspace.Failure) -> APIClient.WorkspaceGetWorkspace.Result {
         let path = "/workspace"
+        var authHeaders: [String: String] = [:]
+        if let provider = client.auth.member, let credential = await provider() {
+            authHeaders["x-workspace-token"] = credential
+        }
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceGetWorkspace.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in authHeaders { request.setValue(value, forHTTPHeaderField: name) }
         let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.WorkspaceGetWorkspace.Failure.self)
         switch statusCode {
         case 200:
@@ -2075,10 +2108,15 @@ public struct APIWorkspaceClient: Sendable {
     /// Delete the workspace — owner-only via the auth map
     public func deleteWorkspace() async throws(APIClient.WorkspaceDeleteWorkspace.Failure) -> APIClient.WorkspaceDeleteWorkspace.Result {
         let path = "/workspace"
+        var authHeaders: [String: String] = [:]
+        if let provider = client.auth.member, let credential = await provider() {
+            authHeaders["x-workspace-token"] = credential
+        }
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "DELETE"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in authHeaders { request.setValue(value, forHTTPHeaderField: name) }
         let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
         switch statusCode {
         case 200:
@@ -2092,10 +2130,15 @@ public struct APIWorkspaceClient: Sendable {
     /// Transfer ownership — owner-only via the auth map
     public func transfer(_ body: APIClient.WorkspaceTransfer.Body) async throws(APIClient.WorkspaceTransfer.Failure) -> APIClient.WorkspaceTransfer.Result {
         let path = "/workspace/transfer"
+        var authHeaders: [String: String] = [:]
+        if let provider = client.auth.member, let credential = await provider() {
+            authHeaders["x-workspace-token"] = credential
+        }
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceTransfer.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        for (name, value) in authHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.WorkspaceTransfer.Failure.self)
         let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.WorkspaceTransfer.Failure.self)

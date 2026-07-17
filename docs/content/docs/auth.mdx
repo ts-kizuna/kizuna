@@ -237,16 +237,19 @@ A `custom` identity has no scheme to emit, so its routes carry an `x-kizuna-guar
 
 ### Client
 
-The [`createClient`](/docs/reference/create-client) client sends the credential in `baseHeaders`; the server's guards enforce the contract's auth and return the typed `401`/`403`:
+The [`createClient`](/docs/reference/create-client) client reads the same identities: register a credential provider per identity, and the client attaches each route's credential where the identity declares it. Providers are optional — a client supplies the credentials it holds, and any scheme without one is left to the server's `401`/`403`.
 
 ```ts
 const apiClient = createClient(contract, {
     baseUrl,
-    baseHeaders: {
-        Authorization: `Bearer ${token}`,
+    auth: {
+        user: () => getSessionToken(),
+        member: () => workspaceToken,
     },
 });
 ```
+
+The generated [Swift](/docs/clients/swift) and [Kotlin](/docs/clients/kotlin) clients take the same per-identity providers, so every client attaches credentials straight from the contract. See the [fetch client's Auth section](/docs/clients/fetch#auth) for the full behavior.
 
 ### MCP
 

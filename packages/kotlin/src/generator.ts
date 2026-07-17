@@ -18,7 +18,7 @@ import {
     mergeHeaderFields,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
-import type { Contract } from '@ts-kizuna/core';
+import { resolveSchemePlacements, describeSchemePlacement, type Contract, type SchemePlacement } from '@ts-kizuna/core';
 import { KotlinWriter, stringLiteral } from './emit.js';
 import {
     TypeRegistry,
@@ -70,6 +70,7 @@ interface RouteMethod {
     pathParams: string[];
     pathTemplate: string;
     method: string;
+    security: string[];
     body?: BodyDescriptor;
     query: KotlinField[];
     headers: KotlinField[];
@@ -110,6 +111,7 @@ interface EmitContext {
     ownedTypeMap: Map<string, string>;
     // Header fields from the contract's request context declarations; empty when none.
     requestContextFields: KotlinField[];
+    authSchemes: Map<string, SchemePlacement>;
 }
 
 const buildRouteMethod = (
@@ -270,6 +272,12 @@ const buildRouteMethod = (
 
     const resultWrapperName = successReturnType !== 'Unit' ? 'Result' : undefined;
 
+    const security: string[] = [];
+    for (const entry of route.security ?? []) {
+        if (typeof entry === 'string') security.push(entry);
+        else for (const name of Object.keys(entry)) if (!security.includes(name)) security.push(name);
+    }
+
     return {
         name: methodName,
         operationName: baseHint,
@@ -280,6 +288,7 @@ const buildRouteMethod = (
         pathParams,
         pathTemplate: route.path,
         method: route.method,
+        security,
         body: bodyDescriptor,
         query: queryFields,
         headers: headerFields,
@@ -1075,6 +1084,30 @@ const emitBodyEncoding = (writer: KotlinWriter, method: RouteMethod, context: Em
     }
 };
 
+const emitKotlinAuthPlacement = (writer: KotlinWriter, placement: SchemePlacement): void => {
+    writer.line(`auth.${escapeKeyword(placement.name)}?.invoke()?.let { credential ->`);
+    switch (placement.kind) {
+        case 'bearer':
+            writer.line('    requestBuilder = requestBuilder.header("Authorization", "Bearer $credential")');
+            break;
+        case 'basic':
+            writer.line(
+                '    requestBuilder = requestBuilder.header("Authorization", Credentials.basic(credential.first, credential.second))'
+            );
+            break;
+        case 'apiKeyHeader':
+            writer.line(`    requestBuilder = requestBuilder.header(${stringLiteral(placement.parameterName!)}, credential)`);
+            break;
+        case 'apiKeyCookie':
+            writer.line(`    requestBuilder = requestBuilder.header("Cookie", "${placement.parameterName}=$credential")`);
+            break;
+        case 'apiKeyQuery':
+            writer.line(`    urlBuilder.addQueryParameter(${stringLiteral(placement.parameterName!)}, credential)`);
+            break;
+    }
+    writer.line('}');
+};
+
 const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: EmitContext): void => {
     const operationRef = `${context.clientName}.${method.operationName}`;
     const failureRef = `${operationRef}.Failure`;
@@ -1124,12 +1157,19 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
         }
     }
 
+    const placements = method.security
+        .map((name) => context.authSchemes.get(name))
+        .filter((placement): placement is SchemePlacement => placement !== undefined);
+    const queryPlacements = placements.filter((placement) => placement.kind === 'apiKeyQuery');
+    const headerPlacements = placements.filter((placement) => placement.kind !== 'apiKeyQuery');
+    for (const placement of queryPlacements) emitKotlinAuthPlacement(writer, placement);
+
     if (hasBody) {
         writer.line('val requestBody: RequestBody');
         emitBodyEncoding(writer, method, context);
     }
 
-    const builderReassigned = context.requestContextFields.length > 0 || method.headers.length > 0;
+    const builderReassigned = context.requestContextFields.length > 0 || method.headers.length > 0 || headerPlacements.length > 0;
     writer.line(`${builderReassigned ? 'var' : 'val'} requestBuilder = Request.Builder()`);
     writer.line('    .url(urlBuilder.build())');
     if (hasBody) {
@@ -1160,6 +1200,8 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
             setHeader(accessor);
         }
     }
+
+    for (const placement of headerPlacements) emitKotlinAuthPlacement(writer, placement);
 
     writer.line('requestInterceptor?.invoke(requestBuilder)');
 
@@ -1292,9 +1334,10 @@ const emitSubClientMethod = (writer: KotlinWriter, method: RouteMethod, context:
 };
 
 const emitSubClientClass = (writer: KotlinWriter, group: RouteGroup, clientName: string, context: EmitContext): void => {
+    const authParam = context.authSchemes.size > 0 ? `private val auth: ${clientName}.Auth, ` : '';
     writer.blank();
     writer.block(
-        `class ${group.className}(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?)`,
+        `class ${group.className}(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, ${authParam}private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?)`,
         () => {
             for (const method of group.methods) {
                 writer.blank();
@@ -1353,6 +1396,9 @@ const emitKizunaObject = (writer: KotlinWriter): void => {
     });
 };
 
+const kotlinAuthProviderType = (placement: SchemePlacement): string =>
+    placement.kind === 'basic' ? '(suspend () -> Pair<String, String>?)?' : '(suspend () -> String?)?';
+
 const emitClient = (
     writer: KotlinWriter,
     config: { clientName: string },
@@ -1371,10 +1417,26 @@ const emitClient = (
     const contextRequired = contextFields.some((field) => !field.optional);
     const contextParam = contextFields.length > 0 ? `requestContext: RequestContext${contextRequired ? '' : ' = RequestContext()'}, ` : '';
 
+    const authSchemes = [...context.authSchemes.values()];
+    const authParam = authSchemes.length > 0 ? 'private val auth: Auth = Auth(), ' : '';
+
     writer.blank();
     writer.block(
-        `class ${clientName}(private val baseUrl: String, ${contextParam}private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null)`,
+        `class ${clientName}(private val baseUrl: String, ${contextParam}${authParam}private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null)`,
         () => {
+            if (authSchemes.length > 0) {
+                writer.blank();
+                writer.line("/** A credential provider per identity, attached to each route from the contract's auth map. */");
+                writer.line('class Auth(');
+                writer.indent(() => {
+                    authSchemes.forEach((placement, index) => {
+                        const separator = index < authSchemes.length - 1 ? ',' : '';
+                        writer.line(`/** ${describeSchemePlacement(placement)} */`);
+                        writer.line(`val ${escapeKeyword(placement.name)}: ${kotlinAuthProviderType(placement)} = null${separator}`);
+                    });
+                });
+                writer.line(')');
+            }
             if (contextFields.length > 0) {
                 writer.blank();
                 writer.line("/** Values sent as headers on every request, from the contract's request context. */");
@@ -1449,7 +1511,7 @@ const emitClient = (
                 for (const group of groups) {
                     writer.blank();
                     writer.line(
-                        `val ${escapeKeyword(group.propertyName)} = ${group.className}(client, baseUrl, json, ${contextFields.length > 0 ? 'requestContextHeaders' : 'emptyMap()'}, requestInterceptor, responseInterceptor)`
+                        `val ${escapeKeyword(group.propertyName)} = ${group.className}(client, baseUrl, json, ${contextFields.length > 0 ? 'requestContextHeaders' : 'emptyMap()'}, ${authSchemes.length > 0 ? 'auth, ' : ''}requestInterceptor, responseInterceptor)`
                     );
                 }
             }
@@ -1554,6 +1616,8 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
         requestContextFields.push(...collectObjectFields(headersSchema, registry, 'RequestContext', undefined, 'headers', undefined));
     }
 
+    const authSchemes = resolveSchemePlacements(contract.securitySchemes);
+
     const context: EmitContext = {
         namespaceName,
         clientName,
@@ -1561,6 +1625,7 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
         fileLevelTypeNames,
         ownedTypeMap,
         requestContextFields,
+        authSchemes,
     };
 
     writer.block(`object ${namespaceName}`, () => {

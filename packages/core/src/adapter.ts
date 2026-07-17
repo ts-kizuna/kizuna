@@ -358,7 +358,8 @@ export const extractCredential = (scheme: SecurityScheme, request: AdapterReques
         let credentials: { username: string; password: string } | null = null;
         if (authorization && /^basic\s+/i.test(authorization)) {
             try {
-                const decoded = atob(authorization.replace(/^basic\s+/i, ''));
+                const bytes = Uint8Array.from(atob(authorization.replace(/^basic\s+/i, '')), (char) => char.charCodeAt(0));
+                const decoded = new TextDecoder().decode(bytes);
                 const separator = decoded.indexOf(':');
                 if (separator !== -1) credentials = { username: decoded.slice(0, separator), password: decoded.slice(separator + 1) };
             } catch {

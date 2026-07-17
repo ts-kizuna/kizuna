@@ -135,15 +135,31 @@ class APIClient(
 }
 ```
 
-## Interceptors &amp; auth
+## Auth
 
-`requestInterceptor` runs before every request — attach auth headers here. `responseInterceptor` observes every response. Both may suspend (e.g. to refresh a token):
+When the contract secures routes with [identities](/docs/auth), pass a credential provider per identity through the generated `Auth` class. The client reads each route's declared security and attaches the credential where the identity says — `Authorization: Bearer` for a bearer identity, `Authorization: Basic` for a basic one (via OkHttp's `Credentials.basic`), or the header, query parameter, or cookie an `apiKey` identity names. Providers are `suspend`, so a token can be read from storage or refreshed on demand; return `null` to send no credential and let the server's guards return the typed `401`/`403`.
+
+```kotlin
+val client = APIClient(
+    baseUrl = "https://api.example.com",
+    auth = APIClient.Auth(
+        user = { sessionToken() },
+        member = { workspaceToken },
+    )
+)
+```
+
+A `custom` identity carries no client-placeable credential, so it gets no provider — its token travels in the route's path parameters.
+
+## Interceptors
+
+`requestInterceptor` runs before every request — use it for cross-cutting headers or logging. `responseInterceptor` observes every response. Both may suspend, and both run after the contract's `auth` providers, so an interceptor can still override a credential:
 
 ```kotlin
 val client = APIClient(
     baseUrl = "https://api.example.com",
     requestInterceptor = { builder ->
-        builder.header("Authorization", "Bearer $token")
+        builder.header("x-trace-id", newTraceId())
     },
     responseInterceptor = { request, response ->
         println("${request.method} ${request.url} -> ${response.code}")

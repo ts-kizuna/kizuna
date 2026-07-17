@@ -96,7 +96,15 @@ object API {
     }
 }
 
-class APIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
+class APIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val auth: Auth = Auth(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
+
+    /** A credential provider per identity, attached to each route from the contract's auth map. */
+    class Auth(
+        /** Bearer token, sent as the `Authorization: Bearer` header. */
+        val user: (suspend () -> String?)? = null,
+        /** API key, sent as the `x-workspace-token` header. */
+        val member: (suspend () -> String?)? = null
+    )
 
     /** Values sent as headers on every request, from the contract's request context. */
     data class RequestContext(
@@ -841,20 +849,20 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, auth, requestInterceptor, responseInterceptor)
 
-    val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, auth, requestInterceptor, responseInterceptor)
 
-    val notifications = APINotificationsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val notifications = APINotificationsClient(client, baseUrl, json, requestContextHeaders, auth, requestInterceptor, responseInterceptor)
 
-    val members = APIMembersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val members = APIMembersClient(client, baseUrl, json, requestContextHeaders, auth, requestInterceptor, responseInterceptor)
 
-    val workspace = APIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val workspace = APIWorkspaceClient(client, baseUrl, json, requestContextHeaders, auth, requestInterceptor, responseInterceptor)
 
-    val invites = APIInvitesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val invites = APIInvitesClient(client, baseUrl, json, requestContextHeaders, auth, requestInterceptor, responseInterceptor)
 }
 
-class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val auth: APIClient.Auth, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** List users with pagination */
     @Throws(APIClient.UsersListUsers.Failure::class)
@@ -1326,7 +1334,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     }
 }
 
-class APIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val auth: APIClient.Auth, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** Health check — exercises nested sub-client routing */
     @Throws(APIClient.HealthCheck.Failure::class)
@@ -1410,7 +1418,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
     }
 }
 
-class APINotificationsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APINotificationsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val auth: APIClient.Auth, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** Send a notification (discriminated by channel) */
     @Throws(APIClient.NotificationsSendNotification.Failure::class)
@@ -1593,7 +1601,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
     }
 }
 
-class APIMembersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIMembersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val auth: APIClient.Auth, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** List workspace members */
     @Throws(APIClient.MembersListMembers.Failure::class)
@@ -1604,6 +1612,9 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
             .url(urlBuilder.build())
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        auth.user?.invoke()?.let { credential ->
+            requestBuilder = requestBuilder.header("Authorization", "Bearer $credential")
+        }
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1636,6 +1647,12 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
             .url(urlBuilder.build())
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        auth.user?.invoke()?.let { credential ->
+            requestBuilder = requestBuilder.header("Authorization", "Bearer $credential")
+        }
+        auth.member?.invoke()?.let { credential ->
+            requestBuilder = requestBuilder.header("x-workspace-token", credential)
+        }
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1667,7 +1684,7 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
     }
 }
 
-class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val auth: APIClient.Auth, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** Get workspace info */
     @Throws(APIClient.WorkspaceGetWorkspace.Failure::class)
@@ -1678,6 +1695,9 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .url(urlBuilder.build())
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        auth.member?.invoke()?.let { credential ->
+            requestBuilder = requestBuilder.header("x-workspace-token", credential)
+        }
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1705,6 +1725,9 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .url(urlBuilder.build())
             .method("DELETE", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        auth.member?.invoke()?.let { credential ->
+            requestBuilder = requestBuilder.header("x-workspace-token", credential)
+        }
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1737,6 +1760,9 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .url(urlBuilder.build())
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        auth.member?.invoke()?.let { credential ->
+            requestBuilder = requestBuilder.header("x-workspace-token", credential)
+        }
         requestInterceptor?.invoke(requestBuilder)
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         return httpResponse.use {
@@ -1762,7 +1788,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
     }
 }
 
-class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val auth: APIClient.Auth, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** Resolve an invite by its capability-URL token, guarded by a custom path-token identity */
     @Throws(APIClient.InvitesGetInvite.Failure::class)

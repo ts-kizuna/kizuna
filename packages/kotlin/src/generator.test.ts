@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createModel, createRequestContext, type Contract } from '@ts-kizuna/core';
+import { kizuna, createModel, createRequestContext, createIdentity, type Contract } from '@ts-kizuna/core';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateKotlinClient } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
@@ -1641,5 +1641,106 @@ describe('Kotlin generator — emitted-syntax cleanups', () => {
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('204 -> {}');
         expect(output).not.toContain('204 -> {\n');
+    });
+});
+
+describe('Kotlin generator — typed auth', () => {
+    const authK = kizuna({
+        identities: {
+            user: createIdentity.bearer({
+                context: z.object({ userId: z.string() }),
+            }),
+            member: createIdentity.apiKey({
+                name: 'x-workspace-token',
+                in: 'header',
+            }),
+            queryKey: createIdentity.apiKey({
+                name: 'api_key',
+                in: 'query',
+            }),
+            admin: createIdentity.basic({
+                context: z.object({ adminId: z.string() }),
+            }),
+            inviteToken: createIdentity.custom({
+                context: z.object({ inviteId: z.string() }),
+            }),
+        },
+    }).k;
+
+    const authRoutes = authK.routes('api', {
+        bearerRoute: {
+            method: 'GET',
+            path: '/bearer',
+            responses: { 200: z.object({ ok: z.boolean() }) },
+        },
+        headerRoute: {
+            method: 'GET',
+            path: '/header',
+            responses: { 200: z.object({ ok: z.boolean() }) },
+        },
+        queryRoute: {
+            method: 'GET',
+            path: '/query',
+            responses: { 200: z.object({ ok: z.boolean() }) },
+        },
+        basicRoute: {
+            method: 'GET',
+            path: '/basic',
+            responses: { 200: z.object({ ok: z.boolean() }) },
+        },
+        inviteRoute: {
+            method: 'GET',
+            path: '/invites/:token',
+            responses: { 200: z.object({ ok: z.boolean() }) },
+        },
+    });
+
+    const authContract = authK.contract({
+        routes: authRoutes,
+        auth: authK.auth(authRoutes, {
+            bearerRoute: 'user',
+            headerRoute: 'member',
+            queryRoute: 'queryKey',
+            basicRoute: 'admin',
+            inviteRoute: 'inviteToken',
+        }),
+    });
+
+    const output = generateKotlinClient(authContract, baseConfig);
+
+    it('emits an Auth class typed per scheme', () => {
+        expect(output).toContain('class Auth(');
+        expect(output).toContain('val user: (suspend () -> String?)? = null');
+        expect(output).toContain('val member: (suspend () -> String?)? = null');
+        expect(output).toContain('val admin: (suspend () -> Pair<String, String>?)? = null');
+    });
+
+    it('adds an auth constructor parameter', () => {
+        expect(output).toContain('private val auth: Auth = Auth()');
+    });
+
+    it('excludes custom identities from the providers', () => {
+        expect(output).not.toContain('val inviteToken: (suspend');
+    });
+
+    it('attaches a bearer token as an Authorization header', () => {
+        expect(output).toContain('auth.user?.invoke()?.let { credential ->');
+        expect(output).toContain('requestBuilder = requestBuilder.header("Authorization", "Bearer $credential")');
+    });
+
+    it('attaches an apiKey to its declared header', () => {
+        expect(output).toContain('requestBuilder = requestBuilder.header("x-workspace-token", credential)');
+    });
+
+    it('attaches an apiKey to the query string', () => {
+        expect(output).toContain('urlBuilder.addQueryParameter("api_key", credential)');
+    });
+
+    it('encodes basic credentials with Credentials.basic', () => {
+        expect(output).toContain('Credentials.basic(credential.first, credential.second)');
+    });
+
+    it('does not inject a credential on a custom-guarded route', () => {
+        expect(output).not.toContain('auth.inviteToken');
     });
 });
