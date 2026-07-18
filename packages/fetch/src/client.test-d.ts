@@ -160,6 +160,30 @@ const contractRoutes = k.routes('api', {
             }),
         },
     },
+    optionalHeaders: {
+        method: 'GET',
+        path: '/optional-headers',
+        headers: z.object({
+            'accept-language': z.string().optional(),
+        }),
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+    requiredHeaders: {
+        method: 'GET',
+        path: '/required-headers',
+        headers: z.object({
+            'x-tenant': z.string(),
+        }),
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
 });
 
 const contract = k.contract({
@@ -296,6 +320,17 @@ test('listUsers also accepts explicit query', async () => {
     if (result.status === 200) {
         expectTypeOf(result.body).toEqualTypeOf<{ users: string[] }>();
     }
+});
+
+test('optional headers can be omitted', async () => {
+    await client.optionalHeaders();
+    await client.optionalHeaders({ headers: { 'accept-language': 'nb' } });
+});
+
+test('required headers must be provided', () => {
+    // @ts-expect-error headers is required when a field is required
+    client.requiredHeaders();
+    client.requiredHeaders({ headers: { 'x-tenant': 'acme' } });
 });
 
 test('rejects wrong param shape', () => {

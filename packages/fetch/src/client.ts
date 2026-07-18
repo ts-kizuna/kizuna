@@ -40,14 +40,23 @@ type ClientParams<R extends RouteDefinition> = R extends { pathParams: z.ZodType
     ? z.output<R['pathParams']>
     : ExtractPathParams<R['path']>;
 
+/**
+ * True when the arg can be omitted: its input accepts `{}` or `undefined`.
+ */
+type IsOmittable<Payload> = {} extends Payload ? true : [undefined] extends [Payload] ? true : false;
+
 type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends true ? { params: ClientParams<R> } : {}) &
     (R extends { body: z.ZodType } ? (ClientPayload<R['body']> extends void ? {} : { body: ClientPayload<R['body']> }) : {}) &
     (R extends { query: z.ZodType }
-        ? {} extends ClientPayload<R['query']>
+        ? IsOmittable<ClientPayload<R['query']>> extends true
             ? { query?: ClientPayload<R['query']> }
             : { query: ClientPayload<R['query']> }
         : {}) &
-    (R extends { headers: z.ZodType } ? { headers: ClientPayload<R['headers']> } : { headers?: Record<string, string> }) & {
+    (R extends { headers: z.ZodType }
+        ? IsOmittable<ClientPayload<R['headers']>> extends true
+            ? { headers?: ClientPayload<R['headers']> }
+            : { headers: ClientPayload<R['headers']> }
+        : { headers?: Record<string, string> }) & {
         fetchOptions?: RequestInit;
     };
 
