@@ -34,5 +34,6 @@ export const member = createIdentity.apiKey({
 export const inviteToken = createIdentity.custom({
     context: z.object({
         inviteId: z.string(),
+        email: z.email(),
     }),
 });

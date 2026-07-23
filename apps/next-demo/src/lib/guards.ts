@@ -1,8 +1,8 @@
-import { sessions, memberships, inviteTokens } from '@ts-kizuna-demo/shared';
+import { db } from '@ts-kizuna-demo/shared';
 import { server } from './server';
 
-export const requireUser = server.guard('user', ({ bearer, deny }) => {
-    const session = bearer ? sessions.get(bearer.token) : undefined;
+export const requireUser = server.guard('user', async ({ bearer, deny }) => {
+    const session = bearer ? await db.sessions.findByToken(bearer.token) : null;
     if (!session) {
         return deny(401, 'Unauthorized');
     }
@@ -11,20 +11,21 @@ export const requireUser = server.guard('user', ({ bearer, deny }) => {
     };
 });
 
-export const requireMember = server.guard('member', ({ apiKey, deny }) => {
-    const membership = apiKey ? memberships.get(apiKey.value) : undefined;
+export const requireMember = server.guard('member', async ({ apiKey, deny }) => {
+    const membership = apiKey ? await db.memberships.findByApiKey(apiKey.value) : null;
     if (!membership) {
         return deny(403, 'Forbidden');
     }
     return membership;
 });
 
-export const requireInviteToken = server.guard('inviteToken', ({ params, deny }) => {
-    const inviteId = params.token ? inviteTokens.get(params.token) : undefined;
-    if (!inviteId) {
+export const requireInviteToken = server.guard('inviteToken', async ({ params, deny }) => {
+    const invite = params.token ? await db.invites.findByToken(params.token) : null;
+    if (!invite) {
         return deny(404, 'Not found');
     }
     return {
-        inviteId,
+        inviteId: invite.id,
+        email: invite.email,
     };
 });
