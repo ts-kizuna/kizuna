@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { createApi, createRequestContextResolver, createGuard, type Router } from '@ts-kizuna/hono';
+import { createServer, type Router } from '@ts-kizuna/hono';
 import { contract, sessions, memberships, inviteTokens, inviteEmails } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
 
@@ -25,12 +25,14 @@ users.set('2', {
 
 const archivedUsers = new Set<string>();
 
-const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ c }) => ({
+const { server } = createServer(contract);
+
+const captureAnalytics = server.requestContext('analytics', ({ c }) => ({
     sessionId: c.req.header('x-posthog-session-id') ?? null,
     distinctId: c.req.header('x-posthog-distinct-id') ?? null,
 }));
 
-const requireUser = createGuard(contract, 'user', ({ bearer, deny }) => {
+const requireUser = server.guard('user', ({ bearer, deny }) => {
     const session = bearer ? sessions.get(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
@@ -40,7 +42,7 @@ const requireUser = createGuard(contract, 'user', ({ bearer, deny }) => {
     };
 });
 
-const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) => {
+const requireMember = server.guard('member', ({ apiKey, deny }) => {
     const membership = apiKey ? memberships.get(apiKey.value) : undefined;
     if (!membership) {
         return deny(403, 'Forbidden');
@@ -48,7 +50,7 @@ const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) => {
     return membership;
 });
 
-const requireInviteToken = createGuard(contract, 'inviteToken', ({ params, deny }) => {
+const requireInviteToken = server.guard('inviteToken', ({ params, deny }) => {
     const inviteId = params.token ? inviteTokens.get(params.token) : undefined;
     if (!inviteId) {
         return deny(404, 'Not found');
@@ -361,8 +363,7 @@ const invitesHandlers: Router<typeof contract>['invites'] = {
     }),
 };
 
-export const api = createApi({
-    contract,
+export const api = server.api({
     router: {
         users: usersHandlers,
         notifications: notificationsHandlers,

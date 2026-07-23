@@ -101,7 +101,7 @@ Handlers called via MCP receive the same framework context as regular HTTP handl
 
 ## Auth
 
-Secured tools authenticate via the headers of the MCP transport request. When an assistant calls one, the endpoint runs the [guards](/docs/auth) registered on `createApi`, exactly like the HTTP pipeline: each identity's credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context as usual. Nothing extra to wire — mounting a secured API gives you a secured MCP endpoint.
+Secured tools authenticate via the headers of the MCP transport request. When an assistant calls one, the endpoint runs the [guards](/docs/auth) registered on `server.api`, exactly like the HTTP pipeline: each identity's credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context as usual. Nothing extra to wire — mounting a secured API gives you a secured MCP endpoint.
 
 Configure the MCP client to send the credential as a header on the connection. For example, with Claude Code:
 

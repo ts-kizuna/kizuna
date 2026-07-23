@@ -3,18 +3,16 @@ title: Mounting
 description: Bind your router to the contract and serve it with an adapter.
 ---
 
-The last step: `createApi` binds your [router](/docs/building/router) to the [contract](/docs/building/contract), producing the API object your framework adapter mounts. After this, your routes are live.
+The last step: `server.api` binds your [router](/docs/building/router) into the API object your framework adapter mounts. After this, your routes are live. The `server` handle comes from `createServer(contract)` (see [Router](/docs/building/router)).
 
-## `createApi`
+## `server.api`
 
-```ts title="src/lib/server.ts"
-import { createApi } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
-import { contract } from './contract';
+```ts title="src/lib/api.ts"
+import { server } from './server'; // createServer(contract) from @ts-kizuna/express, fastify, hono, or next
 import { router } from './router';
 import { requireUser, requireMember } from './guards';
 
-export const api = createApi({
-    contract,
+export const api = server.api({
     router,
     guards: {
         user: requireUser,
@@ -25,15 +23,15 @@ export const api = createApi({
 
 ## Guards
 
-If the contract declares identities, pass one guard per identity under `guards` — created with the adapter's `createGuard`, a guard verifies the extracted credential and returns the identity's context or a denial. The contract's auth map decides which routes each guard protects, so `createApi` attaches them automatically. See the [Auth guide](/docs/auth) for the whole pipeline and the adapter pages for each framework's guard context.
+If the contract declares identities, pass one guard per identity under `guards`. Created with `server.guard`, a guard verifies the extracted credential and returns the identity's context or a denial. The contract's auth map decides which routes each guard protects, so `server.api` attaches them automatically. See the [Auth guide](/docs/auth) for the whole pipeline and the adapter pages for each framework's guard context.
 
 ## Request context
 
-For request-scoped values every handler needs — analytics ids, a logger, a tenant — declare them with [`createRequestContext`](/docs/reference/create-request-context), register them on `kizuna`, and resolve each with the adapter's `createRequestContextResolver`. Resolvers run on every route, never deny, and handlers receive their values typed under each name.
+For request-scoped values every handler needs (analytics ids, a logger, a tenant), declare them with [`createRequestContext`](/docs/reference/create-request-context), register them on `kizuna`, and resolve each with `server.requestContext`. Resolvers run on every route, never deny, and handlers receive their values typed under each name.
 
 ## Middleware
 
-For everything else — rate limiting, multipart parsing — use your framework's own middleware (`app.use`, Fastify hooks). Authentication belongs in guards, request-scoped values in `requestContext`.
+For everything else (rate limiting, multipart parsing) use your framework's own middleware (`app.use`, Fastify hooks). Authentication belongs in guards, request-scoped values in `requestContext`.
 
 ## Mounting
 
@@ -44,7 +42,7 @@ Once you have an `api` object, mount it with the adapter's mount verb:
 ```ts title="src/index.ts"
 import express from 'express';
 import { createExpressEndpoints } from '@ts-kizuna/express';
-import { api } from './lib/server';
+import { api } from './lib/api';
 
 const app = express();
 app.use(express.json());
@@ -57,7 +55,7 @@ app.listen(3000);
 ```ts title="src/index.ts"
 import Fastify from 'fastify';
 import { fastifyKizuna } from '@ts-kizuna/fastify';
-import { api } from './lib/server';
+import { api } from './lib/api';
 
 const app = Fastify();
 app.register(fastifyKizuna, {
@@ -73,7 +71,7 @@ app.listen({
 ```ts title="src/index.ts"
 import { Hono } from 'hono';
 import { createHonoEndpoints } from '@ts-kizuna/hono';
-import { api } from './lib/server';
+import { api } from './lib/api';
 
 const app = new Hono();
 createHonoEndpoints(api, app);
@@ -85,7 +83,7 @@ export default app;
 
 ```ts title="src/app/api/[...ts-kizuna]/route.ts"
 import { createNextEndpoints } from '@ts-kizuna/next';
-import { api } from '../../../lib/server';
+import { api } from '../../../lib/api';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
     basePath: '/api',
@@ -94,8 +92,9 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoi
 
 ## Reference
 
-- [`createApi`](/docs/reference/create-api)
-- [`createGuard`](/docs/reference/create-guard)
+- [`createServer`](/docs/reference/create-server)
+- [`server.api`](/docs/reference/create-server#serverapi)
+- [`server.guard`](/docs/reference/create-server#serverguard)
 
 ## Next steps
 

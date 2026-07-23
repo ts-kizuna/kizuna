@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { createRequestContextResolver, createGuard } from '@ts-kizuna/express';
+import { createServer } from '@ts-kizuna/express';
 import type { Router } from '@ts-kizuna/express';
 import { contract, sessions, memberships, inviteTokens, inviteEmails } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
@@ -26,12 +26,14 @@ users.set('2', {
 
 const archivedUsers = new Set<string>();
 
-export const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ headers }) => ({
+export const { server } = createServer(contract);
+
+export const captureAnalytics = server.requestContext('analytics', ({ headers }) => ({
     sessionId: headers['x-posthog-session-id'] ?? null,
     distinctId: headers['x-posthog-distinct-id'] ?? null,
 }));
 
-export const requireUser = createGuard(contract, 'user', ({ bearer, deny }) => {
+export const requireUser = server.guard('user', ({ bearer, deny }) => {
     const session = bearer ? sessions.get(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
@@ -41,7 +43,7 @@ export const requireUser = createGuard(contract, 'user', ({ bearer, deny }) => {
     };
 });
 
-export const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) => {
+export const requireMember = server.guard('member', ({ apiKey, deny }) => {
     const membership = apiKey ? memberships.get(apiKey.value) : undefined;
     if (!membership) {
         return deny(403, 'Forbidden');
@@ -49,7 +51,7 @@ export const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) 
     return membership;
 });
 
-export const requireInviteToken = createGuard(contract, 'inviteToken', ({ params, deny }) => {
+export const requireInviteToken = server.guard('inviteToken', ({ params, deny }) => {
     const inviteId = params.token ? inviteTokens.get(params.token) : undefined;
     if (!inviteId) {
         return deny(404, 'Not found');

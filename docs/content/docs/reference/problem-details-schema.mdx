@@ -3,7 +3,7 @@ title: ProblemDetailsSchema
 description: RFC 9457 Problem Details error response schema (ProblemDetailsSchema) used across kizuna.
 ---
 
-The standard [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) error response shape used by kizuna. Matches the format produced by [`deny()`](/docs/reference/create-guard#deny-and-problemdetailsschema) in guards and all built-in error responses (404, 405, 415, etc.).
+The standard [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) error response shape used by kizuna. Matches the format produced by [`deny()`](/docs/reference/create-server#serverguard#deny-and-problemdetailsschema) in guards and all built-in error responses (404, 405, 415, etc.).
 
 ```ts
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
@@ -54,7 +54,7 @@ const usersRoutes = k.routes('users', {
 Handlers only need to provide `detail` — kizuna fills in `type`, `title`, and `status` automatically:
 
 ```ts
-const router = createRouter(contract, {
+const router = server.router({
     users: {
         getUser: ({ params, throwError }) => {
             const user = userStore.get(params.id);

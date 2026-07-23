@@ -96,6 +96,8 @@ export interface HonoOptions {
  *     listUsers: ({ query }) => ({ status: 200, body: { users: [], total: 0 } }),
  *     createUser: ({ body }) => ({ status: 201, body: { id: '1', ...body } }),
  * });
+ *
+ * @deprecated Use `server.router` from {@link createServer}, which binds the contract.
  */
 export const createRouter: {
     <const C extends Contract, const Group extends Extract<keyof Router<C>, string>, E extends Env = Env>(
@@ -174,6 +176,8 @@ type RequestResolverFns<RequestContext extends Record<string, RequestContextSche
  * export const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ c }) => ({
  *     sessionId: c.req.header('x-posthog-session-id') ?? null,
  * }));
+ *
+ * @deprecated Use `server.requestContext` from {@link createServer}, which binds the contract.
  */
 export function createRequestContextResolver<
     RequestContext extends Record<string, RequestContextSchema>,
@@ -203,6 +207,8 @@ export function createRequestContextResolver<
  *         userId: session.userId,
  *     };
  * });
+ *
+ * @deprecated Use `server.guard` from {@link createServer}, which binds the contract.
  */
 export function createGuard<
     const R extends Routes,
@@ -250,6 +256,8 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
  *         user: requireUser,
  *     },
  * });
+ *
+ * @deprecated Use `server.api` from {@link createServer}, which binds the contract.
  */
 export function createApi<
     const R extends Routes,
@@ -343,3 +351,92 @@ export function createHonoEndpoints<E extends Env = Env>(api: HonoApi, app: Hono
         );
     }
 }
+
+type ServerContract<
+    R extends Routes,
+    Schemes extends Record<string, SecurityScheme>,
+    Auth,
+    RequestContext extends Record<string, RequestContextSchema>,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext>;
+
+export interface Server<
+    R extends Routes,
+    Schemes extends Record<string, SecurityScheme>,
+    Auth,
+    RequestContext extends Record<string, RequestContextSchema>,
+    E extends Env = Env,
+> {
+    /**
+     * Define a guard for one of the contract's identities.
+     */
+    guard<const Name extends Extract<keyof Schemes, string>>(
+        name: Name,
+        run: GuardFns<Schemes, GuardParams<R, Auth, Name>, E>[Name]
+    ): GuardRun<HonoHandlerContext<E>>;
+    /**
+     * Define a request context resolver declared on the contract.
+     */
+    requestContext<const Name extends Extract<keyof RequestContext, string>>(
+        name: Name,
+        run: RequestResolverFns<RequestContext, E>[Name]
+    ): RequestContextRun<HonoHandlerContext<E>>;
+    /**
+     * Bind typed handlers to the contract or one of its route groups.
+     */
+    router: {
+        <const Group extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext>, E>, string>>(
+            group: Group,
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext>, E>[Group]
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext>, E>[Group];
+        (router: Router<ServerContract<R, Schemes, Auth, RequestContext>, E>): Router<ServerContract<R, Schemes, Auth, RequestContext>, E>;
+    };
+    /**
+     * Assemble the router and guards into the api object.
+     */
+    api(
+        options: {
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext>, E>;
+            guards?: NoInfer<GuardsForSchemes<Schemes, E>>;
+            middleware?: MiddlewareMap<R, MiddlewareHandler<E>>;
+        } & (string extends keyof RequestContext
+            ? { requestContext?: undefined }
+            : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<HonoHandlerContext<E>> }> })
+    ): HonoApi<R>;
+}
+
+/**
+ * Bind a contract to a server handle: the server-side counterpart to `kizuna`'s
+ * `k`.
+ *
+ * @example
+ * const { server } = createServer(contract);
+ *
+ * const requireUser = server.guard('user', ({ bearer, deny }) => {
+ *     const session = bearer && sessions.get(bearer.token);
+ *     return session ? { userId: session.userId } : deny(401, 'Unauthorized');
+ * });
+ *
+ * export const api = server.api({
+ *     router,
+ *     guards: {
+ *         user: requireUser,
+ *     },
+ * });
+ */
+export const createServer = <
+    const R extends Routes,
+    Schemes extends Record<string, SecurityScheme>,
+    Auth,
+    RequestContext extends Record<string, RequestContextSchema>,
+    E extends Env = Env,
+>(
+    contract: ServerContract<R, Schemes, Auth, RequestContext>
+): { server: Server<R, Schemes, Auth, RequestContext, E> } => {
+    const server = {
+        guard: (_name: string, run: unknown) => run,
+        requestContext: (_name: string, run: unknown) => run,
+        router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
+        api: (options: object) => createApi({ contract, ...options } as never),
+    };
+    return { server: server as unknown as Server<R, Schemes, Auth, RequestContext, E> };
+};

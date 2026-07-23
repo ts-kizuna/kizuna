@@ -3,7 +3,7 @@ title: Express
 description: Mount a ts-kizuna API on an Express 5 application.
 ---
 
-`@ts-kizuna/express` connects a ts-kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting — all driven by your contract.
+`@ts-kizuna/express` connects a ts-kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by your contract.
 
 **Requires Express ≥ 5.**
 
@@ -11,17 +11,24 @@ description: Mount a ts-kizuna API on an Express 5 application.
 
 ## Setup
 
-The standard setup uses three functions:
+The standard setup:
 
-- `createRouter` — bind typed implementations to the contract
-- `createApi` — combine your contract, router, and guards into an API object
-- `createExpressEndpoints` — mount the API on an Express app
+- `createServer` binds the contract to a `server` handle
+- `server.router` binds typed implementations to the contract
+- `server.api` combines the router and guards into an API object
+- `createExpressEndpoints` mounts the API on an Express app
 
-```ts title="src/lib/router.ts"
-import { createRouter } from '@ts-kizuna/express';
+```ts title="src/lib/server.ts"
+import { createServer } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 
-export const router = createRouter(contract, {
+export const { server } = createServer(contract);
+```
+
+```ts title="src/lib/router.ts"
+import { server } from './server';
+
+export const router = server.router({
     users: {
         listUsers: async ({ query }) => {
             const found = await db.users.findMany({
@@ -62,13 +69,11 @@ export const router = createRouter(contract, {
 });
 ```
 
-```ts title="src/lib/server.ts"
-import { createApi } from '@ts-kizuna/express';
-import { contract } from '@shared/contract';
+```ts title="src/lib/api.ts"
+import { server } from './server';
 import { router } from './router';
 
-export const api = createApi({
-    contract,
+export const api = server.api({
     router,
 });
 ```
@@ -76,7 +81,7 @@ export const api = createApi({
 ```ts title="src/index.ts"
 import express from 'express';
 import { createExpressEndpoints } from '@ts-kizuna/express';
-import { api } from './lib/server';
+import { api } from './lib/api';
 
 const app = express();
 app.use(express.json());
@@ -88,7 +93,7 @@ app.listen(3000);
 
 ## Handler context
 
-Each handler receives `{ params, query, body, headers, req, res }`. The `req` and `res` are the native Express objects — useful when you need to access cookies, set custom headers, or stream a response.
+Each handler receives `{ params, query, body, headers, req, res }`. The `req` and `res` are the native Express objects, useful when you need to access cookies, set custom headers, or stream a response.
 
 ```ts
 getUser: async ({ params, req, res }) => {
@@ -104,13 +109,12 @@ getUser: async ({ params, req, res }) => {
 
 ## Guards
 
-One guard per identity. The credential arrives extracted and typed, alongside the native `req`/`res` — see the [Auth guide](/docs/auth).
+One guard per identity. The credential arrives extracted and typed, alongside the native `req`/`res`. See the [Auth guide](/docs/auth).
 
 ```ts title="src/lib/guards.ts"
-import { createGuard } from '@ts-kizuna/express';
-import { contract } from '@shared/contract';
+import { server } from './server';
 
-export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {
+export const requireUser = server.guard('user', async ({ bearer, deny }) => {
     const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
@@ -185,6 +189,7 @@ createExpressEndpoints(api, app);
 
 ## Reference
 
-- [`createRouter`](/docs/reference/create-router)
-- [`createApi`](/docs/reference/create-api)
-- [`createGuard`](/docs/reference/create-guard)
+- [`createServer`](/docs/reference/create-server)
+- [`server.router`](/docs/reference/create-server#serverrouter)
+- [`server.api`](/docs/reference/create-server#serverapi)
+- [`server.guard`](/docs/reference/create-server#serverguard)

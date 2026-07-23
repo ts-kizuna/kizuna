@@ -90,7 +90,7 @@ export const createMiddleware = <const R extends Routes>(
  * result. Keying by name lets each guard's return be typed against its own
  * identity, so access values narrow without an annotation.
  */
-type GuardFns<Schemes extends Record<string, SecurityScheme>, Params> = {
+export type GuardFns<Schemes extends Record<string, SecurityScheme>, Params> = {
     [Name in keyof Schemes]: (
         args: NextHandlerContext &
             CredentialOf<Schemes[Name]> & {
@@ -126,6 +126,9 @@ export type RequestResolverFns<RequestContext extends Record<string, RequestCont
  * runs on every route — public ones included — and never denies; handlers read
  * its value under the provider's name.
  *
+ * @deprecated Use `server.requestContext(name, run)` from {@link createServer}. The
+ * contract is bound once and the name carries through to `server.api`.
+ *
  * @example
  * export const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ request }) => ({
  *     sessionId: request.headers.get('x-posthog-session-id'),
@@ -149,6 +152,9 @@ export function createRequestContextResolver<
  * `basic` — `null` when absent), a `deny` helper, and the route's `scopes`.
  * Return the identity's context and access fields to allow the request (read in
  * handlers under `auth`, keyed by the identity's name), or call `deny(status, detail)`.
+ *
+ * @deprecated Use `server.guard(name, run)` from {@link createServer}. The contract
+ * is bound once and the identity name carries through to `server.api`.
  *
  * @example
  * export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {

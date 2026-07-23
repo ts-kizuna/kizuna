@@ -109,17 +109,23 @@ export const contract = k.contract({
 
 ## 3. Implement the server
 
-Pick an adapter — here, Express. Three pieces: a **router**, an **api** that binds it to the contract, and the **mount** that attaches it to your app.
+Pick an adapter, here Express. `createServer` binds the contract to a `server` handle, `server.router` supplies the handlers, `server.api` produces the API object, and the mount attaches it to your app.
 
 <InstallTabs packageName="@ts-kizuna/express" />
 
 `handlers` supplies one function per route in a group. Inputs arrive validated and typed; return values are checked against the contract's declared responses.
 
-```ts title="src/lib/router.ts"
-import { createRouter } from '@ts-kizuna/express';
+```ts title="src/lib/server.ts"
+import { createServer } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 
-export const router = createRouter(contract, {
+export const { server } = createServer(contract);
+```
+
+```ts title="src/lib/router.ts"
+import { server } from './server';
+
+export const router = server.router({
     users: {
         listUsers: async ({ query }) => {
             const users = await db.users.findMany({
@@ -169,15 +175,13 @@ export const router = createRouter(contract, {
 });
 ```
 
-`createApi` binds the router to the contract, producing the API object the adapter mounts.
+`server.api` binds the router into the API object the adapter mounts.
 
-```ts title="src/lib/server.ts"
-import { createApi } from '@ts-kizuna/express';
-import { contract } from '@shared/contract';
+```ts title="src/lib/api.ts"
+import { server } from './server';
 import { router } from './router';
 
-export const api = createApi({
-    contract,
+export const api = server.api({
     router,
 });
 ```
@@ -187,7 +191,7 @@ Mount it on your app.
 ```ts title="src/index.ts"
 import express from 'express';
 import { createExpressEndpoints } from '@ts-kizuna/express';
-import { api } from './lib/server';
+import { api } from './lib/api';
 
 const app = express();
 app.use(express.json());

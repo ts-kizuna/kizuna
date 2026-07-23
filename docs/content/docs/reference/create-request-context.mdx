@@ -34,17 +34,15 @@ export const { k } = kizuna({
 ```
 
 ```ts title="src/lib/request-context.ts"
-import { createRequestContextResolver } from '@ts-kizuna/express';
-import { contract } from './contract';
+import { server } from './server';
 
-export const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ headers }) => ({
+export const captureAnalytics = server.requestContext('analytics', ({ headers }) => ({
     sessionId: headers['x-posthog-session-id'] ?? null,
 }));
 ```
 
-```ts title="src/lib/server.ts"
-export const api = createApi({
-    contract,
+```ts title="src/lib/api.ts"
+export const api = server.api({
     router,
     requestContext: {
         analytics: captureAnalytics,

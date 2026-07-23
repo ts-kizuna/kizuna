@@ -25,11 +25,11 @@ For Fastify, see [`fastifyKizunaMcp`](/docs/reference/fastify-kizuna-mcp).
 createMcpEndpoint(api: Api, app: Express, options?: McpEndpointOptions): void
 ```
 
-| Parameter | Type                 | Required | Description                                                |
-| --------- | -------------------- | -------- | ---------------------------------------------------------- |
-| `api`     | `Api`                | Yes      | API created with [`createApi`](/docs/reference/create-api) |
-| `app`     | `Express`            | Yes      | Express application instance                               |
-| `options` | `McpEndpointOptions` | No       | Configuration options                                      |
+| Parameter | Type                 | Required | Description                                                             |
+| --------- | -------------------- | -------- | ----------------------------------------------------------------------- |
+| `api`     | `Api`                | Yes      | API created with [`createApi`](/docs/reference/create-server#serverapi) |
+| `app`     | `Express`            | Yes      | Express application instance                                            |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                                   |
 
 Mounts the MCP protocol handler at `/mcp` by default.
 
@@ -54,11 +54,11 @@ app.listen(3000);
 createMcpEndpoint(api: Api, app: Hono, options?: McpEndpointOptions): void
 ```
 
-| Parameter | Type                 | Required | Description                                                |
-| --------- | -------------------- | -------- | ---------------------------------------------------------- |
-| `api`     | `Api`                | Yes      | API created with [`createApi`](/docs/reference/create-api) |
-| `app`     | `Hono`               | Yes      | Hono application instance                                  |
-| `options` | `McpEndpointOptions` | No       | Configuration options                                      |
+| Parameter | Type                 | Required | Description                                                             |
+| --------- | -------------------- | -------- | ----------------------------------------------------------------------- |
+| `api`     | `Api`                | Yes      | API created with [`createApi`](/docs/reference/create-server#serverapi) |
+| `app`     | `Hono`               | Yes      | Hono application instance                                               |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                                   |
 
 Mounts the MCP protocol handler at `/mcp` by default.
 
@@ -82,10 +82,10 @@ export default app;
 createMcpEndpoint(api: Api, options?: McpEndpointOptions): { GET, POST, DELETE }
 ```
 
-| Parameter | Type                 | Required | Description                                                |
-| --------- | -------------------- | -------- | ---------------------------------------------------------- |
-| `api`     | `Api`                | Yes      | API created with [`createApi`](/docs/reference/create-api) |
-| `options` | `McpEndpointOptions` | No       | Configuration options                                      |
+| Parameter | Type                 | Required | Description                                                             |
+| --------- | -------------------- | -------- | ----------------------------------------------------------------------- |
+| `api`     | `Api`                | Yes      | API created with [`createApi`](/docs/reference/create-server#serverapi) |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                                   |
 
 Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HTTP transport requires.
 
@@ -107,7 +107,7 @@ export const { GET, POST, DELETE } = createMcpEndpoint(api);
 
 ## Secured routes
 
-Secured tools authenticate via the MCP transport request's headers, running the same [guards](/docs/reference/create-guard) as their HTTP endpoints. The endpoint reads each identity's credential from those headers (`credentialHeaders`, populated automatically) and runs the guard per tool call — the handler receives the identity's context exactly as it would over HTTP, and a `deny(...)` becomes a tool error result.
+Secured tools authenticate via the MCP transport request's headers, running the same [guards](/docs/reference/create-server#serverguard) as their HTTP endpoints. The endpoint reads each identity's credential from those headers (`credentialHeaders`, populated automatically) and runs the guard per tool call — the handler receives the identity's context exactly as it would over HTTP, and a `deny(...)` becomes a tool error result.
 
 Configure the MCP client to send the credential on its connection, for example an `Authorization` header:
 

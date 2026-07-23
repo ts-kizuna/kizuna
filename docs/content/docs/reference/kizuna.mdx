@@ -129,7 +129,7 @@ Auth is deliberately absent from this table. A route's `security` is owned by th
 
 ## Assembling the contract
 
-`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/create-client), [server](/docs/reference/create-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `kizuna`.
+`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/create-client), [server](/docs/reference/create-server#serverapi), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `kizuna`.
 
 ```ts
 // contract.ts
@@ -219,7 +219,7 @@ members: {
 },
 ```
 
-`k.contract` resolves the map onto every route's `security` (and `accessGate` where fields are constrained), which the [guards](/docs/reference/create-guard), [router](/docs/reference/create-router) types, and [OpenAPI spec](/docs/reference/generate-openapi) all read.
+`k.contract` resolves the map onto every route's `security` (and `accessGate` where fields are constrained), which the [guards](/docs/reference/create-server#serverguard), [router](/docs/reference/create-server#serverrouter) types, and [OpenAPI spec](/docs/reference/generate-openapi) all read.
 
 ### `k.auth`
 
