@@ -1,30 +1,31 @@
 import { randomUUID } from 'node:crypto';
-import { inviteEmails, users, archivedUsers, type User } from '@ts-kizuna-demo/shared';
+import { db } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
 import { server } from './server';
 
 export const router = server.router({
     users: {
-        listUsers: ({ query }) => {
-            const all = Array.from(users.values());
-            const start = (query.page - 1) * query.limit;
+        listUsers: async ({ query }) => {
+            const skip = (query.page - 1) * query.limit;
+            const [users, total] = await Promise.all([db.users.findMany({ skip, take: query.limit }), db.users.count()]);
             return {
                 status: 200,
                 body: {
-                    users: all.slice(start, start + query.limit),
-                    total: all.length,
+                    users,
+                    total,
                 },
             };
         },
-        exportUsers: () => {
-            const rows = Array.from(users.values()).map((user) => [user.id, user.name, user.email]);
+        exportUsers: async () => {
+            const users = await db.users.findMany();
+            const rows = users.map((user) => [user.id, user.name, user.email]);
             return {
                 status: 200,
                 body: toCsv(['id', 'name', 'email'], rows),
             };
         },
-        userBadge: ({ params }) => {
-            const user = users.get(params.id);
+        userBadge: async ({ params }) => {
+            const user = await db.users.findById(params.id);
             if (!user) {
                 return {
                     status: 404,
@@ -38,20 +39,21 @@ export const router = server.router({
                 body: Buffer.from(`BADGE:${user.id}:${user.name}`, 'utf-8'),
             };
         },
-        searchUsers: ({ query }) => {
-            const all = Array.from(users.values()).filter((user) => user.name.toLowerCase().includes(query.q.toLowerCase()));
-            const slice = all.slice(query.cursor, query.cursor + query.limit);
-            const nextCursor = query.cursor + slice.length < all.length ? query.cursor + slice.length : null;
+        searchUsers: async ({ query }) => {
+            const { users, nextCursor } = await db.users.search(query.q, {
+                cursor: query.cursor,
+                limit: query.limit,
+            });
             return {
                 status: 200,
                 body: {
-                    users: slice,
+                    users,
                     nextCursor,
                 },
             };
         },
-        getUser: ({ params, headers }) => {
-            const user = users.get(params.id);
+        getUser: async ({ params, headers }) => {
+            const user = await db.users.findById(params.id);
             if (!user) {
                 return {
                     status: 404,
@@ -68,21 +70,21 @@ export const router = server.router({
                 },
             };
         },
-        createUser: ({ body }) => {
-            const user: User = {
+        createUser: async ({ body }) => {
+            const user = await db.users.create({
                 id: randomUUID(),
                 name: body.name,
                 email: body.email,
                 last_name: body.last_name,
-            };
-            users.set(user.id, user);
+            });
             return {
                 status: 201,
                 body: user,
             };
         },
-        deleteUser: ({ params }) => {
-            if (!users.has(params.id)) {
+        deleteUser: async ({ params }) => {
+            const existed = await db.users.delete(params.id);
+            if (!existed) {
                 return {
                     status: 404,
                     body: {
@@ -90,7 +92,6 @@ export const router = server.router({
                     },
                 };
             }
-            users.delete(params.id);
             return {
                 status: 200,
                 body: {
@@ -98,8 +99,9 @@ export const router = server.router({
                 },
             };
         },
-        archiveUser: ({ params }) => {
-            if (archivedUsers.has(params.id)) {
+        archiveUser: async ({ params }) => {
+            const { alreadyArchived } = await db.users.archive(params.id);
+            if (alreadyArchived) {
                 return {
                     status: 200,
                     body: {
@@ -108,7 +110,6 @@ export const router = server.router({
                     },
                 };
             }
-            archivedUsers.add(params.id);
             return {
                 status: 201,
                 body: {
@@ -138,8 +139,8 @@ export const router = server.router({
                 contentType: 'image/jpeg',
             },
         }),
-        checkUser: ({ params }) => {
-            const user = users.get(params.id);
+        checkUser: async ({ params }) => {
+            const user = await db.users.findById(params.id);
             if (!user) {
                 return {
                     status: 404,
@@ -162,7 +163,33 @@ export const router = server.router({
             },
         }),
     },
+    health: {
+        check: () => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        }),
+        version: () => ({
+            status: 200,
+            body: {
+                version: '1.0.0',
+            },
+        }),
+        history: () => ({
+            status: 200,
+            body: [{ ok: true, checkedAt: new Date().toISOString() }],
+        }),
+    },
     notifications: {
+        sendNotification: () => {
+            return {
+                status: 202,
+                body: {
+                    accepted: true,
+                },
+            };
+        },
         listEvents: ({ query, requestContext }) => {
             return {
                 status: 200,
@@ -186,14 +213,6 @@ export const router = server.router({
                 },
             };
         },
-        sendNotification: () => {
-            return {
-                status: 202,
-                body: {
-                    accepted: true,
-                },
-            };
-        },
         validateConfig: () => ({
             status: 200,
             body: {
@@ -208,15 +227,18 @@ export const router = server.router({
         }),
     },
     members: {
-        listMembers: ({ auth }) => ({
-            status: 200,
-            body: {
-                members: Array.from(users.values()).filter((candidate) => candidate.id !== auth.user.userId),
-            },
-        }),
-        inviteMember: ({ body, auth }) => {
-            const existing = Array.from(users.values()).find((candidate) => candidate.email === body.email);
-            if (existing) {
+        listMembers: async ({ auth }) => {
+            const allMembers = await db.users.findMany();
+            return {
+                status: 200,
+                body: {
+                    members: allMembers.filter((candidate) => candidate.id !== auth.user.userId),
+                },
+            };
+        },
+        inviteMember: async ({ body, auth }) => {
+            const existingMember = await db.users.findByEmail(body.email);
+            if (existingMember) {
                 return {
                     status: 409,
                     body: {
@@ -224,12 +246,11 @@ export const router = server.router({
                     },
                 };
             }
-            const invited: User = {
+            const invited = await db.users.create({
                 id: randomUUID(),
                 name: body.email,
                 email: body.email,
-            };
-            users.set(invited.id, invited);
+            });
             return {
                 status: 201,
                 body: invited,
@@ -250,7 +271,7 @@ export const router = server.router({
                 ok: auth.member.role === 'owner',
             },
         }),
-        transfer: ({ body, auth }) => {
+        transfer: async ({ body, auth }) => {
             if (body.toUserId === auth.member.workspaceUserId) {
                 return {
                     status: 200,
@@ -259,7 +280,7 @@ export const router = server.router({
                     },
                 };
             }
-            users.delete(body.toUserId);
+            await db.users.delete(body.toUserId);
             return {
                 status: 200,
                 body: {
@@ -268,30 +289,12 @@ export const router = server.router({
             };
         },
     },
-    health: {
-        check: () => ({
-            status: 200,
-            body: {
-                ok: true,
-            },
-        }),
-        version: () => ({
-            status: 200,
-            body: {
-                version: '1.0.0',
-            },
-        }),
-        history: () => ({
-            status: 200,
-            body: [{ ok: true, checkedAt: new Date().toISOString() }],
-        }),
-    },
     invites: {
         getInvite: ({ auth }) => ({
             status: 200,
             body: {
                 inviteId: auth.inviteToken.inviteId,
-                email: inviteEmails.get(auth.inviteToken.inviteId) ?? 'unknown@example.com',
+                email: auth.inviteToken.email,
             },
         }),
         acceptInvite: ({ auth }) => ({

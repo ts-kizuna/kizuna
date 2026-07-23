@@ -29,7 +29,7 @@ export const UserSchema = createModel({
             example: 'alice@example.com',
         }),
         last_name: z.string().optional().meta({
-            description: 'Family name on the wire as `last_name` — exercises snake_case fidelity through the generators.',
+            description: 'Family name on the wire as `last_name`, exercises snake_case fidelity through the generators.',
             example: 'Hopper',
         }),
         avatar: z
@@ -53,8 +53,6 @@ export const UserSchema = createModel({
             .optional(),
     }),
 });
-
-export type User = z.infer<typeof UserSchema>;
 
 export const CreateUserSchema = createModel({
     title: 'CreateUserInput',
