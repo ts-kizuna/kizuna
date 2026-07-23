@@ -1,3 +1,17 @@
+export interface User {
+    id: string;
+    name: string;
+    email: string;
+    last_name?: string;
+}
+
+export const users = new Map<string, User>([
+    ['1', { id: '1', name: 'Ada Lovelace', email: 'ada@example.com', last_name: 'Lovelace' }],
+    ['2', { id: '2', name: 'Linus Torvalds', email: 'linus@example.com' }],
+]);
+
+export const archivedUsers = new Set<string>();
+
 export const sessions = new Map<string, { userId: string }>([
     ['tok_ada', { userId: '1' }],
     ['tok_linus', { userId: '2' }],

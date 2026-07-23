@@ -1,4 +1,4 @@
-import { openApiSpec } from '../../lib/openapi-spec';
+import { openApiSpec } from '../../lib/openApi';
 
 export const GET = () =>
     new Response(openApiSpec('yaml'), {

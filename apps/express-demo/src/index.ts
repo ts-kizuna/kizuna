@@ -1,40 +1,12 @@
 import express from 'express';
 import { apiReference } from '@scalar/express-api-reference';
 import { createExpressEndpoints } from '@ts-kizuna/express';
-import { generateOpenApi } from '@ts-kizuna/openapi';
-import { contract } from '@ts-kizuna-demo/shared';
 
-import { server, router, requireUser, requireMember, requireInviteToken, captureAnalytics } from './lib/server';
+import { api } from './lib/api';
+import { openApiSpec } from './lib/openApi';
 
 const app = express();
 app.use(express.json());
-
-const api = server.api({
-    router,
-    guards: {
-        user: requireUser,
-        member: requireMember,
-        inviteToken: requireInviteToken,
-    },
-    requestContext: {
-        analytics: captureAnalytics,
-    },
-});
-
-const openApiSpec = generateOpenApi(contract, {
-    info: {
-        title: 'ts-kizuna Express Demo',
-        version: '1.0.0',
-        description: 'Express adapter demo for the ts-kizuna user API.',
-    },
-    servers: [
-        {
-            url: 'http://localhost:8000',
-            description: 'Local express demo',
-        },
-    ],
-    setOperationId: true,
-});
 
 app.get('/openapi.json', (_req, res) => {
     res.json(openApiSpec('json'));

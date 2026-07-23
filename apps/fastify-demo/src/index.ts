@@ -1,28 +1,12 @@
 import Fastify from 'fastify';
 import { fastifyKizuna } from '@ts-kizuna/fastify';
 import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
-import { generateOpenApi } from '@ts-kizuna/openapi';
 import fastifyApiReference from '@scalar/fastify-api-reference';
-import { contract } from '@ts-kizuna-demo/shared';
 
-import { api } from './lib/server';
+import { api } from './lib/api';
+import { openApiSpec } from './lib/openApi';
 
 const app = Fastify();
-
-const openApiSpec = generateOpenApi(contract, {
-    info: {
-        title: 'ts-kizuna Fastify Demo',
-        version: '1.0.0',
-        description: 'Fastify adapter demo for the ts-kizuna user API.',
-    },
-    servers: [
-        {
-            url: 'http://localhost:8002',
-            description: 'Local fastify demo',
-        },
-    ],
-    setOperationId: true,
-});
 
 app.get('/openapi.json', async (_request, reply) => {
     reply.send(openApiSpec('json'));
