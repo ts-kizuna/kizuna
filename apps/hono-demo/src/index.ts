@@ -3,27 +3,11 @@ import { Hono } from 'hono';
 import { apiReference } from '@scalar/hono-api-reference';
 import { createHonoEndpoints } from '@ts-kizuna/hono';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/hono';
-import { generateOpenApi } from '@ts-kizuna/openapi';
-import { contract } from '@ts-kizuna-demo/shared';
 
-import { api } from './lib/server';
+import { api } from './lib/api';
+import { openApiSpec } from './lib/openApi';
 
 const app = new Hono();
-
-const openApiSpec = generateOpenApi(contract, {
-    info: {
-        title: 'ts-kizuna Hono Demo',
-        version: '1.0.0',
-        description: 'Hono adapter demo for the ts-kizuna user API.',
-    },
-    servers: [
-        {
-            url: 'http://localhost:8001',
-            description: 'Local hono demo',
-        },
-    ],
-    setOperationId: true,
-});
 
 app.get('/openapi.json', (c) => {
     return c.json(openApiSpec('json'));
