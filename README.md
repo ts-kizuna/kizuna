@@ -82,8 +82,17 @@ export const contract = k.contract({
 ## Implement your routes on the server
 
 ```ts
+// server.ts
+import { contract } from './contract';
+
+export const { server } = createServer(contract);
+```
+
+```ts
 // router.ts
-export const router = createRouter(contract, {
+import { server } from './server';
+
+export const router = server.router({
     users: {
         getUser: async ({ params }) => {
             const user = await db.users.findById(params.id);
@@ -115,12 +124,14 @@ export const router = createRouter(contract, {
 
 ## Bind the contract to your server
 
-`createApi` joins the contract with your router:
+`server.api` joins your router into the API object the adapter mounts:
 
 ```ts
-// server.ts
-export const api = createApi({
-    contract,
+// api.ts
+import { server } from './server';
+import { router } from './router';
+
+export const api = server.api({
     router,
 });
 ```

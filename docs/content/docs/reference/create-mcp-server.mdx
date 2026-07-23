@@ -19,10 +19,10 @@ import { createMcpServer } from '@ts-kizuna/mcp';
 createMcpServer(api: Api, options?: McpServerOptions): McpServer
 ```
 
-| Parameter | Type               | Required | Description                                                |
-| --------- | ------------------ | -------- | ---------------------------------------------------------- |
-| `api`     | `Api`              | Yes      | API created with [`createApi`](/docs/reference/create-api) |
-| `options` | `McpServerOptions` | No       | Configuration options                                      |
+| Parameter | Type               | Required | Description                                                             |
+| --------- | ------------------ | -------- | ----------------------------------------------------------------------- |
+| `api`     | `Api`              | Yes      | API created with [`createApi`](/docs/reference/create-server#serverapi) |
+| `options` | `McpServerOptions` | No       | Configuration options                                                   |
 
 ## Options
 
@@ -36,7 +36,7 @@ createMcpServer(api: Api, options?: McpServerOptions): McpServer
 
 ## Secured routes
 
-Each call to a secured tool runs the same [guard](/docs/reference/create-guard) pipeline as an HTTP request: the identity's credential is extracted from `credentialHeaders`, the guard resolves it to context (passed to the handler under the identity's name), access gates are checked, and a `deny(...)` becomes a tool error result.
+Each call to a secured tool runs the same [guard](/docs/reference/create-server#serverguard) pipeline as an HTTP request: the identity's credential is extracted from `credentialHeaders`, the guard resolves it to context (passed to the handler under the identity's name), access gates are checked, and a `deny(...)` becomes a tool error result.
 
 The adapter endpoints ([`createMcpEndpoint`](/docs/reference/create-mcp-endpoint), [`fastifyKizunaMcp`](/docs/reference/fastify-kizuna-mcp)) populate `credentialHeaders` automatically from the incoming request. When you drive the transport yourself, pass the headers along — for stdio there is no HTTP request, so supply whatever credential headers the environment provides:
 

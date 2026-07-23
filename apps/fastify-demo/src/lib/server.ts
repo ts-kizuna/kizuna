@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { createRequestContextResolver, createGuard, createApi, type Router } from '@ts-kizuna/fastify';
+import { createServer, type Router } from '@ts-kizuna/fastify';
 import { getHeaderValue } from '@ts-kizuna/core';
 import { contract, sessions, memberships, inviteTokens, inviteEmails } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
@@ -26,12 +26,14 @@ users.set('2', {
 
 const archivedUsers = new Set<string>();
 
-const captureAnalytics = createRequestContextResolver(contract, 'analytics', ({ request }) => ({
+const { server } = createServer(contract);
+
+const captureAnalytics = server.requestContext('analytics', ({ request }) => ({
     sessionId: getHeaderValue(request.headers['x-posthog-session-id']) ?? null,
     distinctId: getHeaderValue(request.headers['x-posthog-distinct-id']) ?? null,
 }));
 
-const requireUser = createGuard(contract, 'user', ({ bearer, deny }) => {
+const requireUser = server.guard('user', ({ bearer, deny }) => {
     const session = bearer ? sessions.get(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
@@ -41,7 +43,7 @@ const requireUser = createGuard(contract, 'user', ({ bearer, deny }) => {
     };
 });
 
-const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) => {
+const requireMember = server.guard('member', ({ apiKey, deny }) => {
     const membership = apiKey ? memberships.get(apiKey.value) : undefined;
     if (!membership) {
         return deny(403, 'Forbidden');
@@ -49,7 +51,7 @@ const requireMember = createGuard(contract, 'member', ({ apiKey, deny }) => {
     return membership;
 });
 
-const requireInviteToken = createGuard(contract, 'inviteToken', ({ params, deny }) => {
+const requireInviteToken = server.guard('inviteToken', ({ params, deny }) => {
     const inviteId = params.token ? inviteTokens.get(params.token) : undefined;
     if (!inviteId) {
         return deny(404, 'Not found');
@@ -59,8 +61,7 @@ const requireInviteToken = createGuard(contract, 'inviteToken', ({ params, deny 
     };
 });
 
-export const api = createApi({
-    contract,
+export const api = server.api({
     guards: {
         user: requireUser,
         member: requireMember,

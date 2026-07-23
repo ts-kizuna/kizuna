@@ -100,7 +100,7 @@ For request bodies, just remove the `body` field. Use `z.void()` for responses t
 
 ## Contract
 
-ts-rest passes its router straight to the client and server. ts-kizuna adds one step: assemble your route groups into a contract with `k.contract`, then pass that everywhere (`client`, `createApi`).
+ts-rest passes its router straight to the client and server. ts-kizuna adds one step: assemble your route groups into a contract with `k.contract`, then pass that everywhere (`client`, `createServer`).
 
 ```ts
 // ts-kizuna
@@ -136,9 +136,9 @@ const client = createClient(contract, {
 
 ## Server
 
-### `initServer` → `createRouter` + `createApi`
+### `initServer` maps to `createServer`
 
-`initServer` does not exist in ts-kizuna. Use `createRouter` to bind implementations to the contract, and `createApi` to produce a mountable API object.
+`initServer` does not exist in ts-kizuna. Bind the contract with `createServer`, use `server.router` to bind implementations, and `server.api` to produce a mountable API object.
 
 ```ts
 // ts-rest
@@ -149,12 +149,13 @@ const router = s.router(contract, { ... });
 
 ```ts
 // ts-kizuna
-import { createRouter, createApi } from '@ts-kizuna/express';
+import { createServer } from '@ts-kizuna/express';
 
-const router = createRouter(contract, { ... });
+const { server } = createServer(contract);
 
-export const api = createApi({
-    contract,
+const router = server.router({ ... });
+
+export const api = server.api({
     router,
 });
 ```
@@ -195,7 +196,7 @@ import { createExpressEndpoints } from '@ts-kizuna/express';
 createExpressEndpoints(api, app);
 ```
 
-In ts-kizuna, `createExpressEndpoints` takes the `api` object (produced by `createApi`) rather than separate routes and handler arguments.
+In ts-kizuna, `createExpressEndpoints` takes the `api` object (produced by `server.api`) rather than separate routes and handler arguments.
 
 ## Next.js adapter
 

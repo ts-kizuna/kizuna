@@ -26,11 +26,17 @@ export default withKizuna(nextConfig);
 
 Then create a catch-all route at `src/app/api/[...ts-kizuna]/route.ts`. The adapter exports handlers for every HTTP method, which Next.js dispatches automatically.
 
-```ts title="src/lib/router.ts"
-import { createRouter } from '@ts-kizuna/next';
+```ts title="src/lib/server.ts"
+import { createServer } from '@ts-kizuna/next';
 import { contract } from '@shared/contract';
 
-export const router = createRouter(contract, {
+export const { server } = createServer(contract);
+```
+
+```ts title="src/lib/router.ts"
+import { server } from './server';
+
+export const router = server.router({
     users: {
         listUsers: async ({ query }) => {
             const found = await db.users.findMany({
@@ -71,27 +77,23 @@ export const router = createRouter(contract, {
 });
 ```
 
-```ts title="src/lib/server.ts"
-import { createApi } from '@ts-kizuna/next';
-import { contract } from '@shared/contract';
+```ts title="src/lib/api.ts"
+import { server } from './server';
 import { router } from './router';
 
-export const api = createApi({
-    contract,
+export const api = server.api({
     router,
 });
 ```
 
 ```ts title="src/app/api/[...ts-kizuna]/route.ts"
 import { createNextEndpoints } from '@ts-kizuna/next';
-import { api } from '../../../lib/server';
+import { api } from '../../../lib/api';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
     basePath: '/api',
 });
 ```
-
-`api.mount({ basePath: '/api' })` is a convenience method that calls `createNextEndpoints` internally — use whichever you prefer.
 
 The `basePath` option tells the adapter to strip the prefix when matching requests against the declared paths.
 
@@ -115,10 +117,9 @@ getUser: async ({ params, request }) => {
 One guard per identity. The credential arrives extracted and typed, alongside the native `request` — see the [Auth guide](/docs/auth).
 
 ```ts title="src/lib/guards.ts"
-import { createGuard } from '@ts-kizuna/next';
-import { contract } from '@shared/contract';
+import { server } from './server';
 
-export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {
+export const requireUser = server.guard('user', async ({ bearer, deny }) => {
     const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
@@ -135,7 +136,7 @@ For request-scoped values handlers need, use [`createRequestContext`](/docs/refe
 
 ## Options
 
-Pass options to `createNextEndpoints` (or `api.mount`):
+Pass options to `createNextEndpoints`:
 
 ```ts
 createNextEndpoints(api, {
@@ -144,24 +145,22 @@ createNextEndpoints(api, {
 });
 ```
 
-| Option               | Default | Description                                                                                                                                                  |
-| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `basePath`           | `''`    | Path prefix to strip when matching incoming paths                                                                                                            |
-| `requestMiddleware`  | `[]`    | Middleware run after route matching, before the handler — see [`requestMiddleware`](#requestmiddleware)                                                      |
-| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                              |
-| `onError`            | —       | Map a thrown error into a response (inbound migration seam); return an `AdapterResult`/`Response` to override the default 500. Also settable on `createApi`. |
+| Option               | Default | Description                                                                                                                                                   |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `basePath`           | `''`    | Path prefix to strip when matching incoming paths                                                                                                             |
+| `requestMiddleware`  | `[]`    | Middleware run after route matching, before the handler — see [`requestMiddleware`](#requestmiddleware)                                                       |
+| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                               |
+| `onError`            | none    | Map a thrown error into a response (inbound migration seam); return an `AdapterResult`/`Response` to override the default 500. Also settable on `server.api`. |
 
 ## `onError`
 
-Set `onError` on `createApi` (or pass it to `createNextEndpoints`) to send a custom response instead of the default 500:
+Set `onError` on `server.api` (or pass it to `createNextEndpoints`) to send a custom response instead of the default 500:
 
-```ts title="src/lib/server.ts"
-import { createApi } from '@ts-kizuna/next';
-import { contract } from '@shared/contract';
+```ts title="src/lib/api.ts"
+import { server } from './server';
 import { router } from './router';
 
-export const api = createApi({
-    contract,
+export const api = server.api({
     router,
     onError: (error) => {
         if (error instanceof AuthError) {
@@ -233,6 +232,7 @@ uploadAvatar: async ({ body }) => {
 
 ## Reference
 
-- [`createRouter`](/docs/reference/create-router)
-- [`createApi`](/docs/reference/create-api)
-- [`createGuard`](/docs/reference/create-guard)
+- [`createServer`](/docs/reference/create-server)
+- [`server.router`](/docs/reference/create-server#serverrouter)
+- [`server.api`](/docs/reference/create-server#serverapi)
+- [`server.guard`](/docs/reference/create-server#serverguard)

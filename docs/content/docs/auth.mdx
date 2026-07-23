@@ -43,10 +43,9 @@ export const contract = k.contract({
 ```
 
 ```ts title="src/lib/guards.ts"
-import { createGuard } from '@ts-kizuna/express';
-import { contract } from '@shared/contract';
+import { server } from './server';
 
-export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {
+export const requireUser = server.guard('user', async ({ bearer, deny }) => {
     const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
@@ -57,14 +56,12 @@ export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }
 });
 ```
 
-```ts title="src/lib/server.ts"
-import { createApi } from '@ts-kizuna/express';
-import { contract } from '@shared/contract';
+```ts title="src/lib/api.ts"
+import { server } from './server';
 import { router } from './router';
 import { requireUser } from './guards';
 
-export const api = createApi({
-    contract,
+export const api = server.api({
     router,
     guards: {
         user: requireUser,
@@ -72,7 +69,7 @@ export const api = createApi({
 });
 ```
 
-Every route under `members` now runs the guard, and its handler receives the guard's return — typed — under `auth`, keyed by the identity's name:
+Every route under `members` now runs the guard, and its handler receives the guard's return, typed, under `auth`, keyed by the identity's name:
 
 ```ts
 members: {
@@ -85,7 +82,7 @@ members: {
 },
 ```
 
-Split into its own file, a handler keeps the typed `auth` via [`RouteHandler`](/docs/reference/create-router)`<typeof contract.routes.members.listMembers>`.
+Split into its own file, a handler keeps the typed `auth` via [`RouteHandler`](/docs/reference/create-server#serverrouter)`<typeof contract.routes.members.listMembers>`.
 
 ## Identities
 
@@ -198,10 +195,10 @@ A route requiring several identities receives all of them under `auth` — `tran
 
 ## Guards
 
-One guard per identity — not per route. The credential arrives extracted and typed, along with the route's path `params`. For a request to `/workspaces/ws_42/members`, `params.workspaceId` is `'ws_42'` — so the guard can check not just that the token is valid, but that the caller belongs to that workspace:
+One guard per identity, not per route. The credential arrives extracted and typed, along with the route's path `params`. For a request to `/workspaces/ws_42/members`, `params.workspaceId` is `'ws_42'`, so the guard can check not just that the token is valid, but that the caller belongs to that workspace:
 
 ```ts title="src/lib/guards.ts"
-export const requireMember = createGuard(contract, 'member', async ({ apiKey, params, deny }) => {
+export const requireMember = server.guard('member', async ({ apiKey, params, deny }) => {
     const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
     if (!membership) {
         return deny(403, 'Forbidden');
@@ -210,7 +207,7 @@ export const requireMember = createGuard(contract, 'member', async ({ apiKey, pa
 });
 ```
 
-The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes` — see [`createGuard`](/docs/reference/create-guard). For request-scoped values that gate nothing — analytics ids, loggers — use [`createRequestContext`](/docs/reference/create-request-context) instead.
+The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/create-server#serverguard). For request-scoped values that gate nothing (analytics ids, loggers), use [`createRequestContext`](/docs/reference/create-request-context) instead.
 
 ## What falls out for free
 
@@ -256,6 +253,6 @@ const apiClient = createClient(contract, {
 
 - [`createIdentity`](/docs/reference/create-identity)
 - [`kizuna`](/docs/reference/kizuna#the-auth-map) — the auth map's value forms
-- [`createGuard`](/docs/reference/create-guard)
-- [`createApi`](/docs/reference/create-api)
+- [`server.guard`](/docs/reference/create-server#serverguard)
+- [`server.api`](/docs/reference/create-server#serverapi)
 - [`createClient`](/docs/reference/create-client)

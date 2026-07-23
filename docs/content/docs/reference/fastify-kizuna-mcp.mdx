@@ -37,17 +37,17 @@ app.listen({
 
 Register the plugin with `app.register(fastifyKizunaMcp, options)`.
 
-| Option        | Type       | Required | Description                                                |
-| ------------- | ---------- | -------- | ---------------------------------------------------------- |
-| `api`         | `Api`      | Yes      | API created with [`createApi`](/docs/reference/create-api) |
-| `path`        | `string`   | No       | Mount path (default: `'/mcp'`)                             |
-| `name`        | `string`   | No       | Human-readable name (default: `'MCP Server'`)              |
-| `version`     | `string`   | No       | Semantic version (default: `'1.0.0'`)                      |
-| `routeFilter` | `Function` | No       | Predicate to filter which routes become tools              |
+| Option        | Type       | Required | Description                                                             |
+| ------------- | ---------- | -------- | ----------------------------------------------------------------------- |
+| `api`         | `Api`      | Yes      | API created with [`createApi`](/docs/reference/create-server#serverapi) |
+| `path`        | `string`   | No       | Mount path (default: `'/mcp'`)                                          |
+| `name`        | `string`   | No       | Human-readable name (default: `'MCP Server'`)                           |
+| `version`     | `string`   | No       | Semantic version (default: `'1.0.0'`)                                   |
+| `routeFilter` | `Function` | No       | Predicate to filter which routes become tools                           |
 
 ## Secured routes
 
-Secured tools authenticate via the MCP transport request's headers, running the same [guards](/docs/reference/create-guard) as their HTTP endpoints. The plugin reads each identity's credential from those headers (`credentialHeaders`, populated automatically) and runs the guard per tool call — the handler receives the identity's context exactly as it would over HTTP, and a `deny(...)` becomes a tool error result.
+Secured tools authenticate via the MCP transport request's headers, running the same [guards](/docs/reference/create-server#serverguard) as their HTTP endpoints. The plugin reads each identity's credential from those headers (`credentialHeaders`, populated automatically) and runs the guard per tool call — the handler receives the identity's context exactly as it would over HTTP, and a `deny(...)` becomes a tool error result.
 
 Configure the MCP client to send the credential on its connection, for example an `Authorization` header:
 

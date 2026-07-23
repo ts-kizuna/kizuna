@@ -4,7 +4,7 @@ import request from 'supertest';
 import { z } from 'zod';
 import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { createApi, createExpressEndpoints, createGuard, createMiddleware, createRouter } from './server.js';
+import { createApi, createExpressEndpoints, createGuard, createMiddleware, createRouter, createServer } from './server.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -1022,5 +1022,114 @@ describe('Express integration — middleware map', () => {
 
         const publicResponse = await request(app).get('/public');
         expect(publicResponse.status).toBe(200);
+    });
+});
+
+describe('createServer', () => {
+    const { k: serverK } = kizuna({
+        identities: {
+            user: createIdentity.bearer({
+                context: z.object({
+                    userId: z.string(),
+                }),
+            }),
+        },
+    });
+
+    const serverRoutes = serverK.routes({
+        getMe: {
+            method: 'GET',
+            path: '/me',
+            responses: {
+                200: z.object({
+                    userId: z.string(),
+                }),
+                401: ProblemDetailsSchema,
+            },
+        },
+        ping: {
+            method: 'GET',
+            path: '/ping',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+    });
+
+    const serverContract = serverK.contract({
+        routes: {
+            main: serverRoutes,
+        },
+        auth: {
+            main: {
+                '*': false,
+                getMe: 'user',
+            },
+        },
+    });
+
+    const { server } = createServer(serverContract);
+
+    const requireUser = server.guard('user', ({ bearer, deny }) => {
+        if (bearer?.token !== 'secret') {
+            return deny(401, 'Unauthorized');
+        }
+        return {
+            userId: 'u1',
+        };
+    });
+
+    const router = server.router({
+        main: {
+            getMe: ({ auth }) => ({
+                status: 200,
+                body: {
+                    userId: auth.user.userId,
+                },
+            }),
+            ping: () => ({
+                status: 200,
+                body: {
+                    ok: true,
+                },
+            }),
+        },
+    });
+
+    const api = server.api({
+        router,
+        guards: {
+            user: requireUser,
+        },
+    });
+
+    const build = () => {
+        const app = express();
+        app.use(express.json());
+        createExpressEndpoints(api, app);
+        return app;
+    };
+
+    it('serves a public route', async () => {
+        const response = await request(build()).get('/ping');
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({
+            ok: true,
+        });
+    });
+
+    it('runs the guard from server.guard and exposes its context', async () => {
+        const response = await request(build()).get('/me').set('authorization', 'Bearer secret');
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({
+            userId: 'u1',
+        });
+    });
+
+    it('denies when the guard from server.guard rejects', async () => {
+        const response = await request(build()).get('/me');
+        expect(response.status).toBe(401);
     });
 });

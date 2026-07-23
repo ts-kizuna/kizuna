@@ -11,17 +11,24 @@ description: Mount a ts-kizuna API on a Hono application.
 
 ## Setup
 
-The standard setup uses three functions:
+The standard setup:
 
-- `createRouter` — bind typed implementations to the contract
-- `createApi` — combine your contract, router, and guards into an API object
-- `createHonoEndpoints` — mount the API on a Hono app
+- `createServer` binds the contract to a `server` handle
+- `server.router` binds typed implementations to the contract
+- `server.api` combines the router and guards into an API object
+- `createHonoEndpoints` mounts the API on a Hono app
 
-```ts title="src/lib/router.ts"
-import { createRouter } from '@ts-kizuna/hono';
+```ts title="src/lib/server.ts"
+import { createServer } from '@ts-kizuna/hono';
 import { contract } from '@shared/contract';
 
-export const router = createRouter(contract, {
+export const { server } = createServer(contract);
+```
+
+```ts title="src/lib/router.ts"
+import { server } from './server';
+
+export const router = server.router({
     users: {
         listUsers: async ({ query }) => {
             const found = await db.users.findMany({
@@ -62,13 +69,11 @@ export const router = createRouter(contract, {
 });
 ```
 
-```ts title="src/lib/server.ts"
-import { createApi } from '@ts-kizuna/hono';
-import { contract } from '@shared/contract';
+```ts title="src/lib/api.ts"
+import { server } from './server';
 import { router } from './router';
 
-export const api = createApi({
-    contract,
+export const api = server.api({
     router,
 });
 ```
@@ -76,7 +81,7 @@ export const api = createApi({
 ```ts title="src/index.ts"
 import { Hono } from 'hono';
 import { createHonoEndpoints } from '@ts-kizuna/hono';
-import { api } from './lib/server';
+import { api } from './lib/api';
 
 const app = new Hono();
 createHonoEndpoints(api, app);
@@ -86,7 +91,7 @@ export default app;
 
 ## Handler context
 
-Each handler receives `{ params, query, body, headers, c }`. The `c` is the Hono `Context` object — useful when you need to access cookies, environment bindings, or other Hono-specific features.
+Each handler receives `{ params, query, body, headers, c }`. The `c` is the Hono `Context` object, useful when you need to access cookies, environment bindings, or other Hono-specific features.
 
 ```ts
 getUser: async ({ params, c }) => {
@@ -99,22 +104,14 @@ getUser: async ({ params, c }) => {
 },
 ```
 
-## Typed environment bindings
+## Environment bindings
 
-`createRouter` accepts a Hono `Env` type parameter for typed environment bindings. This is useful on runtimes like Cloudflare Workers where bindings are accessed via `c.env`.
+On runtimes like Cloudflare Workers, environment bindings are available on the Hono context as `c.env`.
 
 ```ts title="src/lib/router.ts"
-import { createRouter } from '@ts-kizuna/hono';
-import { contract } from '@shared/contract';
+import { server } from './server';
 
-type AppEnv = {
-    Bindings: {
-        DB: D1Database;
-        KV: KVNamespace;
-    };
-};
-
-export const router = createRouter<typeof contract, AppEnv>(contract, {
+export const router = server.router({
     users: {
         getUser: async ({ params, c }) => {
             const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(params.id).first();
@@ -129,13 +126,12 @@ export const router = createRouter<typeof contract, AppEnv>(contract, {
 
 ## Guards
 
-One guard per identity. The credential arrives extracted and typed, alongside the native context `c` — see the [Auth guide](/docs/auth).
+One guard per identity. The credential arrives extracted and typed, alongside the native context `c`. See the [Auth guide](/docs/auth).
 
 ```ts title="src/lib/guards.ts"
-import { createGuard } from '@ts-kizuna/hono';
-import { contract } from '@shared/contract';
+import { server } from './server';
 
-export const requireUser = createGuard(contract, 'user', async ({ bearer, deny }) => {
+export const requireUser = server.guard('user', async ({ bearer, deny }) => {
     const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
         return deny(401, 'Unauthorized');
@@ -196,6 +192,7 @@ const router: Router<typeof contract> = { ... };
 
 ## Reference
 
-- [`createRouter`](/docs/reference/create-router)
-- [`createApi`](/docs/reference/create-api)
-- [`createGuard`](/docs/reference/create-guard)
+- [`createServer`](/docs/reference/create-server)
+- [`server.router`](/docs/reference/create-server#serverrouter)
+- [`server.api`](/docs/reference/create-server#serverapi)
+- [`server.guard`](/docs/reference/create-server#serverguard)
