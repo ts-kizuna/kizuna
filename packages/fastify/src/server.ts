@@ -413,11 +413,11 @@ export interface Server<
      * Bind typed handlers to the contract or one of its route groups.
      */
     router: {
+        <const G extends Routes>(group: G, router: Router<G>): Router<G>;
         <const Group extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext>>, string>>(
             group: Group,
             router: Router<ServerContract<R, Schemes, Auth, RequestContext>>[Group]
         ): Router<ServerContract<R, Schemes, Auth, RequestContext>>[Group];
-        <const G extends Routes>(group: G, router: Router<G>): Router<G>;
         (router: Router<ServerContract<R, Schemes, Auth, RequestContext>>): Router<ServerContract<R, Schemes, Auth, RequestContext>>;
     };
     /**

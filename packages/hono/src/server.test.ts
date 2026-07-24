@@ -120,7 +120,6 @@ describe('createServer — router accepts a bare route group', () => {
     it('types a sub-router from a bare route group and serves it composed into the contract', async () => {
         const { server } = createServer(subContract);
 
-        // Bare route group. No `{ routes: ... }` wrapper needed.
         const usersRouter = server.router(usersRoutes, {
             getUser: ({ params }) => {
                 expectTypeOf(params).toEqualTypeOf<{ id: string }>();
@@ -133,7 +132,6 @@ describe('createServer — router accepts a bare route group', () => {
             },
         });
 
-        // Full contract. Compose the sub-router.
         const composed = server.router({
             users: usersRouter,
         });
@@ -150,6 +148,20 @@ describe('createServer — router accepts a bare route group', () => {
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({
             id: '42',
+        });
+    });
+
+    it('contextually types the bare group without widening', () => {
+        const { server } = createServer(subContract);
+
+        // @ts-expect-error 418 is not a declared response of getUser.
+        server.router(usersRoutes, {
+            getUser: () => ({
+                status: 418,
+                body: {
+                    id: '1',
+                },
+            }),
         });
     });
 });
