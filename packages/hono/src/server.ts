@@ -388,6 +388,7 @@ export interface Server<
             group: Group,
             router: Router<ServerContract<R, Schemes, Auth, RequestContext>, E>[Group]
         ): Router<ServerContract<R, Schemes, Auth, RequestContext>, E>[Group];
+        <const G extends Routes>(group: G, router: Router<G, E>): Router<G, E>;
         (router: Router<ServerContract<R, Schemes, Auth, RequestContext>, E>): Router<ServerContract<R, Schemes, Auth, RequestContext>, E>;
     };
     /**

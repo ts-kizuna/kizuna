@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { createApi, createGuard, createMiddleware, fastifyKizuna, createRouter, type FastifyPreHandler } from './server.js';
+import { createApi, createGuard, createMiddleware, createServer, fastifyKizuna, createRouter, type FastifyPreHandler } from './server.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -94,6 +94,63 @@ describe('createRouter — accepts a contract or a bare route group', () => {
 
         expect(typeof groupRouter.getUser).toBe('function');
         expect(typeof contractRouter.getUser).toBe('function');
+    });
+});
+
+describe('createServer — router accepts a bare route group', () => {
+    const usersRoutes = k.routes('api', {
+        getUser: {
+            method: 'GET',
+            path: '/sub-users/:id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                }),
+            },
+        },
+    });
+
+    const subContract = k.contract({
+        routes: {
+            users: usersRoutes,
+        },
+    });
+
+    it('types a sub-router from a bare route group and serves it composed into the contract', async () => {
+        const { server } = createServer(subContract);
+
+        // Bare route group. No `{ routes: ... }` wrapper needed.
+        const usersRouter = server.router(usersRoutes, {
+            getUser: ({ params }) => {
+                expectTypeOf(params).toEqualTypeOf<{ id: string }>();
+                return {
+                    status: 200,
+                    body: {
+                        id: params.id,
+                    },
+                };
+            },
+        });
+
+        // Full contract. Compose the sub-router.
+        const composed = server.router({
+            users: usersRouter,
+        });
+
+        const server2 = Fastify();
+        server2.register(fastifyKizuna, {
+            api: server.api({
+                router: composed,
+            }),
+        });
+        await server2.ready();
+
+        const response = await server2.inject({
+            method: 'GET',
+            url: '/sub-users/42',
+        });
+        expect(response.statusCode).toBe(200);
+        expect(response.json().id).toBe('42');
     });
 });
 
