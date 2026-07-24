@@ -1,8 +1,17 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
 import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { createApi, createGuard, createMiddleware, createNextEndpoints, createRouter, NextRequest, NextResponse } from './index.js';
+import {
+    createApi,
+    createGuard,
+    createMiddleware,
+    createNextEndpoints,
+    createRouter,
+    createServer,
+    NextRequest,
+    NextResponse,
+} from './index.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -56,6 +65,62 @@ describe('createRouter — accepts a contract or a bare route group', () => {
 
         expect(typeof groupRouter.getUser).toBe('function');
         expect(typeof contractRouter.getUser).toBe('function');
+    });
+});
+
+describe('createServer — router accepts a bare route group', () => {
+    const usersRoutes = k.routes('api', {
+        getUser: {
+            method: 'GET',
+            path: '/sub-users/:id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                }),
+            },
+        },
+    });
+
+    const subContract = k.contract({
+        routes: {
+            users: usersRoutes,
+        },
+    });
+
+    it('types a sub-router from a bare route group and serves it composed into the contract', async () => {
+        const { server } = createServer(subContract);
+
+        // Bare route group. No `{ routes: ... }` wrapper needed.
+        const usersRouter = server.router(usersRoutes, {
+            getUser: ({ params }) => {
+                expectTypeOf(params).toEqualTypeOf<{ id: string }>();
+                return {
+                    status: 200,
+                    body: {
+                        id: params.id,
+                    },
+                };
+            },
+        });
+
+        // Full contract. Compose the sub-router.
+        const composed = server.router({
+            users: usersRouter,
+        });
+
+        const { GET: subGET } = createNextEndpoints(
+            server.api({
+                router: composed,
+            }),
+            {
+                basePath: '/api',
+            }
+        );
+
+        const response = await subGET(new NextRequest('http://localhost:3000/api/sub-users/42', { method: 'GET' }));
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.id).toBe('42');
     });
 });
 

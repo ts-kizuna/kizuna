@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import type { RouteDefinition } from '@ts-kizuna/core';
 import { z } from 'zod';
 import { kizuna, createTags, createIdentity, createRequestContext } from '@ts-kizuna/core';
-import { createApi, createRequestContextResolver, createGuard, createRouter, type RouteHandler } from './server.js';
+import { createApi, createRequestContextResolver, createGuard, createRouter, createServer, type RouteHandler } from './server.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -74,6 +74,35 @@ test('handler receives typed path params', () => {
 
 test('Express Request is augmented with kizunaRoute', () => {
     expectTypeOf<Request['kizunaRoute']>().toEqualTypeOf<RouteDefinition | undefined>();
+});
+
+test('server.router infers handler args from a bare route group', () => {
+    const { server } = createServer(contract);
+
+    // Bare route group. The sub-router form types params/query/body per route.
+    server.router(contractRoutes, {
+        getUser: ({ params }) => {
+            expectTypeOf(params).toEqualTypeOf<{ id: string }>();
+            return {
+                status: 200,
+                body: {
+                    id: params.id,
+                    name: 'x',
+                },
+            };
+        },
+        createUser: ({ body }) => {
+            expectTypeOf(body).toEqualTypeOf<{ name: string; email: string }>();
+            return {
+                status: 201,
+                body: {
+                    id: '1',
+                    name: body.name,
+                    email: body.email,
+                },
+            };
+        },
+    });
 });
 
 const userIdentity = createIdentity.bearer({

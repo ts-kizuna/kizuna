@@ -1132,4 +1132,51 @@ describe('createServer', () => {
         const response = await request(build()).get('/me');
         expect(response.status).toBe(401);
     });
+
+    it('types a sub-router from a bare route group and serves it composed into the contract', async () => {
+        const usersRoutes = serverK.routes('api', {
+            getUser: {
+                method: 'GET',
+                path: '/sub-users/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        });
+
+        const subContract = serverK.contract({
+            routes: {
+                users: usersRoutes,
+            },
+        });
+
+        const { server: subServer } = createServer(subContract);
+
+        // Bare route group. No `{ routes: ... }` wrapper needed.
+        const usersRouter = subServer.router(usersRoutes, {
+            getUser: ({ params }) => ({
+                status: 200,
+                body: {
+                    id: params.id,
+                },
+            }),
+        });
+
+        // Full contract. Compose the sub-router.
+        const composed = subServer.router({
+            users: usersRouter,
+        });
+
+        const app = express();
+        const api = subServer.api({
+            router: composed,
+        });
+        createExpressEndpoints(api, app);
+
+        const response = await request(app).get('/sub-users/42');
+        expect(response.status).toBe(200);
+        expect(response.body.id).toBe('42');
+    });
 });
