@@ -1154,7 +1154,6 @@ describe('createServer', () => {
 
         const { server: subServer } = createServer(subContract);
 
-        // Bare route group. No `{ routes: ... }` wrapper needed.
         const usersRouter = subServer.router(usersRoutes, {
             getUser: ({ params }) => ({
                 status: 200,
@@ -1164,7 +1163,6 @@ describe('createServer', () => {
             }),
         });
 
-        // Full contract. Compose the sub-router.
         const composed = subServer.router({
             users: usersRouter,
         });

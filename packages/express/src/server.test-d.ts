@@ -76,32 +76,32 @@ test('Express Request is augmented with kizunaRoute', () => {
     expectTypeOf<Request['kizunaRoute']>().toEqualTypeOf<RouteDefinition | undefined>();
 });
 
-test('server.router infers handler args from a bare route group', () => {
-    const { server } = createServer(contract);
+const nestedContract = k.contract({
+    routes: {
+        users: contractRoutes,
+    },
+});
 
-    // Bare route group. The sub-router form types params/query/body per route.
+test('server.router contextually types a bare route group without widening', () => {
+    const { server } = createServer(nestedContract);
+
+    // @ts-expect-error 418 is not a declared response of getUser.
     server.router(contractRoutes, {
-        getUser: ({ params }) => {
-            expectTypeOf(params).toEqualTypeOf<{ id: string }>();
-            return {
-                status: 200,
-                body: {
-                    id: params.id,
-                    name: 'x',
-                },
-            };
-        },
-        createUser: ({ body }) => {
-            expectTypeOf(body).toEqualTypeOf<{ name: string; email: string }>();
-            return {
-                status: 201,
-                body: {
-                    id: '1',
-                    name: body.name,
-                    email: body.email,
-                },
-            };
-        },
+        getUser: () => ({
+            status: 418,
+            body: {
+                id: '1',
+                name: 'x',
+            },
+        }),
+        createUser: () => ({
+            status: 201,
+            body: {
+                id: '1',
+                name: 'a',
+                email: 'e',
+            },
+        }),
     });
 });
 
