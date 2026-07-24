@@ -43,7 +43,7 @@ public enum API {
         public var email: String { _email }
         /// Email address
         public let email_address: String?
-        /// Family name on the wire as `last_name` — exercises snake_case fidelity through the generators.
+        /// Family name on the wire as `last_name`, exercises snake_case fidelity through the generators.
         public let last_name: String?
         /// Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another.
         public let avatar: Avatar?
