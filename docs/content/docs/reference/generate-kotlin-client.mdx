@@ -24,10 +24,12 @@ generateKotlinClient(contract: Contract, config: KotlinConfig): string
 
 ## `KotlinConfig`
 
-| Option          | Type     | Required | Description                                                           |
-| --------------- | -------- | -------- | --------------------------------------------------------------------- |
-| `namespaceName` | `string` | Yes      | Name for the generated `object` and client class (e.g. `'API'`)       |
-| `packageName`   | `string` | No       | Package declaration for the generated file (e.g. `'com.example.api'`) |
+| Option                | Type      | Required | Description                                                                                                                                    |
+| --------------------- | --------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `namespaceName`       | `string`  | Yes      | Name for the generated `object` and client class (e.g. `'API'`)                                                                                |
+| `packageName`         | `string`  | No       | Package declaration for the generated file (e.g. `'com.example.api'`)                                                                          |
+| `camelCaseProperties` | `boolean` | No       | Convert wire field names to camelCase properties, mapped back via `@SerialName`. Default `false`                                               |
+| `unknownEnumCase`     | `boolean` | No       | Emit enums as a `sealed interface` with an `Unknown(wireValue)` member so unrecognised wire values decode instead of throwing. Default `false` |
 
 ## Returns
 

@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "generate": "node ../../packages/kotlin/dist/cli.mjs generate --contract ../shared/src/contract.ts --out kotlin/src/main/kotlin/com/kizuna/demo/APIClient.kt --namespace-name API --package com.kizuna.demo",
+    "generate": "node ../../packages/kotlin/dist/cli.mjs generate --contract ../shared/src/contract.ts --out kotlin/src/main/kotlin/com/kizuna/demo/APIClient.kt --namespace-name API --package com.kizuna.demo && node ../../packages/kotlin/dist/cli.mjs generate --contract ../shared/src/contract.ts --out kotlin/src/main/kotlin/com/kizuna/demo/openenum/APIClient.kt --namespace-name OpenEnumAPI --package com.kizuna.demo.openenum --unknown-enum-case",
     "pretest": "pnpm generate",
     "test": "tsx scripts/test.ts",
     "build": "cd kotlin && ./gradlew build",

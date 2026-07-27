@@ -24,9 +24,11 @@ generateSwiftClient(contract: Contract, config: SwiftConfig): string
 
 ## `SwiftConfig`
 
-| Option          | Type     | Required | Description                                                      |
-| --------------- | -------- | -------- | ---------------------------------------------------------------- |
-| `namespaceName` | `string` | Yes      | Name for the generated Swift enum and client type (e.g. `'API'`) |
+| Option                | Type      | Required | Description                                                                                                           |
+| --------------------- | --------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
+| `namespaceName`       | `string`  | Yes      | Name for the generated Swift enum and client type (e.g. `'API'`)                                                      |
+| `camelCaseProperties` | `boolean` | No       | Convert wire field names to camelCase properties, mapped back via `CodingKeys`. Default `false`                       |
+| `unknownEnumCase`     | `boolean` | No       | Emit enums with an `unknown(String)` fallback so unrecognised wire values decode instead of throwing. Default `false` |
 
 ## Returns
 

@@ -16,6 +16,8 @@ Required:
 Optional:
   --camel-case             Convert wire field names to camelCase properties with CodingKeys.
                            Default: keep wire names verbatim.
+  --unknown-enum-case      Emit enums with an unknown(String) fallback so unrecognised
+                           wire values decode instead of throwing. Default: off.
   --export <name>          Export name when none is suffixed. Default: contract.
 `;
 
@@ -46,6 +48,9 @@ const main = async (): Promise<void> => {
             'camel-case': {
                 type: 'boolean',
             },
+            'unknown-enum-case': {
+                type: 'boolean',
+            },
             export: {
                 type: 'string',
             },
@@ -65,6 +70,7 @@ const main = async (): Promise<void> => {
     const swiftSource = generateSwiftClient(contract, {
         namespaceName,
         camelCaseProperties: values['camel-case'],
+        unknownEnumCase: values['unknown-enum-case'],
     });
 
     const outputPath = resolve(process.cwd(), outArg);

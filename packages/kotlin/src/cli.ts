@@ -17,6 +17,8 @@ Optional:
   --package <name>         Package declaration for the generated file (e.g. com.example.api).
   --camel-case             Convert wire field names to camelCase properties with @SerialName.
                            Default: keep wire names verbatim.
+  --unknown-enum-case      Emit enums as a sealed interface with an Unknown(wireValue) member
+                           so unrecognised wire values decode instead of throwing. Default: off.
   --export <name>          Export name when none is suffixed. Default: contract.
 `;
 
@@ -50,6 +52,9 @@ const main = async (): Promise<void> => {
             'camel-case': {
                 type: 'boolean',
             },
+            'unknown-enum-case': {
+                type: 'boolean',
+            },
             export: {
                 type: 'string',
             },
@@ -70,6 +75,7 @@ const main = async (): Promise<void> => {
         namespaceName,
         packageName: values.package,
         camelCaseProperties: values['camel-case'],
+        unknownEnumCase: values['unknown-enum-case'],
     });
 
     const outputPath = resolve(process.cwd(), outArg);

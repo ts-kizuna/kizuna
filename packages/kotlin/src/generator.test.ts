@@ -1643,3 +1643,51 @@ describe('Kotlin generator — emitted-syntax cleanups', () => {
         expect(output).not.toContain('204 -> {\n');
     });
 });
+
+describe('Kotlin generator — unknownEnumCase', () => {
+    const tolerantConfig = {
+        namespaceName: 'TestAPI',
+        unknownEnumCase: true,
+    };
+
+    const enumContract = (values: [string, ...string[]]): Contract =>
+        k.contract({
+            routes: {
+                getOrder: {
+                    method: 'GET',
+                    path: '/orders/:id',
+                    responses: {
+                        200: createModel({
+                            title: 'Order',
+                            schema: z.object({
+                                id: z.string(),
+                                status: z.enum(values),
+                            }),
+                        }),
+                    },
+                },
+            },
+        });
+
+    it('emits a strict enum class by default', () => {
+        const output = generateKotlinClient(enumContract(['encoding', 'encoded', 'failed']), baseConfig);
+        expect(output).toContain('enum class Status(override val wireValue: String) : KizunaQueryValue');
+        expect(output).not.toContain('sealed interface Status');
+    });
+
+    it('emits a sealed interface with an Unknown member when enabled', () => {
+        const output = generateKotlinClient(enumContract(['encoding', 'encoded', 'failed']), tolerantConfig);
+        expect(output).toContain('@Serializable(with = Status.Serializer::class)');
+        expect(output).toContain('sealed interface Status : KizunaQueryValue');
+        expect(output).toContain('data class Unknown(override val wireValue: String) : Status');
+        expect(output).toContain('else -> Unknown(wireValue)');
+        // descriptor/encoding imports are pulled in only when a tolerant enum needs them
+        expect(output).toContain('import kotlinx.serialization.descriptors.*');
+        expect(output).toContain('import kotlinx.serialization.encoding.*');
+    });
+
+    it('does not import serializer descriptors when the flag is off', () => {
+        const output = generateKotlinClient(enumContract(['encoding', 'encoded', 'failed']), baseConfig);
+        expect(output).not.toContain('import kotlinx.serialization.descriptors.*');
+    });
+});

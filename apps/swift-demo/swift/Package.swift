@@ -12,9 +12,13 @@ let package = Package(
             name: "APIClient",
             path: "Sources/APIClient"
         ),
+        .target(
+            name: "OpenEnumAPIClient",
+            path: "Sources/OpenEnumAPIClient"
+        ),
         .testTarget(
             name: "APIClientTests",
-            dependencies: ["APIClient"],
+            dependencies: ["APIClient", "OpenEnumAPIClient"],
             path: "Tests/APIClientTests"
         ),
     ]

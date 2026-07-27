@@ -46,6 +46,15 @@ export interface KotlinConfig {
      * @default false
      */
     camelCaseProperties?: boolean;
+    /**
+     * Emit each `z.enum` as a `sealed interface` with an `Unknown(wireValue)`
+     * member, so unrecognised wire values decode instead of throwing. The raw
+     * string round-trips on encode and in query params. Discriminated unions are
+     * unaffected and still throw on an unknown discriminator.
+     *
+     * @default false
+     */
+    unknownEnumCase?: boolean;
 }
 
 const BODY_FLATTEN_MAX_FIELDS = 6;
@@ -510,18 +519,49 @@ const enumConstantName = (value: string): string => {
     return /^[0-9]/.test(upper) ? `_${upper}` : upper;
 };
 
-const emitEnumClass = (writer: KotlinWriter, name: string, cases: string[], description?: string): void => {
+const emitEnumClass = (writer: KotlinWriter, name: string, cases: string[], unknownCase: boolean, description?: string): void => {
     writer.blank();
     writer.docComment(description);
-    writer.line('@Serializable');
-    // `wireValue` carries the `@SerialName` for query/header serialization (see `stringifyQueryValue`).
-    writer.block(`enum class ${name}(override val wireValue: String) : KizunaQueryValue`, () => {
-        for (let index = 0; index < cases.length; index += 1) {
-            const caseName = cases[index]!;
-            const enumConstant = enumConstantName(caseName);
-            const separator = index < cases.length - 1 ? ',' : '';
-            writer.line(`@SerialName(${stringLiteral(caseName)}) ${enumConstant}(${stringLiteral(caseName)})${separator}`);
+    if (!unknownCase) {
+        writer.line('@Serializable');
+        // `wireValue` carries the `@SerialName` for query/header serialization (see `stringifyQueryValue`).
+        writer.block(`enum class ${name}(override val wireValue: String) : KizunaQueryValue`, () => {
+            for (let index = 0; index < cases.length; index += 1) {
+                const caseName = cases[index]!;
+                const enumConstant = enumConstantName(caseName);
+                const separator = index < cases.length - 1 ? ',' : '';
+                writer.line(`@SerialName(${stringLiteral(caseName)}) ${enumConstant}(${stringLiteral(caseName)})${separator}`);
+            }
+        });
+        return;
+    }
+    writer.line(`@Serializable(with = ${name}.Serializer::class)`);
+    writer.block(`sealed interface ${name} : KizunaQueryValue`, () => {
+        for (const caseName of cases) {
+            writer.block(`data object ${enumConstantName(caseName)} : ${name}`, () => {
+                writer.line(`override val wireValue: String = ${stringLiteral(caseName)}`);
+            });
         }
+        writer.line(`data class Unknown(override val wireValue: String) : ${name}`);
+        writer.blank();
+        writer.block('companion object', () => {
+            writer.block(`fun fromWireValue(wireValue: String): ${name} = when (wireValue)`, () => {
+                for (const caseName of cases) {
+                    writer.line(`${stringLiteral(caseName)} -> ${enumConstantName(caseName)}`);
+                }
+                writer.line('else -> Unknown(wireValue)');
+            });
+        });
+        writer.blank();
+        writer.block(`object Serializer : KSerializer<${name}>`, () => {
+            writer.line(
+                `override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(${stringLiteral(name)}, PrimitiveKind.STRING)`
+            );
+            writer.line(`override fun deserialize(decoder: Decoder): ${name} = ${name}.fromWireValue(decoder.decodeString())`);
+            writer.block(`override fun serialize(encoder: Encoder, value: ${name})`, () => {
+                writer.line('encoder.encodeString(value.wireValue)');
+            });
+        });
     });
 };
 
@@ -669,7 +709,7 @@ const emitType = (
     if (type.kind === 'data-class') {
         emitDataClass(writer, type, ownedTypeMap, ownedTypeLookup, registryName);
     } else if (type.kind === 'enum-class') {
-        emitEnumClass(writer, type.name, type.cases, type.description);
+        emitEnumClass(writer, type.name, type.cases, type.unknownCase, type.description);
     } else if (registry) {
         emitSealedClass(writer, type, registry);
     }
@@ -1471,9 +1511,9 @@ const emitClient = (
  *   - `packageName` — optional package declaration for the generated file.
  */
 export const generateKotlinClient = (contract: Contract, config: KotlinConfig): string => {
-    const { namespaceName, packageName, camelCaseProperties = false } = config;
+    const { namespaceName, packageName, camelCaseProperties = false, unknownEnumCase = false } = config;
 
-    const registry = new TypeRegistry(camelCaseProperties);
+    const registry = new TypeRegistry(camelCaseProperties, unknownEnumCase);
     const partition = kotlinGenerator(contract, {
         namespaceName,
         registry,
@@ -1502,6 +1542,11 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     }
     writer.line('import kotlinx.serialization.*');
     writer.line('import kotlinx.serialization.json.*');
+    const hasTolerantEnums = registry.all().some((type) => type.kind === 'enum-class' && type.unknownCase);
+    if (hasTolerantEnums) {
+        writer.line('import kotlinx.serialization.descriptors.*');
+        writer.line('import kotlinx.serialization.encoding.*');
+    }
     writer.line('import kotlinx.datetime.Instant');
     writer.line('import okhttp3.*');
     writer.line('import okhttp3.MediaType.Companion.toMediaType');

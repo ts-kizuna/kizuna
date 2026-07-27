@@ -46,6 +46,15 @@ export interface SwiftConfig {
      * @default false
      */
     camelCaseProperties?: boolean;
+    /**
+     * Emit each `z.enum` as a `RawRepresentable` enum with a `case unknown(String)`
+     * fallback, so unrecognised wire values decode instead of throwing. The raw
+     * string round-trips on encode and in query params. Discriminated unions are
+     * unaffected and still throw on an unknown discriminator.
+     *
+     * @default false
+     */
+    unknownEnumCase?: boolean;
 }
 
 interface BodyDescriptor {
@@ -531,13 +540,62 @@ const deprecatedStorageName = (field: SwiftField, siblings: SwiftField[]): strin
     return storageName;
 };
 
-const emitStringEnum = (writer: SwiftWriter, name: string, cases: string[], description?: string): void => {
+// `unknown`, or `_unknown` etc. when a wire value already claims that name.
+const unknownCaseName = (caseNames: string[]): string => {
+    const taken = new Set(caseNames);
+    let candidate = 'unknown';
+    while (taken.has(candidate)) {
+        candidate = `_${candidate}`;
+    }
+    return candidate;
+};
+
+const emitStringEnum = (writer: SwiftWriter, name: string, cases: string[], unknownCase: boolean, description?: string): void => {
     writer.blank();
     writer.docComment(description);
-    writer.block(`public enum ${name}: String, Codable, Sendable`, () => {
-        for (const caseName of cases) {
-            writer.line(`case ${escapeKeyword(sanitizeEnumCaseName(caseName))} = ${stringLiteral(caseName)}`);
+    if (!unknownCase) {
+        writer.block(`public enum ${name}: String, Codable, Sendable`, () => {
+            for (const caseName of cases) {
+                writer.line(`case ${escapeKeyword(sanitizeEnumCaseName(caseName))} = ${stringLiteral(caseName)}`);
+            }
+        });
+        return;
+    }
+    const caseNames = cases.map((caseName) => sanitizeEnumCaseName(caseName));
+    const unknown = unknownCaseName(caseNames);
+    writer.block(`public enum ${name}: RawRepresentable, Codable, Sendable, Hashable`, () => {
+        for (const caseName of caseNames) {
+            writer.line(`case ${escapeKeyword(caseName)}`);
         }
+        writer.line(`case ${escapeKeyword(unknown)}(String)`);
+        writer.blank();
+        writer.block('public init(rawValue: String)', () => {
+            writer.line('switch rawValue {');
+            for (let index = 0; index < cases.length; index += 1) {
+                writer.line(`case ${stringLiteral(cases[index]!)}: self = .${escapeKeyword(caseNames[index]!)}`);
+            }
+            writer.line(`default: self = .${escapeKeyword(unknown)}(rawValue)`);
+            writer.line('}');
+        });
+        writer.blank();
+        writer.block('public var rawValue: String', () => {
+            writer.line('switch self {');
+            for (let index = 0; index < cases.length; index += 1) {
+                writer.line(`case .${escapeKeyword(caseNames[index]!)}: return ${stringLiteral(cases[index]!)}`);
+            }
+            writer.line(`case let .${escapeKeyword(unknown)}(value): return value`);
+            writer.line('}');
+        });
+        writer.blank();
+        writer.block('public init(from decoder: Decoder) throws', () => {
+            writer.line('let container = try decoder.singleValueContainer()');
+            writer.line('self.init(rawValue: try container.decode(String.self))');
+        });
+        writer.blank();
+        writer.block('public func encode(to encoder: Encoder) throws', () => {
+            writer.line('var container = encoder.singleValueContainer()');
+            writer.line('try container.encode(rawValue)');
+        });
     });
 };
 
@@ -554,7 +612,7 @@ const emitTypes = (
         if (type.kind === 'struct') {
             emitStruct(writer, type, context, ownedTypeMap, ownedTypeLookup);
         } else if (type.kind === 'enum') {
-            emitStringEnum(writer, type.name, type.cases, type.description);
+            emitStringEnum(writer, type.name, type.cases, type.unknownCase, type.description);
         } else {
             emitDiscriminatedEnum(writer, type, context);
         }
@@ -603,7 +661,7 @@ const emitStruct = (
             if (!ownedType) continue;
             const shortName = shortTypeName(ownedName, lookupName);
             if (ownedType.kind === 'enum') {
-                emitStringEnum(writer, shortName, ownedType.cases, ownedType.description);
+                emitStringEnum(writer, shortName, ownedType.cases, ownedType.unknownCase, ownedType.description);
             } else if (ownedType.kind === 'struct') {
                 emitStruct(writer, { ...ownedType, name: shortName }, context, ownedTypeMap, ownedTypeLookup, ownedName);
             } else if (ownedType.kind === 'discriminated-enum') {
@@ -1696,9 +1754,9 @@ const emitClient = (
  *   - `namespaceName` — the actor class. Defaults to `APIClient`.
  */
 export const generateSwiftClient = (contract: Contract, options: SwiftConfig): string => {
-    const { namespaceName, camelCaseProperties = false } = options;
+    const { namespaceName, camelCaseProperties = false, unknownEnumCase = false } = options;
 
-    const registry = new TypeRegistry(camelCaseProperties);
+    const registry = new TypeRegistry(camelCaseProperties, unknownEnumCase);
     const partition = swiftGenerator(contract, {
         namespaceName,
         registry,
