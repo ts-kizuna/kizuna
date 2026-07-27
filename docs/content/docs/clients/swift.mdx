@@ -13,12 +13,13 @@ description: Generate a native Swift client from your routes with the ts-kizuna-
 ts-kizuna-swift generate --contract src/contract.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
 ```
 
-| Flag               | Description                                                      |
-| ------------------ | ---------------------------------------------------------------- |
-| `--contract`       | Path to the TypeScript file default-exporting your `k.contract`  |
-| `--output`         | Output path for the generated `.swift` file                      |
-| `--namespace-name` | Public enum wrapping all generated types (e.g. `API`)            |
-| `--camel-case`     | Convert wire field names to camelCase properties with CodingKeys |
+| Flag                  | Description                                                                             |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| `--contract`          | Path to the TypeScript file default-exporting your `k.contract`                         |
+| `--output`            | Output path for the generated `.swift` file                                             |
+| `--namespace-name`    | Public enum wrapping all generated types (e.g. `API`)                                   |
+| `--camel-case`        | Convert wire field names to camelCase properties with CodingKeys                        |
+| `--unknown-enum-case` | Emit enums with an `unknown(String)` fallback so new server values don't break decoding |
 
 The CLI reads the contract at runtime using `jiti` — no build step needed. Add the generated file to your Xcode project or Swift package as a regular source file.
 
@@ -27,6 +28,21 @@ The CLI reads the contract at runtime using `jiti` — no build step needed. Add
 By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. The types mirror the wire shape, so it's easy to see what came from the API.
 
 Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `CodingKeys`.
+
+### Unknown enum case (open enums)
+
+By default a `z.enum` is a closed Swift enum that throws on a wire value it doesn't know, failing the whole response. Pass `--unknown-enum-case` to make enums forward-compatible: each gains an `unknown(String)` case, so an unrecognised value decodes to `.unknown("newValue")` instead of throwing:
+
+```swift
+switch event.kind {
+case .login, .logout, .signup:
+    render(event)
+case .unknown(let raw):
+    log("skipping unknown event kind: \(raw)")
+}
+```
+
+The raw value is preserved, so re-encoding writes it back unchanged. Discriminated unions still throw on an unknown discriminator.
 
 ## Usage
 

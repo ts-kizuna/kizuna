@@ -40,6 +40,7 @@ export interface SwiftStringEnum {
     name: string;
     cases: string[];
     description?: string;
+    unknownCase: boolean;
 }
 
 export interface SwiftDiscriminatedEnum {
@@ -68,7 +69,10 @@ export class TypeRegistry {
     private readonly explicitIds = new Set<string>();
     public usesAnyCodable = false;
 
-    constructor(public readonly camelCaseProperties = false) {}
+    constructor(
+        public readonly camelCaseProperties = false,
+        public readonly unknownEnumCase = false
+    ) {}
 
     has(name: string): boolean {
         return this.types.has(name);
@@ -356,6 +360,7 @@ export const mapType = (
                     name: enumName,
                     cases,
                     description: readMetaDescription(schema),
+                    unknownCase: registry.unknownEnumCase,
                 });
             }
             return {

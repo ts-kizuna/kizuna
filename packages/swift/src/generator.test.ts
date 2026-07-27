@@ -1621,3 +1621,51 @@ describe('Swift generator — Result init', () => {
         expect(output).toMatch(/public init\(body: [^,]+, headers: Headers\) \{/);
     });
 });
+
+describe('Swift generator — unknownEnumCase', () => {
+    const tolerantConfig = {
+        namespaceName: 'TestAPI',
+        unknownEnumCase: true,
+    };
+
+    const enumContract = (values: [string, ...string[]]): Contract => {
+        const contractRoutes = k.routes('api', {
+            getOrder: {
+                method: 'GET',
+                path: '/orders/:id',
+                responses: {
+                    200: createModel({
+                        title: 'Order',
+                        schema: z.object({
+                            id: z.string(),
+                            status: z.enum(values),
+                        }),
+                    }),
+                },
+            },
+        });
+        return k.contract({
+            routes: contractRoutes,
+        });
+    };
+
+    it('emits a strict String-backed enum by default', () => {
+        const output = generateSwiftClient(enumContract(['encoding', 'encoded', 'failed']), baseConfig);
+        expect(output).toContain('public enum Status: String, Codable, Sendable');
+        expect(output).not.toContain('case unknown(String)');
+    });
+
+    it('emits a RawRepresentable enum with an unknown(String) fallback when enabled', () => {
+        const output = generateSwiftClient(enumContract(['encoding', 'encoded', 'failed']), tolerantConfig);
+        expect(output).toContain('public enum Status: RawRepresentable, Codable, Sendable, Hashable');
+        expect(output).toContain('case unknown(String)');
+        expect(output).toContain('default: self = .unknown(rawValue)');
+        expect(output).toContain('case let .unknown(value): return value');
+    });
+
+    it('renames the fallback case to avoid colliding with a wire value named "unknown"', () => {
+        const output = generateSwiftClient(enumContract(['known', 'unknown']), tolerantConfig);
+        expect(output).toContain('case _unknown(String)');
+        expect(output).toContain('default: self = ._unknown(rawValue)');
+    });
+});

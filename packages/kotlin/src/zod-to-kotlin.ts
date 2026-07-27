@@ -51,6 +51,7 @@ export interface KotlinEnumClass {
     name: string;
     cases: string[];
     description?: string;
+    unknownCase: boolean;
 }
 
 export interface KotlinSealedClass {
@@ -82,7 +83,10 @@ export class TypeRegistry {
     private readonly sealedVariantPayloads = new Set<string>();
     public usesJsonElement = false;
 
-    constructor(public readonly camelCaseProperties = false) {}
+    constructor(
+        public readonly camelCaseProperties = false,
+        public readonly unknownEnumCase = false
+    ) {}
 
     has(name: string): boolean {
         return this.types.has(name);
@@ -383,6 +387,7 @@ export const mapType = (
                     name: enumName,
                     cases,
                     description: readMetaDescription(schema),
+                    unknownCase: registry.unknownEnumCase,
                 });
             }
             return {
