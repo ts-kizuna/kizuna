@@ -70,6 +70,25 @@ const usersHandlers: Router<typeof contract>['users'] = {
             },
         };
     },
+    userActivity: async ({ params }) => {
+        const user = await db.users.findById(params.id);
+        if (!user) {
+            return {
+                status: 404,
+                body: {
+                    detail: 'User not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: {
+                userId: user.id,
+                year: params.year,
+                events: params.year - 2000,
+            },
+        };
+    },
     createUser: async ({ body }) => {
         const user = await db.users.create({
             id: randomUUID(),

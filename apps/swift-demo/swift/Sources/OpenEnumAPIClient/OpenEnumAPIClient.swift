@@ -611,6 +611,63 @@ public final class OpenEnumAPIClient: Sendable {
         }
     }
 
+    public enum UsersUserActivity {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let userId: String
+            public let year: Int
+            public let events: Int
+
+            public init(
+                userId: String,
+                year: Int,
+                events: Int
+            ) {
+                self.userId = userId
+                self.year = year
+                self.events = events
+            }
+        }
+
+        public struct Params: Sendable {
+            public let id: String
+            public let year: String
+
+            public init(
+                id: String,
+                year: String
+            ) {
+                self.id = id
+                self.year = year
+            }
+
+            public static func params(
+                id: String,
+                year: String
+            ) -> Self {
+                .init(id: id, year: year)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case notFound(OpenEnumAPI.ProblemDetails)
+        }
+    }
+
     public enum UsersCreateUser {
 
         public struct Body: Sendable {
@@ -1781,6 +1838,28 @@ public struct OpenEnumAPIUsersClient: Sendable {
             throw OpenEnumAPIClient.UsersGetUser.Failure.notFound(payload)
         default:
             throw OpenEnumAPIClient.UsersGetUser.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Get a year of user activity, exercising two typed path params (a string id and a coerced int year)
+    public func userActivity(_ params: OpenEnumAPIClient.UsersUserActivity.Params) async throws(OpenEnumAPIClient.UsersUserActivity.Failure) -> OpenEnumAPIClient.UsersUserActivity.Result {
+        var path = "/users/:id/activity/:year"
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        path = path.replacingOccurrences(of: ":year", with: Kizuna.encodePathSegment(params.year))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersUserActivity.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUserActivity.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(OpenEnumAPIClient.UsersUserActivity.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserActivity.Failure.self)
+            return OpenEnumAPIClient.UsersUserActivity.Result(body: body)
+        case 404:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserActivity.Failure.self)
+            throw OpenEnumAPIClient.UsersUserActivity.Failure.notFound(payload)
+        default:
+            throw OpenEnumAPIClient.UsersUserActivity.Failure.unexpectedStatus(statusCode, data)
         }
     }
 

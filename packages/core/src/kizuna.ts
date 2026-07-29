@@ -5,6 +5,7 @@ import { type TagSet, type TagOptions } from './tags.js';
 import type { Routes, RouteDefinition, SecurityRequirement, AccessGate, AuthoredRoutes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
+import type { PathParamsCheck } from './path-params.js';
 
 /**
  * A constraint on an identity's `access` fields: each key is a field, each value
@@ -193,8 +194,8 @@ export interface K<
      * Define a group of routes. Pass a tag (one of the keys from `createTags`)
      * to group them in the OpenAPI document, or omit it for an untagged group.
      */
-    routes<const T extends AuthoredRoutes<Extract<keyof Tags, string>>>(tag: Extract<keyof Tags, string>, defs: T): T;
-    routes<const T extends AuthoredRoutes>(defs: T): T;
+    routes<const T extends AuthoredRoutes<Extract<keyof Tags, string>>>(tag: Extract<keyof Tags, string>, defs: T & PathParamsCheck<T>): T;
+    routes<const T extends AuthoredRoutes>(defs: T & PathParamsCheck<T>): T;
     /**
      * The `auth` map, typed against the routes and identities. Define it wherever
      * you like, then pass it to `k.contract` under `auth`.

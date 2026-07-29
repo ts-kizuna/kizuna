@@ -268,6 +268,39 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
+    object UsersUserActivity {
+
+        @Serializable
+        data class Response(
+            val userId: String,
+            val year: Int,
+            val events: Int
+        )
+
+        data class Params(
+            val id: String,
+            val year: String
+        )
+
+        sealed interface Args {
+            val params: Params
+        }
+
+        object Scope {
+            fun params(id: String, year: String): AfterParams = AfterParams(params = Params(id = id, year = year))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class NotFound(val body: API.ProblemDetails) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object UsersCreateUser {
 
         data class Body(
@@ -1043,6 +1076,43 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     throw APIClient.UsersGetUser.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.UsersGetUser.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Get a year of user activity, exercising two typed path params (a string id and a coerced int year) */
+    @Throws(APIClient.UsersUserActivity.Failure::class)
+    suspend fun userActivity(build: APIClient.UsersUserActivity.Scope.() -> APIClient.UsersUserActivity.Args): APIClient.UsersUserActivity.Result {
+        val args = APIClient.UsersUserActivity.Scope.build()
+        val params = args.params
+        var path = "/users/:id/activity/:year"
+        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        path = path.replace(":year", Kizuna.encodePathSegment(params.year))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.UsersUserActivity.Response>(data.decodeToString())
+                        return@use APIClient.UsersUserActivity.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
+                }
+                404 -> {
+                    val payload = try {
+                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersUserActivity.Failure.NotFound(body = payload)
+                }
+                else -> throw APIClient.UsersUserActivity.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

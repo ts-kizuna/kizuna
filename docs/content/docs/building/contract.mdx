@@ -87,12 +87,32 @@ export const usersRoutes = k.routes('users', {
 | `method`      | Yes      | `GET` `POST` `PUT` `PATCH` `DELETE` `HEAD` `OPTIONS`                                           |
 | `path`        | Yes      | URL path — use `:name` for path parameters                                                     |
 | `responses`   | Yes      | Response schemas keyed by status code                                                          |
+| `pathParams`  | —        | Path parameter schema, keyed by placeholder name                                               |
 | `body`        | —        | Request body schema                                                                            |
 | `query`       | —        | Query string schema                                                                            |
 | `headers`     | —        | Request headers schema                                                                         |
 | `contentType` | —        | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
 | `summary`     | —        | Short description shown in OpenAPI                                                             |
 | `tags`        | —        | OpenAPI tags                                                                                   |
+
+### Typing path parameters
+
+Path parameters are strings unless you say otherwise. Add `pathParams` when you want them parsed and validated:
+
+```ts
+getUser: {
+    method: 'GET',
+    path: '/users/:id',
+    pathParams: z.object({
+        id: z.uuid(),
+    }),
+    responses: {
+        200: UserSchema,
+    },
+},
+```
+
+The keys have to be exactly the `:name` placeholders in the path, no more and no fewer. Misspell one and you get a type error on `pathParams` naming the key that does not line up, so a typo like `/users/:usrId` never reaches the OpenAPI document or your handler.
 
 ## Query, path, and header coercion
 
