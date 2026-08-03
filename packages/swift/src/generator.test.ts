@@ -506,7 +506,13 @@ describe('Swift generator — array type qualification', () => {
         // The element type must be well-formed `[Enum]` with the bracket outside any qualifier.
         expect(output).toMatch(/public let kinds: \[[A-Za-z]/);
         expect(output).not.toMatch(/TestAPIClient\.\[/);
-        expect(output).not.toMatch(/\w\[/); // no `Type[` — bracket never trails the element
+        // No `Type[` in a property declaration: the bracket never trails the element. Scoped to
+        // declarations because subscripting elsewhere (`line[index]`) is legitimate Swift.
+        const declarations = output
+            .split('\n')
+            .filter((line) => /\s(?:let|var)\s\w+:/.test(line))
+            .join('\n');
+        expect(declarations).not.toMatch(/\w\[/);
     });
 });
 

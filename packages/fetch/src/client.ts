@@ -9,20 +9,34 @@ import type {
     RequestContextSchema,
     RequestContextHeaderInputs,
     SecurityScheme,
+    StreamFormat,
 } from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
-import { buildPath, isRouteDefinition } from '@ts-kizuna/core';
+import { buildPath, isRouteDefinition, isStreamResponse } from '@ts-kizuna/core';
+import { parseSseStream } from './sse.js';
+
+type ResponseHeaders<Response> = Response extends { headers: z.ZodType } ? z.infer<Response['headers']> : Record<string, string>;
+
+/**
+ * A streaming response arrives as an async sequence of events rather than a body.
+ * Breaking out of the iteration cancels the request.
+ */
+type StreamResponse<Response, Status> = {
+    status: Status extends number ? Status : never;
+    stream: Response extends { event: z.ZodType } ? AsyncIterable<z.infer<Response['event']>> : never;
+    headers: ResponseHeaders<Response>;
+};
+
+type BodyResponse<Response, Status> = {
+    status: Status extends number ? Status : never;
+    body: Response extends z.ZodType ? z.infer<Response> : Response extends { body: z.ZodType } ? z.infer<Response['body']> : never;
+    headers: ResponseHeaders<Response>;
+};
 
 type ResponseUnion<R extends RouteDefinition> = {
-    [S in keyof R['responses']]: {
-        status: S extends number ? S : never;
-        body: R['responses'][S] extends z.ZodType
-            ? z.infer<R['responses'][S]>
-            : R['responses'][S] extends { body: z.ZodType }
-              ? z.infer<R['responses'][S]['body']>
-              : never;
-        headers: R['responses'][S] extends { headers: z.ZodType } ? z.infer<R['responses'][S]['headers']> : Record<string, string>;
-    };
+    [S in keyof R['responses']]: R['responses'][S] extends { stream: StreamFormat }
+        ? StreamResponse<R['responses'][S], S>
+        : BodyResponse<R['responses'][S], S>;
 }[keyof R['responses']];
 
 /**
@@ -197,6 +211,28 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
             credentials: config.credentials,
             ...args.fetchOptions,
         });
+        const responseHeaders: Record<string, string> = {};
+        res.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+        });
+
+        // Error statuses carry a normal JSON body even on a streaming route, because the
+        // server renders them before any event is flushed.
+        if (isStreamResponse(route.responses[res.status]) && res.body) {
+            const events = parseSseStream(res.body);
+            return {
+                status: res.status,
+                stream: {
+                    async *[Symbol.asyncIterator]() {
+                        for await (const event of events) {
+                            yield event.payload;
+                        }
+                    },
+                },
+                headers: responseHeaders,
+            };
+        }
+
         const text = await res.text();
         let parsed: unknown;
         try {
@@ -204,10 +240,6 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
         } catch {
             parsed = text;
         }
-        const responseHeaders: Record<string, string> = {};
-        res.headers.forEach((value, key) => {
-            responseHeaders[key] = value;
-        });
         return {
             status: res.status,
             body: parsed,

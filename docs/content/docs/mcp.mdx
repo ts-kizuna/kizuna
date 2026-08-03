@@ -88,7 +88,7 @@ Each route becomes an MCP tool:
 - **Tool input** — structured as `{ params, query, body }` matching the route's schemas
 - **Tool execution** — invokes the corresponding handler directly and returns `{ status, body }`
 
-Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-urlencoded'` are excluded by default since MCP tools receive JSON.
+Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-urlencoded'` are excluded by default since MCP tools receive JSON. [Streaming routes](/docs/streaming) are excluded too, since a tool call returns a single result.
 
 ## Framework context
 
@@ -126,12 +126,12 @@ Public routes (`false` in the auth map) run without guards, credentials or not.
 
 ## Options
 
-| Option        | Default                                | Description                                   |
-| ------------- | -------------------------------------- | --------------------------------------------- |
-| `name`        | `'MCP Server'`                         | Human-readable name shown to AI assistants    |
-| `version`     | `'1.0.0'`                              | Semantic version string                       |
-| `routeFilter` | excludes multipart and form-urlencoded | Predicate to filter which routes become tools |
-| `path`        | `'/mcp'`                               | Mount path (Express, Fastify, and Hono)       |
+| Option        | Default                                            | Description                                   |
+| ------------- | -------------------------------------------------- | --------------------------------------------- |
+| `name`        | `'MCP Server'`                                     | Human-readable name shown to AI assistants    |
+| `version`     | `'1.0.0'`                                          | Semantic version string                       |
+| `routeFilter` | excludes multipart, form-urlencoded, and streaming | Predicate to filter which routes become tools |
+| `path`        | `'/mcp'`                                           | Mount path (Express, Fastify, and Hono)       |
 
 ## Connecting clients
 

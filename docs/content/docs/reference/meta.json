@@ -10,6 +10,7 @@
         "create-request-context",
         "problem-details-schema",
         "binary-and-file-schemas",
+        "stream-responses",
         "create-client",
         "is-validation-error",
         "add-coded-issue",

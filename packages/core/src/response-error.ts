@@ -1,5 +1,5 @@
 import type { RouteDefinition } from './types.js';
-import type { HandlerReturn } from './handler-pipeline.js';
+import type { HandlerThrow } from './handler-pipeline.js';
 
 interface ResponseErrorPayload {
     status: number;
@@ -12,7 +12,7 @@ export class ResponseError<R extends RouteDefinition = never> extends Error {
     public readonly body: unknown;
     public readonly headers?: Record<string, string>;
 
-    constructor(response: [R] extends [never] ? ResponseErrorPayload : HandlerReturn<R>) {
+    constructor(response: [R] extends [never] ? ResponseErrorPayload : HandlerThrow<R>) {
         const body = response.body;
         const message =
             body && typeof body === 'object' && 'detail' in body && typeof body.detail === 'string'

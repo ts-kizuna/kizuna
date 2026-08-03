@@ -54,6 +54,36 @@ export const UserSchema = createModel({
     }),
 });
 
+export const ActivityStarted = createModel({
+    title: 'ActivityStarted',
+    schema: z.object({
+        type: z.literal('started'),
+        userId: z.string(),
+    }),
+});
+
+export const ActivityProgress = createModel({
+    title: 'ActivityProgress',
+    schema: z.object({
+        type: z.literal('progress'),
+        percent: z.number().int().min(0).max(100),
+    }),
+});
+
+export const ActivityCompleted = createModel({
+    title: 'ActivityCompleted',
+    schema: z.object({
+        type: z.literal('completed'),
+        total: z.number().int(),
+    }),
+});
+
+export const UserActivityEventSchema = createModel({
+    title: 'UserActivityEvent',
+    description: 'One event in a user activity stream',
+    schema: z.discriminatedUnion('type', [ActivityStarted, ActivityProgress, ActivityCompleted]),
+});
+
 export const CreateUserSchema = createModel({
     title: 'CreateUserInput',
     schema: z.object({
@@ -197,6 +227,19 @@ export const usersRoutes = k.routes('users', {
             404: ProblemDetailsSchema,
         },
         summary: 'Download a user badge — exercises a binary (BinarySchema) response body',
+    },
+    streamUserActivity: {
+        method: 'GET',
+        path: '/users/:id/activity',
+        responses: {
+            200: {
+                stream: 'sse',
+                event: UserActivityEventSchema,
+                eventName: 'type',
+            },
+            404: ProblemDetailsSchema,
+        },
+        summary: 'Stream a user activity feed — exercises an SSE streaming response with named events',
     },
     searchUsers: {
         method: 'GET',

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
 import { server } from './server';
+import { withEventMeta } from '@ts-kizuna/core';
 
 export const router = server.router({
     users: {
@@ -37,6 +38,44 @@ export const router = server.router({
             return {
                 status: 200,
                 body: Buffer.from(`BADGE:${user.id}:${user.name}`, 'utf-8'),
+            };
+        },
+        streamUserActivity: async ({ params, signal, lastEventId }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            // An SSE client that reconnects sends the last id it saw, so the feed resumes instead of restarting.
+            const resumeFrom = lastEventId ? Number(lastEventId) : 0;
+            return {
+                status: 200,
+                stream: async function* () {
+                    yield {
+                        type: 'started',
+                        userId: user.id,
+                    };
+                    for (let percent = resumeFrom + 25; percent <= 100; percent += 25) {
+                        if (signal.aborted) return;
+                        yield withEventMeta(
+                            {
+                                type: 'progress',
+                                percent,
+                            },
+                            {
+                                id: String(percent),
+                            }
+                        );
+                    }
+                    yield {
+                        type: 'completed',
+                        total: await db.users.count(),
+                    };
+                },
             };
         },
         searchUsers: async ({ query }) => {

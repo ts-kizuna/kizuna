@@ -25,6 +25,41 @@ final class APIClientTests: XCTestCase {
         XCTAssertTrue(names.contains("Linus Torvalds"), "expected Linus in seeded users; got \(names)")
     }
 
+    func testStreamUserActivityYieldsTypedEvents() async throws {
+        var percents: [Int] = []
+        var sawStarted = false
+        var total: Int?
+
+        for try await event in try await client.users.streamUserActivity(.params(id: "1")) {
+            switch event {
+            case .started:
+                sawStarted = true
+            case .progress(let progress):
+                percents.append(progress.percent)
+            case .completed(let completed):
+                total = completed.total
+            }
+        }
+
+        XCTAssertTrue(sawStarted, "expected a started event")
+        XCTAssertEqual(percents, [25, 50, 75, 100])
+        XCTAssertNotNil(total)
+    }
+
+    func testStreamUserActivityThrowsTypedFailureForMissingUser() async throws {
+        do {
+            for try await _ in try await client.users.streamUserActivity(.params(id: "does-not-exist")) {
+                XCTFail("expected no events")
+            }
+            XCTFail("expected a notFound failure")
+        } catch let failure as APIClient.UsersStreamUserActivity.Failure {
+            guard case .notFound = failure else {
+                XCTFail("expected notFound, got \(failure)")
+                return
+            }
+        }
+    }
+
     func testListUsersPagination() async throws {
         let firstPage = try await client.users.listUsers(
             .query(page: 1, limit: 1)

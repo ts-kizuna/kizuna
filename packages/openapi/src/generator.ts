@@ -17,6 +17,8 @@ import {
     resolveResponseBody,
     resolveResponseHeaders,
     resolveResponseContentType,
+    isStreamResponse,
+    streamContentType,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
 import { type Contract, type SecurityRequirement, type TagOptions, getStatusText } from '@ts-kizuna/core';
@@ -408,7 +410,6 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
             }
 
             for (const [statusKey, responseValue] of Object.entries(route.responses)) {
-                const bodySchema = resolveResponseBody(responseValue);
                 const headersSchema = resolveResponseHeaders(responseValue);
                 const description = getStatusText(Number(statusKey));
                 const headersObject: Record<string, unknown> | undefined = headersSchema
@@ -418,6 +419,26 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                           ).map(([name, schema]) => [name, { schema, required: false }])
                       )
                     : undefined;
+
+                if (isStreamResponse(responseValue)) {
+                    // The event schema is not emitted: describing it needs `itemSchema`, added in OpenAPI 3.2.
+                    operation.responses[statusKey] = {
+                        description,
+                        ...(headersObject ? { headers: headersObject } : {}),
+                        ...(route.method !== 'HEAD'
+                            ? {
+                                  content: {
+                                      [streamContentType(responseValue.stream)]: {
+                                          schema: { type: 'string' },
+                                      },
+                                  },
+                              }
+                            : {}),
+                    };
+                    continue;
+                }
+
+                const bodySchema = resolveResponseBody(responseValue);
                 const mediaType =
                     resolveResponseContentType(responseValue) ??
                     (Number(statusKey) >= 400 ? 'application/problem+json' : 'application/json');

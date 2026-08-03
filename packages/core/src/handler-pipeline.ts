@@ -1,5 +1,14 @@
 import type { z } from 'zod';
-import { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand, type RouteDefinition, type Routes, type Method } from './types.js';
+import {
+    ROUTES_TAG,
+    HANDLER_CONTEXT_BRAND,
+    type HandlerContextBrand,
+    type RouteDefinition,
+    type Routes,
+    type Method,
+    type StreamFormat,
+} from './types.js';
+import type { HandlerStream } from './stream.js';
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { IdentityAccess } from './identity.js';
@@ -119,13 +128,59 @@ type HandlerBody<S, Status> = S extends z.ZodType
       ? ApplyErrorEnvelope<z.input<S['body']>, Status>
       : never;
 
+/**
+ * A streaming response returns `{ status, stream }` instead of `{ status, body }`.
+ */
+type HandlerStreamReturn<S, Status> = {
+    status: Status extends number ? Status : never;
+    stream: S extends { event: z.ZodType } ? HandlerStream<z.input<S['event']>> : never;
+    headers?: Record<string, string>;
+};
+
+type HandlerBodyReturn<S, Status> = {
+    status: Status extends number ? Status : never;
+    body: HandlerBody<S, Status>;
+    headers?: Record<string, string>;
+};
+
 export type HandlerReturn<R extends RouteDefinition> = {
-    [Status in keyof R['responses']]: {
-        status: Status extends number ? Status : never;
-        body: HandlerBody<R['responses'][Status], Status>;
-        headers?: Record<string, string>;
-    };
+    [Status in keyof R['responses']]: R['responses'][Status] extends { stream: StreamFormat }
+        ? HandlerStreamReturn<R['responses'][Status], Status>
+        : HandlerBodyReturn<R['responses'][Status], Status>;
 }[keyof R['responses']];
+
+/**
+ * The arms of {@link HandlerReturn} that carry a body. `throwError` cannot raise a
+ * stream, which only makes sense as a normal return.
+ */
+export type HandlerThrow<R extends RouteDefinition> = {
+    [Status in keyof R['responses']]: R['responses'][Status] extends { stream: StreamFormat }
+        ? never
+        : HandlerBodyReturn<R['responses'][Status], Status>;
+}[keyof R['responses']];
+
+/**
+ * True when any of the route's responses is a streaming response.
+ */
+type HasStreamResponse<R extends RouteDefinition> = true extends {
+    [Status in keyof R['responses']]: R['responses'][Status] extends { stream: StreamFormat } ? true : false;
+}[keyof R['responses']]
+    ? true
+    : false;
+
+/**
+ * `lastEventId` is only meaningful on a route that streams, so it appears only there.
+ */
+type StreamArgs<R extends RouteDefinition> =
+    HasStreamResponse<R> extends true
+        ? {
+              /**
+               * The `Last-Event-ID` request header, sent by an SSE client when it
+               * reconnects. Resume from this event rather than replaying the stream.
+               */
+              lastEventId: string | undefined;
+          }
+        : {};
 
 export type HandlerArgs<R extends RouteDefinition> = {
     params: R extends { pathParams: z.ZodType } ? z.output<R['pathParams']> : ExtractPathParams<R['path']>;
@@ -133,11 +188,16 @@ export type HandlerArgs<R extends RouteDefinition> = {
     body: R extends { body: z.ZodType } ? z.output<R['body']> : undefined;
     headers: R extends { headers: z.ZodType } ? z.output<R['headers']> : Record<string, string | string[] | undefined>;
     /**
+     * Aborts when the client disconnects. Pass it to downstream work so it stops
+     * with the request, and use it to end a stream early.
+     */
+    signal: AbortSignal;
+    /**
      * Throws a typed error response. Takes the same `{ status, body }` shape as a handler return.
      *
      * This function throws internally and never returns.
      */
-    throwError: (response: HandlerReturn<R>) => never;
+    throwError: (response: HandlerThrow<R>) => never;
     /**
      * Throws a typed error response. Takes the same `{ status, body }` shape as a handler return.
      *
@@ -145,8 +205,8 @@ export type HandlerArgs<R extends RouteDefinition> = {
      *
      * @deprecated Use `throwError` instead.
      */
-    error: (response: HandlerReturn<R>) => never;
-};
+    error: (response: HandlerThrow<R>) => never;
+} & StreamArgs<R>;
 
 export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = (
     args: HandlerArgs<R> & HandlerContext & BrandedHandlerContext<R>

@@ -24,6 +24,8 @@ import {
     createApi as coreApi,
     resolveMiddleware,
     renderJsonResult,
+    pumpChunks,
+    sseHeaders,
 } from '@ts-kizuna/core/adapter';
 import type { z } from 'zod';
 import type {
@@ -91,6 +93,13 @@ export interface FastifyOptions {
      * {@link ErrorFormatter}.
      */
     formatError?: ErrorFormatter<FastifyRequest>;
+    /**
+     * How long a streaming response may sit idle before a keep-alive comment is
+     * sent, in milliseconds. `0` disables it.
+     *
+     * @default 15000
+     */
+    streamKeepAliveMs?: number;
 }
 
 /**
@@ -234,6 +243,14 @@ interface FastifyResponseContext {
     formatError?: ErrorFormatter<FastifyRequest>;
 }
 
+const streamSignal = (reply: FastifyReply): AbortSignal => {
+    const controller = new AbortController();
+    reply.raw.once('close', () => {
+        if (!reply.raw.writableEnded) controller.abort();
+    });
+    return controller.signal;
+};
+
 const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, FastifyResponseContext>({
     buildHandlerContext: (adapterRequest, { reply }) => ({
         request: adapterRequest.request,
@@ -245,6 +262,23 @@ const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
         }
         if (result.kind === 'raw-response') {
             return;
+        }
+        if (result.kind === 'stream') {
+            // Fastify owns the reply lifecycle; hijacking hands the socket over so events can be written as they arrive.
+            reply.hijack();
+            reply.raw.writeHead(result.status, {
+                ...sseHeaders(),
+                ...(result.headers ?? {}),
+            });
+            return pumpChunks(result.events, (frame) => reply.raw.write(frame), {
+                drain: () => new Promise<void>((resolve) => reply.raw.once('drain', resolve)),
+                signal: streamSignal(reply),
+                onError: (error) => {
+                    console.error(`[ts-kizuna/fastify] stream error on ${result.routeKey}:`, error);
+                },
+            }).then(() => {
+                reply.raw.end();
+            });
         }
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, reply.request);
         for (const [key, value] of Object.entries(rendered.headers)) {
@@ -358,6 +392,7 @@ export const fastifyKizuna = fastifyPlugin(
                         query: (request.query ?? {}) as Record<string, string>,
                         headers: request.headers,
                         readBody: () => request.body,
+                        signal: streamSignal(reply),
                     };
 
                     await adapter.handle({
@@ -372,6 +407,7 @@ export const fastifyKizuna = fastifyPlugin(
                         schemes,
                         requestContext,
                         responseValidation: options?.responseValidation,
+                        streamKeepAliveMs: options?.streamKeepAliveMs,
                     });
                 },
             });

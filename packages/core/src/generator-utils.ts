@@ -1,16 +1,43 @@
 import type { z } from 'zod';
-import type { ResponseDefinition } from './types.js';
+import type { ResponseDefinition, StreamFormat, StreamResponseDefinition } from './types.js';
 
 // Kept out of generator.ts so importing these doesn't pull in its node:fs dependency.
 
-export const resolveResponseBody = (value: ResponseDefinition): z.ZodType =>
-    value && typeof value === 'object' && 'body' in value ? value.body : (value as z.ZodType);
+const STREAM_CONTENT_TYPES: Record<StreamFormat, string> = {
+    sse: 'text/event-stream',
+};
+
+/**
+ * True for a {@link StreamResponseDefinition}. A streaming response has no body
+ * schema, so callers of {@link resolveResponseBody} must check this first.
+ */
+export const isStreamResponse = (value: ResponseDefinition | undefined): value is StreamResponseDefinition =>
+    !!value && typeof value === 'object' && 'stream' in value && typeof (value as StreamResponseDefinition).stream === 'string';
+
+/**
+ * The schema for one event of a streaming response, `undefined` otherwise.
+ */
+export const resolveResponseEvent = (value: ResponseDefinition | undefined): z.ZodType | undefined =>
+    isStreamResponse(value) ? value.event : undefined;
+
+export const streamContentType = (format: StreamFormat): string => STREAM_CONTENT_TYPES[format];
+
+export const resolveResponseBody = (value: ResponseDefinition): z.ZodType => {
+    if (isStreamResponse(value)) {
+        throw new Error(
+            'resolveResponseBody was called with a streaming response, which has no body schema. Check isStreamResponse first and read the event schema with resolveResponseEvent.'
+        );
+    }
+    return value && typeof value === 'object' && 'body' in value ? value.body : (value as z.ZodType);
+};
 
 export const resolveResponseHeaders = (value: ResponseDefinition): z.ZodType | undefined =>
-    value && typeof value === 'object' && 'body' in value ? value.headers : undefined;
+    value && typeof value === 'object' && ('body' in value || 'stream' in value) ? value.headers : undefined;
 
-export const resolveResponseContentType = (value: ResponseDefinition | undefined): string | undefined =>
-    value && typeof value === 'object' && 'body' in value ? value.contentType : undefined;
+export const resolveResponseContentType = (value: ResponseDefinition | undefined): string | undefined => {
+    if (isStreamResponse(value)) return streamContentType(value.stream);
+    return value && typeof value === 'object' && 'body' in value ? value.contentType : undefined;
+};
 
 export const toPascalCase = (input: string): string => {
     if (!input) return input;

@@ -9,6 +9,8 @@ import kotlinx.serialization.json.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 import kotlinx.datetime.Instant
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onCompletion
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -53,6 +55,24 @@ object OpenEnumAPI {
         val status: Int,
         val detail: String
     )
+
+    /** One event in a user activity stream */
+    @OptIn(ExperimentalSerializationApi::class)
+    @JsonClassDiscriminator("type")
+    @Serializable
+    sealed interface UserActivityEvent
+
+    @SerialName("started")
+    @Serializable
+    data class ActivityStarted(val userId: String) : UserActivityEvent
+
+    @SerialName("progress")
+    @Serializable
+    data class ActivityProgress(val percent: Int) : UserActivityEvent
+
+    @SerialName("completed")
+    @Serializable
+    data class ActivityCompleted(val total: Int) : UserActivityEvent
 
     @Serializable
     data class CreateUserInput(
@@ -217,6 +237,29 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         class AfterParams internal constructor(override val params: Params) : Args
 
         data class Result(val body: JsonElement)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object UsersStreamUserActivity {
+
+        data class Params(val id: String)
+
+        sealed interface Args {
+            val params: Params
+        }
+
+        object Scope {
+            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args
+
+        data class Result(val body: OpenEnumAPI.UserActivityEvent)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
@@ -1063,6 +1106,35 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                 else -> throw OpenEnumAPIClient.UsersUserBadge.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
+    }
+
+    /** Stream a user activity feed — exercises an SSE streaming response with named events */
+    @Throws(OpenEnumAPIClient.UsersStreamUserActivity.Failure::class)
+    suspend fun streamUserActivity(build: OpenEnumAPIClient.UsersStreamUserActivity.Scope.() -> OpenEnumAPIClient.UsersStreamUserActivity.Args): kotlinx.coroutines.flow.Flow<OpenEnumAPI.UserActivityEvent> {
+        val args = OpenEnumAPIClient.UsersStreamUserActivity.Scope.build()
+        val params = args.params
+        var path = "/users/:id/activity"
+        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        requestBuilder = requestBuilder.header("Accept", "text/event-stream")
+        val httpResponse = Kizuna.executeStreaming(client, requestBuilder.build())
+        responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+        if (httpResponse.code != 200) {
+            val data = httpResponse.use { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { it.body?.bytes() ?: ByteArray(0) } }
+            when (val statusCode = httpResponse.code) {
+                404 -> {
+                    val payload = json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                    throw OpenEnumAPIClient.UsersStreamUserActivity.Failure.NotFound(payload)
+                }
+                else -> throw OpenEnumAPIClient.UsersStreamUserActivity.Failure.Unexpected(statusCode, data)
+            }
+        }
+        return Kizuna.eventFlow(httpResponse, json, OpenEnumAPI.UserActivityEvent.serializer())
     }
 
     /** Search users — required coerced limit and cursor */
@@ -1987,5 +2059,41 @@ private object Kizuna {
             }
             )
         }
+    }
+
+    suspend fun executeStreaming(client: OkHttpClient, request: Request): Response {
+        val streamingClient = client.newBuilder()
+            .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .callTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .build()
+        return execute(streamingClient, request)
+    }
+
+    fun <T> eventFlow(response: Response, json: Json, serializer: kotlinx.serialization.DeserializationStrategy<T>): kotlinx.coroutines.flow.Flow<T> {
+        return kotlinx.coroutines.flow.flow {
+            val source = response.body?.source() ?: return@flow
+            val payload = StringBuilder()
+            while (true) {
+                val line = source.readUtf8Line() ?: break
+                if (line.isEmpty()) {
+                    if (payload.isNotEmpty()) {
+                        val raw = payload.toString()
+                        payload.setLength(0)
+                        emit(json.decodeFromString(serializer, raw))
+                    }
+                    continue
+                }
+                if (line.startsWith(":")) continue
+                val separator = line.indexOf(':')
+                if (separator == -1) continue
+                val field = line.substring(0, separator)
+                var value = line.substring(separator + 1)
+                if (value.startsWith(" ")) value = value.substring(1)
+                if (field == "data") {
+                    if (payload.isNotEmpty()) payload.append('\n')
+                    payload.append(value)
+                }
+            }
+        }.flowOn(kotlinx.coroutines.Dispatchers.IO).onCompletion { response.close() }
     }
 }

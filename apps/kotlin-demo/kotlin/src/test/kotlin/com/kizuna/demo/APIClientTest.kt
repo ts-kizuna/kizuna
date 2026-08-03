@@ -1,5 +1,6 @@
 package com.kizuna.demo
 
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
@@ -25,6 +26,33 @@ class APIClientTest {
         val names = response.body.users.map { it.name }
         assertTrue("Ada Lovelace" in names)
         assertTrue("Linus Torvalds" in names)
+    }
+
+    @Test
+    fun testStreamUserActivityCollectsTypedEvents() = runTest {
+        val events = client.users.streamUserActivity {
+            params(
+                id = "1",
+            )
+        }.toList()
+
+        assertTrue(events.size >= 3, "expected a started, progress, and completed event")
+        assertTrue(events.first() is API.ActivityStarted)
+        assertTrue(events.last() is API.ActivityCompleted)
+
+        val percents = events.filterIsInstance<API.ActivityProgress>().map { it.percent }
+        assertEquals(listOf(25, 50, 75, 100), percents)
+    }
+
+    @Test
+    fun testStreamUserActivityThrowsTypedFailureForMissingUser() = runTest {
+        assertFailsWith<APIClient.UsersStreamUserActivity.Failure.NotFound> {
+            client.users.streamUserActivity {
+                params(
+                    id = "does-not-exist",
+                )
+            }
+        }
     }
 
     @Test

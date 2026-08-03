@@ -1,0 +1,183 @@
+---
+title: Streaming
+description: Declare a response that arrives as a sequence of typed events, and consume it as an async sequence in every client.
+---
+
+Some responses are not a value, they are a sequence: an agent emitting progress and partial text, a long job reporting each step, a live feed. Declaring one in the contract gets you the same thing every other route gets, an event schema the server is held to and a typed client, except the client hands you an async sequence instead of a body.
+
+kizuna streams over [Server-Sent Events](https://html.spec.whatwg.org/multipage/server-sent-events.html). It is the format the major model providers serve, browsers consume it natively through `EventSource`, and it is the only streaming format with a specification, which is what makes named events and resume-after-disconnect possible at all.
+
+## Declare the event schema
+
+A streaming response declares `stream` and `event` instead of `body`. `event` is the schema of **one** event, not of the stream:
+
+```ts
+const ActivityEventSchema = createModel({
+    title: 'ActivityEvent',
+    schema: z.discriminatedUnion('type', [ActivityStarted, ActivityProgress, ActivityCompleted]),
+});
+
+export const activityRoutes = k.routes('activity', {
+    streamActivity: {
+        method: 'GET',
+        path: '/users/:id/activity',
+        responses: {
+            200: {
+                stream: 'sse',
+                event: ActivityEventSchema,
+                eventName: 'type',
+            },
+            404: ProblemDetailsSchema,
+        },
+    },
+});
+```
+
+`eventName` names the field whose value becomes the SSE `event:` line, so a browser can listen for one kind of event with `addEventListener('progress', ...)`. It is usually the discriminant of a union. Leave it out to send unnamed events.
+
+A streaming response sets its own `Content-Type`, so `contentType` is not allowed alongside `stream`.
+
+## Yield the events
+
+The handler returns `stream` in place of `body`. An async generator function is the natural form, and its yields are typed against the event schema:
+
+```ts
+streamActivity: async ({ params, signal }) => {
+    const user = await db.users.findById(params.id);
+    if (!user) {
+        return {
+            status: 404,
+            body: {
+                detail: 'User not found',
+            },
+        };
+    }
+    return {
+        status: 200,
+        stream: async function* () {
+            for (const step of steps) {
+                if (signal.aborted) return;
+                yield {
+                    type: 'progress',
+                    percent: step.percent,
+                };
+            }
+            yield {
+                type: 'completed',
+                total: steps.length,
+            };
+        },
+    };
+},
+```
+
+`signal` aborts when the client disconnects, and a `finally` block in the generator runs when it does, so downstream work stops with the request.
+
+### Emitting from deeper in the call tree
+
+Sometimes the events are produced somewhere other than the `yield` site: a tool loop, a job runner, anything you hand a callback to. Return a function taking `emit` instead, and pass `emit` down:
+
+```ts
+return {
+    status: 200,
+    stream: async (emit) => {
+        const tools = buildTools({
+            emit,
+        });
+        await runAgentLoop(tools);
+    },
+};
+```
+
+Both forms are typed against `event` the same way. Reach for `emit` when threading a generator through would mean restructuring the code that actually produces the events.
+
+## Errors
+
+The status is decided by the first event, not by the handler returning. Nothing is written until then, so anything that fails before the first event, a guard denial, a validation failure, a thrown error, produces an ordinary [Problem Details](/docs/reference/problem-details-schema) response with the right status. That is why the `404` above works exactly like it does on any other route.
+
+After the first event the status is already on the wire and cannot be taken back. kizuna logs the failure and closes the connection; an SSE client treats that as a dropped stream and reconnects.
+
+So model failures you want the client to _handle_ as part of the event union:
+
+```ts
+const ActivityEventSchema = z.discriminatedUnion('type', [ActivityStarted, ActivityProgress, ActivityCompleted, ActivityFailed]);
+```
+
+That keeps the failure in the contract, typed in every client, rather than inferred from a connection closing.
+
+## Resuming after a disconnect
+
+Attach an `id` to an event with `withEventMeta`, and a reconnecting client sends the last one it saw back as `Last-Event-ID`. Handlers read it as `lastEventId`:
+
+```ts
+import { withEventMeta } from '@ts-kizuna/core';
+
+streamActivity: async ({ lastEventId }) => ({
+    status: 200,
+    stream: async function* () {
+        for (const step of stepsAfter(lastEventId)) {
+            yield withEventMeta(
+                {
+                    type: 'progress',
+                    percent: step.percent,
+                },
+                {
+                    id: step.id,
+                }
+            );
+        }
+    },
+}),
+```
+
+`withEventMeta` also takes `retry`, which tells the client how long to wait before reconnecting.
+
+## Consuming a stream
+
+The [fetch client](/docs/clients/fetch) returns `stream` where a normal route returns `body`. Narrowing on `status` picks the right one:
+
+```ts
+const result = await client.activity.streamActivity({
+    params: {
+        id: '1',
+    },
+});
+
+if (result.status === 200) {
+    for await (const event of result.stream) {
+        if (event.type === 'progress') console.log(event.percent);
+    }
+}
+```
+
+Breaking out of the loop cancels the request. Error statuses still arrive as a buffered `body`, so `result.status === 404` gives you the Problem Details object.
+
+The generated [Swift](/docs/clients/swift) and [Kotlin](/docs/clients/kotlin) clients expose the same events idiomatically, as an `AsyncThrowingStream` and a `Flow`.
+
+## Keep-alive
+
+Idle connections get dropped by proxies and load balancers, so adapters send an SSE comment every 15 seconds when a stream has nothing to say. Change it per adapter with `streamKeepAliveMs`, or pass `0` to turn it off:
+
+```ts
+createExpressEndpoints(api, app, {
+    streamKeepAliveMs: 30_000,
+});
+```
+
+## Next.js
+
+A streaming route must not be statically rendered. Mark the route segment dynamic:
+
+```ts title="app/api/[...route]/route.ts"
+export const dynamic = 'force-dynamic';
+```
+
+## Reference
+
+Field-by-field detail lives in [Stream responses](/docs/reference/stream-responses).
+
+## What the spec does not cover yet
+
+OpenAPI 3.1 has no way to describe the schema of one event in a stream, so a streaming route appears in the generated document as `text/event-stream` with a `string` schema. That is accurate but coarse. The `itemSchema` keyword added in OpenAPI 3.2 is the fix, and the generator will emit it once it targets 3.2.
+
+MCP tools return a single result, so streaming routes are left out of [MCP](/docs/mcp) tool generation by default.

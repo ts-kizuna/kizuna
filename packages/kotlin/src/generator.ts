@@ -6,6 +6,8 @@ import {
     parsePath,
     resolveResponseBody,
     resolveResponseHeaders,
+    resolveResponseEvent,
+    isStreamResponse,
     isObjectSchema,
     isDiscriminatedUnionSchema,
     readMetaId,
@@ -97,6 +99,11 @@ interface RouteMethod {
         status: number;
         type: string;
     }>;
+    /**
+     * Set when a success response streams, so the method returns a `Flow` of
+     * decoded events instead of a decoded body.
+     */
+    streamEventType?: string;
 }
 
 interface RouteGroup {
@@ -220,9 +227,25 @@ const buildRouteMethod = (
     const successResponses: RouteMethod['successResponses'] = [];
     const errorCases: RouteMethod['errorCases'] = [];
 
+    let streamEventType: string | undefined;
+
     for (const [statusKey, responseValue] of Object.entries(route.responses)) {
         const status = Number(statusKey);
         const responseHint = `${baseHint}Response${status === 200 ? '' : status}`;
+
+        if (isStreamResponse(responseValue)) {
+            const eventSchema = resolveResponseEvent(responseValue)!;
+            const eventHint = readMetaId(eventSchema as never) ?? `${baseHint}Event`;
+            const event = mapType(eventSchema as z.ZodType, registry, eventHint, fieldPaths, `responses.${statusKey}`, deprecationSchemas);
+            streamEventType = event.expression;
+            successResponses.push({
+                status,
+                type: event.expression,
+                responseHeaders: [],
+            });
+            continue;
+        }
+
         const bodySchema = resolveResponseBody(responseValue);
         const result = mapType(bodySchema as z.ZodType, registry, responseHint, fieldPaths, `responses.${statusKey}`, deprecationSchemas);
         const typeExpression = result.expression;
@@ -277,10 +300,13 @@ const buildRouteMethod = (
         }
     }
 
-    const resultWrapperName = successReturnType !== 'Unit' ? 'Result' : undefined;
+    // A stream is returned bare rather than wrapped in `Result`, since its headers arrive
+    // before any event and there is no single body to pair them with.
+    const resultWrapperName = successReturnType !== 'Unit' && streamEventType === undefined ? 'Result' : undefined;
 
     return {
         name: methodName,
+        streamEventType,
         operationName: baseHint,
         summary: route.summary,
         description: route.description,
@@ -1203,6 +1229,43 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
 
     writer.line('requestInterceptor?.invoke(requestBuilder)');
 
+    if (method.streamEventType) {
+        const event = resolveType(method.streamEventType, method.operationName, context);
+        const successStatus = method.successResponses[0]?.status ?? 200;
+        writer.line(`requestBuilder = requestBuilder.header("Accept", "text/event-stream")`);
+        // Not `use { }`: the response body has to stay open until the flow is collected.
+        writer.line('val httpResponse = Kizuna.executeStreaming(client, requestBuilder.build())');
+        writer.line('responseInterceptor?.invoke(requestBuilder.build(), httpResponse)');
+        writer.block(`if (httpResponse.code != ${successStatus})`, () => {
+            writer.line(
+                'val data = httpResponse.use { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { it.body?.bytes() ?: ByteArray(0) } }'
+            );
+            writer.line('when (val statusCode = httpResponse.code) {');
+            writer.indent(() => {
+                const seen = new Set<number>();
+                for (const errorCase of method.errorCases) {
+                    if (seen.has(errorCase.status)) continue;
+                    seen.add(errorCase.status);
+                    writer.line(`${errorCase.status} -> {`);
+                    writer.indent(() => {
+                        if (errorCase.type === 'Unit') {
+                            writer.line(`throw ${failureRef}.${toPascalCase(errorCase.caseName)}()`);
+                            return;
+                        }
+                        const resolved = resolveType(errorCase.type, method.operationName, context);
+                        writer.line(`val payload = json.decodeFromString<${resolved}>(data.decodeToString())`);
+                        writer.line(`throw ${failureRef}.${toPascalCase(errorCase.caseName)}(payload)`);
+                    });
+                    writer.line('}');
+                }
+                writer.line(`else -> throw ${failureRef}.Unexpected(statusCode, data)`);
+            });
+            writer.line('}');
+        });
+        writer.line(`return Kizuna.eventFlow(httpResponse, json, ${event}.serializer())`);
+        return;
+    }
+
     writer.line('val httpResponse = Kizuna.execute(client, requestBuilder.build())');
     writer.line(`${isVoidSuccess ? '' : 'return '}httpResponse.use {`);
     writer.indent(() => {
@@ -1301,6 +1364,10 @@ const resultRef = (method: RouteMethod, context: EmitContext): string => `${cont
 
 const buildMethodSignature = (method: RouteMethod, context: EmitContext): string => {
     const params = buildMethodParameters(method, context);
+    if (method.streamEventType) {
+        const event = resolveType(method.streamEventType, method.operationName, context);
+        return `suspend fun ${escapeKeyword(method.name)}(${params.join(', ')}): kotlinx.coroutines.flow.Flow<${event}>`;
+    }
     const returnType = isVoidSuccessMethod(method) ? '' : `: ${resultRef(method, context)}`;
     return `suspend fun ${escapeKeyword(method.name)}(${params.join(', ')})${returnType}`;
 };
@@ -1390,6 +1457,50 @@ const emitKizunaObject = (writer: KotlinWriter): void => {
             });
             writer.line('}');
         });
+        writer.blank();
+        // Read and call timeouts are cleared: a stream is open-ended by design.
+        writer.block('suspend fun executeStreaming(client: OkHttpClient, request: Request): Response', () => {
+            writer.line('val streamingClient = client.newBuilder()');
+            writer.line('    .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)');
+            writer.line('    .callTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)');
+            writer.line('    .build()');
+            writer.line('return execute(streamingClient, request)');
+        });
+        writer.blank();
+        writer.block(
+            'fun <T> eventFlow(response: Response, json: Json, serializer: kotlinx.serialization.DeserializationStrategy<T>): kotlinx.coroutines.flow.Flow<T>',
+            () => {
+                writer.line('return kotlinx.coroutines.flow.flow {');
+                writer.indent(() => {
+                    writer.line('val source = response.body?.source() ?: return@flow');
+                    writer.line('val payload = StringBuilder()');
+                    writer.line('while (true) {');
+                    writer.indent(() => {
+                        writer.line('val line = source.readUtf8Line() ?: break');
+                        writer.block('if (line.isEmpty())', () => {
+                            writer.block('if (payload.isNotEmpty())', () => {
+                                writer.line('val raw = payload.toString()');
+                                writer.line('payload.setLength(0)');
+                                writer.line('emit(json.decodeFromString(serializer, raw))');
+                            });
+                            writer.line('continue');
+                        });
+                        writer.line('if (line.startsWith(":")) continue');
+                        writer.line("val separator = line.indexOf(':')");
+                        writer.line('if (separator == -1) continue');
+                        writer.line('val field = line.substring(0, separator)');
+                        writer.line('var value = line.substring(separator + 1)');
+                        writer.line('if (value.startsWith(" ")) value = value.substring(1)');
+                        writer.block('if (field == "data")', () => {
+                            writer.line("if (payload.isNotEmpty()) payload.append('\\n')");
+                            writer.line('payload.append(value)');
+                        });
+                    });
+                    writer.line('}');
+                });
+                writer.line('}.flowOn(kotlinx.coroutines.Dispatchers.IO).onCompletion { response.close() }');
+            }
+        );
     });
 };
 
@@ -1522,6 +1633,7 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
 
     const operationTypeMap = buildOperationTypeMap(allMethods, registry);
     const clientName = `${namespaceName}Client`;
+    const hasStreamingRoute = allMethods.some((method: RouteMethod) => method.streamEventType !== undefined);
 
     const writer = new KotlinWriter();
     writer.line('// Generated by @ts-kizuna/kotlin. Do not edit by hand.');
@@ -1548,6 +1660,10 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
         writer.line('import kotlinx.serialization.encoding.*');
     }
     writer.line('import kotlinx.datetime.Instant');
+    if (hasStreamingRoute) {
+        writer.line('import kotlinx.coroutines.flow.flowOn');
+        writer.line('import kotlinx.coroutines.flow.onCompletion');
+    }
     writer.line('import okhttp3.*');
     writer.line('import okhttp3.MediaType.Companion.toMediaType');
     writer.line('import okhttp3.RequestBody.Companion.toRequestBody');

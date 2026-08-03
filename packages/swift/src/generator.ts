@@ -12,6 +12,8 @@ import {
     resolveResponseContentType,
     isJsonMediaType,
     isBinarySchema,
+    isStreamResponse,
+    resolveResponseEvent,
     readMetaId,
     toPascalCase,
     toCamelCase,
@@ -85,6 +87,7 @@ interface RouteMethod {
         responseHeaders: SwiftField[];
         isRaw: boolean;
         isBinary: boolean;
+        isStream: boolean;
     }>;
     successReturnType: string;
     successSumEnumName?: string;
@@ -96,6 +99,11 @@ interface RouteMethod {
         isRaw: boolean;
         isBinary: boolean;
     }>;
+    /**
+     * Set when a success response streams, so the method returns an
+     * `AsyncThrowingStream` of decoded events instead of a decoded body.
+     */
+    streamEventType?: string;
 }
 
 interface RouteGroup {
@@ -224,9 +232,28 @@ const buildRouteMethod = (
     const successResponses: RouteMethod['successResponses'] = [];
     const errorCases: RouteMethod['errorCases'] = [];
 
+    let streamEventType: string | undefined;
+
     for (const [statusKey, responseValue] of Object.entries(route.responses)) {
         const status = Number(statusKey);
         const responseHint = `${baseHint}Response${status === 200 ? '' : status}`;
+
+        if (isStreamResponse(responseValue)) {
+            const eventSchema = resolveResponseEvent(responseValue)!;
+            const eventHint = readMetaId(eventSchema as never) ?? `${baseHint}Event`;
+            const event = mapType(eventSchema as z.ZodType, registry, eventHint, fieldPaths, `responses.${statusKey}`, deprecationSchemas);
+            streamEventType = event.expression;
+            successResponses.push({
+                status,
+                type: event.expression,
+                responseHeaders: [],
+                isRaw: false,
+                isBinary: false,
+                isStream: true,
+            });
+            continue;
+        }
+
         const bodySchema = resolveResponseBody(responseValue);
         const responseContentType = resolveResponseContentType(responseValue);
         const isBinary = isBinarySchema(bodySchema as z.core.$ZodType);
@@ -251,6 +278,7 @@ const buildRouteMethod = (
                 responseHeaders: perStatusHeaderFields,
                 isRaw,
                 isBinary,
+                isStream: false,
             });
         } else {
             errorCases.push({
@@ -290,10 +318,13 @@ const buildRouteMethod = (
         }
     }
 
-    const resultWrapperName = successReturnType !== 'Void' ? 'Result' : undefined;
+    // A stream is returned bare rather than wrapped in `Result`, since its headers arrive
+    // before any event and there is no single body to pair them with.
+    const resultWrapperName = successReturnType !== 'Void' && streamEventType === undefined ? 'Result' : undefined;
 
     return {
         name: methodName,
+        streamEventType,
         operationName: baseHint,
         summary: route.summary,
         description: route.description,
@@ -1158,6 +1189,79 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
                 writer.line('catch { throw Failure.decoding(error, statusCode: statusCode, data: data) }');
             }
         );
+        writer.blank();
+        writer.block(
+            'static func openStream<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int)',
+            () => {
+                writer.line('if let requestMiddleware {');
+                writer.line('    do { try await requestMiddleware(&request) }');
+                writer.line('    catch is CancellationError { throw Failure.cancelled }');
+                writer.line('    catch { throw Failure.requestFailed(error) }');
+                writer.line('}');
+                writer.line('let bytes: URLSession.AsyncBytes');
+                writer.line('let response: URLResponse');
+                writer.line('do { (bytes, response) = try await session.bytes(for: request) }');
+                writer.line('catch is CancellationError { throw Failure.cancelled }');
+                writer.line('catch { throw Failure.requestFailed(error) }');
+                writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
+                writer.line('return (bytes, httpResponse.statusCode)');
+            }
+        );
+        writer.blank();
+        writer.block(
+            'static func collect<Failure: KizunaFailure>(_ bytes: URLSession.AsyncBytes, failure: Failure.Type) async throws(Failure) -> Foundation.Data',
+            () => {
+                writer.line('var data = Foundation.Data()');
+                writer.line('do { for try await byte in bytes { data.append(byte) } }');
+                writer.line('catch is CancellationError { throw Failure.cancelled }');
+                writer.line('catch { throw Failure.requestFailed(error) }');
+                writer.line('return data');
+            }
+        );
+        writer.blank();
+        writer.block(
+            'static func eventStream<Value: Decodable & Sendable>(_ bytes: URLSession.AsyncBytes, of type: Value.Type, using decoder: JSONDecoder) -> AsyncThrowingStream<Value, Swift.Error>',
+            () => {
+                // Not `bytes.lines`: it drops the blank lines that delimit one event from the next.
+                writer.line('AsyncThrowingStream { continuation in');
+                writer.line('    let task = Task {');
+                writer.line('        var payload: [String] = []');
+                writer.line('        var lineBytes = Foundation.Data()');
+                writer.line('        func handle(_ line: String) throws {');
+                writer.line('            if line.isEmpty {');
+                writer.line('                guard !payload.isEmpty else { return }');
+                writer.line('                let joined = payload.joined(separator: "\\n")');
+                writer.line('                payload.removeAll()');
+                writer.line('                guard let raw = joined.data(using: .utf8) else { return }');
+                writer.line('                continuation.yield(try decoder.decode(Value.self, from: raw))');
+                writer.line('                return');
+                writer.line('            }');
+                writer.line('            if line.hasPrefix(":") { return }');
+                writer.line('            guard let separator = line.firstIndex(of: ":") else { return }');
+                writer.line('            let field = String(line[line.startIndex..<separator])');
+                writer.line('            var value = String(line[line.index(after: separator)...])');
+                writer.line('            if value.hasPrefix(" ") { value.removeFirst() }');
+                writer.line('            if field == "data" { payload.append(value) }');
+                writer.line('        }');
+                writer.line('        do {');
+                writer.line('            for try await byte in bytes {');
+                writer.line('                if byte == 0x0A {');
+                writer.line('                    if lineBytes.last == 0x0D { lineBytes.removeLast() }');
+                writer.line('                    try handle(String(decoding: lineBytes, as: UTF8.self))');
+                writer.line('                    lineBytes.removeAll(keepingCapacity: true)');
+                writer.line('                } else {');
+                writer.line('                    lineBytes.append(byte)');
+                writer.line('                }');
+                writer.line('            }');
+                writer.line('            continuation.finish()');
+                writer.line('        } catch {');
+                writer.line('            continuation.finish(throwing: error)');
+                writer.line('        }');
+                writer.line('    }');
+                writer.line('    continuation.onTermination = { _ in task.cancel() }');
+                writer.line('}');
+            }
+        );
         if (options.multiError) {
             // One status code, several candidate body types: return the first attempt that produces a
             // failure, else a `.decoding` error carrying the raw payload.
@@ -1355,6 +1459,37 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
         writer.line(`Kizuna.setHeader(&request, name: ${stringLiteral(field.wireName)}, value: ${accessor})`);
     }
 
+    if (method.streamEventType) {
+        const event = resolveType(method.streamEventType, method.operationName, context);
+        const errorStatuses = [...new Set(method.errorCases.map((errorCase) => errorCase.status))].sort((left, right) => left - right);
+        writer.line('request.setValue("text/event-stream", forHTTPHeaderField: "Accept")');
+        writer.line(
+            `let (bytes, statusCode) = try await Kizuna.openStream(&request, session: ${receiver}session, requestMiddleware: ${receiver}requestMiddleware, failure: ${failure}.self)`
+        );
+        writer.line(`guard statusCode == ${method.successResponses[0]?.status ?? 200} else {`);
+        writer.line('    let data = try await Kizuna.collect(bytes, failure: ' + failure + '.self)');
+        writer.line('    switch statusCode {');
+        for (const status of errorStatuses) {
+            const errorCase = method.errorCases.find((candidate) => candidate.status === status)!;
+            writer.line(`    case ${status}:`);
+            if (errorCase.type === 'Void') {
+                writer.line(`        throw ${failure}.${escapeKeyword(errorCase.caseName)}`);
+            } else {
+                const resolved = resolveType(errorCase.type, method.operationName, context);
+                writer.line(
+                    `        let payload = try Kizuna.decode(${resolved}.self, from: data, using: ${receiver}decoder, statusCode: statusCode, failure: ${failure}.self)`
+                );
+                writer.line(`        throw ${failure}.${escapeKeyword(errorCase.caseName)}(payload)`);
+            }
+        }
+        writer.line('    default:');
+        writer.line(`        throw ${failure}.unexpectedStatus(statusCode, data)`);
+        writer.line('    }');
+        writer.line('}');
+        writer.line(`return Kizuna.eventStream(bytes, of: ${event}.self, using: ${receiver}decoder)`);
+        return;
+    }
+
     const responseBinding = method.resultHeaderFields.length > 0 ? 'httpResponse' : '_';
     writer.line(
         `let (data, statusCode, ${responseBinding}) = try await Kizuna.send(&request, session: ${receiver}session, requestMiddleware: ${receiver}requestMiddleware, responseMiddleware: ${receiver}responseMiddleware, failure: ${failure}.self)`
@@ -1462,6 +1597,9 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
 
 const methodSuccessType = (method: RouteMethod, context: EmitContext): string => {
     const { clientName } = context;
+    if (method.streamEventType) {
+        return `AsyncThrowingStream<${resolveType(method.streamEventType, method.operationName, context)}, Swift.Error>`;
+    }
     if (method.resultWrapperName) {
         return `${clientName}.${method.operationName}.${method.resultWrapperName}`;
     }

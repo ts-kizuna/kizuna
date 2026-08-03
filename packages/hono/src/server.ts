@@ -24,6 +24,8 @@ import {
     createApi as coreApi,
     resolveMiddleware,
     renderJsonResult,
+    sseHeaders,
+    toReadableStream,
     parseFetchBody,
     headersToObject,
 } from '@ts-kizuna/core/adapter';
@@ -85,6 +87,13 @@ export interface HonoOptions {
      * {@link ErrorFormatter}.
      */
     formatError?: ErrorFormatter<Request>;
+    /**
+     * How long a streaming response may sit idle before a keep-alive comment is
+     * sent, in milliseconds. `0` disables it.
+     *
+     * @default 15000
+     */
+    streamKeepAliveMs?: number;
 }
 
 /**
@@ -233,6 +242,21 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
         if (result.kind === 'raw-response') {
             return result.response as Response;
         }
+        if (result.kind === 'stream') {
+            const body = toReadableStream(result.events, {
+                signal: c.req.raw.signal,
+                onError: (error) => {
+                    console.error(`[ts-kizuna/hono] stream error on ${result.routeKey}:`, error);
+                },
+            });
+            return new Response(body, {
+                status: result.status,
+                headers: {
+                    ...sseHeaders(),
+                    ...(result.headers ?? {}),
+                },
+            });
+        }
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, c.req.raw);
         if (rendered.body === undefined) {
             return c.body(null, rendered.status as ContentfulStatusCode, rendered.headers);
@@ -327,6 +351,7 @@ export function createHonoEndpoints<E extends Env = Env>(api: HonoApi, app: Hono
                 query: Object.fromEntries(url.searchParams),
                 headers: headersToObject(c.req.raw.headers),
                 readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),
+                signal: c.req.raw.signal,
             };
 
             return honoAdapter.handle({
@@ -341,6 +366,7 @@ export function createHonoEndpoints<E extends Env = Env>(api: HonoApi, app: Hono
                 schemes,
                 requestContext,
                 responseValidation: options?.responseValidation,
+                streamKeepAliveMs: options?.streamKeepAliveMs,
             });
         };
         (app.on as (method: string, path: string, ...handlers: MiddlewareHandler[]) => void)(

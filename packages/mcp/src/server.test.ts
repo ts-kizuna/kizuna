@@ -86,6 +86,18 @@ const contractRoutes = k.routes('api', {
             }),
         },
     },
+    streamActivity: {
+        method: 'GET',
+        path: '/activity/stream',
+        responses: {
+            200: {
+                stream: 'sse',
+                event: z.object({
+                    message: z.string(),
+                }),
+            },
+        },
+    },
     pingUser: {
         method: 'POST',
         path: '/users/:id/ping',
@@ -173,6 +185,14 @@ const router = {
             size: 1024,
         },
     }),
+    streamActivity: () => ({
+        status: 200 as const,
+        stream: async function* () {
+            yield {
+                message: 'hello',
+            };
+        },
+    }),
     pingUser: () => ({
         status: 204,
         body: undefined,
@@ -244,6 +264,13 @@ describe('buildToolDefinitions', () => {
         const names = definitions.map((definition) => definition.name);
 
         expect(names).not.toContain('uploadAvatar');
+    });
+
+    it('excludes streaming routes by default', () => {
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const names = definitions.map((definition) => definition.name);
+
+        expect(names).not.toContain('streamActivity');
     });
 
     it('includes multipart routes when routeFilter allows them', () => {

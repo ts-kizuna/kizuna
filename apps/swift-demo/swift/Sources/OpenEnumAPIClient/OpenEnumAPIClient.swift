@@ -98,6 +98,93 @@ public enum OpenEnumAPI {
         }
     }
 
+    /// One event in a user activity stream
+    public enum UserActivityEvent: Codable, Sendable, Equatable {
+        case started(ActivityStarted)
+        case progress(ActivityProgress)
+        case completed(ActivityCompleted)
+        public static func started(userId: String) -> UserActivityEvent {
+            .started(ActivityStarted(type: "started", userId: userId))
+        }
+        public static func progress(percent: Int) -> UserActivityEvent {
+            .progress(ActivityProgress(type: "progress", percent: percent))
+        }
+        public static func completed(total: Int) -> UserActivityEvent {
+            .completed(ActivityCompleted(type: "completed", total: total))
+        }
+
+        private enum DiscriminatorKey: String, CodingKey {
+            case discriminator = "type"
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: DiscriminatorKey.self)
+            let kind = try container.decode(String.self, forKey: .discriminator)
+            let single = try decoder.singleValueContainer()
+            switch kind {
+            case "started":
+                self = .started(try single.decode(ActivityStarted.self))
+            case "progress":
+                self = .progress(try single.decode(ActivityProgress.self))
+            case "completed":
+                self = .completed(try single.decode(ActivityCompleted.self))
+            default:
+                throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var single = encoder.singleValueContainer()
+            switch self {
+            case .started(let payload):
+                try single.encode(payload)
+            case .progress(let payload):
+                try single.encode(payload)
+            case .completed(let payload):
+                try single.encode(payload)
+            }
+        }
+    }
+
+    public struct ActivityStarted: Codable, Sendable, Equatable {
+        public let type: String
+        public let userId: String
+
+        public init(
+            type: String,
+            userId: String
+        ) {
+            self.type = type
+            self.userId = userId
+        }
+    }
+
+    public struct ActivityProgress: Codable, Sendable, Equatable {
+        public let type: String
+        public let percent: Int
+
+        public init(
+            type: String,
+            percent: Int
+        ) {
+            self.type = type
+            self.percent = percent
+        }
+    }
+
+    public struct ActivityCompleted: Codable, Sendable, Equatable {
+        public let type: String
+        public let total: Int
+
+        public init(
+            type: String,
+            total: Int
+        ) {
+            self.type = type
+            self.total = total
+        }
+    }
+
     public struct CreateUserInput: Codable, Sendable, Equatable {
         /// Display name
         public let name: String
@@ -488,6 +575,31 @@ public final class OpenEnumAPIClient: Sendable {
 
             public init(body: Foundation.Data) {
                 self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case notFound(OpenEnumAPI.ProblemDetails)
+        }
+    }
+
+    public enum UsersStreamUserActivity {
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
             }
         }
 
@@ -1737,6 +1849,29 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
+    /// Stream a user activity feed — exercises an SSE streaming response with named events
+    public func streamUserActivity(_ params: OpenEnumAPIClient.UsersStreamUserActivity.Params) async throws(OpenEnumAPIClient.UsersStreamUserActivity.Failure) -> AsyncThrowingStream<OpenEnumAPI.UserActivityEvent, Swift.Error> {
+        var path = "/users/:id/activity"
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersStreamUserActivity.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        let (bytes, statusCode) = try await Kizuna.openStream(&request, session: client.session, requestMiddleware: client.requestMiddleware, failure: OpenEnumAPIClient.UsersStreamUserActivity.Failure.self)
+        guard statusCode == 200 else {
+            let data = try await Kizuna.collect(bytes, failure: OpenEnumAPIClient.UsersStreamUserActivity.Failure.self)
+            switch statusCode {
+            case 404:
+                let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersStreamUserActivity.Failure.self)
+                throw OpenEnumAPIClient.UsersStreamUserActivity.Failure.notFound(payload)
+            default:
+                throw OpenEnumAPIClient.UsersStreamUserActivity.Failure.unexpectedStatus(statusCode, data)
+            }
+        }
+        return Kizuna.eventStream(bytes, of: OpenEnumAPI.UserActivityEvent.self, using: client.decoder)
+    }
+
     /// Search users — required coerced limit and cursor
     public func searchUsers(_ query: OpenEnumAPIClient.UsersSearchUsers.Query) async throws(OpenEnumAPIClient.UsersSearchUsers.Failure) -> OpenEnumAPIClient.UsersSearchUsers.Result {
         let path = "/users/search"
@@ -2397,6 +2532,69 @@ private enum Kizuna {
     static func decode<Value: Decodable, Failure: KizunaDecodableFailure>(_ type: Value.Type, from data: Foundation.Data, using decoder: JSONDecoder, statusCode: Int, failure: Failure.Type) throws(Failure) -> Value {
         do { return try decoder.decode(Value.self, from: data) }
         catch { throw Failure.decoding(error, statusCode: statusCode, data: data) }
+    }
+
+    static func openStream<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int) {
+        if let requestMiddleware {
+            do { try await requestMiddleware(&request) }
+            catch is CancellationError { throw Failure.cancelled }
+            catch { throw Failure.requestFailed(error) }
+        }
+        let bytes: URLSession.AsyncBytes
+        let response: URLResponse
+        do { (bytes, response) = try await session.bytes(for: request) }
+        catch is CancellationError { throw Failure.cancelled }
+        catch { throw Failure.requestFailed(error) }
+        guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }
+        return (bytes, httpResponse.statusCode)
+    }
+
+    static func collect<Failure: KizunaFailure>(_ bytes: URLSession.AsyncBytes, failure: Failure.Type) async throws(Failure) -> Foundation.Data {
+        var data = Foundation.Data()
+        do { for try await byte in bytes { data.append(byte) } }
+        catch is CancellationError { throw Failure.cancelled }
+        catch { throw Failure.requestFailed(error) }
+        return data
+    }
+
+    static func eventStream<Value: Decodable & Sendable>(_ bytes: URLSession.AsyncBytes, of type: Value.Type, using decoder: JSONDecoder) -> AsyncThrowingStream<Value, Swift.Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                var payload: [String] = []
+                var lineBytes = Foundation.Data()
+                func handle(_ line: String) throws {
+                    if line.isEmpty {
+                        guard !payload.isEmpty else { return }
+                        let joined = payload.joined(separator: "\n")
+                        payload.removeAll()
+                        guard let raw = joined.data(using: .utf8) else { return }
+                        continuation.yield(try decoder.decode(Value.self, from: raw))
+                        return
+                    }
+                    if line.hasPrefix(":") { return }
+                    guard let separator = line.firstIndex(of: ":") else { return }
+                    let field = String(line[line.startIndex..<separator])
+                    var value = String(line[line.index(after: separator)...])
+                    if value.hasPrefix(" ") { value.removeFirst() }
+                    if field == "data" { payload.append(value) }
+                }
+                do {
+                    for try await byte in bytes {
+                        if byte == 0x0A {
+                            if lineBytes.last == 0x0D { lineBytes.removeLast() }
+                            try handle(String(decoding: lineBytes, as: UTF8.self))
+                            lineBytes.removeAll(keepingCapacity: true)
+                        } else {
+                            lineBytes.append(byte)
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 
     static func firstError<Failure: KizunaDecodableFailure>(statusCode: Int, data: Foundation.Data, _ attempts: [() -> Failure?]) -> Failure {

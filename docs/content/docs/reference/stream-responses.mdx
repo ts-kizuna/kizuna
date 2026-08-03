@@ -1,0 +1,110 @@
+---
+title: Stream responses
+description: The contract fields, handler forms, and helpers for a streaming (Server-Sent Events) response.
+---
+
+Reference for declaring and implementing a streaming response. The [Streaming guide](/docs/streaming) covers the workflow.
+
+## Contract fields
+
+A streaming response replaces `body` with `stream` and `event`:
+
+```ts
+responses: {
+    200: {
+        stream: 'sse',
+        event: ActivityEventSchema,
+        eventName: 'type',
+        headers: z.object({
+            'x-request-id': z.string(),
+        }),
+    },
+},
+```
+
+| Field       | Required | Description                                                                              |
+| ----------- | -------- | ---------------------------------------------------------------------------------------- |
+| `stream`    | yes      | Wire format. `'sse'` sends `text/event-stream`                                           |
+| `event`     | yes      | Schema for **one** event, not the whole stream                                           |
+| `eventName` | no       | Field of `event` whose value becomes the SSE `event:` line, usually a union discriminant |
+| `headers`   | no       | Response headers, sent before the first event                                            |
+
+`contentType` is not allowed: `stream` determines it.
+
+## Handler forms
+
+The handler returns `stream` in place of `body`. Three forms are accepted, all typed against `event`:
+
+```ts
+// Async generator function. Yields are contextually typed, so no assertions needed.
+stream: async function* () {
+    yield { type: 'progress', percent: 40 };
+},
+
+// An already-created async iterable.
+stream: someAsyncIterable,
+
+// A callback receiving `emit`, for producing events deeper in a call tree.
+stream: async (emit) => {
+    emit({ type: 'progress', percent: 40 });
+},
+```
+
+## Handler args
+
+Streaming routes receive two additional args:
+
+| Arg           | Type                  | Description                                                                  |
+| ------------- | --------------------- | ---------------------------------------------------------------------------- |
+| `signal`      | `AbortSignal`         | Aborts on client disconnect. Present on every route, not just streaming ones |
+| `lastEventId` | `string \| undefined` | The `Last-Event-ID` request header, for resuming after a reconnect           |
+
+## `withEventMeta`
+
+Attaches SSE metadata to a yielded event. The metadata is a non-enumerable symbol, so the event still serializes and validates as its plain self.
+
+```ts
+import { withEventMeta } from '@ts-kizuna/core';
+
+yield withEventMeta(
+    {
+        type: 'progress',
+        percent: 40,
+    },
+    {
+        id: '4',
+        retry: 2000,
+    }
+);
+```
+
+| Meta field | Description                                                      |
+| ---------- | ---------------------------------------------------------------- |
+| `id`       | The SSE `id:` field, echoed back as `Last-Event-ID` on reconnect |
+| `event`    | The SSE `event:` field. Usually set from `eventName` instead     |
+| `retry`    | The SSE `retry:` field, in milliseconds                          |
+
+## Adapter options
+
+Every adapter accepts `streamKeepAliveMs`, which controls how long a stream may sit idle before a keep-alive comment is sent. Defaults to `15000`; pass `0` to disable.
+
+```ts
+createExpressEndpoints(api, app, {
+    streamKeepAliveMs: 30_000,
+});
+```
+
+## Status and error behavior
+
+Headers flush on the first event, so:
+
+- Failing before the first event produces a normal [Problem Details](/docs/reference/problem-details-schema) response with the correct status.
+- Failing after it closes the connection, since the status is already sent. Model recoverable failures as a member of the event union instead.
+- `responseValidation: true` validates each event against `event` as it passes through.
+- `HEAD` on a streaming route sends headers only.
+
+## Known limits
+
+- OpenAPI output declares `text/event-stream` with a `string` schema. Per-event typing needs `itemSchema` from OpenAPI 3.2.
+- Streaming routes are excluded from [MCP](/docs/mcp) tool generation by default.
+- JSON Lines (`application/jsonl`) is not supported. `'sse'` is the only format.

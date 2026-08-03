@@ -1768,3 +1768,69 @@ describe('custom identities (no OpenAPI scheme)', () => {
         expect(operation?.['x-kizuna-guarded']).toBeUndefined();
     });
 });
+
+describe('streaming responses', () => {
+    const StreamEvent = createModel({
+        title: 'StreamEvent',
+        schema: z.object({
+            message: z.string(),
+        }),
+    });
+
+    const streamContract = k.contract({
+        routes: {
+            api: k.routes('api', {
+                streamMessages: {
+                    method: 'GET',
+                    path: '/messages/stream',
+                    responses: {
+                        200: {
+                            stream: 'sse',
+                            event: StreamEvent,
+                        },
+                    },
+                },
+                headStream: {
+                    method: 'HEAD',
+                    path: '/messages/stream',
+                    responses: {
+                        200: {
+                            stream: 'sse',
+                            event: StreamEvent,
+                        },
+                    },
+                },
+            }),
+        },
+        auth: {
+            api: false,
+        },
+    });
+
+    const options: GenerateOpenApiOptions = {
+        info: {
+            title: 'Stream API',
+            version: '1.0.0',
+        },
+    };
+
+    it('declares the response as text/event-stream', () => {
+        const spec = generateJson(streamContract, options) as Record<string, any>;
+        expect(spec.paths['/messages/stream'].get.responses['200'].content).toEqual({
+            'text/event-stream': {
+                schema: {
+                    type: 'string',
+                },
+            },
+        });
+    });
+
+    it('omits content for a HEAD stream route', () => {
+        const spec = generateJson(streamContract, options) as Record<string, any>;
+        expect(spec.paths['/messages/stream'].head.responses['200'].content).toBeUndefined();
+    });
+
+    it('produces a valid document', async () => {
+        await expect(generateJson(streamContract, options)).toBeAValidOpenAPIDefinition();
+    });
+});

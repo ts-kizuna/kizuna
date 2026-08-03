@@ -153,6 +153,28 @@ if (result.status === 201) {
 }
 ```
 
+### Streaming responses
+
+A [streaming route](/docs/streaming) returns `stream`, a typed async sequence, where other routes return `body`. Error statuses still return a buffered `body`, so the same `status` narrowing picks the right shape:
+
+```ts
+const result = await apiClient.activity.streamActivity({
+    params: {
+        id: '1',
+    },
+});
+
+if (result.status === 200) {
+    for await (const event of result.stream) {
+        // event is typed from the route's `event` schema
+    }
+} else {
+    // result.status === 404, result.body is a Problem Details object
+}
+```
+
+Breaking out of the `for await` loop cancels the request.
+
 ## Validation errors
 
 Routes with a `body` or `query` schema can receive a `400` validation error when the request data fails schema validation. This is automatically included in the response type — you don't need to declare it in your routes.

@@ -112,6 +112,25 @@ public final class APIClient: Sendable {
 }
 ```
 
+## Streaming responses
+
+A [streaming route](/docs/streaming) returns an `AsyncThrowingStream` of decoded events instead of a `Result`. A non-2xx status is read before the stream opens, so it still throws the route's typed `Failure`:
+
+```swift
+for try await event in try await client.users.streamActivity(.params(id: "1")) {
+    switch event {
+    case .progress(let progress):
+        print(progress.percent)
+    case .completed(let completed):
+        print("done: \(completed.total)")
+    default:
+        break
+    }
+}
+```
+
+Cancelling the enclosing task cancels the request. `URLSession.bytes(for:)` backs this, so it needs iOS 15 or macOS 12.
+
 ## Deprecation
 
 Routes and fields marked `/** @deprecated */` in the routes emit `@available(*, deprecated)` in the generated Swift code:

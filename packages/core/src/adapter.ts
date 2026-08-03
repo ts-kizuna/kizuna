@@ -18,7 +18,8 @@ import { ResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
-import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
+import { resolveResponseBody, resolveResponseContentType, isJsonMediaType, isStreamResponse } from './generator-utils.js';
+import { DEFAULT_KEEP_ALIVE_MS, normalizeHandlerStream, withKeepAlive, type HandlerStream, type StreamChunk } from './stream.js';
 
 export type { RouteDefinition, Routes, Method } from './types.js';
 
@@ -144,6 +145,16 @@ export const createApi = <const R extends Routes>(routes: R): R & ApiDefinition 
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
 export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
 export { ResponseError } from './response-error.js';
+export {
+    encodeSseChunk,
+    pumpChunks,
+    sseHeaders,
+    toReadableStream,
+    withEventMeta,
+    DEFAULT_KEEP_ALIVE_MS,
+    type EventMeta,
+    type StreamChunk,
+} from './stream.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';
 export { matchRoute } from './route-matcher.js';
@@ -172,6 +183,11 @@ export interface AdapterRequest<NativeRequest> {
     query: unknown;
     headers: unknown;
     readBody: (route: RouteDefinition) => Promise<unknown> | unknown;
+    /**
+     * Aborts when the client disconnects. Handlers receive it as `signal`. When
+     * absent, handlers get a signal that never aborts.
+     */
+    signal?: AbortSignal;
 }
 
 /**
@@ -227,6 +243,18 @@ export type AdapterResult =
           headers?: Record<string, string>;
       }
     | {
+          kind: 'stream';
+          routeKey: string;
+          route: RouteDefinition;
+          status: number;
+          /**
+           * The events to write, already framed as chunks. Headers are flushed on
+           * the first one, so the status is only final once it arrives.
+           */
+          events: AsyncIterable<StreamChunk>;
+          headers?: Record<string, string>;
+      }
+    | {
           kind: 'not-acceptable';
       }
     | {
@@ -268,6 +296,13 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
     requestContext?: RequestContextMap<HandlerContext>;
     basePath?: string;
     responseValidation?: boolean;
+    /**
+     * How long a streaming response may sit idle before a keep-alive comment is
+     * sent, in milliseconds. `0` disables it.
+     *
+     * @default 15000
+     */
+    streamKeepAliveMs?: number;
 }
 
 /**
@@ -447,17 +482,65 @@ const resolveRoute = (
     };
 };
 
-const isAcceptable = (acceptHeader: string | undefined): boolean => {
+/**
+ * `application/problem+json` is always included because any route may return an
+ * error.
+ */
+const producibleMediaTypes = (route: RouteDefinition): string[] => {
+    const types = new Set<string>(['application/problem+json']);
+    for (const responseValue of Object.values(route.responses)) {
+        types.add(resolveResponseContentType(responseValue) ?? 'application/json');
+    }
+    return Array.from(types);
+};
+
+/**
+ * Content negotiation per RFC 9110 §12.5.1, against what the matched route can
+ * actually produce.
+ */
+const isAcceptable = (acceptHeader: string | undefined, route: RouteDefinition): boolean => {
     if (!acceptHeader || acceptHeader.trim() === '') return true;
+    const producible = producibleMediaTypes(route);
     for (const part of acceptHeader.split(',')) {
         const [mediaType = ''] = part.trim().split(';');
         const normalized = mediaType.trim().toLowerCase();
-        if (normalized === '*/*' || normalized === 'application/*' || normalized === 'application/json') {
-            return true;
+        if (normalized === '*/*') return true;
+        for (const produced of producible) {
+            if (normalized === produced) return true;
+            const [type] = produced.split('/');
+            if (normalized === `${type}/*`) return true;
         }
     }
     return false;
 };
+
+const emptyChunks: AsyncIterable<StreamChunk> = {
+    async *[Symbol.asyncIterator]() {},
+};
+
+/**
+ * A failure here surfaces mid-stream, once the status is already on the wire.
+ */
+const validateChunks = (
+    chunks: AsyncIterable<StreamChunk>,
+    eventSchema: z.ZodType,
+    routeKey: string,
+    status: number
+): AsyncIterable<StreamChunk> => ({
+    async *[Symbol.asyncIterator]() {
+        for await (const chunk of chunks) {
+            if (chunk.kind === 'event') {
+                const parsed = eventSchema.safeParse(chunk.payload);
+                if (!parsed.success) {
+                    throw new ResponseValidationError(routeKey, status, parsed.error.issues);
+                }
+            }
+            yield chunk;
+        }
+    },
+});
+
+const neverAborts = (): AbortSignal => new AbortController().signal;
 
 const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     request: AdapterRequest<NativeRequest>,
@@ -469,7 +552,8 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     schemes: Record<string, SecurityScheme> | undefined,
     contextResolvers: RequestContextMap<HandlerContext> | undefined,
     basePath: string | undefined,
-    responseValidation: boolean | undefined
+    responseValidation: boolean | undefined,
+    keepAliveMs: number | undefined
 ): Promise<AdapterResult> => {
     const matcher = definition.matcher ?? defaultMatchRoute;
     const resolution = resolveRoute(request as AdapterRequest<unknown>, routes, matcher, basePath);
@@ -484,11 +568,14 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     };
 
     const acceptHeader = (raw.headers as Record<string, string | undefined>)['accept'];
-    if (!isAcceptable(acceptHeader)) {
+    if (!isAcceptable(acceptHeader, route)) {
         return {
             kind: 'not-acceptable',
         };
     }
+
+    const signal = request.signal ?? neverAborts();
+    const lastEventId = getHeaderValue((raw.headers as Record<string, unknown>)['last-event-id']);
 
     if (route.body && !isVoidSchema(route.body)) {
         const expected = route.contentType ?? 'application/json';
@@ -590,12 +677,19 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             throw new ResponseError(response);
         };
         const handlerResult = await (
-            handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: Record<string, string> }>
+            handler as (args: unknown) => Promise<{
+                status: number;
+                body?: unknown;
+                stream?: HandlerStream<unknown>;
+                headers?: Record<string, string>;
+            }>
         )({
             params: validation.parsed.params,
             query: validation.parsed.query,
             body: validation.parsed.body,
             headers: validation.parsed.headers,
+            signal,
+            lastEventId,
             throwError,
             // Deprecated alias for `throwError`; kept for backward compatibility.
             error: throwError,
@@ -603,27 +697,46 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
         });
-        if (responseValidation) {
-            const responseSpec = route.responses[handlerResult.status];
-            if (responseSpec !== undefined) {
-                const bodySchema = 'safeParse' in responseSpec ? responseSpec : responseSpec.body;
-                // Error responses (status >= 400) auto-fill the Problem Details envelope
-                // (`type`/`title`/`status`) at render time, so the handler only supplies
-                // `detail` plus extensions. Validate the final wire shape, not the partial
-                // body — otherwise every valid error handler would fail validation.
-                const bodyToValidate =
-                    handlerResult.status >= 400 && handlerResult.body !== null && typeof handlerResult.body === 'object'
-                        ? {
-                              type: 'about:blank',
-                              title: STATUS_TITLES[handlerResult.status] ?? 'Unknown Error',
-                              status: handlerResult.status,
-                              ...(handlerResult.body as Record<string, unknown>),
-                          }
-                        : handlerResult.body;
-                const parseResult = bodySchema.safeParse(bodyToValidate);
-                if (!parseResult.success) {
-                    throw new ResponseValidationError(routeKey, handlerResult.status, parseResult.error.issues);
-                }
+        const responseSpec = route.responses[handlerResult.status];
+
+        if (isStreamResponse(responseSpec)) {
+            if (handlerResult.stream === undefined) {
+                throw new Error(
+                    `${routeKey} (status ${handlerResult.status}) is declared as a streaming response, so the handler must return a "stream", but it returned none.`
+                );
+            }
+            const chunks = normalizeHandlerStream(handlerResult.stream, {
+                eventName: responseSpec.eventName,
+            });
+            const validated = responseValidation ? validateChunks(chunks, responseSpec.event, routeKey, handlerResult.status) : chunks;
+            return {
+                kind: 'stream',
+                routeKey,
+                route,
+                status: handlerResult.status,
+                events: route.method === 'HEAD' ? emptyChunks : withKeepAlive(validated, keepAliveMs ?? DEFAULT_KEEP_ALIVE_MS),
+                headers: handlerResult.headers,
+            };
+        }
+
+        if (responseValidation && responseSpec !== undefined) {
+            const bodySchema = resolveResponseBody(responseSpec);
+            // Error responses (status >= 400) auto-fill the Problem Details envelope
+            // (`type`/`title`/`status`) at render time, so the handler only supplies
+            // `detail` plus extensions. Validate the final wire shape, not the partial
+            // body, otherwise every valid error handler would fail validation.
+            const bodyToValidate =
+                handlerResult.status >= 400 && handlerResult.body !== null && typeof handlerResult.body === 'object'
+                    ? {
+                          type: 'about:blank',
+                          title: STATUS_TITLES[handlerResult.status] ?? 'Unknown Error',
+                          status: handlerResult.status,
+                          ...(handlerResult.body as Record<string, unknown>),
+                      }
+                    : handlerResult.body;
+            const parseResult = bodySchema.safeParse(bodyToValidate);
+            if (!parseResult.success) {
+                throw new ResponseValidationError(routeKey, handlerResult.status, parseResult.error.issues);
             }
         }
         const successHeaders =
@@ -672,7 +785,18 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
 export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, ResponseContext = Record<string, never>>(
     definition: AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, ResponseContext>
 ): Adapter<NativeRequest, NativeResponse, HandlerContext, ResponseContext> => ({
-    handle: async ({ routes, router, request, responseContext, guards, schemes, requestContext, basePath, responseValidation }) => {
+    handle: async ({
+        routes,
+        router,
+        request,
+        responseContext,
+        guards,
+        schemes,
+        requestContext,
+        basePath,
+        responseValidation,
+        streamKeepAliveMs,
+    }) => {
         const result = await runPipeline(
             request,
             routes,
@@ -683,7 +807,8 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
             schemes,
             requestContext,
             basePath,
-            responseValidation
+            responseValidation,
+            streamKeepAliveMs
         );
         return definition.respond(result, responseContext);
     },
@@ -745,11 +870,11 @@ const describeBodyType = (body: unknown): string => {
  * `formatError` — there is no custom-error-shape passthrough. Pass an `ErrorFormatter`
  * to reshape the wire bytes for migration; the canonical problem is unchanged.
  *
- * `raw-response` is excluded — it carries a framework-specific `NativeResponse`
- * the adapter must return directly, so handle that case before calling this.
+ * `raw-response` and `stream` are excluded: both are written to the connection by
+ * the adapter rather than rendered to a single body, so handle them first.
  */
 export const renderJsonResult = (
-    result: Exclude<AdapterResult, { kind: 'raw-response' }>,
+    result: Exclude<AdapterResult, { kind: 'raw-response' } | { kind: 'stream' }>,
     formatError: ErrorFormatter = defaultErrorFormatter,
     request: unknown = undefined
 ): { status: number; headers: Record<string, string>; body: unknown; raw?: boolean } => {

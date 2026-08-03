@@ -25,8 +25,67 @@ export type ResponseContentType =
     | (string & {});
 
 /**
- * A response: either a schema for the body, or an object declaring the body
- * schema with optional response `headers` and `contentType`.
+ * The wire format of a streaming response. `'sse'` is Server-Sent Events
+ * (`text/event-stream`).
+ *
+ * @see https://html.spec.whatwg.org/multipage/server-sent-events.html
+ */
+export type StreamFormat = 'sse';
+
+/**
+ * A streaming response: a sequence of events over one open connection instead of
+ * a single materialized body. The handler returns `{ status, stream }` rather
+ * than `{ status, body }`, and generated clients expose the events as a typed
+ * async sequence.
+ *
+ * @example
+ * ```ts
+ * const ActivityEventSchema = z.discriminatedUnion('type', [
+ *     z.object({ type: z.literal('progress'), percent: z.number() }),
+ *     z.object({ type: z.literal('done') }),
+ * ]);
+ *
+ * streamActivity: {
+ *     method: 'POST',
+ *     path: '/users/:id/activity',
+ *     responses: {
+ *         200: {
+ *             stream: 'sse',
+ *             event: ActivityEventSchema,
+ *             eventName: 'type',
+ *         },
+ *     },
+ * }
+ * ```
+ */
+export interface StreamResponseDefinition {
+    /**
+     * The wire format, which determines the `Content-Type`.
+     */
+    stream: StreamFormat;
+    /**
+     * Schema for a single event, not for the stream as a whole.
+     */
+    event: z.ZodType;
+    /**
+     * The field of `event` whose value names the SSE `event:` line, letting
+     * browser clients use `addEventListener(name)`. Typically the discriminant
+     * of a `z.discriminatedUnion`. Omit to send unnamed events.
+     */
+    eventName?: string;
+    /**
+     * Schema for the response headers. Each property becomes one response
+     * header, sent before the first event.
+     */
+    headers?: z.ZodType;
+    contentType?: never;
+    body?: never;
+}
+
+/**
+ * A response: a schema for the body, an object declaring the body schema with
+ * optional response `headers` and `contentType`, or a
+ * {@link StreamResponseDefinition} for a streaming response.
  */
 export type ResponseDefinition =
     | z.ZodType
@@ -46,7 +105,10 @@ export type ResponseDefinition =
            * @default 'application/json'
            */
           contentType?: ResponseContentType;
-      };
+          stream?: never;
+          event?: never;
+      }
+    | StreamResponseDefinition;
 
 /**
  * A single security requirement on a route: either a scheme name (sugar for the

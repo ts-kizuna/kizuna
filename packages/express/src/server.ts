@@ -24,6 +24,8 @@ import {
     resolveMiddleware,
     renderJsonResult,
     createApi as coreApi,
+    pumpChunks,
+    sseHeaders,
 } from '@ts-kizuna/core/adapter';
 import type { z } from 'zod';
 import type {
@@ -94,6 +96,13 @@ export interface ExpressOptions {
      * {@link ErrorFormatter}.
      */
     formatError?: ErrorFormatter<Request>;
+    /**
+     * How long a streaming response may sit idle before a keep-alive comment is
+     * sent, in milliseconds. `0` disables it.
+     *
+     * @default 15000
+     */
+    streamKeepAliveMs?: number;
 }
 
 /**
@@ -243,6 +252,14 @@ interface ExpressResponseContext {
     formatError?: ErrorFormatter<Request>;
 }
 
+const streamSignal = (res: Response): AbortSignal => {
+    const controller = new AbortController();
+    res.once('close', () => {
+        if (!res.writableEnded) controller.abort();
+    });
+    return controller.signal;
+};
+
 const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressResponseContext>({
     buildHandlerContext: (adapterRequest, { res }) => ({
         req: adapterRequest.request,
@@ -257,6 +274,22 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
             return;
         }
         if (res.headersSent) return;
+        if (result.kind === 'stream') {
+            res.status(result.status);
+            for (const [key, value] of Object.entries({ ...sseHeaders(), ...(result.headers ?? {}) })) {
+                res.setHeader(key, value);
+            }
+            res.flushHeaders();
+            return pumpChunks(result.events, (frame) => res.write(frame), {
+                drain: () => new Promise<void>((resolve) => res.once('drain', resolve)),
+                signal: streamSignal(res),
+                onError: (error) => {
+                    console.error(`[ts-kizuna/express] stream error on ${result.routeKey}:`, error);
+                },
+            }).then(() => {
+                res.end();
+            });
+        }
         if (result.kind === 'not-found' || result.kind === 'method-not-allowed') {
             next();
             return;
@@ -314,6 +347,7 @@ export function createExpressEndpoints(api: ExpressApi, app: AppLike, options?: 
                     query: req.query,
                     headers: req.headers,
                     readBody: () => req.body,
+                    signal: streamSignal(res),
                 };
                 await adapter.handle({
                     routes: api as unknown as Routes,
@@ -328,6 +362,7 @@ export function createExpressEndpoints(api: ExpressApi, app: AppLike, options?: 
                     schemes,
                     requestContext,
                     responseValidation: options?.responseValidation,
+                    streamKeepAliveMs: options?.streamKeepAliveMs,
                 });
             }
         );

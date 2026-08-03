@@ -19,6 +19,8 @@ import {
     parseFetchBody,
     resolveMiddleware,
     renderJsonResult,
+    sseHeaders,
+    toReadableStream,
 } from '@ts-kizuna/core/adapter';
 import type { z } from 'zod';
 import type {
@@ -208,6 +210,13 @@ export interface NextHandlerOptions {
      * @default false
      */
     responseValidation?: boolean;
+    /**
+     * How long a streaming response may sit idle before a keep-alive comment is
+     * sent, in milliseconds. `0` disables it.
+     *
+     * @default 15000
+     */
+    streamKeepAliveMs?: number;
 }
 
 const jsonResponse = (status: number, body: unknown, headers: Record<string, string>, raw = false): NextResponse =>
@@ -235,6 +244,21 @@ export const handleNextRequest = async <T extends Routes>(
         }),
         respond: (result) => {
             if (result.kind === 'raw-response') return result.response as NextResponse;
+            if (result.kind === 'stream') {
+                const body = toReadableStream(result.events, {
+                    signal: request.signal,
+                    onError: (error) => {
+                        console.error(`[ts-kizuna/next] stream error on ${result.routeKey}:`, error);
+                    },
+                });
+                return new NextResponse(body, {
+                    status: result.status,
+                    headers: {
+                        ...sseHeaders(),
+                        ...(result.headers ?? {}),
+                    },
+                });
+            }
             const rendered = renderJsonResult(result, options?.formatError as ErrorFormatter, request);
             return jsonResponse(rendered.status, rendered.body, rendered.headers, rendered.raw);
         },
@@ -291,6 +315,7 @@ export const handleNextRequest = async <T extends Routes>(
                 query: Object.fromEntries(url.searchParams),
                 headers: headersToObject(request.headers),
                 readBody: (route) => parseFetchBody(request, route),
+                signal: request.signal,
             };
 
             return adapter.handle({
@@ -302,6 +327,7 @@ export const handleNextRequest = async <T extends Routes>(
                 schemes,
                 requestContext,
                 responseValidation: options?.responseValidation,
+                streamKeepAliveMs: options?.streamKeepAliveMs,
             });
         }
     }
@@ -316,6 +342,7 @@ export const handleNextRequest = async <T extends Routes>(
         query: Object.fromEntries(url.searchParams),
         headers: headersToObject(request.headers),
         readBody: (route) => parseFetchBody(request, route),
+        signal: request.signal,
     };
 
     return adapter.handle({
@@ -328,5 +355,6 @@ export const handleNextRequest = async <T extends Routes>(
         requestContext,
         basePath: options?.basePath,
         responseValidation: options?.responseValidation,
+        streamKeepAliveMs: options?.streamKeepAliveMs,
     });
 };

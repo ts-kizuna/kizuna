@@ -183,6 +183,18 @@ responses: {
 },
 ```
 
+Streaming responses: declare `stream` and an `event` schema for a response that arrives as a sequence of events rather than one body. See [Streaming](/docs/streaming):
+
+```ts
+responses: {
+    200: {
+        stream: 'sse',
+        event: ActivityEventSchema,
+        eventName: 'type',
+    },
+},
+```
+
 That's everything you need to define an API. The rest of this page is optional — reach for it when you need it.
 
 ## Auth

@@ -201,6 +201,26 @@ val result = runCatching {
 result.onSuccess { println(it.body) }.onFailure { println("failed: ${it.message}") }
 ```
 
+## Streaming responses
+
+A [streaming route](/docs/streaming) returns a `Flow` of decoded events instead of a `Result`. The status is checked before the flow is returned, so a non-2xx still throws the route's typed `Failure`:
+
+```kotlin
+client.users.streamActivity {
+    params(
+        id = "1",
+    )
+}.collect { event ->
+    when (event) {
+        is API.ActivityProgress -> println(event.percent)
+        is API.ActivityCompleted -> println("done: ${event.total}")
+        else -> Unit
+    }
+}
+```
+
+Read and call timeouts are cleared for the streaming call, since a stream is open-ended by design, and the response is closed when collection completes.
+
 ## Dependencies
 
 Add these to your `build.gradle.kts`:

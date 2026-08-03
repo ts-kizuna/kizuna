@@ -40,4 +40,6 @@ export {
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export { STATUS_TITLES, getStatusText } from './status-titles.js';
 export { isVoidSchema, readObjectShape } from './zod-internals.js';
+export { withEventMeta, type EventMeta, type HandlerStream, type StreamChunk, type StreamEmit } from './stream.js';
+export { isStreamResponse, resolveResponseEvent, streamContentType } from './generator-utils.js';
 export { type DeprecationMap, type SerializedDeprecationMap } from './deprecation.js';

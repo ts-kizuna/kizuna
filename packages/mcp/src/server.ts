@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { flattenRoutes, validateRequest } from '@ts-kizuna/core';
+import { flattenRoutes, isStreamResponse, validateRequest } from '@ts-kizuna/core';
 import {
     ResponseError,
     type AdapterRequest,
@@ -61,6 +61,8 @@ export interface McpServerOptions {
 }
 
 const defaultRouteFilter = (route: RouteDefinition): boolean => {
+    // A tool call returns a single result, so a route that streams events has nothing to map onto.
+    if (Object.values(route.responses).some((response) => isStreamResponse(response))) return false;
     return route.contentType === undefined || route.contentType === 'application/json';
 };
 
