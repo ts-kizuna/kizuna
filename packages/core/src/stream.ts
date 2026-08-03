@@ -426,12 +426,15 @@ export const pumpToNodeResponse = async (
     });
     const iterator = source.events[Symbol.asyncIterator]();
     try {
+        // Capacity is awaited before the next write rather than straight after the
+        // one that filled the buffer, so a stream whose last frame fills it still
+        // ends instead of waiting for a `drain` that has nothing left to carry.
+        let bufferIsFull = false;
         while (!options.signal?.aborted) {
             const next = await iterator.next();
             if (next.done) break;
-            if (response.write(encodeSseChunk(next.value)) === false) {
-                await waitForCapacity(response, options.signal);
-            }
+            if (bufferIsFull) await waitForCapacity(response, options.signal);
+            bufferIsFull = response.write(encodeSseChunk(next.value)) === false;
         }
     } catch (error) {
         options.onError?.(error);

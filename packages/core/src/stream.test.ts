@@ -419,7 +419,7 @@ describe('withKeepAlive', () => {
 });
 
 describe('sseResponseInit', () => {
-    it('merges the SSE headers with the handler's own', () => {
+    it("merges the SSE headers with the handler's own", () => {
         const init = sseResponseInit({
             status: 200,
             events: normalizeHandlerStream(() => Promise.resolve()),
@@ -517,7 +517,10 @@ const fakeNodeResponse = (capacity = Infinity) => {
             listeners.set(name, [...(listeners.get(name) ?? []), listener]);
         },
         off(name: string, listener: () => void) {
-            listeners.set(name, (listeners.get(name) ?? []).filter((candidate) => candidate !== listener));
+            listeners.set(
+                name,
+                (listeners.get(name) ?? []).filter((candidate) => candidate !== listener)
+            );
         },
         emit(name: string) {
             for (const listener of [...(listeners.get(name) ?? [])]) listener();
