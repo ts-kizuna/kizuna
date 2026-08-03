@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/mcp",
-  "version": "1.40.0",
+  "version": "1.41.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
