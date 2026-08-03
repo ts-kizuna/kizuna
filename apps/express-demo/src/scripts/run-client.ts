@@ -46,6 +46,15 @@ const main = async () => {
         });
         if (got.status === 200) console.log('found:', got.body.name);
 
+        console.log('--- userActivity (hover year to see a number, not a string) ---');
+        const activity = await apiClient.users.userActivity({
+            params: {
+                id: created.body.id,
+                year: 2024,
+            },
+        });
+        if (activity.status === 200) console.log(`events in ${activity.body.year}:`, activity.body.events);
+
         console.log('--- deleteUser created.id ---');
         const deleted = await apiClient.users.deleteUser({
             params: {

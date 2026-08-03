@@ -231,6 +231,23 @@ export const usersRoutes = k.routes('users', {
         },
         summary: 'Get a user by id',
     },
+    userActivity: {
+        method: 'GET',
+        path: '/users/:id/activity/:year',
+        pathParams: z.object({
+            id: z.string(),
+            year: z.int().min(2000).max(2100),
+        }),
+        responses: {
+            200: z.object({
+                userId: z.string(),
+                year: z.int(),
+                events: z.int(),
+            }),
+            404: ProblemDetailsSchema,
+        },
+        summary: 'Get a year of user activity, exercising two typed path params (a string id and a coerced int year)',
+    },
     createUser: {
         method: 'POST',
         path: '/users',

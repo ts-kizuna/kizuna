@@ -215,3 +215,141 @@ describe('k.routes z.coerce ban', () => {
         ).not.toThrow();
     });
 });
+
+describe('k.routes pathParams/path agreement', () => {
+    it('throws when pathParams declares a key the path does not have', () => {
+        expect(() =>
+            k.routes('users', {
+                getPlace: {
+                    method: 'GET',
+                    path: '/places/:plackeId',
+                    // @ts-expect-error intentional, asserts k.routes throws on a mismatched key
+                    pathParams: z.object({
+                        placeId: z.uuid(),
+                    }),
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                },
+            })
+        ).toThrowError(
+            'Route "getPlace" has pathParams that do not match its path "/places/:plackeId": declared in pathParams but not in the path: placeId; in the path but not declared in pathParams: plackeId.'
+        );
+    });
+
+    it('throws when the path has a placeholder pathParams omits', () => {
+        expect(() =>
+            k.routes('users', {
+                getVisit: {
+                    method: 'GET',
+                    path: '/places/:placeId/visits/:visitId',
+                    // @ts-expect-error intentional, asserts k.routes throws on a missing key
+                    pathParams: z.object({
+                        placeId: z.uuid(),
+                    }),
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                },
+            })
+        ).toThrowError('in the path but not declared in pathParams: visitId.');
+    });
+
+    it('throws for a mismatch on a nested route', () => {
+        expect(() =>
+            k.routes('users', {
+                management: {
+                    getPlace: {
+                        method: 'GET',
+                        path: '/places/:placeId',
+                        // @ts-expect-error intentional, asserts k.routes throws on a mismatched key
+                        pathParams: z.object({
+                            place: z.uuid(),
+                        }),
+                        responses: {
+                            200: z.object({
+                                id: z.string(),
+                            }),
+                        },
+                    },
+                },
+            })
+        ).toThrowError('Route "management.getPlace" has pathParams that do not match its path "/places/:placeId"');
+    });
+
+    it('accepts pathParams whose keys match the path', () => {
+        expect(() =>
+            k.routes('users', {
+                getVisit: {
+                    method: 'GET',
+                    path: '/places/:placeId/visits/:visitId',
+                    pathParams: z.object({
+                        placeId: z.uuid(),
+                        visitId: z.uuid(),
+                    }),
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                },
+            })
+        ).not.toThrow();
+    });
+
+    it('accepts a path parameter followed by a literal in the same segment', () => {
+        expect(() =>
+            k.routes('users', {
+                getReport: {
+                    method: 'GET',
+                    path: '/reports/:reportId.pdf',
+                    pathParams: z.object({
+                        reportId: z.uuid(),
+                    }),
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                },
+            })
+        ).not.toThrow();
+    });
+
+    it('accepts a route that omits pathParams entirely', () => {
+        expect(() =>
+            k.routes('users', {
+                getPlace: {
+                    method: 'GET',
+                    path: '/places/:placeId',
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                },
+            })
+        ).not.toThrow();
+    });
+
+    it('leaves a pathParams schema without a known key set alone', () => {
+        expect(() =>
+            k.routes('users', {
+                getPlace: {
+                    method: 'GET',
+                    path: '/places/:placeId',
+                    pathParams: z.record(z.string(), z.string()),
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                },
+            })
+        ).not.toThrow();
+    });
+});

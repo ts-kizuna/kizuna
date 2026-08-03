@@ -3,6 +3,7 @@ import { ROUTES_TAG, type Routes, type RouteDefinition, type ResponseDefinition 
 import { isRouteDefinition } from './handler-pipeline.js';
 import { type TagSet, type TagKeysOf, isTagSet } from './tags.js';
 import { findCoercedSchemaPath } from './zod-internals.js';
+import { parsePath, type PathParamsCheck } from './path-params.js';
 
 const isEmptyObjectSchema = (schema: unknown): boolean => {
     if (!schema || typeof schema !== 'object') return false;
@@ -44,6 +45,32 @@ const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
     }
 };
 
+const objectShapeKeys = (schema: z.ZodType): string[] | undefined => {
+    const candidate = schema as unknown as { shape?: unknown };
+    if (typeof candidate.shape !== 'object' || candidate.shape === null) return undefined;
+    return Object.keys(candidate.shape as object);
+};
+
+/**
+ * Throws when a route's `pathParams` keys and its path's `:param` placeholders
+ * disagree. Unchecked, the stray key is dropped from the OpenAPI document and
+ * the handler validates params the request never carries.
+ */
+const assertPathParamsMatchPath = (route: RouteDefinition, routeKey: string): void => {
+    if (!route.pathParams) return;
+    const declared = objectShapeKeys(route.pathParams);
+    if (declared === undefined) return;
+    const { paramNames } = parsePath(route.path);
+    const unmatched = declared.filter((name) => !paramNames.includes(name));
+    const undeclared = paramNames.filter((name) => !declared.includes(name));
+    if (unmatched.length === 0 && undeclared.length === 0) return;
+    const details = [
+        unmatched.length > 0 ? `declared in pathParams but not in the path: ${unmatched.join(', ')}` : undefined,
+        undeclared.length > 0 ? `in the path but not declared in pathParams: ${undeclared.join(', ')}` : undefined,
+    ].filter((detail) => detail !== undefined);
+    throw new Error(`Route "${routeKey}" has pathParams that do not match its path "${route.path}": ${details.join('; ')}.`);
+};
+
 const validateRoutes = (routes: Routes, prefix?: string): void => {
     for (const [key, value] of Object.entries(routes)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
@@ -51,6 +78,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             if (isEmptyObjectSchema(value.body)) {
                 throw new Error(`Route "${fullKey}" has an empty body schema (z.object({})). Use z.void() or omit the body field.`);
             }
+            assertPathParamsMatchPath(value, fullKey);
             assertNoCoercion(value, fullKey);
         } else if (value && typeof value === 'object') {
             validateRoutes(value as Routes, fullKey);
@@ -63,10 +91,14 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
  * {@link createTags} for completion on the group tag and route-level `tags`; the
  * tag is stamped onto every route in the group.
  */
-export function tagRoutes<const T extends Routes<TagKeysOf<Set>>, Set extends TagSet>(tags: Set, tag: TagKeysOf<Set>, routes: T): T;
-export function tagRoutes<const T extends Routes<TagKeysOf<Set>>, Set extends TagSet>(tags: Set, routes: T): T;
-export function tagRoutes<const T extends Routes>(tag: string, routes: T): T;
-export function tagRoutes<const T extends Routes>(routes: T): T;
+export function tagRoutes<const T extends Routes<TagKeysOf<Set>>, Set extends TagSet>(
+    tags: Set,
+    tag: TagKeysOf<Set>,
+    routes: T & PathParamsCheck<T>
+): T;
+export function tagRoutes<const T extends Routes<TagKeysOf<Set>>, Set extends TagSet>(tags: Set, routes: T & PathParamsCheck<T>): T;
+export function tagRoutes<const T extends Routes>(tag: string, routes: T & PathParamsCheck<T>): T;
+export function tagRoutes<const T extends Routes>(routes: T & PathParamsCheck<T>): T;
 export function tagRoutes(first: TagSet | string | Routes, second?: string | Routes, third?: Routes): Routes {
     if (isTagSet(first)) {
         if (third !== undefined) {

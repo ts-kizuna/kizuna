@@ -121,3 +121,102 @@ test('tagless tagRoutes accepts arbitrary tag strings', () => {
         },
     });
 });
+
+test('pathParams keys must match the path placeholders', () => {
+    tagRoutes({
+        getPlace: {
+            method: 'GET',
+            path: '/places/:plackeId',
+            // @ts-expect-error 'placeId' is not a parameter in '/places/:plackeId'
+            pathParams: z.object({
+                placeId: z.uuid(),
+            }),
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                }),
+            },
+        },
+    });
+});
+
+test('every path placeholder must appear in pathParams', () => {
+    tagRoutes({
+        getVisit: {
+            method: 'GET',
+            path: '/places/:placeId/visits/:visitId',
+            // @ts-expect-error 'visitId' is missing from pathParams
+            pathParams: z.object({
+                placeId: z.uuid(),
+            }),
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                }),
+            },
+        },
+    });
+});
+
+test('matching pathParams are accepted, in nested groups too', () => {
+    const checked = tagRoutes({
+        getPlace: {
+            method: 'GET',
+            path: '/places/:placeId',
+            pathParams: z.object({
+                placeId: z.uuid(),
+            }),
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                }),
+            },
+        },
+        visits: {
+            getVisit: {
+                method: 'GET',
+                path: '/places/:placeId/visits/:visitId',
+                pathParams: z.object({
+                    placeId: z.uuid(),
+                    visitId: z.uuid(),
+                }),
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        },
+    });
+    expectTypeOf(checked.getPlace.path).toEqualTypeOf<'/places/:placeId'>();
+    expectTypeOf(checked.visits.getVisit.path).toEqualTypeOf<'/places/:placeId/visits/:visitId'>();
+});
+
+test('routes that omit pathParams are left alone', () => {
+    tagRoutes({
+        getPlace: {
+            method: 'GET',
+            path: '/places/:placeId',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                }),
+            },
+        },
+    });
+});
+
+test('a pathParams schema without a known key set switches the check off', () => {
+    tagRoutes({
+        getPlace: {
+            method: 'GET',
+            path: '/places/:placeId',
+            pathParams: z.record(z.string(), z.string()),
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                }),
+            },
+        },
+    });
+});
