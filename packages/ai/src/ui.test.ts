@@ -24,8 +24,10 @@ const drain = async (stream: ReadableStream<UIMessageChunk>): Promise<UIMessageC
 };
 
 describe('toUIMessageChunks', () => {
-    it('opens a step on start', async () => {
-        expect(await collect(from({ type: 'start' }))).toEqual([{ type: 'start' }, { type: 'start-step' }]);
+    // A step left open would leave the UI waiting, so the end of the stream closes it
+    // even when the model never sent a done event.
+    it('opens a step on start and closes it when the stream ends', async () => {
+        expect(await collect(from({ type: 'start' }))).toEqual([{ type: 'start' }, { type: 'start-step' }, { type: 'finish-step' }]);
     });
 
     it('opens the text part once and streams deltas into it', async () => {

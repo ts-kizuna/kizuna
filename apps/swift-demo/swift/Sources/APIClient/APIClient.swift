@@ -37,8 +37,10 @@ public enum API {
         public let id: String
         /// Display name
         public let name: String
+        private let _email: String
         /// Email address
-        public let email: String
+        @available(*, deprecated, message: "use `email_address` instead.")
+        public var email: String { _email }
         /// Email address
         public let email_address: String?
         /// Family name on the wire as `last_name`, exercises snake_case fidelity through the generators.
@@ -46,6 +48,16 @@ public enum API {
         /// Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another.
         public let avatar: Avatar?
         public let avatars: [AvatarsItem]?
+
+        private enum CodingKeys: String, CodingKey {
+            case id
+            case name
+            case _email = "email"
+            case email_address
+            case last_name
+            case avatar
+            case avatars
+        }
 
         public init(
             id: String,
@@ -58,7 +70,7 @@ public enum API {
         ) {
             self.id = id
             self.name = name
-            self.email = email
+            self._email = email
             self.email_address = email_address
             self.last_name = last_name
             self.avatar = avatar

@@ -58,8 +58,8 @@ export default function ChatPage() {
                     marginTop: 0,
                     lineHeight: 1.5,
                 }}>
-                One contract-typed <code>POST /chat</code> route, driven by <code>useChat</code>. <code>lookup_order</code> is exposed in full;{' '}
-                <code>search_orders</code> is name-only, so its arguments never reach the browser.
+                One contract-typed <code>POST /chat</code> route, driven by <code>useChat</code>. <code>lookup_order</code> is exposed in
+                full; <code>search_orders</code> is name-only, so its arguments never reach the browser.
             </p>
 
             {messages.map((message) => (
