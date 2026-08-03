@@ -70,7 +70,7 @@ const { server } = createServer(contract);
 const router = server.router('api', {
     streamGenerator: () => ({
         status: 200 as const,
-        stream: (async function* () {
+        stream: async function* () {
             yield withEventMeta(
                 {
                     type: 'progress' as const,
@@ -83,7 +83,7 @@ const router = server.router('api', {
             yield {
                 type: 'done' as const,
             };
-        })(),
+        },
     }),
     streamWriter: () => ({
         status: 200 as const,

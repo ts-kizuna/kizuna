@@ -93,7 +93,7 @@ const { server } = createServer(contract);
 const router = server.router('api', {
     streamGenerator: () => ({
         status: 200 as const,
-        stream: (async function* () {
+        stream: async function* () {
             yield withEventMeta(
                 {
                     type: 'progress' as const,
@@ -106,7 +106,7 @@ const router = server.router('api', {
             yield {
                 type: 'done' as const,
             };
-        })(),
+        },
     }),
     streamWriter: () => ({
         status: 200 as const,
@@ -126,20 +126,20 @@ const router = server.router('api', {
     },
     streamInvalidEvent: () => ({
         status: 200 as const,
-        stream: (async function* () {
+        stream: async function* () {
             yield {
                 type: 'progress' as const,
                 percent: 'not-a-number' as unknown as number,
             };
-        })(),
+        },
     }),
     streamEchoesLastEventId: ({ lastEventId }) => ({
         status: 200 as const,
-        stream: (async function* () {
+        stream: async function* () {
             yield {
                 resumedFrom: lastEventId ?? 'none',
             };
-        })(),
+        },
     }),
 });
 
@@ -179,10 +179,12 @@ describe('Express streaming', () => {
         expect(response.headers['content-type']).not.toContain('text/event-stream');
     });
 
-    it('closes the stream when an event fails response validation', async () => {
+    // The first event is pulled before any header, so a validation failure there is
+    // still an ordinary error response rather than an opened-then-closed stream.
+    it('renders Problem Details when the first event fails response validation', async () => {
         const response = await request(app).get('/stream/invalid-event');
-        expect(response.status).toBe(200);
-        expect(response.text).toBe('');
+        expect(response.status).toBe(500);
+        expect(response.headers['content-type']).not.toContain('text/event-stream');
     });
 
     it('passes Last-Event-ID to the handler', async () => {

@@ -1,10 +1,9 @@
 import { z } from 'zod';
-import { createModel } from './model.js';
-import { readDiscriminatedUnion, readDiscriminatorStringLiteral } from './zod-internals.js';
-import type { StreamResponseDefinition, ToolDeclaration } from './types.js';
+import { createModel, readDiscriminatedUnion, readDiscriminatorStringLiteral, type StreamResponseDefinition } from '@ts-kizuna/core';
+import type { ToolDeclaration } from './types.js';
 
 /**
- * Tool events are named after this field, so `streamWithTools` fixes `eventName`
+ * Tool events are named after this field, so `agentStream` fixes `eventName`
  * to it rather than taking one.
  */
 const DISCRIMINATOR = 'type';
@@ -88,12 +87,12 @@ export type ToolStreamEvent<Tools extends readonly ToolDeclaration[]> = {
  * Everything a tool-calling stream can yield: the standard agent events, the
  * events derived from its tools, and the author's own event schema.
  */
-export type StreamWithToolsEvent<Tools extends readonly ToolDeclaration[], Event extends z.ZodType | undefined> =
+export type AgentStreamEventOf<Tools extends readonly ToolDeclaration[], Event extends z.ZodType | undefined> =
     | AgentStreamEvent
     | ToolStreamEvent<Tools>
     | (Event extends z.ZodType ? z.output<Event> : never);
 
-export interface StreamWithToolsOptions<Tools extends readonly ToolDeclaration[], Event extends z.ZodType | undefined> {
+export interface AgentStreamOptions<Tools extends readonly ToolDeclaration[], Event extends z.ZodType | undefined> {
     /**
      * Name of the merged event union in the generated OpenAPI spec and native
      * clients. Unique across the contract, like any other model title.
@@ -101,9 +100,11 @@ export interface StreamWithToolsOptions<Tools extends readonly ToolDeclaration[]
     title: string;
     description?: string;
     /**
-     * The tools the model may call, each built with `createTool`.
+     * The tools the model may call, each built with `createTool`. Omit it for a
+     * stream with no tools, though a route that never calls one wants core's
+     * plain `{ stream: 'sse', event }` form instead.
      */
-    tools: Tools;
+    tools?: Tools;
     /**
      * Extra application-specific events, merged into the union. Variants must
      * discriminate on `type`, since that is what names an event on the wire.
@@ -116,7 +117,7 @@ export interface StreamWithToolsOptions<Tools extends readonly ToolDeclaration[]
  * A streaming response whose event union is known statically, so a handler's
  * yields and a client's iteration are both typed against it.
  */
-export interface ToolStreamResponseDefinition<Event, Tools extends readonly ToolDeclaration[]> extends Omit<
+export interface AgentStreamResponseDefinition<Event, Tools extends readonly ToolDeclaration[]> extends Omit<
     StreamResponseDefinition,
     'event' | 'tools'
 > {
@@ -231,7 +232,7 @@ const assertDistinctToolNames = (title: string, tools: readonly ToolDeclaration[
     for (const tool of tools) {
         if (seen.has(tool.name)) {
             throw new Error(
-                `streamWithTools('${title}') declares the tool '${tool.name}' twice. A model cannot tell two same-named tools apart.`
+                `agentStream('${title}') declares the tool '${tool.name}' twice. A model cannot tell two same-named tools apart.`
             );
         }
         seen.add(tool.name);
@@ -250,7 +251,7 @@ const assertDistinctTypes = (title: string, variants: z.ZodType[]): void => {
         if (literal === undefined) continue;
         if (seen.has(literal)) {
             throw new Error(
-                `streamWithTools('${title}') produced two events with type '${literal}'. The 'event' schema redeclares a reserved event name.`
+                `agentStream('${title}') produced two events with type '${literal}'. The 'event' schema redeclares a reserved event name.`
             );
         }
         seen.add(literal);
@@ -287,7 +288,7 @@ const assertDistinctTypes = (title: string, variants: z.ZodType[]): void => {
  *         messages: z.array(ChatMessageSchema),
  *     }),
  *     responses: {
- *         200: streamWithTools({
+ *         200: agentStream({
  *             title: 'ChatEvent',
  *             tools: [ListEventsTool],
  *         }),
@@ -295,13 +296,14 @@ const assertDistinctTypes = (title: string, variants: z.ZodType[]): void => {
  * }
  * ```
  */
-export const streamWithTools = <const Tools extends readonly ToolDeclaration[], Event extends z.ZodType | undefined = undefined>(
-    options: StreamWithToolsOptions<Tools, Event>
-): ToolStreamResponseDefinition<StreamWithToolsEvent<Tools, Event>, Tools> => {
-    assertDistinctToolNames(options.title, options.tools);
+export const agentStream = <const Tools extends readonly ToolDeclaration[] = readonly [], Event extends z.ZodType | undefined = undefined>(
+    options: AgentStreamOptions<Tools, Event>
+): AgentStreamResponseDefinition<AgentStreamEventOf<Tools, Event>, Tools> => {
+    const tools = options.tools ?? ([] as unknown as Tools);
+    assertDistinctToolNames(options.title, tools);
     const variants: z.ZodType[] = [
         ...agentVariants(options.title),
-        ...toolVariants(options.tools),
+        ...toolVariants(tools),
         ...(options.event ? authorVariants(options.event) : []),
     ];
     assertDistinctTypes(options.title, variants);
@@ -321,9 +323,9 @@ export const streamWithTools = <const Tools extends readonly ToolDeclaration[], 
         stream: 'sse',
         // The runtime schema is the union built above. The cast supplies the static
         // type, which Zod cannot infer through a dynamically assembled union.
-        event: event as unknown as z.ZodType<StreamWithToolsEvent<Tools, Event>, StreamWithToolsEvent<Tools, Event>>,
+        event: event as unknown as z.ZodType<AgentStreamEventOf<Tools, Event>, AgentStreamEventOf<Tools, Event>>,
         eventName: DISCRIMINATOR,
-        tools: options.tools,
+        tools,
         ...(options.headers
             ? {
                   headers: options.headers,

@@ -1,8 +1,8 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { streamWithTools } from './agent-stream.js';
+import { agentStream } from './agent-stream.js';
 import { createTool, type ToolImplementations, type ToolsOf } from './tool.js';
-import type { HandlerReturn } from './handler-pipeline.js';
+import type { HandlerReturn } from '@ts-kizuna/core';
 
 const LookupOrderTool = createTool({
     name: 'lookup_order',
@@ -35,7 +35,7 @@ const AuditAccessTool = createTool({
     expose: 'none',
 });
 
-const chatEvents = streamWithTools({
+const chatEvents = agentStream({
     title: 'ChatEvent',
     tools: [LookupOrderTool, SearchDocsTool, AuditAccessTool],
 });
@@ -131,7 +131,7 @@ test('tool implementations are keyed and typed from the declarations', () => {
 });
 
 test('a custom event schema widens the union', () => {
-    const withCustom = streamWithTools({
+    const withCustom = agentStream({
         title: 'SupportEvent',
         tools: [],
         event: z.object({

@@ -100,7 +100,7 @@ export type ToolImplementations<Tools extends readonly ToolDeclaration[]> = {
 
 /**
  * The tool declarations of anything carrying a `tools` list, such as a response
- * built by `streamWithTools`.
+ * built by `agentStream`.
  */
 export type ToolsOf<Source> = Source extends {
     tools: infer Tools extends readonly ToolDeclaration[];

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createModel } from './model.js';
+import { createModel } from '@ts-kizuna/core';
 import { createTool } from './tool.js';
-import { streamWithTools } from './agent-stream.js';
-import { isDiscriminatedUnionSchema, readDiscriminatedUnion, readMetaId } from './zod-internals.js';
+import { agentStream } from './agent-stream.js';
+import { isDiscriminatedUnionSchema, readDiscriminatedUnion, readMetaId } from '@ts-kizuna/core/generator';
 
 const LookupOrderTool = createTool({
     name: 'lookup_order',
@@ -39,9 +39,9 @@ describe('createTool', () => {
     });
 });
 
-describe('streamWithTools', () => {
+describe('agentStream', () => {
     it('returns an sse response whose events are named after their type field', () => {
-        const response = streamWithTools({
+        const response = agentStream({
             title: 'ChatEvent',
             tools: [LookupOrderTool],
         });
@@ -53,7 +53,7 @@ describe('streamWithTools', () => {
     });
 
     it('accepts every standard agent event', () => {
-        const { event } = streamWithTools({
+        const { event } = agentStream({
             title: 'ChatEvent',
             tools: [LookupOrderTool],
         });
@@ -73,7 +73,7 @@ describe('streamWithTools', () => {
     });
 
     it('derives call, result and error events for each declared tool', () => {
-        const { event } = streamWithTools({
+        const { event } = agentStream({
             title: 'ChatEvent',
             tools: [LookupOrderTool],
         });
@@ -109,7 +109,7 @@ describe('streamWithTools', () => {
     });
 
     it('rejects a tool event naming a tool that was never declared', () => {
-        const { event } = streamWithTools({
+        const { event } = agentStream({
             title: 'ChatEvent',
             tools: [LookupOrderTool],
         });
@@ -125,7 +125,7 @@ describe('streamWithTools', () => {
     });
 
     it('titles tool variants from the tool, so a shared tool contributes one set of models', () => {
-        const response = streamWithTools({
+        const response = agentStream({
             title: 'ChatEvent',
             tools: [LookupOrderTool],
         });
@@ -152,7 +152,7 @@ describe('streamWithTools', () => {
         });
 
         expect(() =>
-            streamWithTools({
+            agentStream({
                 title: 'ChatEvent',
                 tools: [LookupOrderTool, other],
             })
@@ -161,7 +161,7 @@ describe('streamWithTools', () => {
 
     describe('expose', () => {
         it("omits the payloads but keeps the events under 'name-only'", () => {
-            const { event } = streamWithTools({
+            const { event } = agentStream({
                 title: 'SearchEvent',
                 tools: [
                     createTool({
@@ -206,7 +206,7 @@ describe('streamWithTools', () => {
         });
 
         it("emits no variants at all under 'none'", () => {
-            const response = streamWithTools({
+            const response = agentStream({
                 title: 'AuditEvent',
                 tools: [
                     createTool({
@@ -240,7 +240,7 @@ describe('streamWithTools', () => {
 
     describe('merging the author event schema', () => {
         it('flattens a discriminated union into the merged union', () => {
-            const response = streamWithTools({
+            const response = agentStream({
                 title: 'ChatEvent',
                 tools: [],
                 event: z.discriminatedUnion('type', [
@@ -256,7 +256,7 @@ describe('streamWithTools', () => {
         });
 
         it('keeps a single object variant as itself', () => {
-            const { event } = streamWithTools({
+            const { event } = agentStream({
                 title: 'ChatEvent',
                 tools: [],
                 event: z.object({
@@ -269,7 +269,7 @@ describe('streamWithTools', () => {
         });
 
         it('falls back to a plain union when a variant does not discriminate on type', () => {
-            const response = streamWithTools({
+            const response = agentStream({
                 title: 'ChatEvent',
                 tools: [],
                 event: z.object({
@@ -284,7 +284,7 @@ describe('streamWithTools', () => {
 
         it('throws when an author variant redeclares a standard event', () => {
             expect(() =>
-                streamWithTools({
+                agentStream({
                     title: 'ChatEvent',
                     tools: [],
                     event: z.object({

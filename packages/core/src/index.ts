@@ -39,16 +39,13 @@ export {
 } from './security-scheme.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export { STATUS_TITLES, getStatusText } from './status-titles.js';
-export { isVoidSchema, readObjectShape } from './zod-internals.js';
-export { withEventMeta, type EventMeta, type HandlerStream, type StreamChunk, type StreamEmit } from './stream.js';
-export { createTool, type ToolContext, type ToolImplementations, type ToolOptions, type ToolsOf } from './tool.js';
 export {
-    streamWithTools,
-    type AgentStreamEvent,
-    type StreamWithToolsEvent,
-    type StreamWithToolsOptions,
-    type ToolStreamEvent,
-    type ToolStreamResponseDefinition,
-} from './agent-stream.js';
+    isVoidSchema,
+    readObjectShape,
+    readDiscriminatedUnion,
+    readDiscriminatorStringLiteral,
+    type DiscriminatedUnion,
+} from './zod-internals.js';
+export { withEventMeta, type EventMeta, type HandlerStream, type StreamChunk, type StreamEmit } from './stream.js';
 export { isStreamResponse, resolveResponseEvent, streamContentType } from './generator-utils.js';
 export { type DeprecationMap, type SerializedDeprecationMap } from './deprecation.js';
