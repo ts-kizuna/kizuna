@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { agentStream } from './agent-stream.js';
-import { createTool, type ToolImplementations, type ToolsOf } from './tool.js';
+import { createTool, implementTool, type ToolsOf } from './tool.js';
 import type { HandlerReturn } from '@ts-kizuna/core';
 
 const LookupOrderTool = createTool({
@@ -108,26 +108,30 @@ test('a handler must yield the merged union for a route using the response', () 
     expectTypeOf<Return['stream']>().parameter(0).toBeCallableWith({ type: 'start' });
 });
 
-test('tool implementations are keyed and typed from the declarations', () => {
-    type Implementations = ToolImplementations<ToolsOf<typeof chatEvents>>;
+test('implementTool types its run from the declaration', () => {
+    const lookup = implementTool(LookupOrderTool, (input) => {
+        expectTypeOf(input).toEqualTypeOf<{
+            orderId: string;
+        }>();
+        return {
+            status: 'shipped',
+        };
+    });
 
-    expectTypeOf<keyof Implementations>().toEqualTypeOf<'lookup_order' | 'search_docs' | 'audit_access'>();
-    expectTypeOf<Implementations['lookup_order']>().parameter(0).toEqualTypeOf<{
-        orderId: string;
-    }>();
-    expectTypeOf<Implementations['lookup_order']>().returns.toExtend<
-        | {
-              status: string;
-          }
-        | Promise<{
-              status: string;
-          }>
+    expectTypeOf(lookup.declaration.name).toEqualTypeOf<'lookup_order'>();
+    // Exposure is about the wire, so a tool nobody sees still has a typed input.
+    const audit = implementTool(AuditAccessTool, (input) => {
+        expectTypeOf(input).toEqualTypeOf<{
+            accountId: string;
+        }>();
+    });
+    expectTypeOf(audit.declaration.expose).toEqualTypeOf<'none'>();
+});
+
+test('the declared tools of a response are recoverable', () => {
+    expectTypeOf<ToolsOf<typeof chatEvents>>().toEqualTypeOf<
+        readonly [typeof LookupOrderTool, typeof SearchDocsTool, typeof AuditAccessTool]
     >();
-    // An excluded tool still needs an implementation: exposure is about the wire,
-    // not about whether the model can call it.
-    expectTypeOf<Implementations['audit_access']>().parameter(0).toEqualTypeOf<{
-        accountId: string;
-    }>();
 });
 
 test('a custom event schema widens the union', () => {

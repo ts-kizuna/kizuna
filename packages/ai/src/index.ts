@@ -1,5 +1,13 @@
 export { type ToolDeclaration, type ToolExposure } from './types.js';
-export { createTool, type ToolContext, type ToolImplementations, type ToolOptions, type ToolsOf } from './tool.js';
+export {
+    createTool,
+    implementTool,
+    type ToolContext,
+    type ToolImplementation,
+    type ToolOptions,
+    type ToolRun,
+    type ToolsOf,
+} from './tool.js';
 export {
     agentStream,
     type AgentStreamEvent,

@@ -10,6 +10,7 @@ import {
     withEventMeta,
     withKeepAlive,
     SSE_HEADERS,
+    type EventMeta,
     type NodeStreamResponse,
     type StreamChunk,
 } from './stream.js';
@@ -20,7 +21,7 @@ const collect = async <T>(source: AsyncIterable<T>): Promise<T[]> => {
     return seen;
 };
 
-const event = (payload: unknown, meta?: StreamChunk extends { meta?: infer M } ? M : never): StreamChunk => ({
+const event = (payload: unknown, meta?: EventMeta): StreamChunk => ({
     kind: 'event',
     payload,
     ...(meta ? { meta } : {}),

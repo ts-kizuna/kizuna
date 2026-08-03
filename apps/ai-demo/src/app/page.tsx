@@ -1,145 +1,42 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import type { z } from 'zod';
+import { useState } from 'react';
+import { useChat } from '@ai-sdk/react';
+import { createAgentTransport } from '@ts-kizuna/ai/ui';
 import { apiClient } from '../lib/api-client';
-import type { ChatStream, ChatMessageSchema } from '../lib/contract';
-
-type ChatEvent = z.infer<typeof ChatStream.event>;
-type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
 /**
- * What a tool did, assembled from the `tool_call`, `tool_result` and `tool_error`
- * events. A tool declared `expose: 'name-only'` sends the same events without the
- * payloads, which is why `input` and `output` are optional here.
+ * The route speaks kizuna's typed event union, which is what the OpenAPI document
+ * and the Swift and Kotlin clients read. The adapter converts that union to the
+ * chunks `useChat` expects, so nothing here hand-rolls streaming state.
  */
-interface ToolActivity {
-    id: string;
-    name: string;
-    input?: unknown;
-    output?: unknown;
-    error?: string;
-}
-
-interface Turn {
-    question: string;
-    reasoning: string;
-    reply: string;
-    tools: ToolActivity[];
-    usage?: {
-        finishReason: string;
-        inputTokens: number;
-        outputTokens: number;
-    };
-}
-
-const emptyTurn = (question: string): Turn => ({
-    question,
-    reasoning: '',
-    reply: '',
-    tools: [],
+const transport = createAgentTransport({
+    call: async ({ messages, abortSignal }) => {
+        const result = await apiClient.chat.sendChatMessage({
+            body: {
+                messages,
+            },
+            fetchOptions: {
+                signal: abortSignal,
+            },
+        });
+        return result.status === 200 ? result : { error: result.body.detail };
+    },
 });
 
+const card = {
+    border: '1px solid #262b36',
+    borderRadius: '0.5rem',
+    padding: '0.65rem 0.8rem',
+    margin: '0.6rem 0',
+    background: '#151924',
+    fontSize: '0.85rem',
+} as const;
+
 export default function ChatPage() {
+    const { messages, sendMessage, status, error } = useChat({ transport });
     const [question, setQuestion] = useState('Where is order ord_1001, and how much was it?');
-    const [turns, setTurns] = useState<Turn[]>([]);
-    const [streaming, setStreaming] = useState(false);
-    const [problem, setProblem] = useState<string | undefined>();
-    const historyRef = useRef<ChatMessage[]>([]);
-
-    const send = async () => {
-        if (streaming || question.trim().length === 0) return;
-        setStreaming(true);
-        setProblem(undefined);
-
-        const asked = question;
-        setQuestion('');
-        const messages: ChatMessage[] = [...historyRef.current, { role: 'user', content: asked }];
-        const index = turns.length;
-        setTurns((current) => [...current, emptyTurn(asked)]);
-
-        const update = (change: (turn: Turn) => Turn) => {
-            setTurns((current) => current.map((turn, position) => (position === index ? change(turn) : turn)));
-        };
-
-        const upsertTool = (activity: ToolActivity) =>
-            update((turn) => ({
-                ...turn,
-                tools: turn.tools.some((candidate) => candidate.id === activity.id)
-                    ? turn.tools.map((candidate) => (candidate.id === activity.id ? { ...candidate, ...activity } : candidate))
-                    : [...turn.tools, activity],
-            }));
-
-        try {
-            const result = await apiClient.chat.sendChatMessage({
-                body: {
-                    messages,
-                },
-            });
-
-            if (result.status !== 200) {
-                setProblem(result.body.detail);
-                return;
-            }
-
-            let reply = '';
-            // Each branch is narrowed from the contract's event union, so the payload
-            // of a fully exposed tool is typed without any casting.
-            for await (const event of result.stream) {
-                switch (event.type) {
-                    case 'reasoning':
-                        update((turn) => ({ ...turn, reasoning: turn.reasoning + event.text }));
-                        break;
-                    case 'delta':
-                        reply += event.text;
-                        update((turn) => ({ ...turn, reply: turn.reply + event.text }));
-                        break;
-                    case 'tool_call':
-                        upsertTool({
-                            id: event.id,
-                            name: event.name,
-                            ...('input' in event ? { input: event.input } : {}),
-                        });
-                        break;
-                    case 'tool_result':
-                        upsertTool({
-                            id: event.id,
-                            name: event.name,
-                            ...('output' in event ? { output: event.output } : {}),
-                        });
-                        break;
-                    case 'tool_error':
-                        upsertTool({
-                            id: event.id,
-                            name: event.name,
-                            error: event.message,
-                        });
-                        break;
-                    case 'done':
-                        update((turn) => ({
-                            ...turn,
-                            usage: {
-                                finishReason: event.finishReason,
-                                inputTokens: event.inputTokens,
-                                outputTokens: event.outputTokens,
-                            },
-                        }));
-                        break;
-                    case 'aborted':
-                        setProblem(event.reason);
-                        break;
-                    case 'start':
-                        break;
-                }
-            }
-
-            historyRef.current = [...messages, { role: 'assistant', content: reply }];
-        } catch (error) {
-            setProblem(error instanceof Error ? error.message : 'The stream failed.');
-        } finally {
-            setStreaming(false);
-        }
-    };
+    const busy = status === 'submitted' || status === 'streaming';
 
     return (
         <main
@@ -161,133 +58,131 @@ export default function ChatPage() {
                     marginTop: 0,
                     lineHeight: 1.5,
                 }}>
-                One <code>POST /chat</code> route streaming a typed event union. <code>lookup_order</code> is exposed in full;{' '}
+                One contract-typed <code>POST /chat</code> route, driven by <code>useChat</code>. <code>lookup_order</code> is exposed in full;{' '}
                 <code>search_orders</code> is name-only, so its arguments never reach the browser.
             </p>
 
-            {turns.map((turn, position) => (
+            {messages.map((message) => (
                 <section
-                    key={position}
+                    key={message.id}
                     style={{
-                        marginTop: '1.75rem',
+                        marginTop: '1.5rem',
                     }}>
                     <p
                         style={{
-                            fontWeight: 600,
-                            margin: '0 0 0.75rem',
+                            color: '#8b93a7',
+                            fontSize: '0.75rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                            margin: '0 0 0.35rem',
                         }}>
-                        {turn.question}
+                        {message.role}
                     </p>
-
-                    {turn.reasoning.length > 0 && (
-                        <details
-                            style={{
-                                marginBottom: '0.75rem',
-                                color: '#8b93a7',
-                            }}>
-                            <summary>reasoning</summary>
-                            <p
-                                style={{
-                                    whiteSpace: 'pre-wrap',
-                                    fontSize: '0.85rem',
-                                }}>
-                                {turn.reasoning}
-                            </p>
-                        </details>
-                    )}
-
-                    {turn.tools.map((activity) => (
-                        <div
-                            key={activity.id}
-                            style={{
-                                border: '1px solid #262b36',
-                                borderRadius: '0.5rem',
-                                padding: '0.65rem 0.8rem',
-                                marginBottom: '0.6rem',
-                                background: '#151924',
-                                fontSize: '0.85rem',
-                            }}>
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    gap: '0.5rem',
-                                }}>
-                                <strong>{activity.name}</strong>
-                                <span
-                                    style={{
-                                        color: activity.error ? '#f2777a' : activity.output === undefined ? '#d5a45c' : '#7fb37f',
-                                    }}>
-                                    {activity.error ? 'failed' : activity.output === undefined ? 'running' : 'done'}
-                                </span>
-                            </div>
-                            {activity.input !== undefined && (
-                                <pre
-                                    style={{
-                                        margin: '0.4rem 0 0',
-                                        color: '#8b93a7',
-                                        overflowX: 'auto',
-                                    }}>
-                                    {JSON.stringify(activity.input)}
-                                </pre>
-                            )}
-                            {activity.output !== undefined && (
-                                <pre
-                                    style={{
-                                        margin: '0.4rem 0 0',
-                                        overflowX: 'auto',
-                                    }}>
-                                    {JSON.stringify(activity.output, null, 2)}
-                                </pre>
-                            )}
-                            {activity.error && (
+                    {message.parts.map((part, index) => {
+                        if (part.type === 'text') {
+                            return (
                                 <p
+                                    key={index}
                                     style={{
-                                        margin: '0.4rem 0 0',
-                                        color: '#f2777a',
+                                        whiteSpace: 'pre-wrap',
+                                        lineHeight: 1.6,
+                                        margin: 0,
                                     }}>
-                                    {activity.error}
+                                    {part.text}
                                 </p>
-                            )}
-                        </div>
-                    ))}
+                            );
+                        }
 
-                    <p
-                        style={{
-                            whiteSpace: 'pre-wrap',
-                            lineHeight: 1.6,
-                            margin: 0,
-                        }}>
-                        {turn.reply}
-                    </p>
+                        if (part.type === 'reasoning') {
+                            return (
+                                <details
+                                    key={index}
+                                    style={{
+                                        color: '#8b93a7',
+                                        marginBottom: '0.5rem',
+                                    }}>
+                                    <summary>reasoning</summary>
+                                    <p
+                                        style={{
+                                            whiteSpace: 'pre-wrap',
+                                            fontSize: '0.85rem',
+                                        }}>
+                                        {part.text}
+                                    </p>
+                                </details>
+                            );
+                        }
 
-                    {turn.usage && (
-                        <p
-                            style={{
-                                color: '#8b93a7',
-                                fontSize: '0.8rem',
-                                marginTop: '0.5rem',
-                            }}>
-                            {turn.usage.finishReason} · {turn.usage.inputTokens} in / {turn.usage.outputTokens} out
-                        </p>
-                    )}
+                        // Tool parts arrive as `tool-<name>`, carrying whatever the route's
+                        // exposure setting allowed onto the wire.
+                        if (part.type.startsWith('tool-')) {
+                            const tool = part as {
+                                type: string;
+                                state?: string;
+                                input?: unknown;
+                                output?: unknown;
+                                errorText?: string;
+                            };
+                            return (
+                                <div key={index} style={card}>
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            gap: '0.5rem',
+                                        }}>
+                                        <strong>{tool.type.slice('tool-'.length)}</strong>
+                                        <span
+                                            style={{
+                                                color: tool.errorText ? '#f2777a' : tool.output === undefined ? '#d5a45c' : '#7fb37f',
+                                            }}>
+                                            {tool.errorText ?? tool.state ?? 'running'}
+                                        </span>
+                                    </div>
+                                    {tool.input !== undefined && (
+                                        <pre
+                                            style={{
+                                                margin: '0.4rem 0 0',
+                                                color: '#8b93a7',
+                                                overflowX: 'auto',
+                                            }}>
+                                            {JSON.stringify(tool.input)}
+                                        </pre>
+                                    )}
+                                    {tool.output !== undefined && (
+                                        <pre
+                                            style={{
+                                                margin: '0.4rem 0 0',
+                                                overflowX: 'auto',
+                                            }}>
+                                            {JSON.stringify(tool.output, null, 2)}
+                                        </pre>
+                                    )}
+                                </div>
+                            );
+                        }
+
+                        return null;
+                    })}
                 </section>
             ))}
 
-            {problem && (
+            {error && (
                 <p
                     style={{
                         color: '#f2777a',
                         marginTop: '1.5rem',
                     }}>
-                    {problem}
+                    {error.message}
                 </p>
             )}
 
             <form
                 onSubmit={(submitEvent) => {
                     submitEvent.preventDefault();
-                    void send();
+                    if (busy || question.trim().length === 0) return;
+                    void sendMessage({ text: question });
+                    setQuestion('');
                 }}
                 style={{
                     display: 'flex',
@@ -309,16 +204,16 @@ export default function ChatPage() {
                 />
                 <button
                     type="submit"
-                    disabled={streaming}
+                    disabled={busy}
                     style={{
                         padding: '0.6rem 1rem',
                         borderRadius: '0.5rem',
                         border: 'none',
-                        background: streaming ? '#262b36' : '#4c7fd4',
+                        background: busy ? '#262b36' : '#4c7fd4',
                         color: '#fff',
-                        cursor: streaming ? 'default' : 'pointer',
+                        cursor: busy ? 'default' : 'pointer',
                     }}>
-                    {streaming ? 'streaming' : 'send'}
+                    {busy ? 'streaming' : 'send'}
                 </button>
             </form>
         </main>

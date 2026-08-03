@@ -25,13 +25,23 @@
         "types": "./dist/runtime.d.cts",
         "default": "./dist/runtime.cjs"
       }
+    },
+    "./ui": {
+      "import": {
+        "types": "./dist/ui.d.mts",
+        "default": "./dist/ui.mjs"
+      },
+      "require": {
+        "types": "./dist/ui.d.cts",
+        "default": "./dist/ui.cjs"
+      }
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsdown src/index.ts src/runtime.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external ai",
+    "build": "tsdown src/index.ts src/runtime.ts src/ui.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external ai",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

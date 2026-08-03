@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { simulateReadableStream } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
 import type { LanguageModelV4StreamPart } from '@ai-sdk/provider';
-import { createTool } from './tool.js';
+import { createTool, implementTool } from './tool.js';
 import { agentStream } from './agent-stream.js';
 import { runAgent, ToolOutputError } from './runtime.js';
 
@@ -16,6 +16,18 @@ const LookupOrderTool = createTool({
     output: z.object({
         status: z.string(),
     }),
+});
+
+const QuietLookupTool = createTool({
+    ...LookupOrderTool,
+    title: 'QuietLookup',
+    expose: 'name-only',
+});
+
+const SilentLookupTool = createTool({
+    ...LookupOrderTool,
+    title: 'SilentLookup',
+    expose: 'none',
 });
 
 const usage = {
@@ -54,6 +66,7 @@ const textStep = (text: string): LanguageModelV4StreamPart[] => [
         type: 'finish',
         finishReason: {
             unified: 'stop',
+            raw: 'stop',
         },
         usage,
     },
@@ -74,6 +87,7 @@ const toolCallStep = (input: string): LanguageModelV4StreamPart[] => [
         type: 'finish',
         finishReason: {
             unified: 'tool-calls',
+            raw: 'tool_use',
         },
         usage,
     },
@@ -109,7 +123,7 @@ describe('runAgent', () => {
                 response,
                 model: mockModel(textStep('hello')),
                 messages: [{ role: 'user', content: 'hi' }],
-                tools: {},
+                tools: [],
             })
         );
 
@@ -140,9 +154,7 @@ describe('runAgent', () => {
                 response,
                 model: mockModel(toolCallStep('{"orderId":"ord_1"}'), textStep('It shipped.')),
                 messages: [{ role: 'user', content: 'where is ord_1' }],
-                tools: {
-                    lookup_order: lookup,
-                },
+                tools: [implementTool(LookupOrderTool, lookup)],
             })
         );
 
@@ -191,14 +203,14 @@ describe('runAgent', () => {
                 model: mockModel(toolCallStep('{"orderId":"ord_1"}'), textStep('done')),
                 messages: [{ role: 'user', content: 'where is ord_1' }],
                 signal: controller.signal,
-                tools: {
-                    lookup_order: (_input, context) => {
+                tools: [
+                    implementTool(LookupOrderTool, (_input, context) => {
                         seenSignal = context.signal;
                         return {
                             status: 'shipped',
                         };
-                    },
-                },
+                    }),
+                ],
             })
         );
 
@@ -212,13 +224,7 @@ describe('runAgent', () => {
         it("sends the events without payloads under 'name-only'", async () => {
             const response = agentStream({
                 title: 'NameOnlyEvent',
-                tools: [
-                    createTool({
-                        ...LookupOrderTool,
-                        title: 'QuietLookup',
-                        expose: 'name-only',
-                    }),
-                ],
+                tools: [QuietLookupTool],
             });
 
             const events = await collect(
@@ -226,11 +232,11 @@ describe('runAgent', () => {
                     response,
                     model: mockModel(toolCallStep('{"orderId":"ord_1"}'), textStep('ok')),
                     messages: [{ role: 'user', content: 'where is ord_1' }],
-                    tools: {
-                        lookup_order: () => ({
+                    tools: [
+                        implementTool(QuietLookupTool, () => ({
                             status: 'shipped',
-                        }),
-                    },
+                        })),
+                    ],
                 })
             );
 
@@ -249,13 +255,7 @@ describe('runAgent', () => {
         it("emits no tool events under 'none' while still running the tool", async () => {
             const response = agentStream({
                 title: 'SilentEvent',
-                tools: [
-                    createTool({
-                        ...LookupOrderTool,
-                        title: 'SilentLookup',
-                        expose: 'none',
-                    }),
-                ],
+                tools: [SilentLookupTool],
             });
             const lookup = vi.fn(() => ({
                 status: 'shipped',
@@ -266,9 +266,7 @@ describe('runAgent', () => {
                     response,
                     model: mockModel(toolCallStep('{"orderId":"ord_1"}'), textStep('ok')),
                     messages: [{ role: 'user', content: 'where is ord_1' }],
-                    tools: {
-                        lookup_order: lookup,
-                    },
+                    tools: [implementTool(SilentLookupTool, lookup)],
                 })
             );
 
@@ -289,11 +287,11 @@ describe('runAgent', () => {
                     response,
                     model: mockModel(toolCallStep('{"orderId":"ord_1"}'), textStep('I could not check.')),
                     messages: [{ role: 'user', content: 'where is ord_1' }],
-                    tools: {
-                        lookup_order: () => {
+                    tools: [
+                        implementTool(LookupOrderTool, () => {
                             throw new Error('order service timed out');
-                        },
-                    },
+                        }),
+                    ],
                 })
             );
 
@@ -322,9 +320,7 @@ describe('runAgent', () => {
                     response,
                     model: mockModel(toolCallStep('{"orderId":42}'), textStep('Let me retry.')),
                     messages: [{ role: 'user', content: 'where is ord_1' }],
-                    tools: {
-                        lookup_order: lookup,
-                    },
+                    tools: [implementTool(LookupOrderTool, lookup)],
                 })
             );
 
@@ -347,9 +343,7 @@ describe('runAgent', () => {
                         response,
                         model: mockModel(toolCallStep('{"orderId":"ord_1"}'), textStep('ok')),
                         messages: [{ role: 'user', content: 'where is ord_1' }],
-                        tools: {
-                            lookup_order: () => ({ status: 12 }) as unknown as { status: string },
-                        },
+                        tools: [implementTool(LookupOrderTool, () => ({ status: 12 }) as unknown as { status: string })],
                     })
                 )
             ).rejects.toThrow(ToolOutputError);
@@ -367,7 +361,7 @@ describe('runAgent', () => {
                         response,
                         model: mockModel(textStep('hi')),
                         messages: [{ role: 'user', content: 'hi' }],
-                        tools: {} as never,
+                        tools: [],
                     })
                 )
             ).rejects.toThrow(/No implementation was supplied for the declared tool 'lookup_order'/);

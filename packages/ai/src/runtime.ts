@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { stepCountIs, streamText, tool, type LanguageModel, type ModelMessage, type ToolSet } from 'ai';
 import type { HandlerStream } from '@ts-kizuna/core';
 import type { AgentStreamResponseDefinition } from './agent-stream.js';
-import type { ToolContext, ToolImplementations, ToolsOf } from './tool.js';
+import type { ToolImplementation, ToolsOf } from './tool.js';
 import type { ToolDeclaration, ToolExposure } from './types.js';
 
 /**
@@ -31,7 +31,7 @@ export class ToolOutputError extends Error {
 /**
  * Any response built by `agentStream`, whatever its events and tools.
  */
-export type AnyAgentStream = AgentStreamResponseDefinition<never, readonly ToolDeclaration[]>;
+export type AnyAgentStream = AgentStreamResponseDefinition<unknown, readonly ToolDeclaration[]>;
 
 /**
  * The event union of a response built by `agentStream`.
@@ -55,9 +55,10 @@ export interface RunAgentOptions<Definition extends AnyAgentStream> {
     system?: string;
     messages: ModelMessage[];
     /**
-     * One implementation per declared tool, keyed by tool name.
+     * The implemented tools, each built with `implementTool`. Only tools this
+     * response declares are accepted, and every declared tool needs one.
      */
-    tools: ToolImplementations<ToolsOf<Definition>>;
+    tools: readonly ToolImplementation<ToolsOf<Definition>[number]>[];
     /**
      * The handler's `signal`. Passing it stops generation and in-flight tool work
      * when the client disconnects.
@@ -83,15 +84,15 @@ const errorMessage = (error: unknown): string => {
 
 const NEVER_ABORTS: AbortSignal = new AbortController().signal;
 
-const buildToolSet = <Tools extends readonly ToolDeclaration[]>(
-    declarations: Tools,
-    implementations: ToolImplementations<Tools>,
+const buildToolSet = (
+    declarations: readonly ToolDeclaration[],
+    implementations: readonly ToolImplementation[],
     signal: AbortSignal | undefined
 ): ToolSet => {
-    const lookup = implementations as Record<string, (input: never, context: ToolContext) => unknown>;
+    const runOf = new Map(implementations.map((implementation) => [implementation.declaration.name, implementation.run]));
     const toolSet: ToolSet = {};
     for (const declaration of declarations) {
-        const run = lookup[declaration.name];
+        const run = runOf.get(declaration.name);
         if (!run) throw new Error(`No implementation was supplied for the declared tool '${declaration.name}'.`);
         toolSet[declaration.name] = tool({
             description: declaration.description,
@@ -154,7 +155,7 @@ export const runAgent = <const Definition extends AnyAgentStream>(
             model: options.model,
             ...(options.system === undefined ? {} : { system: options.system }),
             messages: options.messages,
-            tools: buildToolSet(declarations, options.tools as ToolImplementations<readonly ToolDeclaration[]>, options.signal),
+            tools: buildToolSet(declarations, options.tools as readonly ToolImplementation[], options.signal),
             stopWhen: stepCountIs(options.maxSteps ?? DEFAULT_MAX_STEPS),
             ...(options.signal === undefined ? {} : { abortSignal: options.signal }),
             ...(options.providerOptions === undefined ? {} : { providerOptions: options.providerOptions }),
