@@ -92,10 +92,7 @@ describe('toUIMessageChunks', () => {
 
     it('still renders a name-only tool, with nothing to show for its payloads', async () => {
         const chunks = await collect(
-            from(
-                { type: 'tool_call', id: 'call_1', name: 'search_orders' },
-                { type: 'tool_result', id: 'call_1', name: 'search_orders' }
-            )
+            from({ type: 'tool_call', id: 'call_1', name: 'search_orders' }, { type: 'tool_result', id: 'call_1', name: 'search_orders' })
         );
 
         expect(chunks).toEqual([
@@ -127,14 +124,18 @@ describe('toUIMessageChunks', () => {
 
     it('closes the open parts and the step before finishing', async () => {
         const chunks = await collect(
-            from(
-                { type: 'start' },
-                { type: 'delta', text: 'hi' },
-                { type: 'done', finishReason: 'stop', inputTokens: 1, outputTokens: 2 }
-            )
+            from({ type: 'start' }, { type: 'delta', text: 'hi' }, { type: 'done', finishReason: 'stop', inputTokens: 1, outputTokens: 2 })
         );
 
-        expect(chunks.map((chunk) => chunk.type)).toEqual(['start', 'start-step', 'text-start', 'text-delta', 'text-end', 'finish-step', 'finish']);
+        expect(chunks.map((chunk) => chunk.type)).toEqual([
+            'start',
+            'start-step',
+            'text-start',
+            'text-delta',
+            'text-end',
+            'finish-step',
+            'finish',
+        ]);
     });
 
     it('reports an abort as an error chunk', async () => {
