@@ -1411,7 +1411,7 @@ const emitSubClientClass = (writer: KotlinWriter, group: RouteGroup, clientName:
     );
 };
 
-const emitKizunaObject = (writer: KotlinWriter): void => {
+const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean }): void => {
     writer.blank();
     writer.block('private object Kizuna', () => {
         writer.block('fun resolveUrl(baseUrl: String, path: String): HttpUrl.Builder', () => {
@@ -1457,6 +1457,7 @@ const emitKizunaObject = (writer: KotlinWriter): void => {
             });
             writer.line('}');
         });
+        if (!options.streaming) return;
         writer.blank();
         // Read and call timeouts are cleared: a stream is open-ended by design.
         writer.block('suspend fun executeStreaming(client: OkHttpClient, request: Request): Response', () => {
@@ -1734,7 +1735,9 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
         emitSubClientClass(writer, group, clientName, context);
     }
 
-    emitKizunaObject(writer);
+    emitKizunaObject(writer, {
+        streaming: hasStreamingRoute,
+    });
 
     for (const warning of registry.warnings()) {
         process.stderr.write(`[ts-kizuna/kotlin] JsonElement fallback at ${warning}\n`);

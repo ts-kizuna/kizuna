@@ -1072,7 +1072,10 @@ const emitKizunaFailureProtocols = (writer: SwiftWriter): void => {
     });
 };
 
-const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean; multiError: boolean; clientName: string }): void => {
+const emitKizunaNamespace = (
+    writer: SwiftWriter,
+    options: { multipart: boolean; multiError: boolean; streaming: boolean; clientName: string }
+): void => {
     writer.blank();
     writer.block('private enum Kizuna', () => {
         writer.block('@Sendable static func decodeDate(_ decoder: Decoder) throws -> Date', () => {
@@ -1189,79 +1192,81 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
                 writer.line('catch { throw Failure.decoding(error, statusCode: statusCode, data: data) }');
             }
         );
-        writer.blank();
-        writer.block(
-            'static func openStream<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int)',
-            () => {
-                writer.line('if let requestMiddleware {');
-                writer.line('    do { try await requestMiddleware(&request) }');
-                writer.line('    catch is CancellationError { throw Failure.cancelled }');
-                writer.line('    catch { throw Failure.requestFailed(error) }');
-                writer.line('}');
-                writer.line('let bytes: URLSession.AsyncBytes');
-                writer.line('let response: URLResponse');
-                writer.line('do { (bytes, response) = try await session.bytes(for: request) }');
-                writer.line('catch is CancellationError { throw Failure.cancelled }');
-                writer.line('catch { throw Failure.requestFailed(error) }');
-                writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
-                writer.line('return (bytes, httpResponse.statusCode)');
-            }
-        );
-        writer.blank();
-        writer.block(
-            'static func collect<Failure: KizunaFailure>(_ bytes: URLSession.AsyncBytes, failure: Failure.Type) async throws(Failure) -> Foundation.Data',
-            () => {
-                writer.line('var data = Foundation.Data()');
-                writer.line('do { for try await byte in bytes { data.append(byte) } }');
-                writer.line('catch is CancellationError { throw Failure.cancelled }');
-                writer.line('catch { throw Failure.requestFailed(error) }');
-                writer.line('return data');
-            }
-        );
-        writer.blank();
-        writer.block(
-            'static func eventStream<Value: Decodable & Sendable>(_ bytes: URLSession.AsyncBytes, of type: Value.Type, using decoder: JSONDecoder) -> AsyncThrowingStream<Value, Swift.Error>',
-            () => {
-                // Not `bytes.lines`: it drops the blank lines that delimit one event from the next.
-                writer.line('AsyncThrowingStream { continuation in');
-                writer.line('    let task = Task {');
-                writer.line('        var payload: [String] = []');
-                writer.line('        var lineBytes = Foundation.Data()');
-                writer.line('        func handle(_ line: String) throws {');
-                writer.line('            if line.isEmpty {');
-                writer.line('                guard !payload.isEmpty else { return }');
-                writer.line('                let joined = payload.joined(separator: "\\n")');
-                writer.line('                payload.removeAll()');
-                writer.line('                guard let raw = joined.data(using: .utf8) else { return }');
-                writer.line('                continuation.yield(try decoder.decode(Value.self, from: raw))');
-                writer.line('                return');
-                writer.line('            }');
-                writer.line('            if line.hasPrefix(":") { return }');
-                writer.line('            guard let separator = line.firstIndex(of: ":") else { return }');
-                writer.line('            let field = String(line[line.startIndex..<separator])');
-                writer.line('            var value = String(line[line.index(after: separator)...])');
-                writer.line('            if value.hasPrefix(" ") { value.removeFirst() }');
-                writer.line('            if field == "data" { payload.append(value) }');
-                writer.line('        }');
-                writer.line('        do {');
-                writer.line('            for try await byte in bytes {');
-                writer.line('                if byte == 0x0A {');
-                writer.line('                    if lineBytes.last == 0x0D { lineBytes.removeLast() }');
-                writer.line('                    try handle(String(decoding: lineBytes, as: UTF8.self))');
-                writer.line('                    lineBytes.removeAll(keepingCapacity: true)');
-                writer.line('                } else {');
-                writer.line('                    lineBytes.append(byte)');
-                writer.line('                }');
-                writer.line('            }');
-                writer.line('            continuation.finish()');
-                writer.line('        } catch {');
-                writer.line('            continuation.finish(throwing: error)');
-                writer.line('        }');
-                writer.line('    }');
-                writer.line('    continuation.onTermination = { _ in task.cancel() }');
-                writer.line('}');
-            }
-        );
+        if (options.streaming) {
+            writer.blank();
+            writer.block(
+                'static func openStream<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int)',
+                () => {
+                    writer.line('if let requestMiddleware {');
+                    writer.line('    do { try await requestMiddleware(&request) }');
+                    writer.line('    catch is CancellationError { throw Failure.cancelled }');
+                    writer.line('    catch { throw Failure.requestFailed(error) }');
+                    writer.line('}');
+                    writer.line('let bytes: URLSession.AsyncBytes');
+                    writer.line('let response: URLResponse');
+                    writer.line('do { (bytes, response) = try await session.bytes(for: request) }');
+                    writer.line('catch is CancellationError { throw Failure.cancelled }');
+                    writer.line('catch { throw Failure.requestFailed(error) }');
+                    writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
+                    writer.line('return (bytes, httpResponse.statusCode)');
+                }
+            );
+            writer.blank();
+            writer.block(
+                'static func collect<Failure: KizunaFailure>(_ bytes: URLSession.AsyncBytes, failure: Failure.Type) async throws(Failure) -> Foundation.Data',
+                () => {
+                    writer.line('var data = Foundation.Data()');
+                    writer.line('do { for try await byte in bytes { data.append(byte) } }');
+                    writer.line('catch is CancellationError { throw Failure.cancelled }');
+                    writer.line('catch { throw Failure.requestFailed(error) }');
+                    writer.line('return data');
+                }
+            );
+            writer.blank();
+            writer.block(
+                'static func eventStream<Value: Decodable & Sendable>(_ bytes: URLSession.AsyncBytes, of type: Value.Type, using decoder: JSONDecoder) -> AsyncThrowingStream<Value, Swift.Error>',
+                () => {
+                    // Not `bytes.lines`: it drops the blank lines that delimit one event from the next.
+                    writer.line('AsyncThrowingStream { continuation in');
+                    writer.line('    let task = Task {');
+                    writer.line('        var payload: [String] = []');
+                    writer.line('        var lineBytes = Foundation.Data()');
+                    writer.line('        func handle(_ line: String) throws {');
+                    writer.line('            if line.isEmpty {');
+                    writer.line('                guard !payload.isEmpty else { return }');
+                    writer.line('                let joined = payload.joined(separator: "\\n")');
+                    writer.line('                payload.removeAll()');
+                    writer.line('                guard let raw = joined.data(using: .utf8) else { return }');
+                    writer.line('                continuation.yield(try decoder.decode(Value.self, from: raw))');
+                    writer.line('                return');
+                    writer.line('            }');
+                    writer.line('            if line.hasPrefix(":") { return }');
+                    writer.line('            guard let separator = line.firstIndex(of: ":") else { return }');
+                    writer.line('            let field = String(line[line.startIndex..<separator])');
+                    writer.line('            var value = String(line[line.index(after: separator)...])');
+                    writer.line('            if value.hasPrefix(" ") { value.removeFirst() }');
+                    writer.line('            if field == "data" { payload.append(value) }');
+                    writer.line('        }');
+                    writer.line('        do {');
+                    writer.line('            for try await byte in bytes {');
+                    writer.line('                if byte == 0x0A {');
+                    writer.line('                    if lineBytes.last == 0x0D { lineBytes.removeLast() }');
+                    writer.line('                    try handle(String(decoding: lineBytes, as: UTF8.self))');
+                    writer.line('                    lineBytes.removeAll(keepingCapacity: true)');
+                    writer.line('                } else {');
+                    writer.line('                    lineBytes.append(byte)');
+                    writer.line('                }');
+                    writer.line('            }');
+                    writer.line('            continuation.finish()');
+                    writer.line('        } catch {');
+                    writer.line('            continuation.finish(throwing: error)');
+                    writer.line('        }');
+                    writer.line('    }');
+                    writer.line('    continuation.onTermination = { _ in task.cancel() }');
+                    writer.line('}');
+                }
+            );
+        }
         if (options.multiError) {
             // One status code, several candidate body types: return the first attempt that produces a
             // failure, else a `.decoding` error carrying the raw payload.
@@ -1915,6 +1920,7 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
 
     const usesMultipart = allMethods.some((method) => method.body?.kind === 'multipart');
     const usesMultiError = allMethods.some(hasMultiErrorGroup);
+    const usesStreaming = allMethods.some((method) => method.streamEventType !== undefined);
 
     // Split registry types:
     //   - operation-local → per-operation enum inside the actor
@@ -1982,6 +1988,7 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
     emitKizunaNamespace(writer, {
         multipart: usesMultipart,
         multiError: usesMultiError,
+        streaming: usesStreaming,
         clientName,
     });
 

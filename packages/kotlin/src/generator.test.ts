@@ -1691,3 +1691,56 @@ describe('Kotlin generator — unknownEnumCase', () => {
         expect(output).not.toContain('import kotlinx.serialization.descriptors.*');
     });
 });
+
+describe('Kotlin generator — streaming', () => {
+    const streamContract = () =>
+        k.contract({
+            routes: {
+                streamActivity: {
+                    method: 'GET',
+                    path: '/activity',
+                    responses: {
+                        200: {
+                            stream: 'sse',
+                            event: z.object({
+                                message: z.string(),
+                            }),
+                        },
+                    },
+                },
+            },
+        });
+
+    const plainContract = () =>
+        k.contract({
+            routes: {
+                getThing: {
+                    method: 'GET',
+                    path: '/thing',
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                },
+            },
+        });
+
+    it('emits the stream helpers and their imports together', () => {
+        const output = generateKotlinClient(streamContract(), baseConfig);
+        expect(output).toContain('fun <T> eventFlow(');
+        expect(output).toContain('suspend fun executeStreaming(');
+        expect(output).toContain('import kotlinx.coroutines.flow.flowOn');
+        expect(output).toContain('import kotlinx.coroutines.flow.onCompletion');
+    });
+
+    // eventFlow references flowOn/onCompletion, so emitting it without a streaming
+    // route would leave the generated file with unresolved imports.
+    it('omits the stream helpers when no route streams', () => {
+        const output = generateKotlinClient(plainContract(), baseConfig);
+        expect(output).not.toContain('eventFlow');
+        expect(output).not.toContain('executeStreaming');
+        expect(output).not.toContain('flowOn');
+        expect(output).not.toContain('onCompletion');
+    });
+});

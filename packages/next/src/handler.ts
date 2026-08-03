@@ -19,8 +19,8 @@ import {
     parseFetchBody,
     resolveMiddleware,
     renderJsonResult,
-    sseHeaders,
-    toReadableStream,
+    sseResponseInit,
+    reportStreamError,
 } from '@ts-kizuna/core/adapter';
 import type { z } from 'zod';
 import type {
@@ -217,6 +217,12 @@ export interface NextHandlerOptions {
      * @default 15000
      */
     streamKeepAliveMs?: number;
+    /**
+     * Called when a streaming response fails after its first event. Separate from
+     * `onError` because the status is already sent by then, so there is no response
+     * left to return. Without this the error is logged to `console.error`.
+     */
+    onStreamError?: (error: unknown, request: NextRequest) => void;
 }
 
 const jsonResponse = (status: number, body: unknown, headers: Record<string, string>, raw = false): NextResponse =>
@@ -245,19 +251,11 @@ export const handleNextRequest = async <T extends Routes>(
         respond: (result) => {
             if (result.kind === 'raw-response') return result.response as NextResponse;
             if (result.kind === 'stream') {
-                const body = toReadableStream(result.events, {
+                const { body, ...init } = sseResponseInit(result, {
                     signal: request.signal,
-                    onError: (error) => {
-                        console.error(`[ts-kizuna/next] stream error on ${result.routeKey}:`, error);
-                    },
+                    onError: (error) => reportStreamError('next', result.routeKey, error, request, options?.onStreamError),
                 });
-                return new NextResponse(body, {
-                    status: result.status,
-                    headers: {
-                        ...sseHeaders(),
-                        ...(result.headers ?? {}),
-                    },
-                });
+                return new NextResponse(body, init);
             }
             const rendered = renderJsonResult(result, options?.formatError as ErrorFormatter, request);
             return jsonResponse(rendered.status, rendered.body, rendered.headers, rendered.raw);

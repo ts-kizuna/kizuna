@@ -40,11 +40,12 @@ export type StreamChunk =
 export type StreamEmit<Event> = (event: Event, meta?: EventMeta) => void;
 
 /**
- * The shapes a handler may return under `stream`: an async generator function
- * (the yields are typed against the response's `event` schema), an already-created
- * async iterable, or a callback that receives {@link StreamEmit}.
+ * What a handler returns under `stream`: an async generator function, whose yields
+ * are typed against the response's `event` schema, or a callback that emits through
+ * {@link StreamEmit}. Wrap an existing async iterable in a function to pass it:
+ * `stream: () => existingIterable`.
  */
-export type HandlerStream<Event> = AsyncIterable<Event> | ((emit: StreamEmit<Event>) => AsyncIterable<Event> | Promise<void> | void);
+export type HandlerStream<Event> = (emit: StreamEmit<Event>) => AsyncIterable<Event> | Promise<void> | void;
 
 const EVENT_META: unique symbol = Symbol('ts-kizuna.stream.eventMeta');
 
@@ -107,7 +108,7 @@ export const encodeSseChunk = (chunk: StreamChunk): string => {
  * `Connection` is absent because it is the default in HTTP/1.1 and forbidden in
  * HTTP/2.
  */
-export const sseHeaders = (): Record<string, string> => ({
+export const SSE_HEADERS: Readonly<Record<string, string>> = Object.freeze({
     'content-type': 'text/event-stream',
     'cache-control': 'no-cache, no-transform',
     'x-accel-buffering': 'no',
@@ -164,15 +165,18 @@ export const normalizeHandlerStream = <Event>(
         eventName?: string;
     } = {}
 ): AsyncIterable<StreamChunk> => {
-    const toChunk = (event: Event, meta?: EventMeta): StreamChunk => {
-        const attached = meta ?? readEventMeta(event);
-        const name =
+    // Three sources can name an event, in increasing precedence: the `eventName` field of
+    // the payload, `withEventMeta` on the event, and the `meta` argument to `emit`. They
+    // merge rather than override, so nothing is silently dropped when two are used.
+    const toChunk = (event: Event, emitted?: EventMeta): StreamChunk => {
+        const derivedName =
             options.eventName !== undefined && event && typeof event === 'object'
                 ? (event as Record<string, unknown>)[options.eventName]
                 : undefined;
         const resolved: EventMeta = {
-            ...(typeof name === 'string' ? { event: name } : {}),
-            ...(attached ?? {}),
+            ...(typeof derivedName === 'string' ? { event: derivedName } : {}),
+            ...readEventMeta(event),
+            ...emitted,
         };
         return {
             kind: 'event',
@@ -180,16 +184,6 @@ export const normalizeHandlerStream = <Event>(
             ...(Object.keys(resolved).length > 0 ? { meta: resolved } : {}),
         };
     };
-
-    const iterate = (source: AsyncIterable<Event>): AsyncIterable<StreamChunk> => ({
-        async *[Symbol.asyncIterator]() {
-            for await (const event of source) {
-                yield toChunk(event);
-            }
-        },
-    });
-
-    if (typeof stream !== 'function') return iterate(stream);
 
     return {
         async *[Symbol.asyncIterator]() {
@@ -201,7 +195,9 @@ export const normalizeHandlerStream = <Event>(
             // it and returns a promise. Calling once tells the two apart.
             const produced = stream(emit);
             if (isAsyncIterable(produced)) {
-                yield* iterate(produced as AsyncIterable<Event>);
+                for await (const event of produced as AsyncIterable<Event>) {
+                    yield toChunk(event);
+                }
                 return;
             }
             void Promise.resolve(produced).then(
@@ -209,6 +205,34 @@ export const normalizeHandlerStream = <Event>(
                 (error: unknown) => chunks.settle({ error })
             );
             yield* chunks.drain();
+        },
+    };
+};
+
+/**
+ * Pulls the first chunk before any header is written, then hands back a stream that
+ * replays it. This is what lets a failure while producing the first event still
+ * render an ordinary Problem Details response: nothing has been committed yet, so the
+ * rejection propagates to the pipeline's error handling like any other thrown error.
+ *
+ * The returned iterable is single-use, which is all an adapter needs.
+ */
+export const primeStream = async (chunks: AsyncIterable<StreamChunk>): Promise<AsyncIterable<StreamChunk>> => {
+    const iterator = chunks[Symbol.asyncIterator]();
+    const first = await iterator.next();
+    return {
+        async *[Symbol.asyncIterator]() {
+            try {
+                if (first.done) return;
+                yield first.value;
+                while (true) {
+                    const next = await iterator.next();
+                    if (next.done) return;
+                    yield next.value;
+                }
+            } finally {
+                await iterator.return?.();
+            }
         },
     };
 };
@@ -296,31 +320,123 @@ export const toReadableStream = (
 };
 
 /**
- * For adapters that own a Node response object rather than returning a
- * `Response`. A `false` return from `write` means the socket buffer is full, so
- * the next write waits on `drain`.
+ * The parts of a streaming {@link AdapterResult} the transport helpers need. Keeping
+ * it structural lets an adapter pass the result straight through.
  */
-export const pumpChunks = async (
-    chunks: AsyncIterable<StreamChunk>,
-    write: (frame: string) => boolean | void,
-    options: {
-        drain?: () => Promise<void>;
-        onError?: (error: unknown) => void;
-        signal?: AbortSignal;
-    } = {}
+export interface SseSource {
+    status: number;
+    events: AsyncIterable<StreamChunk>;
+    headers?: Record<string, string>;
+}
+
+export interface SseTransportOptions {
+    onError?: (error: unknown) => void;
+    signal?: AbortSignal;
+}
+
+/**
+ * A failure after the first event cannot change the response, so it is reported rather
+ * than rendered. An adapter's `onStreamError` gets first refusal; without one the error
+ * is logged, because a stream that just stops with no trace is very hard to debug.
+ */
+export const reportStreamError = <NativeRequest>(
+    adapterName: string,
+    routeKey: string,
+    error: unknown,
+    request: NativeRequest,
+    onStreamError?: (error: unknown, request: NativeRequest) => void
+): void => {
+    if (onStreamError) {
+        try {
+            onStreamError(error, request);
+            return;
+        } catch (hookError) {
+            console.error(`[ts-kizuna/${adapterName}] onStreamError hook threw:`, hookError);
+        }
+    }
+    console.error(`[ts-kizuna/${adapterName}] stream error on ${routeKey}:`, error);
+};
+
+/**
+ * The response pieces for an adapter whose framework returns a `Response`. The body is
+ * lazy, so nothing is read from the handler until the runtime starts pulling.
+ */
+export const sseResponseInit = (
+    source: SseSource,
+    options: SseTransportOptions = {}
+): {
+    status: number;
+    headers: Record<string, string>;
+    body: ReadableStream<Uint8Array>;
+} => ({
+    status: source.status,
+    headers: {
+        ...SSE_HEADERS,
+        ...source.headers,
+    },
+    body: toReadableStream(source.events, options),
+});
+
+/**
+ * The subset of Node's `ServerResponse` the pump needs. Express's `Response` and
+ * Fastify's `reply.raw` both satisfy it.
+ */
+export interface NodeStreamResponse {
+    writeHead: (status: number, headers: Record<string, string>) => unknown;
+    write: (chunk: string) => boolean;
+    end: () => unknown;
+    once: (event: string, listener: () => void) => unknown;
+    off: (event: string, listener: () => void) => unknown;
+    readonly writableEnded: boolean;
+}
+
+/**
+ * `write` returned `false`, so the socket buffer is full and the next write has to wait
+ * for `drain`. It also settles on anything meaning no `drain` is ever coming, because a
+ * client that disconnects mid-buffer would otherwise leave the pump waiting forever,
+ * holding the handler's generator open with it.
+ */
+const waitForCapacity = (response: NodeStreamResponse, signal: AbortSignal | undefined): Promise<void> =>
+    new Promise<void>((resolve) => {
+        const settle = (): void => {
+            response.off('drain', settle);
+            response.off('close', settle);
+            response.off('error', settle);
+            signal?.removeEventListener('abort', settle);
+            resolve();
+        };
+        response.once('drain', settle);
+        response.once('close', settle);
+        response.once('error', settle);
+        signal?.addEventListener('abort', settle);
+    });
+
+/**
+ * Writes a stream into a Node response. For adapters that own the response object
+ * rather than returning a `Response`.
+ */
+export const pumpToNodeResponse = async (
+    response: NodeStreamResponse,
+    source: SseSource,
+    options: SseTransportOptions = {}
 ): Promise<void> => {
-    const iterator = chunks[Symbol.asyncIterator]();
+    response.writeHead(source.status, {
+        ...SSE_HEADERS,
+        ...source.headers,
+    });
+    const iterator = source.events[Symbol.asyncIterator]();
     try {
-        while (true) {
-            if (options.signal?.aborted) break;
+        while (!options.signal?.aborted) {
             const next = await iterator.next();
             if (next.done) break;
-            const flushed = write(encodeSseChunk(next.value));
-            if (flushed === false && options.drain) await options.drain();
+            if (response.write(encodeSseChunk(next.value)) === false) {
+                await waitForCapacity(response, options.signal);
+            }
         }
     } catch (error) {
         options.onError?.(error);
     } finally {
         await iterator.return?.();
+        if (!response.writableEnded) response.end();
     }
 };

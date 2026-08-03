@@ -24,8 +24,8 @@ import {
     resolveMiddleware,
     renderJsonResult,
     createApi as coreApi,
-    pumpChunks,
-    sseHeaders,
+    pumpToNodeResponse,
+    reportStreamError,
 } from '@ts-kizuna/core/adapter';
 import type { z } from 'zod';
 import type {
@@ -103,6 +103,12 @@ export interface ExpressOptions {
      * @default 15000
      */
     streamKeepAliveMs?: number;
+    /**
+     * Called when a streaming response fails after its first event. The status is
+     * already sent by then, so the stream can only close. Without this the error is
+     * logged to `console.error`.
+     */
+    onStreamError?: (error: unknown, req: Request) => void;
 }
 
 /**
@@ -250,9 +256,15 @@ interface ExpressResponseContext {
     res: Response;
     next: NextFunction;
     formatError?: ErrorFormatter<Request>;
+    signal: AbortSignal;
+    onStreamError?: (error: unknown, req: Request) => void;
 }
 
-const streamSignal = (res: Response): AbortSignal => {
+/**
+ * Aborts when the client goes away before the response is finished. Built once per
+ * request and shared with `respond`, so there is only ever one `close` listener.
+ */
+const disconnectSignal = (res: Response): AbortSignal => {
     const controller = new AbortController();
     res.once('close', () => {
         if (!res.writableEnded) controller.abort();
@@ -265,7 +277,7 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
         req: adapterRequest.request,
         res,
     }),
-    respond: (result, { res, next, formatError }) => {
+    respond: (result, { res, next, formatError, signal, onStreamError }) => {
         if (result.kind === 'handler-error') {
             next(result.error);
             return;
@@ -275,19 +287,9 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
         }
         if (res.headersSent) return;
         if (result.kind === 'stream') {
-            res.status(result.status);
-            for (const [key, value] of Object.entries({ ...sseHeaders(), ...(result.headers ?? {}) })) {
-                res.setHeader(key, value);
-            }
-            res.flushHeaders();
-            return pumpChunks(result.events, (frame) => res.write(frame), {
-                drain: () => new Promise<void>((resolve) => res.once('drain', resolve)),
-                signal: streamSignal(res),
-                onError: (error) => {
-                    console.error(`[ts-kizuna/express] stream error on ${result.routeKey}:`, error);
-                },
-            }).then(() => {
-                res.end();
+            return pumpToNodeResponse(res, result, {
+                signal,
+                onError: (error) => reportStreamError('express', result.routeKey, error, res.req, onStreamError),
             });
         }
         if (result.kind === 'not-found' || result.kind === 'method-not-allowed') {
@@ -335,6 +337,7 @@ export function createExpressEndpoints(api: ExpressApi, app: AppLike, options?: 
             },
             ...routeMiddleware,
             async (req: Request, res: Response, next: NextFunction) => {
+                const signal = disconnectSignal(res);
                 const adapterRequest: AdapterRequest<Request> = {
                     request: req,
                     method: req.method,
@@ -347,7 +350,7 @@ export function createExpressEndpoints(api: ExpressApi, app: AppLike, options?: 
                     query: req.query,
                     headers: req.headers,
                     readBody: () => req.body,
-                    signal: streamSignal(res),
+                    signal,
                 };
                 await adapter.handle({
                     routes: api as unknown as Routes,
@@ -357,6 +360,8 @@ export function createExpressEndpoints(api: ExpressApi, app: AppLike, options?: 
                         res,
                         next,
                         formatError: options?.formatError,
+                        signal,
+                        onStreamError: options?.onStreamError,
                     },
                     guards,
                     schemes,

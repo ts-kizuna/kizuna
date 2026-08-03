@@ -24,8 +24,8 @@ import {
     createApi as coreApi,
     resolveMiddleware,
     renderJsonResult,
-    sseHeaders,
-    toReadableStream,
+    sseResponseInit,
+    reportStreamError,
     parseFetchBody,
     headersToObject,
 } from '@ts-kizuna/core/adapter';
@@ -94,6 +94,12 @@ export interface HonoOptions {
      * @default 15000
      */
     streamKeepAliveMs?: number;
+    /**
+     * Called when a streaming response fails after its first event. The status is
+     * already sent by then, so the stream can only close. Without this the error is
+     * logged to `console.error`.
+     */
+    onStreamError?: (error: unknown, request: Request) => void;
 }
 
 /**
@@ -233,9 +239,18 @@ export function createGuard<
     return run as unknown as GuardRun<HonoHandlerContext<E>>;
 }
 
-const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { c: Context<Env>; formatError?: ErrorFormatter<Request> }>({
+const honoAdapter = createAdapter<
+    Request,
+    Response,
+    HonoHandlerContext<Env>,
+    {
+        c: Context<Env>;
+        formatError?: ErrorFormatter<Request>;
+        onStreamError?: (error: unknown, request: Request) => void;
+    }
+>({
     buildHandlerContext: (_adapterRequest, { c }) => ({ c }),
-    respond: (result, { c, formatError }) => {
+    respond: (result, { c, formatError, onStreamError }) => {
         if (result.kind === 'handler-error') {
             throw result.error;
         }
@@ -243,19 +258,11 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
             return result.response as Response;
         }
         if (result.kind === 'stream') {
-            const body = toReadableStream(result.events, {
+            const { body, ...init } = sseResponseInit(result, {
                 signal: c.req.raw.signal,
-                onError: (error) => {
-                    console.error(`[ts-kizuna/hono] stream error on ${result.routeKey}:`, error);
-                },
+                onError: (error) => reportStreamError('hono', result.routeKey, error, c.req.raw, onStreamError),
             });
-            return new Response(body, {
-                status: result.status,
-                headers: {
-                    ...sseHeaders(),
-                    ...(result.headers ?? {}),
-                },
-            });
+            return new Response(body, init);
         }
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, c.req.raw);
         if (rendered.body === undefined) {
@@ -361,6 +368,7 @@ export function createHonoEndpoints<E extends Env = Env>(api: HonoApi, app: Hono
                 responseContext: {
                     c: c as unknown as Context<Env>,
                     formatError: options?.formatError,
+                    onStreamError: options?.onStreamError,
                 },
                 guards,
                 schemes,

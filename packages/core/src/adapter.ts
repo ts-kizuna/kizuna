@@ -19,7 +19,14 @@ import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveResponseBody, resolveResponseContentType, isJsonMediaType, isStreamResponse } from './generator-utils.js';
-import { DEFAULT_KEEP_ALIVE_MS, normalizeHandlerStream, withKeepAlive, type HandlerStream, type StreamChunk } from './stream.js';
+import {
+    DEFAULT_KEEP_ALIVE_MS,
+    normalizeHandlerStream,
+    primeStream,
+    withKeepAlive,
+    type HandlerStream,
+    type StreamChunk,
+} from './stream.js';
 
 export type { RouteDefinition, Routes, Method } from './types.js';
 
@@ -147,12 +154,17 @@ export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDef
 export { ResponseError } from './response-error.js';
 export {
     encodeSseChunk,
-    pumpChunks,
-    sseHeaders,
+    pumpToNodeResponse,
+    reportStreamError,
+    sseResponseInit,
     toReadableStream,
     withEventMeta,
     DEFAULT_KEEP_ALIVE_MS,
+    SSE_HEADERS,
     type EventMeta,
+    type NodeStreamResponse,
+    type SseSource,
+    type SseTransportOptions,
     type StreamChunk,
 } from './stream.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
@@ -245,11 +257,11 @@ export type AdapterResult =
     | {
           kind: 'stream';
           routeKey: string;
-          route: RouteDefinition;
           status: number;
           /**
-           * The events to write, already framed as chunks. Headers are flushed on
-           * the first one, so the status is only final once it arrives.
+           * The events to write, already framed as chunks. The first one has been
+           * pulled before this result exists, so reaching here means the status is
+           * settled and only a mid-stream failure remains possible.
            */
           events: AsyncIterable<StreamChunk>;
           headers?: Record<string, string>;
@@ -482,16 +494,23 @@ const resolveRoute = (
     };
 };
 
+const producibleCache = new WeakMap<RouteDefinition, string[]>();
+
 /**
  * `application/problem+json` is always included because any route may return an
- * error.
+ * error. Cached per route: this runs on every request, and a route's responses
+ * cannot change after the contract is built.
  */
 const producibleMediaTypes = (route: RouteDefinition): string[] => {
+    const cached = producibleCache.get(route);
+    if (cached) return cached;
     const types = new Set<string>(['application/problem+json']);
     for (const responseValue of Object.values(route.responses)) {
         types.add(resolveResponseContentType(responseValue) ?? 'application/json');
     }
-    return Array.from(types);
+    const producible = Array.from(types);
+    producibleCache.set(route, producible);
+    return producible;
 };
 
 /**
@@ -540,7 +559,11 @@ const validateChunks = (
     },
 });
 
-const neverAborts = (): AbortSignal => new AbortController().signal;
+/**
+ * Handed to handlers when the adapter has no disconnect signal to offer. Shared: it
+ * never aborts, so there is no per-request state to keep.
+ */
+const NEVER_ABORTS: AbortSignal = new AbortController().signal;
 
 const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     request: AdapterRequest<NativeRequest>,
@@ -574,7 +597,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         };
     }
 
-    const signal = request.signal ?? neverAborts();
+    const signal = request.signal ?? NEVER_ABORTS;
     const lastEventId = getHeaderValue((raw.headers as Record<string, unknown>)['last-event-id']);
 
     if (route.body && !isVoidSchema(route.body)) {
@@ -709,12 +732,18 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 eventName: responseSpec.eventName,
             });
             const validated = responseValidation ? validateChunks(chunks, responseSpec.event, routeKey, handlerResult.status) : chunks;
+            // Priming inside the try block is what keeps the documented contract: a failure
+            // while producing the first event is caught below and rendered as Problem Details,
+            // because no header has gone out yet. Keep-alive wraps the primed stream so its
+            // timer cannot fire before that first event and commit the status early.
+            // HEAD sends headers only, so the stream is never started.
+            const events =
+                route.method === 'HEAD' ? emptyChunks : withKeepAlive(await primeStream(validated), keepAliveMs ?? DEFAULT_KEEP_ALIVE_MS);
             return {
                 kind: 'stream',
                 routeKey,
-                route,
                 status: handlerResult.status,
-                events: route.method === 'HEAD' ? emptyChunks : withKeepAlive(validated, keepAliveMs ?? DEFAULT_KEEP_ALIVE_MS),
+                events,
                 headers: handlerResult.headers,
             };
         }

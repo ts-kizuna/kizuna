@@ -24,8 +24,8 @@ import {
     createApi as coreApi,
     resolveMiddleware,
     renderJsonResult,
-    pumpChunks,
-    sseHeaders,
+    pumpToNodeResponse,
+    reportStreamError,
 } from '@ts-kizuna/core/adapter';
 import type { z } from 'zod';
 import type {
@@ -100,6 +100,12 @@ export interface FastifyOptions {
      * @default 15000
      */
     streamKeepAliveMs?: number;
+    /**
+     * Called when a streaming response fails after its first event. The status is
+     * already sent by then, so the stream can only close. Without this the error is
+     * logged to `console.error`.
+     */
+    onStreamError?: (error: unknown, request: FastifyRequest) => void;
 }
 
 /**
@@ -241,9 +247,15 @@ export function createGuard<
 interface FastifyResponseContext {
     reply: FastifyReply;
     formatError?: ErrorFormatter<FastifyRequest>;
+    signal: AbortSignal;
+    onStreamError?: (error: unknown, request: FastifyRequest) => void;
 }
 
-const streamSignal = (reply: FastifyReply): AbortSignal => {
+/**
+ * Aborts when the client goes away before the response is finished. Built once per
+ * request and shared with `respond`, so there is only ever one `close` listener.
+ */
+const disconnectSignal = (reply: FastifyReply): AbortSignal => {
     const controller = new AbortController();
     reply.raw.once('close', () => {
         if (!reply.raw.writableEnded) controller.abort();
@@ -256,7 +268,7 @@ const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
         request: adapterRequest.request,
         reply,
     }),
-    respond: (result, { reply, formatError }) => {
+    respond: (result, { reply, formatError, signal, onStreamError }) => {
         if (result.kind === 'handler-error') {
             throw result.error;
         }
@@ -266,18 +278,9 @@ const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
         if (result.kind === 'stream') {
             // Fastify owns the reply lifecycle; hijacking hands the socket over so events can be written as they arrive.
             reply.hijack();
-            reply.raw.writeHead(result.status, {
-                ...sseHeaders(),
-                ...(result.headers ?? {}),
-            });
-            return pumpChunks(result.events, (frame) => reply.raw.write(frame), {
-                drain: () => new Promise<void>((resolve) => reply.raw.once('drain', resolve)),
-                signal: streamSignal(reply),
-                onError: (error) => {
-                    console.error(`[ts-kizuna/fastify] stream error on ${result.routeKey}:`, error);
-                },
-            }).then(() => {
-                reply.raw.end();
+            return pumpToNodeResponse(reply.raw, result, {
+                signal,
+                onError: (error) => reportStreamError('fastify', result.routeKey, error, reply.request, onStreamError),
             });
         }
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, reply.request);
@@ -380,6 +383,7 @@ export const fastifyKizuna = fastifyPlugin(
                     ...routeMiddleware,
                 ],
                 handler: async (request: FastifyRequest, reply: FastifyReply) => {
+                    const signal = disconnectSignal(reply);
                     const adapterRequest: AdapterRequest<FastifyRequest> = {
                         request,
                         method: request.method,
@@ -392,7 +396,7 @@ export const fastifyKizuna = fastifyPlugin(
                         query: (request.query ?? {}) as Record<string, string>,
                         headers: request.headers,
                         readBody: () => request.body,
-                        signal: streamSignal(reply),
+                        signal,
                     };
 
                     await adapter.handle({
@@ -402,6 +406,8 @@ export const fastifyKizuna = fastifyPlugin(
                         responseContext: {
                             reply,
                             formatError: options?.formatError,
+                            signal,
+                            onStreamError: options?.onStreamError,
                         },
                         guards,
                         schemes,

@@ -1675,3 +1675,62 @@ describe('Swift generator — unknownEnumCase', () => {
         expect(output).toContain('default: self = ._unknown(rawValue)');
     });
 });
+
+describe('Swift generator — streaming', () => {
+    const streamContract = () =>
+        k.contract({
+            routes: {
+                api: k.routes('api', {
+                    streamActivity: {
+                        method: 'GET',
+                        path: '/activity',
+                        responses: {
+                            200: {
+                                stream: 'sse',
+                                event: z.object({
+                                    message: z.string(),
+                                }),
+                            },
+                        },
+                    },
+                }),
+            },
+            auth: {
+                api: false,
+            },
+        });
+
+    const plainContract = () =>
+        k.contract({
+            routes: {
+                api: k.routes('api', {
+                    getThing: {
+                        method: 'GET',
+                        path: '/thing',
+                        responses: {
+                            200: z.object({
+                                id: z.string(),
+                            }),
+                        },
+                    },
+                }),
+            },
+            auth: {
+                api: false,
+            },
+        });
+
+    it('emits the stream helpers for a streaming route', () => {
+        const output = generateSwiftClient(streamContract(), baseConfig);
+        expect(output).toContain('static func openStream<');
+        expect(output).toContain('static func eventStream<');
+        expect(output).toContain('AsyncThrowingStream');
+    });
+
+    it('omits the stream helpers when no route streams', () => {
+        const output = generateSwiftClient(plainContract(), baseConfig);
+        expect(output).not.toContain('openStream');
+        expect(output).not.toContain('eventStream');
+        expect(output).not.toContain('AsyncThrowingStream');
+    });
+});
