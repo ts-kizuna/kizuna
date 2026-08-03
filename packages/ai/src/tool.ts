@@ -84,19 +84,47 @@ export interface ToolContext {
 }
 
 /**
- * Server-side implementations for a set of declared tools, keyed by tool name:
- * one function per declaration, taking that tool's parsed `input` and returning
- * its `output`.
+ * What a tool actually does, given its parsed `input`.
+ */
+export type ToolRun<Declaration extends ToolDeclaration> = (
+    input: z.output<Declaration['input']>,
+    context: ToolContext
+) => z.input<Declaration['output']> | Promise<z.input<Declaration['output']>>;
+
+/**
+ * A declared tool paired with its server-side implementation.
+ */
+export interface ToolImplementation<Declaration extends ToolDeclaration = ToolDeclaration> {
+    declaration: Declaration;
+    run: ToolRun<Declaration>;
+}
+
+/**
+ * Give a declared tool its implementation.
+ *
+ * Keep these next to the code they call rather than in the contract: the
+ * declaration is client-safe, an implementation reaches for a database or a
+ * service. One implemented tool is a value like any other, so several routes can
+ * share it.
  *
  * Independent of how the reply reaches the client. A route that streams and a
  * route that returns a single body implement their tools the same way.
+ *
+ * ```ts
+ * export const lookupOrder = implementTool(LookupOrderTool, async ({ orderId }, { signal }) => {
+ *     const order = await db.orders.findById(orderId, { signal });
+ *     if (!order) throw new Error(`No order exists with id ${orderId}.`);
+ *     return order;
+ * });
+ * ```
  */
-export type ToolImplementations<Tools extends readonly ToolDeclaration[]> = {
-    [Tool in Tools[number] as Tool['name']]: (
-        input: z.output<Tool['input']>,
-        context: ToolContext
-    ) => z.input<Tool['output']> | Promise<z.input<Tool['output']>>;
-};
+export const implementTool = <const Declaration extends ToolDeclaration>(
+    declaration: Declaration,
+    run: ToolRun<Declaration>
+): ToolImplementation<Declaration> => ({
+    declaration,
+    run,
+});
 
 /**
  * The tool declarations of anything carrying a `tools` list, such as a response

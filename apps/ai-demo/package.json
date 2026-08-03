@@ -1,0 +1,29 @@
+{
+  "name": "@ts-kizuna-demo/ai",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "next dev -p 3040",
+    "build": "next build",
+    "start": "next start -p 3040",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.0",
+    "@ts-kizuna/ai": "workspace:*",
+    "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/fetch": "workspace:*",
+    "@ts-kizuna/next": "workspace:*",
+    "ai": "^7.0.0",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}

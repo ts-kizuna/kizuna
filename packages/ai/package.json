@@ -45,6 +45,7 @@
     }
   },
   "devDependencies": {
+    "@ai-sdk/provider": "^4.0.0",
     "@ts-kizuna/core": "workspace:*",
     "ai": "^7.0.0",
     "tsdown": "catalog:",

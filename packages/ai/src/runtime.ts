@@ -1,7 +1,8 @@
+import type { z } from 'zod';
 import { stepCountIs, streamText, tool, type LanguageModel, type ModelMessage, type ToolSet } from 'ai';
 import type { HandlerStream } from '@ts-kizuna/core';
 import type { AgentStreamResponseDefinition } from './agent-stream.js';
-import type { ToolContext, ToolImplementations } from './tool.js';
+import type { ToolContext, ToolImplementations, ToolsOf } from './tool.js';
 import type { ToolDeclaration, ToolExposure } from './types.js';
 
 /**
@@ -27,12 +28,26 @@ export class ToolOutputError extends Error {
     }
 }
 
-export interface RunAgentOptions<Event, Tools extends readonly ToolDeclaration[]> {
+/**
+ * Any response built by `agentStream`, whatever its events and tools.
+ */
+export type AnyAgentStream = AgentStreamResponseDefinition<never, readonly ToolDeclaration[]>;
+
+/**
+ * The event union of a response built by `agentStream`.
+ */
+export type EventOf<Definition> = Definition extends {
+    event: z.ZodType<infer Event, infer _Input>;
+}
+    ? Event
+    : never;
+
+export interface RunAgentOptions<Definition extends AnyAgentStream> {
     /**
      * The response built with `agentStream`. It carries the tool declarations and
      * their exposure, and types both the implementations and the events.
      */
-    response: AgentStreamResponseDefinition<Event, Tools>;
+    response: Definition;
     /**
      * A model from any AI SDK provider, such as `anthropic('claude-opus-5')`.
      */
@@ -42,7 +57,7 @@ export interface RunAgentOptions<Event, Tools extends readonly ToolDeclaration[]
     /**
      * One implementation per declared tool, keyed by tool name.
      */
-    tools: ToolImplementations<Tools>;
+    tools: ToolImplementations<ToolsOf<Definition>>;
     /**
      * The handler's `signal`. Passing it stops generation and in-flight tool work
      * when the client disconnects.
@@ -128,17 +143,18 @@ const buildToolSet = <Tools extends readonly ToolDeclaration[]>(
  * })
  * ```
  */
-export const runAgent = <Event, const Tools extends readonly ToolDeclaration[]>(
-    options: RunAgentOptions<Event, Tools>
-): HandlerStream<Event> =>
+export const runAgent = <const Definition extends AnyAgentStream>(
+    options: RunAgentOptions<Definition>
+): HandlerStream<EventOf<Definition>> =>
     async function* () {
-        const declarations = options.response.tools;
+        type Event = EventOf<Definition>;
+        const declarations: readonly ToolDeclaration[] = options.response.tools;
         const exposureOf = new Map<string, ToolExposure>(declarations.map((declaration) => [declaration.name, declaration.expose]));
         const result = streamText({
             model: options.model,
             ...(options.system === undefined ? {} : { system: options.system }),
             messages: options.messages,
-            tools: buildToolSet(declarations, options.tools, options.signal),
+            tools: buildToolSet(declarations, options.tools as ToolImplementations<readonly ToolDeclaration[]>, options.signal),
             stopWhen: stepCountIs(options.maxSteps ?? DEFAULT_MAX_STEPS),
             ...(options.signal === undefined ? {} : { abortSignal: options.signal }),
             ...(options.providerOptions === undefined ? {} : { providerOptions: options.providerOptions }),
