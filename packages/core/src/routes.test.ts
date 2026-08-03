@@ -353,3 +353,67 @@ describe('k.routes pathParams/path agreement', () => {
         ).not.toThrow();
     });
 });
+
+describe('k.routes structured path params', () => {
+    const routeWith = (schema: z.ZodType) => () =>
+        k.routes('users', {
+            getPlace: {
+                method: 'GET',
+                path: '/places/:value',
+                pathParams: z.object({
+                    value: schema,
+                }),
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        });
+
+    it('throws for every structured schema kind, naming the parameter and pointing at query', () => {
+        expect(routeWith(z.object({ city: z.string() }))).toThrowError(
+            'Route "getPlace" declares path parameter "value" as object. A path parameter arrives as a single string, so this is not supported.'
+        );
+        expect(routeWith(z.object({ city: z.string() }))).toThrowError(/move the value to query/);
+        expect(routeWith(z.array(z.string()))).toThrowError('as array');
+        expect(routeWith(z.record(z.string(), z.string()))).toThrowError('as record');
+        expect(routeWith(z.tuple([z.string()]))).toThrowError('as tuple');
+        expect(routeWith(z.map(z.string(), z.string()))).toThrowError('as map');
+        expect(routeWith(z.set(z.string()))).toThrowError('as set');
+    });
+
+    it('accepts scalars, enums, and a string transform that yields an array', () => {
+        expect(routeWith(z.uuid())).not.toThrow();
+        expect(routeWith(z.int())).not.toThrow();
+        expect(routeWith(z.date())).not.toThrow();
+        expect(routeWith(z.enum(['city', 'region']))).not.toThrow();
+        expect(routeWith(z.string().transform((value) => value.split(',')))).not.toThrow();
+    });
+
+    it('resolves a schema reached through a widened annotation', () => {
+        const widened: z.ZodType = z.object({
+            city: z.string(),
+        });
+        expect(routeWith(widened)).toThrowError('declares path parameter "value" as object');
+    });
+
+    it('leaves an array in query alone', () => {
+        expect(() =>
+            k.routes('users', {
+                listPlaces: {
+                    method: 'GET',
+                    path: '/places',
+                    query: z.object({
+                        ids: z.array(z.string()),
+                    }),
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                },
+            })
+        ).not.toThrow();
+    });
+});

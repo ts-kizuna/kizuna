@@ -78,6 +78,22 @@ export const WRAPPER_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * The schema kind a value is checked against once wrappers and the input side of
+ * a pipe are peeled away. `z.string().transform(...)` resolves to `'string'`,
+ * which is what makes it a valid path or query param.
+ */
+export const resolveBaseType = (schema: z.core.$ZodType): string => {
+    const def = readDef(schema);
+    if (def.type && WRAPPER_TYPES.has(def.type) && def.innerType) {
+        return resolveBaseType(def.innerType);
+    }
+    if (def.type === 'pipe' && def.in) {
+        return resolveBaseType(def.in);
+    }
+    return def.type ?? '';
+};
+
+/**
  * Removes optional/nullable/default wrappers, returning the inner schema and
  * whether any were present.
  */

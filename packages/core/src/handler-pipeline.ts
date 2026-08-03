@@ -3,18 +3,7 @@ import { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand, type Route
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { IdentityAccess } from './identity.js';
-import { readDef, readObjectShape, WRAPPER_TYPES } from './zod-internals.js';
-
-const resolveBaseType = (schema: z.core.$ZodType): string => {
-    const def = readDef(schema);
-    if (def.type && WRAPPER_TYPES.has(def.type) && def.innerType) {
-        return resolveBaseType(def.innerType);
-    }
-    if (def.type === 'pipe' && def.in) {
-        return resolveBaseType(def.in);
-    }
-    return def.type ?? '';
-};
+import { readDef, readObjectShape, resolveBaseType, WRAPPER_TYPES } from './zod-internals.js';
 
 const resolveArrayElement = (schema: z.core.$ZodType): z.core.$ZodType | undefined => {
     const def = readDef(schema);
