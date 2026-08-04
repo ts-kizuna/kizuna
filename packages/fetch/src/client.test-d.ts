@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags, createRequestContext, type ValidationError } from '@ts-kizuna/core';
+import { kizuna, createTags, createModel, createRequestContext, type ValidationError } from '@ts-kizuna/core';
 import { createClient } from './client.js';
 
 const { k } = kizuna({
@@ -748,4 +748,48 @@ test('requestContext config is required when a declared header is required', () 
             'x-session-id': 's1',
         },
     });
+});
+
+const activityRoutes = k.routes('api', {
+    getActivity: {
+        method: 'GET',
+        path: '/activity',
+        responses: {
+            200: createModel({
+                title: 'UserActivityEvent',
+                schema: z.discriminatedUnion('kind', [
+                    createModel({
+                        title: 'UserActivityEventStarted',
+                        schema: z.object({
+                            kind: z.literal('started'),
+                            at: z.string(),
+                        }),
+                    }),
+                    createModel({
+                        title: 'UserActivityEventDone',
+                        schema: z.object({
+                            kind: z.literal('done'),
+                            ok: z.boolean(),
+                        }),
+                    }),
+                ]),
+            }),
+        },
+    },
+});
+
+const activityClient = createClient(
+    k.contract({
+        routes: activityRoutes,
+    }),
+    {
+        baseUrl: 'http://localhost:3000',
+    }
+);
+
+test('a union response built from named models is the exact union, not any', async () => {
+    const result = await activityClient.getActivity();
+    if (result.status === 200) {
+        expectTypeOf(result.body).toEqualTypeOf<{ kind: 'started'; at: string } | { kind: 'done'; ok: boolean }>();
+    }
 });

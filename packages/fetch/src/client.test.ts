@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags, createRequestContext } from '@ts-kizuna/core';
+import { kizuna, createTags, createModel, createRequestContext } from '@ts-kizuna/core';
 import { createClient } from './client.js';
 
 const { k } = kizuna({
@@ -669,5 +669,119 @@ describe('requestContext on the client initializer', () => {
         await ctxClient.users.listUsers();
         const requestInit = (fetchMock.mock.calls[0] as unknown[])[1] as { headers: Headers };
         expect(requestInit.headers.get('x-session-id')).toBeNull();
+    });
+});
+
+const activityRoutes = k.routes('api', {
+    getActivity: {
+        method: 'GET',
+        path: '/activity',
+        responses: {
+            200: createModel({
+                title: 'UserActivityEvent',
+                schema: z.discriminatedUnion('kind', [
+                    createModel({
+                        title: 'UserActivityEventStarted',
+                        schema: z.object({
+                            kind: z.literal('started'),
+                            at: z.string(),
+                        }),
+                    }),
+                    createModel({
+                        title: 'UserActivityEventDone',
+                        schema: z.object({
+                            kind: z.literal('done'),
+                            ok: z.boolean(),
+                        }),
+                    }),
+                ]),
+            }),
+        },
+    },
+});
+
+const activityContract = k.contract({
+    routes: activityRoutes,
+});
+
+describe('discriminated union response built from named models', () => {
+    it('switches over the response body and narrows the started branch', async () => {
+        const client = createClient(activityContract, {
+            baseUrl: 'http://localhost:3000',
+            fetch: stubFetch(200, {
+                kind: 'started',
+                at: '2026-08-04T10:00:00Z',
+            }),
+        });
+
+        const result = await client.getActivity();
+        expect(result.status).toBe(200);
+        if (result.status !== 200) throw new Error('expected 200');
+
+        let summary: string;
+        switch (result.body.kind) {
+            case 'started':
+                summary = `started at ${result.body.at}`;
+                break;
+            case 'done':
+                summary = result.body.ok ? 'finished' : 'failed';
+                break;
+            default: {
+                const exhaustive: never = result.body;
+                throw new Error(`unhandled event: ${JSON.stringify(exhaustive)}`);
+            }
+        }
+
+        expect(summary).toBe('started at 2026-08-04T10:00:00Z');
+    });
+
+    it('switches over the response body and narrows the done branch', async () => {
+        const client = createClient(activityContract, {
+            baseUrl: 'http://localhost:3000',
+            fetch: stubFetch(200, {
+                kind: 'done',
+                ok: false,
+            }),
+        });
+
+        const result = await client.getActivity();
+        if (result.status !== 200) throw new Error('expected 200');
+
+        let summary: string;
+        switch (result.body.kind) {
+            case 'started':
+                summary = `started at ${result.body.at}`;
+                break;
+            case 'done':
+                summary = result.body.ok ? 'finished' : 'failed';
+                break;
+            default: {
+                const exhaustive: never = result.body;
+                throw new Error(`unhandled event: ${JSON.stringify(exhaustive)}`);
+            }
+        }
+
+        expect(summary).toBe('failed');
+    });
+
+    it('types the discriminator as a closed literal union, not string', async () => {
+        const client = createClient(activityContract, {
+            baseUrl: 'http://localhost:3000',
+            fetch: stubFetch(200, {
+                kind: 'done',
+                ok: true,
+            }),
+        });
+
+        const result = await client.getActivity();
+        if (result.status !== 200) throw new Error('expected 200');
+
+        switch (result.body.kind) {
+            // @ts-expect-error 'cancelled' is not one of the contract's discriminator literals
+            case 'cancelled':
+                throw new Error('unreachable');
+            default:
+                expect(result.body.kind).toBe('done');
+        }
     });
 });

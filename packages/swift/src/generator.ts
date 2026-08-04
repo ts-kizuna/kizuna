@@ -605,6 +605,23 @@ const emitStringEnum = (writer: SwiftWriter, name: string, cases: string[], unkn
     });
 };
 
+const ownedTypePath = (typeName: string, ownedTypeMap: Map<string, string>): string => {
+    const owningStruct = ownedTypeMap.get(typeName);
+    if (owningStruct === undefined) return typeName;
+    return `${ownedTypePath(owningStruct, ownedTypeMap)}.${shortTypeName(typeName, owningStruct)}`;
+};
+
+const qualifyOwnedVariants = (
+    type: Extract<SwiftType, { kind: 'discriminated-enum' }>,
+    ownedTypeMap: Map<string, string>
+): Extract<SwiftType, { kind: 'discriminated-enum' }> => ({
+    ...type,
+    variants: type.variants.map((variant) => ({
+        ...variant,
+        payloadType: ownedTypePath(variant.payloadType, ownedTypeMap),
+    })),
+});
+
 const emitTypes = (
     writer: SwiftWriter,
     types: SwiftType[],
@@ -620,7 +637,7 @@ const emitTypes = (
         } else if (type.kind === 'enum') {
             emitStringEnum(writer, type.name, type.cases, type.unknownCase, type.description);
         } else {
-            emitDiscriminatedEnum(writer, type, context);
+            emitDiscriminatedEnum(writer, qualifyOwnedVariants(type, ownedTypeMap), context);
         }
     }
 };
@@ -671,7 +688,7 @@ const emitStruct = (
             } else if (ownedType.kind === 'struct') {
                 emitStruct(writer, { ...ownedType, name: shortName }, context, ownedTypeMap, ownedTypeLookup, ownedName);
             } else if (ownedType.kind === 'discriminated-enum') {
-                emitDiscriminatedEnum(writer, { ...ownedType, name: shortName }, context);
+                emitDiscriminatedEnum(writer, qualifyOwnedVariants({ ...ownedType, name: shortName }, ownedTypeMap), context);
             }
         }
         for (const field of type.fields) {
@@ -720,8 +737,7 @@ const emitDiscriminatedEnum = (
         // Static factory per variant (`.email(to:subject:)`); the payload struct is built here with the
         // discriminator literal injected.
         for (const variant of type.variants) {
-            const registryKey = variant.payloadType.split('.').pop() ?? variant.payloadType;
-            const payloadStruct = registryStruct(registryKey, context);
+            const payloadStruct = registryStruct(variant.payloadRegistryName, context);
             if (!payloadStruct) continue;
             const isDiscriminator = (field: SwiftField): boolean =>
                 field.wireName === type.discriminator || field.name === type.discriminator;

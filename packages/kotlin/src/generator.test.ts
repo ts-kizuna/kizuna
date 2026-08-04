@@ -1691,3 +1691,47 @@ describe('Kotlin generator — unknownEnumCase', () => {
         expect(output).not.toContain('import kotlinx.serialization.descriptors.*');
     });
 });
+
+describe('Kotlin generator — union variants owned by a name-prefix class', () => {
+    it('does not duplicate sealed variant payloads as nested classes', () => {
+        const contract = k.contract({
+            routes: {
+                getUser: {
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: {
+                        200: createModel({
+                            title: 'User',
+                            schema: z.object({
+                                id: z.string(),
+                            }),
+                        }),
+                    },
+                },
+                getActivity: {
+                    method: 'GET',
+                    path: '/activity',
+                    responses: {
+                        200: createModel({
+                            title: 'UserActivityEvent',
+                            schema: z.discriminatedUnion('kind', [
+                                z.object({
+                                    kind: z.literal('started'),
+                                    at: z.string(),
+                                }),
+                                z.object({
+                                    kind: z.literal('done'),
+                                    ok: z.boolean(),
+                                }),
+                            ]),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('data class User(val id: String)');
+        expect(output).not.toContain('data class ActivityEventStarted');
+        expect(output).toContain('data class Started(val at: String) : UserActivityEvent');
+    });
+});

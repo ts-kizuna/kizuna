@@ -1669,3 +1669,59 @@ describe('Swift generator — unknownEnumCase', () => {
         expect(output).toContain('default: self = ._unknown(rawValue)');
     });
 });
+
+describe('Swift generator — union variants owned by a name-prefix struct', () => {
+    const collidingContract = (): Contract => {
+        const contractRoutes = k.routes('api', {
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: createModel({
+                        title: 'User',
+                        schema: z.object({
+                            id: z.string(),
+                        }),
+                    }),
+                },
+            },
+            getActivity: {
+                method: 'GET',
+                path: '/activity',
+                responses: {
+                    200: createModel({
+                        title: 'UserActivityEvent',
+                        schema: z.discriminatedUnion('kind', [
+                            z.object({
+                                kind: z.literal('started'),
+                                at: z.string(),
+                            }),
+                            z.object({
+                                kind: z.literal('done'),
+                                ok: z.boolean(),
+                            }),
+                        ]),
+                    }),
+                },
+            },
+        });
+        return k.contract({
+            routes: contractRoutes,
+        });
+    };
+
+    it('references nested variant payloads through their owning struct', () => {
+        const output = generateSwiftClient(collidingContract(), baseConfig);
+        expect(output).toContain('public struct ActivityEventStarted: Codable, Sendable, Equatable');
+        expect(output).toContain('case started(User.ActivityEventStarted)');
+        expect(output).toContain('case done(User.ActivityEventDone)');
+        expect(output).toContain('try single.decode(User.ActivityEventStarted.self)');
+        expect(output).not.toContain('case started(UserActivityEventStarted)');
+    });
+
+    it('still emits the per-variant factories when the payload is nested', () => {
+        const output = generateSwiftClient(collidingContract(), baseConfig);
+        expect(output).toContain('public static func started(at: String) -> UserActivityEvent');
+        expect(output).toContain('.started(User.ActivityEventStarted(kind: "started", at: at))');
+    });
+});

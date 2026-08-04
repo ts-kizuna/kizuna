@@ -12,6 +12,15 @@ const sessions = new Map<string, { userId: string }>([
     ['tok_linus', { userId: '2' }],
 ]);
 
+type SessionEvent =
+    | { kind: 'login'; at: string; ipAddress: string; userAgent: string }
+    | { kind: 'logout'; at: string; reason: 'signed_out' | 'session_expired' };
+
+const lastSessionEvents = new Map<string, SessionEvent>([
+    ['1', { kind: 'login', at: '2026-08-04T10:00:00.000Z', ipAddress: '203.0.113.7', userAgent: 'Mozilla/5.0' }],
+    ['2', { kind: 'logout', at: '2026-08-03T18:42:11.000Z', reason: 'session_expired' }],
+]);
+
 const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | 'admin' }>([
     ['wst_owner', { workspaceUserId: '1', role: 'owner' }],
     ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
@@ -60,6 +69,7 @@ export const db = {
     },
     sessions: {
         findByToken: async (token: string): Promise<{ userId: string } | null> => sessions.get(token) ?? null,
+        findLastEventByUserId: async (userId: string): Promise<SessionEvent | null> => lastSessionEvents.get(userId) ?? null,
     },
     memberships: {
         findByApiKey: async (apiKey: string): Promise<{ workspaceUserId: string; role: 'owner' | 'admin' } | null> =>

@@ -33,6 +33,44 @@ public enum API {
                 self.url = url
             }
         }
+        public struct SessionEventLogin: Codable, Sendable, Equatable {
+            public let kind: String
+            public let at: Date
+            public let ipAddress: String
+            public let userAgent: String
+
+            public init(
+                kind: String,
+                at: Date,
+                ipAddress: String,
+                userAgent: String
+            ) {
+                self.kind = kind
+                self.at = at
+                self.ipAddress = ipAddress
+                self.userAgent = userAgent
+            }
+        }
+        public struct SessionEventLogout: Codable, Sendable, Equatable {
+
+            public enum Reason: String, Codable, Sendable {
+                case signed_out = "signed_out"
+                case session_expired = "session_expired"
+            }
+            public let kind: String
+            public let at: Date
+            public let reason: Reason
+
+            public init(
+                kind: String,
+                at: Date,
+                reason: Reason
+            ) {
+                self.kind = kind
+                self.at = at
+                self.reason = reason
+            }
+        }
         /// Unique user identifier
         public let id: String
         /// Display name
@@ -95,6 +133,45 @@ public enum API {
             self.title = title
             self.status = status
             self.detail = detail
+        }
+    }
+
+    public enum UserSessionEvent: Codable, Sendable, Equatable {
+        case login(User.SessionEventLogin)
+        case logout(User.SessionEventLogout)
+        public static func login(at: Date, ipAddress: String, userAgent: String) -> UserSessionEvent {
+            .login(User.SessionEventLogin(kind: "login", at: at, ipAddress: ipAddress, userAgent: userAgent))
+        }
+        public static func logout(at: Date, reason: API.User.SessionEventLogout.Reason) -> UserSessionEvent {
+            .logout(User.SessionEventLogout(kind: "logout", at: at, reason: reason))
+        }
+
+        private enum DiscriminatorKey: String, CodingKey {
+            case discriminator = "kind"
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: DiscriminatorKey.self)
+            let kind = try container.decode(String.self, forKey: .discriminator)
+            let single = try decoder.singleValueContainer()
+            switch kind {
+            case "login":
+                self = .login(try single.decode(User.SessionEventLogin.self))
+            case "logout":
+                self = .logout(try single.decode(User.SessionEventLogout.self))
+            default:
+                throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var single = encoder.singleValueContainer()
+            switch self {
+            case .login(let payload):
+                try single.encode(payload)
+            case .logout(let payload):
+                try single.encode(payload)
+            }
         }
     }
 
@@ -458,6 +535,39 @@ public final class APIClient: Sendable {
             public let body: Foundation.Data
 
             public init(body: Foundation.Data) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case notFound(API.ProblemDetails)
+        }
+    }
+
+    public enum UsersLastSessionEvent {
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: API.UserSessionEvent
+
+            public init(body: API.UserSessionEvent) {
                 self.body = body
             }
         }
@@ -1673,6 +1783,27 @@ public struct APIUsersClient: Sendable {
             throw APIClient.UsersUserBadge.Failure.notFound(payload)
         default:
             throw APIClient.UsersUserBadge.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// A user's most recent login or logout — inline union variants nest under the User model in native clients
+    public func lastSessionEvent(_ params: APIClient.UsersLastSessionEvent.Params) async throws(APIClient.UsersLastSessionEvent.Failure) -> APIClient.UsersLastSessionEvent.Result {
+        var path = "/users/:id/last-session-event"
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersLastSessionEvent.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersLastSessionEvent.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(API.UserSessionEvent.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersLastSessionEvent.Failure.self)
+            return APIClient.UsersLastSessionEvent.Result(body: body)
+        case 404:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersLastSessionEvent.Failure.self)
+            throw APIClient.UsersLastSessionEvent.Failure.notFound(payload)
+        default:
+            throw APIClient.UsersLastSessionEvent.Failure.unexpectedStatus(statusCode, data)
         }
     }
 

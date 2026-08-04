@@ -43,6 +43,33 @@ object OpenEnumAPI {
             val id: String,
             val url: String
         )
+
+        @Serializable(with = SessionEventLogoutReason.Serializer::class)
+        sealed interface SessionEventLogoutReason : KizunaQueryValue {
+            data object SIGNED_OUT : SessionEventLogoutReason {
+                override val wireValue: String = "signed_out"
+            }
+            data object SESSION_EXPIRED : SessionEventLogoutReason {
+                override val wireValue: String = "session_expired"
+            }
+            data class Unknown(override val wireValue: String) : SessionEventLogoutReason
+
+            companion object {
+                fun fromWireValue(wireValue: String): SessionEventLogoutReason = when (wireValue) {
+                    "signed_out" -> SIGNED_OUT
+                    "session_expired" -> SESSION_EXPIRED
+                    else -> Unknown(wireValue)
+                }
+            }
+
+            object Serializer : KSerializer<SessionEventLogoutReason> {
+                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("SessionEventLogoutReason", PrimitiveKind.STRING)
+                override fun deserialize(decoder: Decoder): SessionEventLogoutReason = SessionEventLogoutReason.fromWireValue(decoder.decodeString())
+                override fun serialize(encoder: Encoder, value: SessionEventLogoutReason) {
+                    encoder.encodeString(value.wireValue)
+                }
+            }
+        }
     }
 
     /** RFC 9457 Problem Details error response. */
@@ -53,6 +80,25 @@ object OpenEnumAPI {
         val status: Int,
         val detail: String
     )
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @JsonClassDiscriminator("kind")
+    @Serializable
+    sealed interface UserSessionEvent {
+        @SerialName("login")
+        @Serializable
+        data class Login(
+            val at: Instant,
+            val ipAddress: String,
+            val userAgent: String
+        ) : UserSessionEvent
+        @SerialName("logout")
+        @Serializable
+        data class Logout(
+            val at: Instant,
+            val reason: User.SessionEventLogoutReason
+        ) : UserSessionEvent
+    }
 
     @Serializable
     data class CreateUserInput(
@@ -217,6 +263,29 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         class AfterParams internal constructor(override val params: Params) : Args
 
         data class Result(val body: JsonElement)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object UsersLastSessionEvent {
+
+        data class Params(val id: String)
+
+        sealed interface Args {
+            val params: Params
+        }
+
+        object Scope {
+            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args
+
+        data class Result(val body: OpenEnumAPI.UserSessionEvent)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
@@ -1094,6 +1163,42 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     throw OpenEnumAPIClient.UsersUserBadge.Failure.NotFound(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.UsersUserBadge.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** A user's most recent login or logout — inline union variants nest under the User model in native clients */
+    @Throws(OpenEnumAPIClient.UsersLastSessionEvent.Failure::class)
+    suspend fun lastSessionEvent(build: OpenEnumAPIClient.UsersLastSessionEvent.Scope.() -> OpenEnumAPIClient.UsersLastSessionEvent.Args): OpenEnumAPIClient.UsersLastSessionEvent.Result {
+        val args = OpenEnumAPIClient.UsersLastSessionEvent.Scope.build()
+        val params = args.params
+        var path = "/users/:id/last-session-event"
+        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPI.UserSessionEvent>(data.decodeToString())
+                        return@use OpenEnumAPIClient.UsersLastSessionEvent.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
+                }
+                404 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.NotFound(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.UsersLastSessionEvent.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
