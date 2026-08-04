@@ -41,12 +41,6 @@ object API {
             val id: String,
             val url: String
         )
-
-        @Serializable
-        enum class SessionEventLogoutReason(override val wireValue: String) : KizunaQueryValue {
-            @SerialName("signed_out") SIGNED_OUT("signed_out"),
-            @SerialName("session_expired") SESSION_EXPIRED("session_expired")
-        }
     }
 
     /** RFC 9457 Problem Details error response. */
@@ -73,8 +67,15 @@ object API {
         @Serializable
         data class Logout(
             val at: Instant,
-            val reason: User.SessionEventLogoutReason
-        ) : UserSessionEvent
+            val reason: Reason
+        ) : UserSessionEvent {
+
+            @Serializable
+            enum class Reason(override val wireValue: String) : KizunaQueryValue {
+                @SerialName("signed_out") SIGNED_OUT("signed_out"),
+                @SerialName("session_expired") SESSION_EXPIRED("session_expired")
+            }
+        }
     }
 
     @Serializable

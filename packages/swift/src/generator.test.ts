@@ -1670,7 +1670,7 @@ describe('Swift generator — unknownEnumCase', () => {
     });
 });
 
-describe('Swift generator — union variants owned by a name-prefix struct', () => {
+describe('Swift generator — union variants nest under their union', () => {
     const collidingContract = (): Contract => {
         const contractRoutes = k.routes('api', {
             getUser: {
@@ -1710,18 +1710,21 @@ describe('Swift generator — union variants owned by a name-prefix struct', () 
         });
     };
 
-    it('references nested variant payloads through their owning struct', () => {
+    it('nests variant payloads under the union, not the name-prefixed User struct', () => {
         const output = generateSwiftClient(collidingContract(), baseConfig);
-        expect(output).toContain('public struct ActivityEventStarted: Codable, Sendable, Equatable');
-        expect(output).toContain('case started(User.ActivityEventStarted)');
-        expect(output).toContain('case done(User.ActivityEventDone)');
-        expect(output).toContain('try single.decode(User.ActivityEventStarted.self)');
+        expect(output).toContain('public struct Started: Codable, Sendable, Equatable');
+        // inside the enum the nested payload is already in scope, so no self-qualification
+        expect(output).toContain('case started(Started)');
+        expect(output).toContain('case done(Done)');
+        expect(output).toContain('try single.decode(Started.self)');
+        // the old prefix guess handed these to User, which does not own them
+        expect(output).not.toContain('User.ActivityEventStarted');
         expect(output).not.toContain('case started(UserActivityEventStarted)');
     });
 
     it('still emits the per-variant factories when the payload is nested', () => {
         const output = generateSwiftClient(collidingContract(), baseConfig);
         expect(output).toContain('public static func started(at: String) -> UserActivityEvent');
-        expect(output).toContain('.started(User.ActivityEventStarted(kind: "started", at: at))');
+        expect(output).toContain('.started(Started(kind: "started", at: at))');
     });
 });

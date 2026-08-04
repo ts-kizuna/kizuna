@@ -68,6 +68,7 @@ export class TypeRegistry {
     private readonly types = new Map<string, SwiftType>();
     private readonly warningSet = new Set<string>();
     private readonly explicitIds = new Set<string>();
+    private readonly unionVariantOwners = new Map<string, string>();
     public usesAnyCodable = false;
 
     constructor(
@@ -102,6 +103,18 @@ export class TypeRegistry {
 
     isExplicitId(name: string): boolean {
         return this.explicitIds.has(name);
+    }
+
+    /**
+     * Records that `payloadName` was synthesized as a variant of `unionName`. The real parent, as
+     * opposed to the name-prefix guess the ownership heuristic would otherwise make.
+     */
+    markUnionVariant(payloadName: string, unionName: string): void {
+        this.unionVariantOwners.set(payloadName, unionName);
+    }
+
+    unionVariantOwner(payloadName: string): string | undefined {
+        return this.unionVariantOwners.get(payloadName);
     }
 
     warnAnyCodable(hint: string, reason: string): void {
@@ -218,6 +231,9 @@ export const mapType = (
                         payloadType: variantResult.expression,
                         payloadRegistryName: variantResult.expression,
                     });
+                    if (variantId === undefined) {
+                        registry.markUnionVariant(variantResult.expression, enumName);
+                    }
                 }
             }
             registry.replace({

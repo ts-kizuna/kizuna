@@ -611,14 +611,24 @@ const ownedTypePath = (typeName: string, ownedTypeMap: Map<string, string>): str
     return `${ownedTypePath(owningStruct, ownedTypeMap)}.${shortTypeName(typeName, owningStruct)}`;
 };
 
+// Inside `enclosingName`, a type it owns is already in scope: `Logout.Reason`, not
+// `API.UserSessionEvent.Logout.Reason`. Undefined when the type is owned by something else.
+const relativeOwnedPath = (typeName: string, ownedTypeMap: Map<string, string>, enclosingName: string): string | undefined => {
+    const path = ownedTypePath(typeName, ownedTypeMap);
+    const prefix = `${enclosingName}.`;
+    return path.startsWith(prefix) ? path.slice(prefix.length) : undefined;
+};
+
 const qualifyOwnedVariants = (
     type: Extract<SwiftType, { kind: 'discriminated-enum' }>,
-    ownedTypeMap: Map<string, string>
+    ownedTypeMap: Map<string, string>,
+    enclosingName: string
 ): Extract<SwiftType, { kind: 'discriminated-enum' }> => ({
     ...type,
     variants: type.variants.map((variant) => ({
         ...variant,
-        payloadType: ownedTypePath(variant.payloadType, ownedTypeMap),
+        payloadType:
+            relativeOwnedPath(variant.payloadType, ownedTypeMap, enclosingName) ?? ownedTypePath(variant.payloadType, ownedTypeMap),
     })),
 });
 
@@ -637,7 +647,43 @@ const emitTypes = (
         } else if (type.kind === 'enum') {
             emitStringEnum(writer, type.name, type.cases, type.unknownCase, type.description);
         } else {
-            emitDiscriminatedEnum(writer, qualifyOwnedVariants(type, ownedTypeMap), context);
+            emitDiscriminatedEnum(
+                writer,
+                qualifyOwnedVariants(type, ownedTypeMap, type.name),
+                context,
+                type.name,
+                ownedTypeMap,
+                ownedTypeLookup
+            );
+        }
+    }
+};
+
+const emitOwnedTypes = (
+    writer: SwiftWriter,
+    ownerName: string,
+    context: EmitContext,
+    ownedTypeMap: Map<string, string>,
+    ownedTypeLookup: Map<string, SwiftType>
+): void => {
+    for (const [ownedName, owningType] of ownedTypeMap) {
+        if (owningType !== ownerName) continue;
+        const ownedType = ownedTypeLookup.get(ownedName);
+        if (!ownedType) continue;
+        const shortName = shortTypeName(ownedName, ownerName);
+        if (ownedType.kind === 'enum') {
+            emitStringEnum(writer, shortName, ownedType.cases, ownedType.unknownCase, ownedType.description);
+        } else if (ownedType.kind === 'struct') {
+            emitStruct(writer, { ...ownedType, name: shortName }, context, ownedTypeMap, ownedTypeLookup, ownedName);
+        } else if (ownedType.kind === 'discriminated-enum') {
+            emitDiscriminatedEnum(
+                writer,
+                qualifyOwnedVariants({ ...ownedType, name: shortName }, ownedTypeMap, ownedName),
+                context,
+                ownedName,
+                ownedTypeMap,
+                ownedTypeLookup
+            );
         }
     }
 };
@@ -678,19 +724,7 @@ const emitStruct = (
         !hasFile &&
         type.fields.some((field) => field.name !== field.wireName || SWIFT_KEYWORDS.has(field.name) || field.deprecated === true);
     writer.block(`public struct ${type.name}: ${conformances}`, () => {
-        for (const [ownedName, owningStruct] of ownedTypeMap) {
-            if (owningStruct !== lookupName) continue;
-            const ownedType = ownedTypeLookup.get(ownedName);
-            if (!ownedType) continue;
-            const shortName = shortTypeName(ownedName, lookupName);
-            if (ownedType.kind === 'enum') {
-                emitStringEnum(writer, shortName, ownedType.cases, ownedType.unknownCase, ownedType.description);
-            } else if (ownedType.kind === 'struct') {
-                emitStruct(writer, { ...ownedType, name: shortName }, context, ownedTypeMap, ownedTypeLookup, ownedName);
-            } else if (ownedType.kind === 'discriminated-enum') {
-                emitDiscriminatedEnum(writer, qualifyOwnedVariants({ ...ownedType, name: shortName }, ownedTypeMap), context);
-            }
-        }
+        emitOwnedTypes(writer, lookupName, context, ownedTypeMap, ownedTypeLookup);
         for (const field of type.fields) {
             const fieldType = resolveFieldType(field.type, field.optional);
             if (field.deprecated) {
@@ -727,9 +761,16 @@ const emitStruct = (
 const emitDiscriminatedEnum = (
     writer: SwiftWriter,
     type: Extract<SwiftType, { kind: 'discriminated-enum' }>,
-    context: EmitContext
+    context: EmitContext,
+    registryName?: string,
+    ownedTypeMap?: Map<string, string>,
+    ownedTypeLookup?: Map<string, SwiftType>
 ): void => {
+    const lookupName = registryName ?? type.name;
     writer.block(`public enum ${type.name}: Codable, Sendable, Equatable`, () => {
+        if (ownedTypeMap && ownedTypeLookup) {
+            emitOwnedTypes(writer, lookupName, context, ownedTypeMap, ownedTypeLookup);
+        }
         for (const variant of type.variants) {
             writer.line(`case ${escapeKeyword(variant.caseName)}(${variant.payloadType})`);
         }
@@ -745,7 +786,9 @@ const emitDiscriminatedEnum = (
             const factoryParams = valueFields
                 .map((field) => {
                     const defaultPart = field.optional ? ' = nil' : '';
-                    return `${escapeKeyword(field.name)}: ${optionalize(resolveType(field.type, undefined, context), field.optional)}${defaultPart}`;
+                    const relative = ownedTypeMap && relativeOwnedPath(field.type, ownedTypeMap, lookupName);
+                    const fieldType = relative ?? resolveType(field.type, undefined, context);
+                    return `${escapeKeyword(field.name)}: ${optionalize(fieldType, field.optional)}${defaultPart}`;
                 })
                 .join(', ');
             const payloadArgs = payloadStruct.fields
@@ -1824,8 +1867,16 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
 
     const allStructNames = sharedTypes.filter((type) => type.kind === 'struct').map((type) => type.name);
     const ownedTypeMap = new Map<string, string>();
+    const sharedTypeNames = new Set(sharedTypes.map((type) => type.name));
     for (const type of sharedTypes) {
         if (registry.isExplicitId(type.name)) continue;
+        // A synthesized union variant belongs to its union. Prefer that over the prefix guess, which
+        // would hand it to whichever unrelated struct happens to share a name prefix.
+        const unionOwner = registry.unionVariantOwner(type.name);
+        if (unionOwner !== undefined && sharedTypeNames.has(unionOwner)) {
+            ownedTypeMap.set(type.name, unionOwner);
+            continue;
+        }
         let bestMatch: string | undefined;
         for (const structName of allStructNames) {
             if (structName === type.name) continue;

@@ -43,33 +43,6 @@ object OpenEnumAPI {
             val id: String,
             val url: String
         )
-
-        @Serializable(with = SessionEventLogoutReason.Serializer::class)
-        sealed interface SessionEventLogoutReason : KizunaQueryValue {
-            data object SIGNED_OUT : SessionEventLogoutReason {
-                override val wireValue: String = "signed_out"
-            }
-            data object SESSION_EXPIRED : SessionEventLogoutReason {
-                override val wireValue: String = "session_expired"
-            }
-            data class Unknown(override val wireValue: String) : SessionEventLogoutReason
-
-            companion object {
-                fun fromWireValue(wireValue: String): SessionEventLogoutReason = when (wireValue) {
-                    "signed_out" -> SIGNED_OUT
-                    "session_expired" -> SESSION_EXPIRED
-                    else -> Unknown(wireValue)
-                }
-            }
-
-            object Serializer : KSerializer<SessionEventLogoutReason> {
-                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("SessionEventLogoutReason", PrimitiveKind.STRING)
-                override fun deserialize(decoder: Decoder): SessionEventLogoutReason = SessionEventLogoutReason.fromWireValue(decoder.decodeString())
-                override fun serialize(encoder: Encoder, value: SessionEventLogoutReason) {
-                    encoder.encodeString(value.wireValue)
-                }
-            }
-        }
     }
 
     /** RFC 9457 Problem Details error response. */
@@ -96,8 +69,36 @@ object OpenEnumAPI {
         @Serializable
         data class Logout(
             val at: Instant,
-            val reason: User.SessionEventLogoutReason
-        ) : UserSessionEvent
+            val reason: Reason
+        ) : UserSessionEvent {
+
+            @Serializable(with = Reason.Serializer::class)
+            sealed interface Reason : KizunaQueryValue {
+                data object SIGNED_OUT : Reason {
+                    override val wireValue: String = "signed_out"
+                }
+                data object SESSION_EXPIRED : Reason {
+                    override val wireValue: String = "session_expired"
+                }
+                data class Unknown(override val wireValue: String) : Reason
+
+                companion object {
+                    fun fromWireValue(wireValue: String): Reason = when (wireValue) {
+                        "signed_out" -> SIGNED_OUT
+                        "session_expired" -> SESSION_EXPIRED
+                        else -> Unknown(wireValue)
+                    }
+                }
+
+                object Serializer : KSerializer<Reason> {
+                    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Reason", PrimitiveKind.STRING)
+                    override fun deserialize(decoder: Decoder): Reason = Reason.fromWireValue(decoder.decodeString())
+                    override fun serialize(encoder: Encoder, value: Reason) {
+                        encoder.encodeString(value.wireValue)
+                    }
+                }
+            }
+        }
     }
 
     @Serializable

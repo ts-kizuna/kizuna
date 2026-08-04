@@ -81,6 +81,7 @@ export class TypeRegistry {
     private readonly warningSet = new Set<string>();
     private readonly explicitIds = new Set<string>();
     private readonly sealedVariantPayloads = new Set<string>();
+    private readonly sealedVariantPaths = new Map<string, string>();
     public usesJsonElement = false;
 
     constructor(
@@ -123,6 +124,18 @@ export class TypeRegistry {
 
     isSealedVariantPayload(name: string): boolean {
         return this.sealedVariantPayloads.has(name);
+    }
+
+    /**
+     * An inlined sealed variant has no class of its own, so references to it go through the sealed
+     * interface: `UserSessionEvent.Logout`.
+     */
+    markSealedVariantPath(name: string, path: string): void {
+        this.sealedVariantPaths.set(name, path);
+    }
+
+    sealedVariantPath(name: string): string | undefined {
+        return this.sealedVariantPaths.get(name);
     }
 
     warnJsonElement(hint: string, reason: string): void {
@@ -235,6 +248,7 @@ export const mapType = (
             for (const variant of variants) {
                 if (variant.nested) {
                     registry.markSealedVariantPayload(variant.payloadType);
+                    registry.markSealedVariantPath(variant.payloadType, `${enumName}.${variant.caseName}`);
                     continue;
                 }
                 const payload = registry.get(variant.payloadType);

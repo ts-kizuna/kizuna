@@ -184,7 +184,7 @@ class APIClientTest {
         }
         val logoutEvent = logout.body
         assertIs<API.UserSessionEvent.Logout>(logoutEvent)
-        assertEquals(API.User.SessionEventLogoutReason.SESSION_EXPIRED, logoutEvent.reason)
+        assertEquals(API.UserSessionEvent.Logout.Reason.SESSION_EXPIRED, logoutEvent.reason)
     }
 
     @Test
