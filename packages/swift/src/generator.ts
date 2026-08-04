@@ -72,6 +72,7 @@ interface RouteMethod {
     deprecated: boolean;
     deprecationMessage?: string;
     pathParams: string[];
+    declaredPathParams: SwiftField[];
     pathTemplate: string;
     method: string;
     body?: BodyDescriptor;
@@ -143,6 +144,10 @@ const buildRouteMethod = (
     const methodName = methodNameOverride ?? fullJoinedName;
     const baseHint = toPascalCase(fullJoinedName);
     const pathParams = parsePath(route.path).paramNames;
+
+    const declaredPathParams: SwiftField[] = route.pathParams
+        ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`, fieldPaths, 'pathParams', deprecationSchemas)
+        : [];
 
     const queryFields: SwiftField[] = route.query
         ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`, fieldPaths, 'query', deprecationSchemas)
@@ -300,6 +305,7 @@ const buildRouteMethod = (
         deprecated,
         deprecationMessage,
         pathParams,
+        declaredPathParams,
         pathTemplate: route.path,
         method: route.method,
         body: bodyDescriptor,
@@ -1079,8 +1085,9 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
         writer.line('    return allowed');
         writer.line('}()');
         writer.blank();
-        writer.block('static func encodePathSegment(_ value: String) -> String', () => {
-            writer.line('value.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) ?? value');
+        writer.block('static func encodePathSegment<Value>(_ value: Value) -> String', () => {
+            writer.line('let text = stringifyQueryValue(value).first ?? ""');
+            writer.line('return text.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) ?? text');
         });
         writer.blank();
         writer.block('static func appendPath(_ base: URL, _ path: String) -> URL', () => {
@@ -1221,7 +1228,10 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
 // static factory; a field reads back as `group.field`.
 
 const pathParamFields = (method: RouteMethod): SwiftField[] =>
-    method.pathParams.map((name) => ({ name, wireName: name, type: 'String', optional: false }));
+    method.pathParams.map((name) => {
+        const declared = method.declaredPathParams.find((field) => field.wireName === name);
+        return declared ? { ...declared, optional: false } : { name, wireName: name, type: 'String', optional: false };
+    });
 
 const registryStruct = (typeName: string, context: EmitContext): Extract<SwiftType, { kind: 'struct' }> | undefined => {
     const found = context.registry.get(typeName);

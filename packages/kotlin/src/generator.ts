@@ -77,6 +77,7 @@ interface RouteMethod {
     deprecated: boolean;
     deprecationMessage?: string;
     pathParams: string[];
+    declaredPathParams: KotlinField[];
     pathTemplate: string;
     method: string;
     body?: BodyDescriptor;
@@ -140,6 +141,10 @@ const buildRouteMethod = (
     const methodName = methodNameOverride ?? fullJoinedName;
     const baseHint = toPascalCase(fullJoinedName);
     const pathParams = parsePath(route.path).paramNames;
+
+    const declaredPathParams: KotlinField[] = route.pathParams
+        ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`, fieldPaths, 'pathParams', deprecationSchemas)
+        : [];
 
     const queryFields: KotlinField[] = route.query
         ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`, fieldPaths, 'query', deprecationSchemas)
@@ -287,6 +292,7 @@ const buildRouteMethod = (
         deprecated,
         deprecationMessage,
         pathParams,
+        declaredPathParams,
         pathTemplate: route.path,
         method: route.method,
         body: bodyDescriptor,
@@ -896,7 +902,10 @@ const emitRequestGroupClasses = (writer: KotlinWriter, method: RouteMethod, cont
 };
 
 const pathParamFields = (method: RouteMethod): KotlinField[] =>
-    method.pathParams.map((name) => ({ name, wireName: name, type: 'String', optional: false }));
+    method.pathParams.map((name) => {
+        const declared = method.declaredPathParams.find((field) => field.wireName === name);
+        return declared ? { ...declared, optional: false } : { name, wireName: name, type: 'String', optional: false };
+    });
 
 // Whether the method carries a call-site body group. `json-empty` bodies send `{}` with no group.
 const hasBodyGroup = (method: RouteMethod): boolean => method.body !== undefined && method.body.kind !== 'json-empty';
@@ -1355,8 +1364,9 @@ const emitKizunaObject = (writer: KotlinWriter): void => {
             writer.line('return base.newBuilder().encodedPath(fullPath)');
         });
         writer.blank();
-        writer.block('fun encodePathSegment(value: String): String', () => {
-            writer.line('return java.net.URLEncoder.encode(value, "UTF-8").replace("+", "%20")');
+        writer.block('fun encodePathSegment(value: Any): String', () => {
+            writer.line('val text = stringifyQueryValue(value).firstOrNull() ?: ""');
+            writer.line('return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20")');
         });
         writer.blank();
         writer.block('fun stringifyQueryValue(value: Any): List<String>', () => {

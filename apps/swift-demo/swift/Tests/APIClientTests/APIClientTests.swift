@@ -47,6 +47,15 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(result.body.email, "ada@example.com")
     }
 
+    func testTypedPathParamIsSentOnTheWire() async throws {
+        let response = try await client.users.userActivity(
+            .params(id: "1", year: 2024)
+        )
+        XCTAssertEqual(response.body.userId, "1")
+        XCTAssertEqual(response.body.year, 2024)
+        XCTAssertEqual(response.body.events, 24)
+    }
+
     func testGetUserNotFoundThrowsTypedError() async throws {
         do {
             _ = try await client.users.getUser(
