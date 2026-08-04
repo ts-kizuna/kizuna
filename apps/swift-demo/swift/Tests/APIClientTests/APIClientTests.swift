@@ -407,6 +407,28 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(text, "BADGE:1:Ada Lovelace")
     }
 
+    func testLastSessionEventNestedUnionPayloads() async throws {
+        // UserSessionEvent's inline variants are name-prefixed by User, so the generator nests them
+        // as User.SessionEventLogin / User.SessionEventLogout. Switching over both arms proves the
+        // enum references the nested types rather than the flat synthesized names.
+        let login = try await client.users.lastSessionEvent(.params(id: "1"))
+        switch login.body {
+        case .login(let payload):
+            XCTAssertEqual(payload.ipAddress, "203.0.113.7")
+            XCTAssertEqual(payload.at, Date(timeIntervalSince1970: 1_785_837_600))
+        case .logout:
+            XCTFail("user 1's last session event is a login")
+        }
+
+        let logout = try await client.users.lastSessionEvent(.params(id: "2"))
+        switch logout.body {
+        case .login:
+            XCTFail("user 2's last session event is a logout")
+        case .logout(let payload):
+            XCTAssertEqual(payload.reason, .session_expired)
+        }
+    }
+
     func testWebhookAnyCodableBody() async throws {
         let payload = APIClient.JSONValue.object([
             "event": .string("test"),

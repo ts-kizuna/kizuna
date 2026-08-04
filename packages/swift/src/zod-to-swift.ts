@@ -51,6 +51,7 @@ export interface SwiftDiscriminatedEnum {
         caseName: string;
         literal: string;
         payloadType: string;
+        payloadRegistryName: string;
     }>;
     description?: string;
 }
@@ -215,6 +216,7 @@ export const mapType = (
                         caseName: sanitizeCaseName(literal),
                         literal,
                         payloadType: variantResult.expression,
+                        payloadRegistryName: variantResult.expression,
                     });
                 }
             }

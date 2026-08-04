@@ -39,6 +39,21 @@ const usersHandlers: Router<typeof contract>['users'] = {
             body: Buffer.from(`BADGE:${user.id}:${user.name}`, 'utf-8'),
         };
     },
+    lastSessionEvent: async ({ params }) => {
+        const event = await db.sessions.findLastEventByUserId(params.id);
+        if (!event) {
+            return {
+                status: 404,
+                body: {
+                    detail: 'No session events for this user',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: event,
+        };
+    },
     searchUsers: async ({ query }) => {
         const { users, nextCursor } = await db.users.search(query.q, {
             cursor: query.cursor,

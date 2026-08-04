@@ -41,6 +41,12 @@ object API {
             val id: String,
             val url: String
         )
+
+        @Serializable
+        enum class SessionEventLogoutReason(override val wireValue: String) : KizunaQueryValue {
+            @SerialName("signed_out") SIGNED_OUT("signed_out"),
+            @SerialName("session_expired") SESSION_EXPIRED("session_expired")
+        }
     }
 
     /** RFC 9457 Problem Details error response. */
@@ -51,6 +57,25 @@ object API {
         val status: Int,
         val detail: String
     )
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @JsonClassDiscriminator("kind")
+    @Serializable
+    sealed interface UserSessionEvent {
+        @SerialName("login")
+        @Serializable
+        data class Login(
+            val at: Instant,
+            val ipAddress: String,
+            val userAgent: String
+        ) : UserSessionEvent
+        @SerialName("logout")
+        @Serializable
+        data class Logout(
+            val at: Instant,
+            val reason: User.SessionEventLogoutReason
+        ) : UserSessionEvent
+    }
 
     @Serializable
     data class CreateUserInput(
@@ -191,6 +216,29 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         class AfterParams internal constructor(override val params: Params) : Args
 
         data class Result(val body: JsonElement)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class NotFound(val body: API.ProblemDetails) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object UsersLastSessionEvent {
+
+        data class Params(val id: String)
+
+        sealed interface Args {
+            val params: Params
+        }
+
+        object Scope {
+            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args
+
+        data class Result(val body: API.UserSessionEvent)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: API.ProblemDetails) : Failure()
@@ -993,6 +1041,42 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     throw APIClient.UsersUserBadge.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.UsersUserBadge.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** A user's most recent login or logout — inline union variants nest under the User model in native clients */
+    @Throws(APIClient.UsersLastSessionEvent.Failure::class)
+    suspend fun lastSessionEvent(build: APIClient.UsersLastSessionEvent.Scope.() -> APIClient.UsersLastSessionEvent.Args): APIClient.UsersLastSessionEvent.Result {
+        val args = APIClient.UsersLastSessionEvent.Scope.build()
+        val params = args.params
+        var path = "/users/:id/last-session-event"
+        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<API.UserSessionEvent>(data.decodeToString())
+                        return@use APIClient.UsersLastSessionEvent.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
+                }
+                404 -> {
+                    val payload = try {
+                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersLastSessionEvent.Failure.NotFound(body = payload)
+                }
+                else -> throw APIClient.UsersLastSessionEvent.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

@@ -120,6 +120,23 @@ export const NotificationEvent = createModel({
     schema: z.discriminatedUnion('channel', [EmailEvent, SmsEvent]),
 });
 
+export const UserSessionEvent = createModel({
+    title: 'UserSessionEvent',
+    schema: z.discriminatedUnion('kind', [
+        z.object({
+            kind: z.literal('login'),
+            at: z.iso.datetime(),
+            ipAddress: z.string(),
+            userAgent: z.string(),
+        }),
+        z.object({
+            kind: z.literal('logout'),
+            at: z.iso.datetime(),
+            reason: z.enum(['signed_out', 'session_expired']),
+        }),
+    ]),
+});
+
 export const EventKind = createModel({
     title: 'EventKind',
     schema: z.enum(['login', 'logout', 'signup']),
@@ -197,6 +214,15 @@ export const usersRoutes = k.routes('users', {
             404: ProblemDetailsSchema,
         },
         summary: 'Download a user badge — exercises a binary (BinarySchema) response body',
+    },
+    lastSessionEvent: {
+        method: 'GET',
+        path: '/users/:id/last-session-event',
+        responses: {
+            200: UserSessionEvent,
+            404: ProblemDetailsSchema,
+        },
+        summary: "A user's most recent login or logout — inline union variants nest under the User model in native clients",
     },
     searchUsers: {
         method: 'GET',

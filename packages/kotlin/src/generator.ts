@@ -656,7 +656,18 @@ const emitDataClass = (
     }
 };
 
-const emitSealedClass = (writer: KotlinWriter, type: Extract<KotlinType, { kind: 'sealed-class' }>, registry: TypeRegistry): void => {
+const ownedTypePath = (typeName: string, ownedTypeMap: Map<string, string>): string => {
+    const owningClass = ownedTypeMap.get(typeName);
+    if (owningClass === undefined) return typeName;
+    return `${ownedTypePath(owningClass, ownedTypeMap)}.${shortTypeName(typeName, owningClass)}`;
+};
+
+const emitSealedClass = (
+    writer: KotlinWriter,
+    type: Extract<KotlinType, { kind: 'sealed-class' }>,
+    registry: TypeRegistry,
+    ownedTypeMap: Map<string, string>
+): void => {
     writer.line(`@OptIn(ExperimentalSerializationApi::class)`);
     writer.line(`@JsonClassDiscriminator(${stringLiteral(type.discriminator)})`);
     writer.line('@Serializable');
@@ -678,7 +689,7 @@ const emitSealedClass = (writer: KotlinWriter, type: Extract<KotlinType, { kind:
                     writer.line(`data object ${variant.caseName} : ${type.name}`);
                 } else {
                     const params = fields.map((field) => {
-                        const typeExpression = optionalize(field.type, field.optional);
+                        const typeExpression = optionalize(ownedTypePath(field.type, ownedTypeMap), field.optional);
                         const defaultPart = field.optional ? ' = null' : '';
                         return `val ${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
                     });
@@ -696,7 +707,9 @@ const emitSealedClass = (writer: KotlinWriter, type: Extract<KotlinType, { kind:
                     }
                 }
             } else {
-                writer.line(`data class ${variant.caseName}(val value: ${variant.payloadType}) : ${type.name}`);
+                writer.line(
+                    `data class ${variant.caseName}(val value: ${ownedTypePath(variant.payloadType, ownedTypeMap)}) : ${type.name}`
+                );
             }
         }
     });
@@ -717,7 +730,7 @@ const emitType = (
     } else if (type.kind === 'enum-class') {
         emitEnumClass(writer, type.name, type.cases, type.unknownCase, type.description);
     } else if (registry) {
-        emitSealedClass(writer, type, registry);
+        emitSealedClass(writer, type, registry, ownedTypeMap);
     }
 };
 
@@ -1586,10 +1599,15 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     }
     const fileLevelTypeNames = new Set<string>();
 
-    const allClassNames = sharedTypes.filter((type) => type.kind === 'data-class').map((type) => type.name);
+    // Sealed variant payloads are inlined into their sealed interface, so they are never emitted as a
+    // class: they can neither be nested themselves nor own anything.
+    const allClassNames = sharedTypes
+        .filter((type) => type.kind === 'data-class' && !registry.isSealedVariantPayload(type.name))
+        .map((type) => type.name);
     const ownedTypeMap = new Map<string, string>();
     for (const type of sharedTypes) {
         if (registry.isExplicitId(type.name)) continue;
+        if (registry.isSealedVariantPayload(type.name)) continue;
         let bestMatch: string | undefined;
         for (const className of allClassNames) {
             if (className === type.name) continue;

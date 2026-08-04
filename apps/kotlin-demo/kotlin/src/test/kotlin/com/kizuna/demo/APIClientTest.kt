@@ -1,6 +1,7 @@
 package com.kizuna.demo
 
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.Instant
 import kotlin.test.*
 
 class APIClientTest {
@@ -162,6 +163,28 @@ class APIClientTest {
             )
         }
         assertTrue(response.body.users.size >= 0)
+    }
+
+    @Test
+    fun testLastSessionEventSealedVariants() = runTest {
+        val login = client.users.lastSessionEvent {
+            params(
+                id = "1",
+            )
+        }
+        val loginEvent = login.body
+        assertIs<API.UserSessionEvent.Login>(loginEvent)
+        assertEquals("203.0.113.7", loginEvent.ipAddress)
+        assertEquals(Instant.parse("2026-08-04T10:00:00Z"), loginEvent.at)
+
+        val logout = client.users.lastSessionEvent {
+            params(
+                id = "2",
+            )
+        }
+        val logoutEvent = logout.body
+        assertIs<API.UserSessionEvent.Logout>(logoutEvent)
+        assertEquals(API.User.SessionEventLogoutReason.SESSION_EXPIRED, logoutEvent.reason)
     }
 
     @Test
