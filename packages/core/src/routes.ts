@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { ROUTES_TAG, type Routes, type RouteDefinition, type ResponseDefinition } from './types.js';
 import { isRouteDefinition } from './handler-pipeline.js';
 import { type TagSet, type TagKeysOf, isTagSet } from './tags.js';
-import { findCoercedSchemaPath } from './zod-internals.js';
+import { findCoercedSchemaPath, readObjectShape, resolveBaseType } from './zod-internals.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
 
 const isEmptyObjectSchema = (schema: unknown): boolean => {
@@ -45,21 +45,15 @@ const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
     }
 };
 
-const objectShapeKeys = (schema: z.ZodType): string[] | undefined => {
-    const candidate = schema as unknown as { shape?: unknown };
-    if (typeof candidate.shape !== 'object' || candidate.shape === null) return undefined;
-    return Object.keys(candidate.shape as object);
-};
-
 /**
  * Throws when a route's `pathParams` keys and its path's `:param` placeholders
  * disagree. Unchecked, the stray key is dropped from the OpenAPI document and
  * the handler validates params the request never carries.
  */
 const assertPathParamsMatchPath = (route: RouteDefinition, routeKey: string): void => {
-    if (!route.pathParams) return;
-    const declared = objectShapeKeys(route.pathParams);
-    if (declared === undefined) return;
+    const shape = route.pathParams ? readObjectShape(route.pathParams) : undefined;
+    if (!shape) return;
+    const declared = Object.keys(shape);
     const { paramNames } = parsePath(route.path);
     const unmatched = declared.filter((name) => !paramNames.includes(name));
     const undeclared = paramNames.filter((name) => !declared.includes(name));
@@ -71,6 +65,27 @@ const assertPathParamsMatchPath = (route: RouteDefinition, routeKey: string): vo
     throw new Error(`Route "${routeKey}" has pathParams that do not match its path "${route.path}": ${details.join('; ')}.`);
 };
 
+const STRUCTURED_TYPES: ReadonlySet<string> = new Set(['object', 'array', 'record', 'tuple', 'map', 'set']);
+
+/**
+ * Throws when a path parameter is declared as a structured type. A path segment
+ * arrives as one string, so these are not supported.
+ */
+const assertPathParamsAreScalar = (route: RouteDefinition, routeKey: string): void => {
+    const shape = route.pathParams ? readObjectShape(route.pathParams) : undefined;
+    if (!shape) return;
+    for (const [name, fieldSchema] of Object.entries(shape)) {
+        const baseType = resolveBaseType(fieldSchema);
+        if (!STRUCTURED_TYPES.has(baseType)) continue;
+        throw new Error(
+            `Route "${routeKey}" declares path parameter "${name}" as ${baseType}. ` +
+                `A path parameter arrives as a single string, so this is not supported.\n` +
+                `Use a scalar schema (z.string(), z.int(), z.uuid(), z.enum([...])), move the value to query, ` +
+                `or parse it yourself with z.string().transform(...).`
+        );
+    }
+};
+
 const validateRoutes = (routes: Routes, prefix?: string): void => {
     for (const [key, value] of Object.entries(routes)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
@@ -79,6 +94,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
                 throw new Error(`Route "${fullKey}" has an empty body schema (z.object({})). Use z.void() or omit the body field.`);
             }
             assertPathParamsMatchPath(value, fullKey);
+            assertPathParamsAreScalar(value, fullKey);
             assertNoCoercion(value, fullKey);
         } else if (value && typeof value === 'object') {
             validateRoutes(value as Routes, fullKey);

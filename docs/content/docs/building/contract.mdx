@@ -97,7 +97,7 @@ export const usersRoutes = k.routes('users', {
 
 ### Typing path parameters
 
-Path parameters are strings unless you say otherwise. Add `pathParams` when you want them parsed and validated:
+Path parameters are strings unless you say otherwise. Add `pathParams` to parse and validate them:
 
 ```ts
 getUser: {
@@ -112,7 +112,15 @@ getUser: {
 },
 ```
 
-The keys have to be exactly the `:name` placeholders in the path, no more and no fewer. Misspell one and you get a type error on `pathParams` naming the key that does not line up, so a typo like `/users/:usrId` never reaches the OpenAPI document or your handler.
+The keys must be exactly the `:name` placeholders in the path, so a typo like `/users/:usrId` is a type error on `pathParams`.
+
+Each value must be a scalar, since a path segment arrives as one string. Structured values belong in `query`. To parse one into something richer, use `z.string().transform(...)`:
+
+```ts
+pathParams: z.object({
+    tags: z.string().transform((value) => value.split(',')),
+}),
+```
 
 ## Query, path, and header coercion
 
