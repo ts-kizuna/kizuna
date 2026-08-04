@@ -279,7 +279,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         data class Params(
             val id: String,
-            val year: String
+            val year: Int
         )
 
         sealed interface Args {
@@ -287,7 +287,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
 
         object Scope {
-            fun params(id: String, year: String): AfterParams = AfterParams(params = Params(id = id, year = year))
+            fun params(id: String, year: Int): AfterParams = AfterParams(params = Params(id = id, year = year))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -1926,8 +1926,9 @@ private object Kizuna {
         return base.newBuilder().encodedPath(fullPath)
     }
 
-    fun encodePathSegment(value: String): String {
-        return java.net.URLEncoder.encode(value, "UTF-8").replace("+", "%20")
+    fun encodePathSegment(value: Any): String {
+        val text = stringifyQueryValue(value).firstOrNull() ?: ""
+        return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20")
     }
 
     fun stringifyQueryValue(value: Any): List<String> {

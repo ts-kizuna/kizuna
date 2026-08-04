@@ -61,6 +61,19 @@ class APIClientTest {
     }
 
     @Test
+    fun testTypedPathParamIsSentOnTheWire() = runTest {
+        val response = client.users.userActivity {
+            params(
+                id = "1",
+                year = 2024,
+            )
+        }
+        assertEquals("1", response.body.userId)
+        assertEquals(2024, response.body.year)
+        assertEquals(24, response.body.events)
+    }
+
+    @Test
     fun testGetUserNotFoundThrowsTypedError() = runTest {
         val failure = assertFailsWith<APIClient.UsersGetUser.Failure.NotFound> {
             client.users.getUser {

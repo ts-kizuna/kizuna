@@ -631,11 +631,11 @@ public final class OpenEnumAPIClient: Sendable {
 
         public struct Params: Sendable {
             public let id: String
-            public let year: String
+            public let year: Int
 
             public init(
                 id: String,
-                year: String
+                year: Int
             ) {
                 self.id = id
                 self.year = year
@@ -643,7 +643,7 @@ public final class OpenEnumAPIClient: Sendable {
 
             public static func params(
                 id: String,
-                year: String
+                year: Int
             ) -> Self {
                 .init(id: id, year: year)
             }
@@ -2410,8 +2410,9 @@ private enum Kizuna {
         return allowed
     }()
 
-    static func encodePathSegment(_ value: String) -> String {
-        value.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) ?? value
+    static func encodePathSegment<Value>(_ value: Value) -> String {
+        let text = stringifyQueryValue(value).first ?? ""
+        return text.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) ?? text
     }
 
     static func appendPath(_ base: URL, _ path: String) -> URL {
