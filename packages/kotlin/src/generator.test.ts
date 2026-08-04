@@ -1734,4 +1734,48 @@ describe('Kotlin generator — union variants owned by a name-prefix class', () 
         expect(output).not.toContain('data class ActivityEventStarted');
         expect(output).toContain('data class Started(val at: String) : UserActivityEvent');
     });
+
+    it('nests a variant-owned enum inside the variant, matching the Swift client', () => {
+        const contract = k.contract({
+            routes: {
+                getUser: {
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: {
+                        200: createModel({
+                            title: 'User',
+                            schema: z.object({
+                                id: z.string(),
+                            }),
+                        }),
+                    },
+                },
+                getSession: {
+                    method: 'GET',
+                    path: '/session',
+                    responses: {
+                        200: createModel({
+                            title: 'UserSessionEvent',
+                            schema: z.discriminatedUnion('kind', [
+                                z.object({
+                                    kind: z.literal('login'),
+                                    ipAddress: z.string(),
+                                }),
+                                z.object({
+                                    kind: z.literal('logout'),
+                                    reason: z.enum(['signed_out', 'session_expired']),
+                                }),
+                            ]),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        // inside the Logout variant the nested enum is already in scope
+        expect(output).toContain('val reason: Reason');
+        expect(output).toContain('enum class Reason');
+        expect(output).not.toContain('UserSessionEventLogoutReason');
+        expect(output).not.toContain('User.SessionEventLogoutReason');
+    });
 });

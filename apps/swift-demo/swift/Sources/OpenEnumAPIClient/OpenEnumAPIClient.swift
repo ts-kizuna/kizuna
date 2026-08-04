@@ -33,71 +33,6 @@ public enum OpenEnumAPI {
                 self.url = url
             }
         }
-        public struct SessionEventLogin: Codable, Sendable, Equatable {
-            public let kind: String
-            public let at: Date
-            public let ipAddress: String
-            public let userAgent: String
-
-            public init(
-                kind: String,
-                at: Date,
-                ipAddress: String,
-                userAgent: String
-            ) {
-                self.kind = kind
-                self.at = at
-                self.ipAddress = ipAddress
-                self.userAgent = userAgent
-            }
-        }
-        public struct SessionEventLogout: Codable, Sendable, Equatable {
-
-            public enum Reason: RawRepresentable, Codable, Sendable, Hashable {
-                case signed_out
-                case session_expired
-                case unknown(String)
-
-                public init(rawValue: String) {
-                    switch rawValue {
-                    case "signed_out": self = .signed_out
-                    case "session_expired": self = .session_expired
-                    default: self = .unknown(rawValue)
-                    }
-                }
-
-                public var rawValue: String {
-                    switch self {
-                    case .signed_out: return "signed_out"
-                    case .session_expired: return "session_expired"
-                    case let .unknown(value): return value
-                    }
-                }
-
-                public init(from decoder: Decoder) throws {
-                    let container = try decoder.singleValueContainer()
-                    self.init(rawValue: try container.decode(String.self))
-                }
-
-                public func encode(to encoder: Encoder) throws {
-                    var container = encoder.singleValueContainer()
-                    try container.encode(rawValue)
-                }
-            }
-            public let kind: String
-            public let at: Date
-            public let reason: Reason
-
-            public init(
-                kind: String,
-                at: Date,
-                reason: Reason
-            ) {
-                self.kind = kind
-                self.at = at
-                self.reason = reason
-            }
-        }
         /// Unique user identifier
         public let id: String
         /// Display name
@@ -164,13 +99,78 @@ public enum OpenEnumAPI {
     }
 
     public enum UserSessionEvent: Codable, Sendable, Equatable {
-        case login(User.SessionEventLogin)
-        case logout(User.SessionEventLogout)
-        public static func login(at: Date, ipAddress: String, userAgent: String) -> UserSessionEvent {
-            .login(User.SessionEventLogin(kind: "login", at: at, ipAddress: ipAddress, userAgent: userAgent))
+        public struct Login: Codable, Sendable, Equatable {
+            public let kind: String
+            public let at: Date
+            public let ipAddress: String
+            public let userAgent: String
+
+            public init(
+                kind: String,
+                at: Date,
+                ipAddress: String,
+                userAgent: String
+            ) {
+                self.kind = kind
+                self.at = at
+                self.ipAddress = ipAddress
+                self.userAgent = userAgent
+            }
         }
-        public static func logout(at: Date, reason: OpenEnumAPI.User.SessionEventLogout.Reason) -> UserSessionEvent {
-            .logout(User.SessionEventLogout(kind: "logout", at: at, reason: reason))
+        public struct Logout: Codable, Sendable, Equatable {
+
+            public enum Reason: RawRepresentable, Codable, Sendable, Hashable {
+                case signed_out
+                case session_expired
+                case unknown(String)
+
+                public init(rawValue: String) {
+                    switch rawValue {
+                    case "signed_out": self = .signed_out
+                    case "session_expired": self = .session_expired
+                    default: self = .unknown(rawValue)
+                    }
+                }
+
+                public var rawValue: String {
+                    switch self {
+                    case .signed_out: return "signed_out"
+                    case .session_expired: return "session_expired"
+                    case let .unknown(value): return value
+                    }
+                }
+
+                public init(from decoder: Decoder) throws {
+                    let container = try decoder.singleValueContainer()
+                    self.init(rawValue: try container.decode(String.self))
+                }
+
+                public func encode(to encoder: Encoder) throws {
+                    var container = encoder.singleValueContainer()
+                    try container.encode(rawValue)
+                }
+            }
+            public let kind: String
+            public let at: Date
+            public let reason: Reason
+
+            public init(
+                kind: String,
+                at: Date,
+                reason: Reason
+            ) {
+                self.kind = kind
+                self.at = at
+                self.reason = reason
+            }
+        }
+        case login(Login)
+        case logout(Logout)
+        public static func login(at: Date, ipAddress: String, userAgent: String) -> UserSessionEvent {
+            .login(Login(kind: "login", at: at, ipAddress: ipAddress, userAgent: userAgent))
+        }
+        public static func logout(at: Date, reason: Logout.Reason) -> UserSessionEvent {
+            .logout(Logout(kind: "logout", at: at, reason: reason))
         }
 
         private enum DiscriminatorKey: String, CodingKey {
@@ -183,9 +183,9 @@ public enum OpenEnumAPI {
             let single = try decoder.singleValueContainer()
             switch kind {
             case "login":
-                self = .login(try single.decode(User.SessionEventLogin.self))
+                self = .login(try single.decode(Login.self))
             case "logout":
-                self = .logout(try single.decode(User.SessionEventLogout.self))
+                self = .logout(try single.decode(Logout.self))
             default:
                 throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
             }

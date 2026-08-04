@@ -644,29 +644,55 @@ const emitDataClass = (
     if (hasOwnedTypes) {
         writer.appendToLastLine(' {');
         writer.indent(() => {
-            for (const [ownedName, owningStruct] of ownedTypeMap) {
-                if (owningStruct !== lookupName) continue;
-                const ownedType = ownedTypeLookup.get(ownedName);
-                if (!ownedType) continue;
-                const shortName = shortTypeName(ownedName, lookupName);
-                emitType(writer, { ...ownedType, name: shortName }, ownedTypeMap, ownedTypeLookup, ownedName);
-            }
+            emitOwnedTypes(writer, lookupName, ownedTypeMap, ownedTypeLookup);
         });
         writer.line('}');
     }
 };
 
-const ownedTypePath = (typeName: string, ownedTypeMap: Map<string, string>): string => {
+const emitOwnedTypes = (
+    writer: KotlinWriter,
+    ownerName: string,
+    ownedTypeMap: Map<string, string>,
+    ownedTypeLookup: Map<string, KotlinType>,
+    registry?: TypeRegistry
+): void => {
+    for (const [ownedName, owningType] of ownedTypeMap) {
+        if (owningType !== ownerName) continue;
+        const ownedType = ownedTypeLookup.get(ownedName);
+        if (!ownedType) continue;
+        const shortName = shortTypeName(ownedName, ownerName);
+        emitType(writer, { ...ownedType, name: shortName }, ownedTypeMap, ownedTypeLookup, ownedName, registry);
+    }
+};
+
+// Inside `enclosingPath`, a type it owns is already in scope: `Reason`, not
+// `UserSessionEvent.Logout.Reason`. Undefined when the type is owned by something else.
+const relativeOwnedPath = (
+    typeName: string,
+    ownedTypeMap: Map<string, string>,
+    enclosingPath: string,
+    registry?: TypeRegistry
+): string | undefined => {
+    const path = ownedTypePath(typeName, ownedTypeMap, registry);
+    const prefix = `${enclosingPath}.`;
+    return path.startsWith(prefix) ? path.slice(prefix.length) : undefined;
+};
+
+const ownedTypePath = (typeName: string, ownedTypeMap: Map<string, string>, registry?: TypeRegistry): string => {
+    const sealedPath = registry?.sealedVariantPath(typeName);
+    if (sealedPath !== undefined) return sealedPath;
     const owningClass = ownedTypeMap.get(typeName);
     if (owningClass === undefined) return typeName;
-    return `${ownedTypePath(owningClass, ownedTypeMap)}.${shortTypeName(typeName, owningClass)}`;
+    return `${ownedTypePath(owningClass, ownedTypeMap, registry)}.${shortTypeName(typeName, owningClass)}`;
 };
 
 const emitSealedClass = (
     writer: KotlinWriter,
     type: Extract<KotlinType, { kind: 'sealed-class' }>,
     registry: TypeRegistry,
-    ownedTypeMap: Map<string, string>
+    ownedTypeMap: Map<string, string>,
+    ownedTypeLookup: Map<string, KotlinType>
 ): void => {
     writer.line(`@OptIn(ExperimentalSerializationApi::class)`);
     writer.line(`@JsonClassDiscriminator(${stringLiteral(type.discriminator)})`);
@@ -683,13 +709,19 @@ const emitSealedClass = (
             const payloadType = registry.all().find((candidate) => candidate.name === variant.payloadType);
             writer.line(`@SerialName(${stringLiteral(variant.literal)})`);
             writer.line('@Serializable');
+            const ownsNestedTypes = Array.from(ownedTypeMap.values()).includes(variant.payloadType);
+            const emitVariantBody = (): void => {
+                emitOwnedTypes(writer, variant.payloadType, ownedTypeMap, ownedTypeLookup, registry);
+            };
             if (payloadType && payloadType.kind === 'data-class' && payloadType.fields.length > 0) {
                 const fields = payloadType.fields.filter((field) => field.wireName !== type.discriminator);
                 if (fields.length === 0) {
                     writer.line(`data object ${variant.caseName} : ${type.name}`);
                 } else {
                     const params = fields.map((field) => {
-                        const typeExpression = optionalize(ownedTypePath(field.type, ownedTypeMap), field.optional);
+                        const variantPath = registry.sealedVariantPath(variant.payloadType) ?? variant.payloadType;
+                        const relative = relativeOwnedPath(field.type, ownedTypeMap, variantPath, registry);
+                        const typeExpression = optionalize(relative ?? ownedTypePath(field.type, ownedTypeMap, registry), field.optional);
                         const defaultPart = field.optional ? ' = null' : '';
                         return `val ${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
                     });
@@ -705,10 +737,15 @@ const emitSealedClass = (
                         });
                         writer.line(`) : ${type.name}`);
                     }
+                    if (ownsNestedTypes) {
+                        writer.appendToLastLine(' {');
+                        writer.indent(emitVariantBody);
+                        writer.line('}');
+                    }
                 }
             } else {
                 writer.line(
-                    `data class ${variant.caseName}(val value: ${ownedTypePath(variant.payloadType, ownedTypeMap)}) : ${type.name}`
+                    `data class ${variant.caseName}(val value: ${ownedTypePath(variant.payloadType, ownedTypeMap, registry)}) : ${type.name}`
                 );
             }
         }
@@ -730,7 +767,7 @@ const emitType = (
     } else if (type.kind === 'enum-class') {
         emitEnumClass(writer, type.name, type.cases, type.unknownCase, type.description);
     } else if (registry) {
-        emitSealedClass(writer, type, registry, ownedTypeMap);
+        emitSealedClass(writer, type, registry, ownedTypeMap, ownedTypeLookup);
     }
 };
 
@@ -1599,11 +1636,7 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     }
     const fileLevelTypeNames = new Set<string>();
 
-    // Sealed variant payloads are inlined into their sealed interface, so they are never emitted as a
-    // class: they can neither be nested themselves nor own anything.
-    const allClassNames = sharedTypes
-        .filter((type) => type.kind === 'data-class' && !registry.isSealedVariantPayload(type.name))
-        .map((type) => type.name);
+    const allClassNames = sharedTypes.filter((type) => type.kind === 'data-class').map((type) => type.name);
     const ownedTypeMap = new Map<string, string>();
     for (const type of sharedTypes) {
         if (registry.isExplicitId(type.name)) continue;

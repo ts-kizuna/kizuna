@@ -408,9 +408,9 @@ final class APIClientTests: XCTestCase {
     }
 
     func testLastSessionEventNestedUnionPayloads() async throws {
-        // UserSessionEvent's inline variants are name-prefixed by User, so the generator nests them
-        // as User.SessionEventLogin / User.SessionEventLogout. Switching over both arms proves the
-        // enum references the nested types rather than the flat synthesized names.
+        // UserSessionEvent's inline variants nest under the union as UserSessionEvent.Login /
+        // .Logout, matching the Kotlin client. Switching over both arms proves the enum references
+        // the nested types rather than the flat synthesized names.
         let login = try await client.users.lastSessionEvent(.params(id: "1"))
         switch login.body {
         case .login(let payload):
