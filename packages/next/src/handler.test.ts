@@ -1,17 +1,9 @@
-import { beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
+import { kizuna, createTags } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import {
-    createApi,
-    createGuard,
-    createMiddleware,
-    createNextEndpoints,
-    createRouter,
-    createServer,
-    NextRequest,
-    NextResponse,
-} from './index.js';
+import { createApi, createNextEndpoints, createServer, NextRequest, NextResponse } from './index.js';
+import { readTestBody, sessionAuthorization, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -50,90 +42,6 @@ const contractRoutes = k.routes('api', {
 
 const contract = k.contract({
     routes: contractRoutes,
-});
-
-describe('createRouter — accepts a contract or a bare route group', () => {
-    it('types handlers from a bare route group and from a full contract', () => {
-        // Bare route group — no `{ routes: ... }` wrapper.
-        const groupRouter = createRouter(contractRoutes, {
-            getUser: ({ params }) => ({ status: 200, body: { id: params.id, name: 'x' } }),
-            createUser: ({ body }) => ({ status: 201, body: { id: '1', name: body.name, email: body.email } }),
-        });
-
-        // Full contract — the existing form still works.
-        const contractRouter = createRouter(contract, groupRouter);
-
-        expect(typeof groupRouter.getUser).toBe('function');
-        expect(typeof contractRouter.getUser).toBe('function');
-    });
-});
-
-describe('createServer — router accepts a bare route group', () => {
-    const usersRoutes = k.routes('api', {
-        getUser: {
-            method: 'GET',
-            path: '/sub-users/:id',
-            responses: {
-                200: z.object({
-                    id: z.string(),
-                }),
-            },
-        },
-    });
-
-    const subContract = k.contract({
-        routes: {
-            users: usersRoutes,
-        },
-    });
-
-    it('types a sub-router from a bare route group and serves it composed into the contract', async () => {
-        const { server } = createServer(subContract);
-
-        const usersRouter = server.router(usersRoutes, {
-            getUser: ({ params }) => {
-                expectTypeOf(params).toEqualTypeOf<{ id: string }>();
-                return {
-                    status: 200,
-                    body: {
-                        id: params.id,
-                    },
-                };
-            },
-        });
-
-        const composed = server.router({
-            users: usersRouter,
-        });
-
-        const { GET: subGET } = createNextEndpoints(
-            server.api({
-                router: composed,
-            }),
-            {
-                basePath: '/api',
-            }
-        );
-
-        const response = await subGET(new NextRequest('http://localhost:3000/api/sub-users/42', { method: 'GET' }));
-        expect(response.status).toBe(200);
-        const body = await response.json();
-        expect(body.id).toBe('42');
-    });
-
-    it('contextually types the bare group without widening', () => {
-        const { server } = createServer(subContract);
-
-        // @ts-expect-error 418 is not a declared response of getUser.
-        server.router(usersRoutes, {
-            getUser: () => ({
-                status: 418,
-                body: {
-                    id: '1',
-                },
-            }),
-        });
-    });
 });
 
 interface User {
@@ -180,7 +88,7 @@ const api = createApi({
     },
 });
 
-const { GET, POST, DELETE } = createNextEndpoints(api, {
+const { DELETE } = createNextEndpoints(api, {
     basePath: '/api',
 });
 
@@ -203,83 +111,12 @@ describe('Next.js handler', () => {
         users.clear();
     });
 
-    it('handles POST with body validation', async () => {
-        const response = await POST(
-            makeRequest('POST', '/api/users', {
-                name: 'Alice',
-                email: 'alice@test.com',
-            })
-        );
-        expect(response.status).toBe(201);
-        const body = await response.json();
-        expect(body.name).toBe('Alice');
-        expect(body.email).toBe('alice@test.com');
-    });
-
-    it('handles GET with path params', async () => {
-        const created = await POST(
-            makeRequest('POST', '/api/users', {
-                name: 'Bob',
-                email: 'bob@test.com',
-            })
-        );
-        const createdBody = await created.json();
-
-        const response = await GET(makeRequest('GET', `/api/users/${createdBody.id}`));
-        expect(response.status).toBe(200);
-        const body = await response.json();
-        expect(body.name).toBe('Bob');
-    });
-
-    it('returns 400 for invalid body', async () => {
-        const response = await POST(
-            makeRequest('POST', '/api/users', {
-                name: '',
-                email: 'not-email',
-            })
-        );
-        expect(response.status).toBe(400);
-        const body = await response.json();
-        expect(body.detail).toBe('Invalid request body');
-        expect(Array.isArray(body.errors)).toBe(true);
-    });
-
-    it('returns 404 for an unmatched route', async () => {
-        const response = await GET(makeRequest('GET', '/api/unknown'));
-        expect(response.status).toBe(404);
-    });
-
     it('returns 405 with Allow header on method mismatch', async () => {
         const response = await DELETE(makeRequest('DELETE', '/api/users/123'));
         expect(response.status).toBe(405);
         expect(response.headers.get('allow')).toBe('GET');
         const body = await response.json();
         expect(body.allowed).toEqual(['GET']);
-    });
-
-    it('returns 415 when Content-Type does not match route expectation', async () => {
-        const url = 'http://localhost:3000/api/users';
-        const response = await POST(
-            new NextRequest(url, {
-                method: 'POST',
-                body: '<user><name>Bob</name></user>',
-                headers: {
-                    'content-type': 'application/xml',
-                },
-            })
-        );
-        expect(response.status).toBe(415);
-        const body = await response.json();
-        expect(body.detail).toContain('Unsupported Media Type');
-        expect(body.detail).toContain('application/json');
-        expect(body.detail).toContain('application/xml');
-    });
-
-    it('returns 404 for a missing user', async () => {
-        const response = await GET(makeRequest('GET', '/api/users/missing'));
-        expect(response.status).toBe(404);
-        const body = await response.json();
-        expect(body.detail).toBe('Not found');
     });
 
     it('routes onError hook overrides the default 500', async () => {
@@ -422,250 +259,6 @@ describe('Next.js handler — alternate content types', () => {
             name: 'Alice',
             age: '30',
         });
-    });
-});
-
-describe('Next.js handler — all HTTP methods', () => {
-    const allMethodsContractRoutes = k.routes('api', {
-        getItem: {
-            method: 'GET',
-            path: '/items/:id',
-            responses: {
-                200: z.object({
-                    method: z.string(),
-                }),
-            },
-        },
-        headItem: {
-            method: 'HEAD',
-            path: '/items/:id',
-            responses: {
-                200: z.object({
-                    method: z.string(),
-                }),
-            },
-        },
-        createItem: {
-            method: 'POST',
-            path: '/items',
-            body: z.object({
-                name: z.string(),
-            }),
-            responses: {
-                200: z.object({
-                    method: z.string(),
-                }),
-            },
-        },
-        replaceItem: {
-            method: 'PUT',
-            path: '/items/:id',
-            body: z.object({
-                name: z.string(),
-            }),
-            responses: {
-                200: z.object({
-                    method: z.string(),
-                }),
-            },
-        },
-        patchItem: {
-            method: 'PATCH',
-            path: '/items/:id',
-            body: z.object({
-                name: z.string(),
-            }),
-            responses: {
-                200: z.object({
-                    method: z.string(),
-                }),
-            },
-        },
-        deleteItem: {
-            method: 'DELETE',
-            path: '/items/:id',
-            responses: {
-                200: z.object({
-                    method: z.string(),
-                }),
-            },
-        },
-        optionsItem: {
-            method: 'OPTIONS',
-            path: '/items/:id',
-            responses: {
-                200: z.object({
-                    method: z.string(),
-                }),
-            },
-        },
-    });
-
-    const allMethodsContract = k.contract({
-        routes: allMethodsContractRoutes,
-    });
-
-    const echoMethod = (method: string) => () => ({
-        status: 200 as const,
-        body: {
-            method,
-        },
-    });
-
-    const allMethodsApi = createApi({
-        contract: allMethodsContract,
-        router: {
-            getItem: echoMethod('GET'),
-            headItem: echoMethod('HEAD'),
-            createItem: echoMethod('POST'),
-            replaceItem: echoMethod('PUT'),
-            patchItem: echoMethod('PATCH'),
-            deleteItem: echoMethod('DELETE'),
-            optionsItem: echoMethod('OPTIONS'),
-        },
-    });
-
-    const { GET: handler } = createNextEndpoints(allMethodsApi);
-
-    const makeMethodRequest = (method: string, path: string, body?: unknown) =>
-        new NextRequest(`http://localhost:3000${path}`, {
-            method,
-            ...(body !== undefined
-                ? {
-                      body: JSON.stringify(body),
-                      headers: {
-                          'content-type': 'application/json',
-                      },
-                  }
-                : {}),
-        });
-
-    it('GET routes correctly', async () => {
-        const response = await handler(makeMethodRequest('GET', '/items/1'));
-        expect(response.status).toBe(200);
-        expect((await response.json()).method).toBe('GET');
-    });
-
-    it('HEAD routes correctly and strips the response body', async () => {
-        const response = await handler(makeMethodRequest('HEAD', '/items/1'));
-        expect(response.status).toBe(200);
-        expect(await response.text()).toBe('');
-    });
-
-    it('POST routes correctly', async () => {
-        const response = await handler(makeMethodRequest('POST', '/items', { name: 'x' }));
-        expect(response.status).toBe(200);
-        expect((await response.json()).method).toBe('POST');
-    });
-
-    it('PUT routes correctly', async () => {
-        const response = await handler(makeMethodRequest('PUT', '/items/1', { name: 'x' }));
-        expect(response.status).toBe(200);
-        expect((await response.json()).method).toBe('PUT');
-    });
-
-    it('PATCH routes correctly', async () => {
-        const response = await handler(makeMethodRequest('PATCH', '/items/1', { name: 'x' }));
-        expect(response.status).toBe(200);
-        expect((await response.json()).method).toBe('PATCH');
-    });
-
-    it('DELETE routes correctly', async () => {
-        const response = await handler(makeMethodRequest('DELETE', '/items/1'));
-        expect(response.status).toBe(200);
-        expect((await response.json()).method).toBe('DELETE');
-    });
-
-    it('OPTIONS routes correctly', async () => {
-        const response = await handler(makeMethodRequest('OPTIONS', '/items/1'));
-        expect(response.status).toBe(200);
-        expect((await response.json()).method).toBe('OPTIONS');
-    });
-
-    it('OPTIONS response includes Allow header listing all methods for the path', async () => {
-        const response = await handler(makeMethodRequest('OPTIONS', '/items/1'));
-        expect(response.status).toBe(200);
-        const allow = response.headers.get('allow') ?? '';
-        expect(allow).toContain('GET');
-        expect(allow).toContain('PUT');
-        expect(allow).toContain('PATCH');
-        expect(allow).toContain('DELETE');
-        expect(allow).toContain('OPTIONS');
-    });
-});
-
-describe('Next.js handler — responseValidation', () => {
-    it('returns 500 when responseValidation is enabled and the handler returns a mismatched body', async () => {
-        const strictRoutes = k.routes('api', {
-            getItem: {
-                method: 'GET',
-                path: '/items/:id',
-                responses: {
-                    200: z.object({
-                        id: z.string(),
-                    }),
-                },
-            },
-        });
-        const strictContract = k.contract({
-            routes: strictRoutes,
-        });
-        const strictApi = createApi({
-            contract: strictContract,
-            router: {
-                getItem: () => ({ status: 200, body: { id: 123 } }) as any,
-            },
-        });
-        const { GET: strictGET } = createNextEndpoints(strictApi, {
-            responseValidation: true,
-        });
-        const response = await strictGET(new NextRequest('http://localhost:3000/items/1'));
-        expect(response.status).toBe(500);
-    });
-});
-
-describe('Next.js handler — Accept header / 406', () => {
-    it('returns 406 when Accept excludes application/json', async () => {
-        const response = await GET(
-            new NextRequest('http://localhost:3000/api/users/1', {
-                method: 'GET',
-                headers: {
-                    accept: 'text/html',
-                },
-            })
-        );
-        expect(response.status).toBe(406);
-        const body = await response.json();
-        expect(body.detail).toBe('Not Acceptable');
-    });
-
-    it('returns 200 when Accept is */*', async () => {
-        const response = await GET(
-            new NextRequest('http://localhost:3000/api/users/1', {
-                method: 'GET',
-                headers: {
-                    accept: '*/*',
-                },
-            })
-        );
-        expect(response.status).not.toBe(406);
-    });
-
-    it('returns 200 when Accept includes application/json', async () => {
-        const response = await GET(
-            new NextRequest('http://localhost:3000/api/users/1', {
-                method: 'GET',
-                headers: {
-                    accept: 'text/html, application/json',
-                },
-            })
-        );
-        expect(response.status).not.toBe(406);
-    });
-
-    it('returns 200 when Accept is absent', async () => {
-        const response = await GET(makeRequest('GET', '/api/users/1'));
-        expect(response.status).not.toBe(406);
     });
 });
 
@@ -834,277 +427,47 @@ describe('Next.js handler — requestMiddleware', () => {
     });
 });
 
-describe('Next.js — guards', () => {
-    const user = createIdentity.bearer({
-        context: z.object({
-            userId: z.string(),
-        }),
-    });
+const nextRequireAuth = (request: NextRequest) =>
+    request.headers.get('authorization') === sessionAuthorization
+        ? undefined
+        : NextResponse.json(
+              {
+                  detail: 'Unauthorized',
+              },
+              {
+                  status: 401,
+              }
+          );
 
-    const { k: securedK } = kizuna({
-        identities: {
-            user,
-        },
-    });
-
-    const securedRoutes = securedK.routes({
-        publicRoute: {
-            method: 'GET',
-            path: '/public',
-            responses: {
-                200: z.object({
-                    message: z.string(),
-                }),
-            },
-        },
-        whoAmI: {
-            method: 'GET',
-            path: '/who-am-i',
-            responses: {
-                200: z.object({
-                    userId: z.string(),
-                }),
-            },
-        },
-    });
-
-    const securedContract = securedK.contract({
-        routes: {
-            api: securedRoutes,
-        },
-        auth: {
-            api: {
-                '*': false,
-                whoAmI: 'user',
-            },
-        },
-    });
-
-    const requireUser = createGuard(securedContract, 'user', ({ bearer, deny }) => {
-        if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
+testAdapterFeatures({
+    name: 'next',
+    createApi,
+    createServerApi: (contract, options) => createServer(contract).server.api(options),
+    requireAuth: nextRequireAuth,
+    mount: (api, { responseValidation }) => {
+        const handlers = createNextEndpoints(api, {
+            basePath: '/api',
+            responseValidation,
+        });
         return {
-            userId: '1',
+            request: async ({ method, path, body, headers }) => {
+                const handler = handlers[method];
+                if (!handler) throw new Error(`next: no handler exported for ${method}`);
+                const response = await handler(
+                    new NextRequest(`http://localhost:3000/api${path}`, {
+                        method,
+                        body,
+                        headers,
+                    })
+                );
+                const text = await response.text();
+                return {
+                    status: response.status,
+                    headers: response.headers,
+                    body: readTestBody(text),
+                    text,
+                };
+            },
         };
-    });
-
-    const makeEndpoints = () => {
-        const api = createApi({
-            contract: securedContract,
-            router: {
-                api: {
-                    publicRoute: () => ({
-                        status: 200,
-                        body: {
-                            message: 'public',
-                        },
-                    }),
-                    whoAmI: ({ auth }) => ({
-                        status: 200,
-                        body: {
-                            userId: auth.user.userId,
-                        },
-                    }),
-                },
-            },
-            guards: {
-                user: requireUser,
-            },
-        });
-        return createNextEndpoints(api, {
-            basePath: '',
-        });
-    };
-
-    it('serves a public route without credentials', async () => {
-        const { GET } = makeEndpoints();
-        const response = await GET(makeRequest('GET', '/public'));
-        expect(response.status).toBe(200);
-    });
-
-    it('denies a secured route without a credential as problem details', async () => {
-        const { GET } = makeEndpoints();
-        const response = await GET(makeRequest('GET', '/who-am-i'));
-        expect(response.status).toBe(401);
-        expect(response.headers.get('content-type')).toContain('application/problem+json');
-        const body = await response.json();
-        expect(body.detail).toBe('Unauthorized');
-    });
-
-    it('passes the guard context to the handler', async () => {
-        const { GET } = makeEndpoints();
-        const authedRequest = makeRequest('GET', '/who-am-i');
-        authedRequest.headers.set('authorization', 'Bearer tok_ada');
-        const response = await GET(authedRequest);
-        expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({
-            userId: '1',
-        });
-    });
-});
-
-describe('Next.js — middleware map', () => {
-    const middlewareContractRoutes = k.routes('api', {
-        publicRoute: {
-            method: 'GET',
-            path: '/public',
-            responses: {
-                200: z.object({
-                    message: z.string(),
-                }),
-            },
-        },
-        protectedRoute: {
-            method: 'GET',
-            path: '/protected',
-            responses: {
-                200: z.object({
-                    message: z.string(),
-                }),
-            },
-        },
-        admin: {
-            dashboard: {
-                method: 'GET',
-                path: '/admin/dashboard',
-                responses: {
-                    200: z.object({
-                        message: z.string(),
-                    }),
-                },
-            },
-            settings: {
-                method: 'GET',
-                path: '/admin/settings',
-                responses: {
-                    200: z.object({
-                        message: z.string(),
-                    }),
-                },
-            },
-        },
-    });
-
-    const middlewareContract = k.contract({
-        routes: middlewareContractRoutes,
-    });
-
-    const requireAuth = (request: NextRequest) => {
-        const token = request.headers.get('authorization');
-        if (!token || token !== 'Bearer valid') {
-            return new Response(
-                JSON.stringify({
-                    error: 'Unauthorized',
-                }),
-                {
-                    status: 401,
-                }
-            );
-        }
-    };
-
-    it('applies middleware to a specific route', async () => {
-        const middleware = createMiddleware(middlewareContract, {
-            publicRoute: [],
-            protectedRoute: [requireAuth],
-            admin: [],
-        });
-        const middlewareApi = createApi({
-            contract: middlewareContract,
-            router: {
-                publicRoute: () => ({
-                    status: 200,
-                    body: {
-                        message: 'public',
-                    },
-                }),
-                protectedRoute: () => ({
-                    status: 200,
-                    body: {
-                        message: 'protected',
-                    },
-                }),
-                admin: {
-                    dashboard: () => ({
-                        status: 200,
-                        body: {
-                            message: 'dashboard',
-                        },
-                    }),
-                    settings: () => ({
-                        status: 200,
-                        body: {
-                            message: 'settings',
-                        },
-                    }),
-                },
-            },
-            middleware,
-        });
-        const { GET } = createNextEndpoints(middlewareApi, {
-            basePath: '',
-        });
-
-        const publicResponse = await GET(makeRequest('GET', '/public'));
-        expect(publicResponse.status).toBe(200);
-
-        const protectedNoAuth = await GET(makeRequest('GET', '/protected'));
-        expect(protectedNoAuth.status).toBe(401);
-
-        const protectedRequest = makeRequest('GET', '/protected');
-        protectedRequest.headers.set('authorization', 'Bearer valid');
-        const protectedWithAuth = await GET(protectedRequest);
-        expect(protectedWithAuth.status).toBe(200);
-    });
-
-    it('applies group-level middleware to all routes in a group', async () => {
-        const middleware = createMiddleware(middlewareContract, {
-            publicRoute: [],
-            protectedRoute: [],
-            admin: [requireAuth],
-        });
-        const middlewareApi = createApi({
-            contract: middlewareContract,
-            router: {
-                publicRoute: () => ({
-                    status: 200,
-                    body: {
-                        message: 'public',
-                    },
-                }),
-                protectedRoute: () => ({
-                    status: 200,
-                    body: {
-                        message: 'unprotected here',
-                    },
-                }),
-                admin: {
-                    dashboard: () => ({
-                        status: 200,
-                        body: {
-                            message: 'dashboard',
-                        },
-                    }),
-                    settings: () => ({
-                        status: 200,
-                        body: {
-                            message: 'settings',
-                        },
-                    }),
-                },
-            },
-            middleware,
-        });
-        const { GET } = createNextEndpoints(middlewareApi, {
-            basePath: '',
-        });
-
-        const dashboardNoAuth = await GET(makeRequest('GET', '/admin/dashboard'));
-        expect(dashboardNoAuth.status).toBe(401);
-
-        const settingsNoAuth = await GET(makeRequest('GET', '/admin/settings'));
-        expect(settingsNoAuth.status).toBe(401);
-
-        const publicResponse = await GET(makeRequest('GET', '/public'));
-        expect(publicResponse.status).toBe(200);
-    });
+    },
 });

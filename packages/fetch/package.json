@@ -33,6 +33,9 @@
   },
   "devDependencies": {
     "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/express": "workspace:*",
+    "@types/express": "catalog:",
+    "express": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"

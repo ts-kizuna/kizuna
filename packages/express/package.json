@@ -33,7 +33,6 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/core": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",

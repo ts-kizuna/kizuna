@@ -62,7 +62,8 @@
     "src",
     "!src/**/*.test.ts",
     "!src/**/*.test-d.ts",
-    "!src/**/*.fixture.ts"
+    "!src/**/*.fixture.ts",
+    "!src/adapter-testing"
   ],
   "publishConfig": {
     "registry": "https://npm.pkg.github.com/"
@@ -78,6 +79,7 @@
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "vitest": "3.2.4"
   }
 }
