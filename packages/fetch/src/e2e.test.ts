@@ -5,7 +5,7 @@ import type { Server, AddressInfo } from 'node:net';
 import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createClient, type Client } from '@ts-kizuna/fetch';
-import { createApi, createExpressEndpoints, createGuard } from './server.js';
+import { createApi, createExpressEndpoints, createGuard } from '@ts-kizuna/express';
 
 const { k } = kizuna({
     tags: createTags({

@@ -333,7 +333,12 @@ export const fastifyKizuna = fastifyPlugin(
         const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<FastifyHandlerContext> | undefined;
         const middlewareMap = api[MIDDLEWARE_META] as MiddlewareMap<Routes, FastifyPreHandler> | undefined;
 
-        for (const { routeKey, route } of adapter.eachRoute(api as unknown as Routes, resolvedRouter)) {
+        // Fastify's auto-exposed HEAD collides with a declared one, but it skips paths that already have HEAD.
+        const declaredRoutes = [...adapter.eachRoute(api as unknown as Routes, resolvedRouter)].sort(
+            (left, right) => Number(right.route.method === 'HEAD') - Number(left.route.method === 'HEAD')
+        );
+
+        for (const { routeKey, route } of declaredRoutes) {
             const routeMiddleware = resolveMiddleware(routeKey, middlewareMap);
 
             app.route({
