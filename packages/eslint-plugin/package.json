@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/eslint-plugin",
-  "version": "1.42.2",
+  "version": "1.43.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
