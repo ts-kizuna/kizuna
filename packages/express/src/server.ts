@@ -72,6 +72,15 @@ export type Router<C> =
           ? CoreRouter<C, ExpressHandlerContext>
           : never;
 
+/**
+ * The handlers for a group named on the contract, or for a bare route group.
+ * Both forms resolve through one signature: a second candidate of the same
+ * arity costs zero-argument handlers their contextual type.
+ */
+type GroupRouter<Source, GroupOrRoutes> = GroupOrRoutes extends string
+    ? Router<Source>[Extract<GroupOrRoutes, keyof Router<Source>>]
+    : Router<GroupOrRoutes>;
+
 declare global {
     // eslint-disable-next-line @typescript-eslint/no-namespace
     namespace Express {
@@ -414,11 +423,10 @@ export interface Server<
      * Bind typed handlers to the contract or one of its route groups.
      */
     router: {
-        <const G extends Routes>(group: G, router: Router<G>): Router<G>;
-        <const Group extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext>>, string>>(
-            group: Group,
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext>>[Group]
-        ): Router<ServerContract<R, Schemes, Auth, RequestContext>>[Group];
+        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext>>, string> | Routes>(
+            group: GroupOrRoutes,
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes>;
         (router: Router<ServerContract<R, Schemes, Auth, RequestContext>>): Router<ServerContract<R, Schemes, Auth, RequestContext>>;
     };
     /**
