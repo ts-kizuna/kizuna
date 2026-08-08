@@ -71,6 +71,15 @@ export type Router<C, E extends Env = Env> =
           ? CoreRouter<C, HonoHandlerContext<E>>
           : never;
 
+/**
+ * The handlers for a group named on the contract, or for a bare route group.
+ * Both forms resolve through one signature: a second candidate of the same
+ * arity costs zero-argument handlers their contextual type.
+ */
+type GroupRouter<Source, GroupOrRoutes, E extends Env> = GroupOrRoutes extends string
+    ? Router<Source, E>[Extract<GroupOrRoutes, keyof Router<Source, E>>]
+    : Router<GroupOrRoutes, E>;
+
 export interface HonoOptions {
     /**
      * Validate handler return values against the routes' response schemas.
@@ -384,11 +393,10 @@ export interface Server<
      * Bind typed handlers to the contract or one of its route groups.
      */
     router: {
-        <const G extends Routes>(group: G, router: Router<G, E>): Router<G, E>;
-        <const Group extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext>, E>, string>>(
-            group: Group,
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext>, E>[Group]
-        ): Router<ServerContract<R, Schemes, Auth, RequestContext>, E>[Group];
+        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext>, E>, string> | Routes>(
+            group: GroupOrRoutes,
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes, E>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes, E>;
         (router: Router<ServerContract<R, Schemes, Auth, RequestContext>, E>): Router<ServerContract<R, Schemes, Auth, RequestContext>, E>;
     };
     /**

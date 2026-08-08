@@ -85,16 +85,38 @@ const nestedContract = k.contract({
 test('server.router contextually types a bare route group without widening', () => {
     const { server } = createServer(nestedContract);
 
-    // @ts-expect-error 418 is not a declared response of getUser.
     server.router(contractRoutes, {
         getUser: () => ({
-            status: 418,
+            status: 200,
             body: {
                 id: '1',
                 name: 'x',
             },
         }),
         createUser: () => ({
+            // @ts-expect-error 418 is not a declared response of createUser.
+            status: 418,
+            body: {
+                id: '1',
+                name: 'a',
+                email: 'e',
+            },
+        }),
+    });
+});
+
+test('server.router types a group by name when its handlers take no arguments', () => {
+    const { server } = createServer(nestedContract);
+
+    const users = server.router('users', {
+        getUser: async () => ({
+            status: 200,
+            body: {
+                id: '1',
+                name: 'x',
+            },
+        }),
+        createUser: async () => ({
             status: 201,
             body: {
                 id: '1',
@@ -102,6 +124,12 @@ test('server.router contextually types a bare route group without widening', () 
                 email: 'e',
             },
         }),
+    });
+
+    server.api({
+        router: {
+            users,
+        },
     });
 });
 
