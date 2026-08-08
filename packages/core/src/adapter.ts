@@ -18,6 +18,7 @@ import { ResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
+import { resolveCoercionPlans } from './coercion.js';
 import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
 
 export type { RouteDefinition, Routes, Method } from './types.js';
@@ -147,6 +148,9 @@ export const assembleApi = <const R extends Routes>(
     parts: ApiParts
 ): R & ApiWithRouter => {
     assertNoDuplicateRoutes(contract.routes);
+    for (const { route } of flattenRoutes(contract.routes)) {
+        resolveCoercionPlans(route);
+    }
     return Object.assign(
         { ...contract.routes },
         {

@@ -3,6 +3,7 @@ import { ROUTES_TAG, type Routes, type RouteDefinition, type ResponseDefinition 
 import { isRouteDefinition } from './handler-pipeline.js';
 import { type TagSet, type TagKeysOf, isTagSet } from './tags.js';
 import { findCoercedSchemaPath, readObjectShape, resolveBaseType } from './zod-internals.js';
+import { resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
 
 const isEmptyObjectSchema = (schema: unknown): boolean => {
@@ -96,6 +97,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             assertPathParamsMatchPath(value, fullKey);
             assertPathParamsAreScalar(value, fullKey);
             assertNoCoercion(value, fullKey);
+            resolveCoercionPlans(value);
         } else if (value && typeof value === 'object') {
             validateRoutes(value as Routes, fullKey);
         }
