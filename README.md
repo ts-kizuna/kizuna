@@ -36,7 +36,7 @@ Define each route: pick a method and path, then describe what it takes in and se
 
 ```ts
 // routes.ts
-const UserSchema = createModel({
+const UserSchema = Kizuna.model({
     title: 'User',
     schema: z.object({
         id: z.string(),

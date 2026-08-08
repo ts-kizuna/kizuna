@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { parsePath, isVoidSchema, readObjectShape } from '@ts-kizuna/core';
+import { parsePath } from '@ts-kizuna/core/adapter';
+import { isVoidSchema, readObjectShape } from '@ts-kizuna/core/generator';
 import type { RouteDefinition } from '@ts-kizuna/core';
 
 export interface ToolInputSchema {

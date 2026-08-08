@@ -1565,7 +1565,7 @@ const emitClient = (
 /**
  * Generate a Kotlin API client from a ts-kizuna contract.
  *
- * @param contract - The router from `createContract({ ... })`.
+ * @param contract - The router from `k.contract({ ... })`.
  * @param config - Override the generated names:
  *   - `namespaceName` — the object wrapping shared types.
  *   - `packageName` — optional package declaration for the generated file.

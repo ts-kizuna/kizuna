@@ -86,7 +86,7 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
     description?: string;
     /**
      * Tag keys grouping this route in the OpenAPI spec. Keys come from the tag set
-     * declared with `createTags`; `k.routes` stamps the group's tag onto every
+     * declared with `Kizuna.tags`; `k.routes` stamps the group's tag onto every
      * route, and the generator resolves each key to its `title` for the spec.
      */
     tags?: readonly TagKeys[];

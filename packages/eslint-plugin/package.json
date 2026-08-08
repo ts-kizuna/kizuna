@@ -24,12 +24,13 @@
     "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external eslint --external typescript --external @typescript-eslint/utils --external @typescript-eslint/parser",
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external eslint --external typescript --external @typescript-eslint/utils --external @typescript-eslint/parser --external @ts-kizuna/core",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "eslint": ">=9.0.0",
-    "typescript": ">=5.0.0"
+    "typescript": ">=5.0.0",
+    "@ts-kizuna/core": "workspace:*"
   },
   "dependencies": {
     "@typescript-eslint/parser": "^8.0.0",

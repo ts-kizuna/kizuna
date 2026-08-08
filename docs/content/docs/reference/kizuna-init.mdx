@@ -1,0 +1,99 @@
+---
+title: Kizuna.init
+description: Bind one API surface — its tags, identities, request contexts, and validation codes — and get back `k`.
+---
+
+`Kizuna.init` binds one API surface. Destructure `k` from it, then use `k.routes` to define route groups and `k.contract` to assemble them. Set it up once and import `k` wherever you define routes.
+
+<InstallTabs packageName="@ts-kizuna/core" />
+
+```ts
+import { Kizuna } from '@ts-kizuna/core';
+```
+
+## Parameters
+
+```ts
+Kizuna.init(config?: {
+    identities?: Record<string, Identity>;
+    requestContext?: Record<string, RequestContext>;
+    tags?: TagSet;
+    validation?: { issueCodes?: readonly string[] };
+}): { k: K }
+```
+
+| Field                   | Type                             | Description                                                                                                                                                     |
+| ----------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `identities`            | `Record<string, Identity>`       | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names the `auth` map and guards use. |
+| `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) — request-scoped values every handler receives.                   |
+| `tags`                  | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                  |
+| `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                |
+
+## Returns
+
+`{ k }`, the factory for this API:
+
+| Method       | Signature                        | Description                                                |
+| ------------ | -------------------------------- | ---------------------------------------------------------- |
+| `k.routes`   | `(tag, defs) => Routes`          | Define a route group under one of the tag set's keys.      |
+| `k.contract` | `({ routes, auth }) => Contract` | Assemble route groups into the contract shared everywhere. |
+
+## Example
+
+Set the factory up once — usually in a `k.ts` file — then import `k` wherever you define routes.
+
+```ts
+// k.ts
+import { Kizuna } from '@ts-kizuna/core';
+import { tags } from './tags';
+import { user, member } from './identities';
+import { analytics } from './request-contexts';
+
+export const { k } = Kizuna.init({
+    identities: {
+        user,
+        member,
+    },
+    requestContext: {
+        analytics,
+    },
+    tags,
+    validation: {
+        issueCodes: ['invalid_phone_number'],
+    },
+});
+```
+
+## Request context
+
+`requestContext` registers declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) — request-scoped values like analytics ids or a logger. Every handler receives them typed under `requestContext`, keyed by their name; each is resolved per request by a [`server.requestContext`](/docs/reference/create-server#serverrequestcontext) resolver wired on `server.api`.
+
+```ts title="request-contexts.ts"
+import { z } from 'zod';
+import { Kizuna } from '@ts-kizuna/core';
+
+export const analytics = Kizuna.requestContext(
+    z.object({
+        sessionId: z.string().nullable(),
+    })
+);
+```
+
+```ts title="k.ts"
+import { analytics } from './request-contexts';
+
+export const { k } = Kizuna.init({
+    requestContext: {
+        analytics,
+    },
+});
+```
+
+```ts
+listUsers: ({ query, requestContext }) => {
+    track(requestContext.analytics.sessionId, 'listUsers');
+    // ...
+},
+```
+
+See the [Contract guide](/docs/building/contract) for response schemas, deprecation, typed response headers, and nesting.

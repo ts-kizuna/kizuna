@@ -23,7 +23,7 @@ export interface BasicCredential {
  * the identity named, with `in`/`name` echoing where it came from.
  *
  * @example
- * // for createIdentity.apiKey({ name: 'x-workspace-token', in: 'header' }):
+ * // for Kizuna.identity.apiKey({ name: 'x-workspace-token', in: 'header' }):
  * // { in: 'header'; name: 'x-workspace-token'; value: string }
  */
 export interface ApiKeyCredential<In extends 'header' | 'query' | 'cookie' = 'header' | 'query' | 'cookie', Name extends string = string> {
@@ -54,7 +54,7 @@ export type NoCredential = Record<never, never>;
 declare const CREDENTIAL: unique symbol;
 
 /**
- * An authenticated caller, defined with the {@link createIdentity} builders. Extends
+ * An authenticated caller, defined with the `Kizuna.identity` builders. Extends
  * {@link SecurityScheme} with an optional `access` schema describing the fields
  * the `auth` map may constrain, and carries the credential its authentication
  * method extracts from the request.
@@ -119,7 +119,7 @@ const make = <
     scheme,
 });
 
-interface BearerConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+export interface BearerConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
     context?: ContextSchema;
     access?: AccessSchema;
     bearerFormat?: string;
@@ -127,7 +127,7 @@ interface BearerConfig<ContextSchema extends z.ZodType | undefined, AccessSchema
     scheme?: string;
 }
 
-interface ApiKeyConfig<
+export interface ApiKeyConfig<
     ContextSchema extends z.ZodType | undefined,
     AccessSchema extends z.ZodType | undefined,
     Name extends string,
@@ -141,14 +141,14 @@ interface ApiKeyConfig<
     scheme?: string;
 }
 
-interface BasicConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+export interface BasicConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
     context?: ContextSchema;
     access?: AccessSchema;
     description?: string;
     scheme?: string;
 }
 
-interface OAuth2Config<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+export interface OAuth2Config<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
     flows: OAuthFlows;
     context?: ContextSchema;
     access?: AccessSchema;
@@ -156,7 +156,7 @@ interface OAuth2Config<ContextSchema extends z.ZodType | undefined, AccessSchema
     scheme?: string;
 }
 
-interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+export interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
     openIdConnectUrl: string;
     context?: ContextSchema;
     access?: AccessSchema;
@@ -164,7 +164,7 @@ interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined, Acces
     scheme?: string;
 }
 
-interface CustomConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+export interface CustomConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
     context?: ContextSchema;
     access?: AccessSchema;
     description?: string;
@@ -181,7 +181,7 @@ interface CustomConfig<ContextSchema extends z.ZodType | undefined, AccessSchema
  * no handler args.
  *
  * @example
- * const user = createIdentity.bearer({
+ * const user = Kizuna.identity.bearer({
  *     context: z.object({
  *         id: z.string().uuid(),
  *     }),
@@ -192,7 +192,7 @@ interface CustomConfig<ContextSchema extends z.ZodType | undefined, AccessSchema
  *
  * @example
  * // Authentication-only — no context, no handler args:
- * const apiConsumer = createIdentity.apiKey({
+ * const apiConsumer = Kizuna.identity.apiKey({
  *     name: 'x-api-key',
  *     in: 'header',
  * });
@@ -256,7 +256,7 @@ export const createIdentity = {
      * header; reach for `custom` only when neither fits.
      *
      * @example
-     * const inviteToken = createIdentity.custom({
+     * const inviteToken = Kizuna.identity.custom({
      *     context: z.object({
      *         inviteId: z.string(),
      *     }),

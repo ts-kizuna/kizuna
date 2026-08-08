@@ -292,7 +292,7 @@ export function HandlerExplorer() {
                         }}
                         codeblock={{
                             title: feature.file,
-                            icon: <TsLogo className="size-3.5" />,
+                            icon: <TsLogo key="ts" className="size-3.5" />,
                         }}
                     />
                 </div>

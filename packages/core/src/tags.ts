@@ -17,7 +17,7 @@ export interface TagOptions {
 }
 
 /**
- * A set of OpenAPI tags created with {@link createTags}. Passed to `kizuna`,
+ * A set of OpenAPI tags created with `Kizuna.tags`. Passed to `Kizuna.init`,
  * where routes reference each tag by its key.
  */
 export interface TagSet<T extends Record<string, TagOptions> = Record<string, TagOptions>> {
@@ -36,10 +36,10 @@ export const isTagSet = (value: unknown): value is TagSet =>
 /**
  * Define a set of tags. A tag value may be a full {@link TagOptions} object or a
  * string, which is shorthand for `{ title }`. Pass the result to
- * `kizuna({ tags })`.
+ * `Kizuna.init({ tags })`.
  *
  * @example
- * const tags = createTags({
+ * const tags = Kizuna.tags({
  *     orders: {
  *         title: 'Orders',
  *         description: 'Create and manage orders',
@@ -59,7 +59,7 @@ export const createTags = <const T extends Record<string, TagOptions | string>>(
 };
 
 /**
- * Normalize a {@link createTags} input, where each value is {@link TagOptions}
+ * Normalize a `Kizuna.tags` input, where each value is {@link TagOptions}
  * or a title string, into a uniform `Record<string, TagOptions>`.
  */
 export type NormalizeTags<T extends Record<string, TagOptions | string>> = {

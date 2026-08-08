@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { addCodedIssue } from './coded-issue.js';
 import { renderJsonResult } from './adapter.js';
+import { Kizuna } from './namespace.js';
 
 /**
  * Map Zod issues through the adapter's `validation-failed` rendering exactly as

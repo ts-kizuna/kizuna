@@ -1,7 +1,7 @@
-import { kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { CleanQuery } from './shared-schemas.js';
 
-const { k } = kizuna();
+const { k } = Kizuna.init();
 
 export const routes = k.routes({
     a: {

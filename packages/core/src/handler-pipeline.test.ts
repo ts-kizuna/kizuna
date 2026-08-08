@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { validateRequest } from './handler-pipeline.js';
 import type { RouteDefinition } from './types.js';
+import { Kizuna } from './namespace.js';
 
 const makeRoute = (overrides: Partial<RouteDefinition>): RouteDefinition => ({
     method: 'GET',

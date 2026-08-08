@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { kizuna } from './kizuna.js';
-import { createIdentity } from './identity.js';
 import {
     createAdapter,
     extractCredential,
@@ -12,14 +10,15 @@ import {
     type GuardMap,
 } from './adapter.js';
 import type { RouteDefinition } from './types.js';
+import { Kizuna } from './namespace.js';
 
-const user = createIdentity.bearer({
+const user = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
 });
 
-const member = createIdentity.apiKey({
+const member = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -30,7 +29,7 @@ const member = createIdentity.apiKey({
     }),
 });
 
-const { k } = kizuna({
+const { k } = Kizuna.init({
     identities: {
         user,
         member,
@@ -403,7 +402,7 @@ describe('extractCredential', () => {
     });
 
     it('extracts an apiKey from a query parameter', () => {
-        const queryKey = createIdentity.apiKey({
+        const queryKey = Kizuna.identity.apiKey({
             name: 'api_key',
             in: 'query',
             context: z.object({}),
@@ -418,7 +417,7 @@ describe('extractCredential', () => {
     });
 
     it('extracts an apiKey from a cookie', () => {
-        const cookieKey = createIdentity.apiKey({
+        const cookieKey = Kizuna.identity.apiKey({
             name: 'session',
             in: 'cookie',
             context: z.object({}),
@@ -433,7 +432,7 @@ describe('extractCredential', () => {
     });
 
     it('decodes basic credentials and tolerates malformed input', () => {
-        const admin = createIdentity.basic({
+        const admin = Kizuna.identity.basic({
             context: z.object({}),
         });
         const encoded = Buffer.from('ada:secret').toString('base64');
@@ -449,11 +448,11 @@ describe('extractCredential', () => {
     });
 
     it('labels oauth2 and openIdConnect tokens by their scheme kind', () => {
-        const oauthUser = createIdentity.oauth2({
+        const oauthUser = Kizuna.identity.oauth2({
             flows: {},
             context: z.object({}),
         });
-        const oidcUser = createIdentity.openIdConnect({
+        const oidcUser = Kizuna.identity.openIdConnect({
             openIdConnectUrl: 'https://example.com/.well-known/openid-configuration',
             context: z.object({}),
         });
@@ -521,7 +520,7 @@ describe('guard params and array gates', () => {
         });
     });
 
-    const workspaceMember = createIdentity.apiKey({
+    const workspaceMember = Kizuna.identity.apiKey({
         name: 'x-workspace-token',
         in: 'header',
         context: z.object({
@@ -532,7 +531,7 @@ describe('guard params and array gates', () => {
         }),
     });
 
-    const { k: permK } = kizuna({
+    const { k: permK } = Kizuna.init({
         identities: {
             member: workspaceMember,
         },
@@ -610,13 +609,13 @@ describe('guard params and array gates', () => {
 });
 
 describe('custom identity guard', () => {
-    const inviteToken = createIdentity.custom({
+    const inviteToken = Kizuna.identity.custom({
         context: z.object({
             inviteId: z.string(),
         }),
     });
 
-    const { k: inviteK } = kizuna({
+    const { k: inviteK } = Kizuna.init({
         identities: {
             inviteToken,
         },

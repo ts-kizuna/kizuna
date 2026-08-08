@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import * as url from 'node:url';
 import { z } from 'zod';
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { loadDeprecations, contractFingerprint, serializeDeprecationMap, deserializeDeprecationMap } from '@ts-kizuna/core/generator';
 import { createDeprecationMap, writeKizunaDeprecations } from './deprecation-parser.js';
 import { contract } from './deprecation.fixture.js';
@@ -68,16 +68,16 @@ describe('createDeprecationMap', () => {
         expect(map.fields.get('listUsersPaginated')?.has('responses.200.email')).toBe(false);
     });
 
-    test('unwraps a createModel reached through a wrapper, with no spurious `.schema.` segment', () => {
-        // A `createModel` referenced via `z.array(...)`/`.optional()` must dive into its
+    test('unwraps a Kizuna.model reached through a wrapper, with no spurious `.schema.` segment', () => {
+        // A `Kizuna.model` referenced via `z.array(...)`/`.optional()` must dive into its
         // `schema`, not treat the `{ title, schema }` argument's `schema` key as a field.
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-cm-'));
         const file = path.join(dir, 'contract.ts');
         fs.writeFileSync(
             file,
-            `import { createContract, createModel } from '@ts-kizuna/core';
+            `import { Kizuna, createContract } from '@ts-kizuna/core';
 import { z } from 'zod';
-const InnerModel = createModel({
+const InnerModel = Kizuna.model({
     title: 'InnerModel',
     schema: z.object({
         id: z.string(),
@@ -85,7 +85,7 @@ const InnerModel = createModel({
         legacy: z.string(),
     }),
 });
-const OuterModel = createModel({
+const OuterModel = Kizuna.model({
     title: 'OuterModel',
     schema: z.object({
         items: z.array(InnerModel),
@@ -174,8 +174,8 @@ describe('loadDeprecations', () => {
     test('returns undefined for a contract not in the file', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-'));
         writeKizunaDeprecations([{ contract, contractPath: fixturePath }], dir);
-        const { k } = kizuna({
-            tags: createTags({
+        const { k } = Kizuna.init({
+            tags: Kizuna.tags({
                 ping: 'Ping',
             }),
         });

@@ -28,14 +28,12 @@ import type {
     Contract,
     TagOptions,
     SecurityScheme,
-    HandlersFromAuth,
     GuardSuccess,
     CredentialOf,
-    GuardParams,
     RequestContextSchema,
     RequestContextHeaderValues,
-    RequestContextValues,
 } from '@ts-kizuna/core';
+import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
 
 export type ExpressApi<R extends Routes = Routes> = R &
     ApiWithRouter & {

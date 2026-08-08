@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { assembleApi, type GuardDeny } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildToolDefinitions, createMcpServer } from './server.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });
@@ -655,13 +655,13 @@ describe('MCP server e2e', () => {
 });
 
 describe('MCP server — guards', () => {
-    const user = createIdentity.bearer({
+    const user = Kizuna.identity.bearer({
         context: z.object({
             userId: z.string(),
         }),
     });
 
-    const { k: securedK } = kizuna({
+    const { k: securedK } = Kizuna.init({
         identities: {
             user,
         },

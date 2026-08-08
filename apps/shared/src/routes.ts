@@ -1,11 +1,10 @@
-import { createModel } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema, BinarySchema } from '@ts-kizuna/core/schemas';
-import { addCodedIssue } from '@ts-kizuna/core/zod';
 import { z } from 'zod';
 import { k } from './k.js';
 import { PaginationQuery } from './pagination.js';
 
-export const UserSchema = createModel({
+export const UserSchema = Kizuna.model({
     title: 'User',
     description: 'A user in the system',
     schema: z.object({
@@ -54,7 +53,7 @@ export const UserSchema = createModel({
     }),
 });
 
-export const CreateUserSchema = createModel({
+export const CreateUserSchema = Kizuna.model({
     title: 'CreateUserInput',
     schema: z.object({
         name: z.string().min(1).meta({
@@ -72,17 +71,17 @@ export const CreateUserSchema = createModel({
         /**
          * Optional phone number, validated with a custom-coded issue.
          *
-         * On failure it emits `invalid_phone_number` via `addCodedIssue`. The
-         * code is declared in `kizuna.contract.ts` and passed to `createClient`,
-         * so the client suggests `invalid_phone_number` in autocomplete when
-         * reading `errors[].code` on the `400` response.
+         * On failure it emits `invalid_phone_number` via `k.issue`, which checks
+         * the code against the `issueCodes` declared on `Kizuna.init`. The client
+         * suggests it in autocomplete when reading `errors[].code` on the `400`
+         * response.
          */
         phone: z
             .string()
             .optional()
             .superRefine((value, ctx) => {
                 if (value === undefined || /^\+?[0-9]{7,15}$/.test(value)) return;
-                addCodedIssue(ctx, {
+                k.issue(ctx, {
                     code: 'invalid_phone_number',
                     message: 'Phone number must be 7–15 digits, optionally prefixed with +.',
                     input: value,
@@ -97,7 +96,7 @@ export const CreateUserSchema = createModel({
 
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 
-export const EmailEvent = createModel({
+export const EmailEvent = Kizuna.model({
     title: 'EmailEvent',
     schema: z.object({
         channel: z.literal('email'),
@@ -106,7 +105,7 @@ export const EmailEvent = createModel({
     }),
 });
 
-export const SmsEvent = createModel({
+export const SmsEvent = Kizuna.model({
     title: 'SmsEvent',
     schema: z.object({
         channel: z.literal('sms'),
@@ -115,12 +114,12 @@ export const SmsEvent = createModel({
     }),
 });
 
-export const NotificationEvent = createModel({
+export const NotificationEvent = Kizuna.model({
     title: 'NotificationEvent',
     schema: z.discriminatedUnion('channel', [EmailEvent, SmsEvent]),
 });
 
-export const UserSessionEvent = createModel({
+export const UserSessionEvent = Kizuna.model({
     title: 'UserSessionEvent',
     schema: z.discriminatedUnion('kind', [
         z.object({
@@ -137,12 +136,12 @@ export const UserSessionEvent = createModel({
     ]),
 });
 
-export const EventKind = createModel({
+export const EventKind = Kizuna.model({
     title: 'EventKind',
     schema: z.enum(['login', 'logout', 'signup']),
 });
 
-export const EventRecord = createModel({
+export const EventRecord = Kizuna.model({
     title: 'EventRecord',
     schema: z.object({
         id: z.string(),

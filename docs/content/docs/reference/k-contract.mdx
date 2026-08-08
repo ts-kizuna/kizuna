@@ -1,0 +1,96 @@
+---
+title: k.contract
+description: Assemble route groups into the Contract your server, clients, and generators all read.
+---
+
+`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/create-client), [server](/docs/reference/create-server#serverapi), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `Kizuna.init`.
+
+```ts
+// contract.ts
+import { k } from './k';
+import { usersRoutes } from './routes';
+
+export const contract = k.contract({
+    routes: {
+        users: usersRoutes,
+    },
+    auth: {
+        users: false,
+    },
+});
+```
+
+The declared `issueCodes` widen `errors[].code` on `400` responses to `ValidationIssueCode | <your codes>`, so the client suggests them in autocomplete. Emit them at runtime with [`k.issue`](/docs/reference/k-issue). Because the factory is per API, codes and tags stay scoped to their API rather than leaking across the multiple kizuna APIs a project may define.
+
+## The auth map
+
+The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `Kizuna.init`. It is **exhaustive over groups** — every key in `routes` must appear, and public takes an explicit `false`, so a new group can't ship unsecured by omission. For the full walkthrough, see the [Auth guide](/docs/auth).
+
+```ts
+export const contract = k.contract({
+    routes,
+    auth: {
+        users: false,
+        health: false,
+        members: {
+            '*': 'user',
+            inviteMember: {
+                member: {
+                    role: ['owner', 'admin'],
+                },
+            },
+        },
+        workspace: {
+            '*': 'member',
+            deleteWorkspace: {
+                member: {
+                    role: 'owner',
+                },
+            },
+        },
+    },
+});
+```
+
+### Value forms
+
+| Form                           | Example                                     | Meaning                                                                                                                           |
+| ------------------------------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `false`                        | `health: false`                             | Public — no guard runs.                                                                                                           |
+| Identity name                  | `members: 'user'`                           | Require the identity. Its guard runs; handlers receive its context.                                                               |
+| Constraint object              | `{ member: { role: 'owner' } }`             | Require the identity **and** gate its `access` fields — out-of-range values get a 403, in-range values narrow the handler's type. |
+| Constraint with allowed values | `{ member: { role: ['owner', 'admin'] } }`  | Gate a field to a set of values.                                                                                                  |
+| Scope array (`oauth2`)         | `{ user: ['users:write'] }`                 | Require the identity with these OAuth scopes.                                                                                     |
+| Multiple identities            | `{ user: true, member: { role: 'owner' } }` | Require every listed identity (AND). Handlers receive each context.                                                               |
+
+### Cascades
+
+A group's value can be a cascade — `'*'` sets the group default, and a route entry refines it: the route inherits the default's identities and states only its delta. `false` opts a route out.
+
+```ts
+workspace: {
+    '*': 'member',
+    deleteWorkspace: {
+        member: {
+            role: 'owner',
+        },
+    },
+},
+```
+
+Every route under `workspace` requires `member`; `deleteWorkspace` additionally gates on `role: 'owner'` — and inside its handler, `auth.member.role` is typed `'owner'`.
+
+Cascade keys name the group's own routes and subgroups. A subgroup key takes a value for its whole subtree, or its own nested cascade; a key that matches nothing in the group is an error.
+
+```ts
+members: {
+    '*': 'user',
+    session: {
+        '*': 'user',
+        login: false,
+    },
+    invites: false,
+},
+```
+
+`k.contract` resolves the map onto every route's `security` (and `accessGate` where fields are constrained), which the [guards](/docs/reference/create-server#serverguard), [router](/docs/reference/create-server#serverrouter) types, and [OpenAPI spec](/docs/reference/generate-openapi) all read.

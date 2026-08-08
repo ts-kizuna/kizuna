@@ -3,12 +3,12 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createModel, createRequestContext, type Contract } from '@ts-kizuna/core';
+import { Kizuna, type Contract } from '@ts-kizuna/core';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateKotlinClient } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
-const { k } = kizuna();
+const { k } = Kizuna.init();
 
 const baseConfig = {
     namespaceName: 'TestAPI',
@@ -137,6 +137,7 @@ describe('Kotlin generator — z.pipe() and z.string().transform()', () => {
                     method: 'GET',
                     path: '/search',
                     query: z.object({
+                        // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- asserts the generator handles a piped coerce
                         limit: z.string().pipe(z.coerce.number()),
                     }),
                     responses: {
@@ -183,7 +184,7 @@ describe('Kotlin generator — namespace wrapper', () => {
                     method: 'GET',
                     path: '/users/:id',
                     responses: {
-                        200: createModel({ title: 'Error', schema: z.object({ id: z.string() }) }),
+                        200: Kizuna.model({ title: 'Error', schema: z.object({ id: z.string() }) }),
                     },
                 },
             },
@@ -530,7 +531,7 @@ describe('Kotlin generator — owned type nesting', () => {
                     method: 'GET',
                     path: '/videos/:id',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'Video',
                             schema: z.object({
                                 id: z.string(),
@@ -555,7 +556,7 @@ describe('Kotlin generator — owned type nesting', () => {
                     method: 'GET',
                     path: '/pages/:id',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'Page',
                             schema: z.object({
                                 id: z.string(),
@@ -577,7 +578,7 @@ describe('Kotlin generator — owned type nesting', () => {
     });
 
     it('does not nest an inline object that has its own meta.id', () => {
-        const Image = createModel({
+        const Image = Kizuna.model({
             title: 'Image',
             schema: z.object({
                 url: z.string(),
@@ -590,7 +591,7 @@ describe('Kotlin generator — owned type nesting', () => {
                     method: 'GET',
                     path: '/pages/:id',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'Page',
                             schema: z.object({
                                 id: z.string(),
@@ -618,7 +619,7 @@ describe('Kotlin generator — owned type nesting', () => {
                     method: 'GET',
                     path: '/pages/:id',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'Page',
                             schema: z.object({
                                 settings: z.object({
@@ -646,7 +647,7 @@ describe('Kotlin generator — owned type nesting', () => {
                     method: 'GET',
                     path: '/order-items/:id',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'FittingProductOrderItem',
                             schema: z.object({
                                 type: z.literal('fittingItem'),
@@ -1012,7 +1013,7 @@ describe('Kotlin generator — discriminated union', () => {
                     method: 'GET',
                     path: '/videos/:id',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'Video',
                             schema: z.object({
                                 encodingStatus: z.enum(['encoding', 'encoded', 'failed']),
@@ -1032,22 +1033,22 @@ describe('Kotlin generator — discriminated union', () => {
     });
 
     it('emits union members under their model title so direct field references resolve', () => {
-        const Video = createModel({
+        const Video = Kizuna.model({
             title: 'Video',
             schema: z.object({
                 encodingStatus: z.enum(['encoding', 'encoded', 'failed']),
                 url: z.string(),
             }),
         });
-        const ImageAttachment = createModel({
+        const ImageAttachment = Kizuna.model({
             title: 'ImageAttachment',
             schema: z.object({ kind: z.literal('image'), url: z.string(), order: z.string() }),
         });
-        const VideoAttachment = createModel({
+        const VideoAttachment = Kizuna.model({
             title: 'VideoAttachment',
             schema: Video.extend({ kind: z.literal('video'), order: z.string() }),
         });
-        const Attachment = createModel({
+        const Attachment = Kizuna.model({
             title: 'Attachment',
             schema: z.discriminatedUnion('kind', [ImageAttachment, VideoAttachment]),
         });
@@ -1057,7 +1058,7 @@ describe('Kotlin generator — discriminated union', () => {
                     method: 'GET',
                     path: '/messages/:id',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'Message',
                             schema: z.object({
                                 attachments: z.array(Attachment),
@@ -1369,7 +1370,7 @@ describe('Kotlin generator — grouped request components (params/body/query/hea
                 createUser: {
                     method: 'POST',
                     path: '/users',
-                    body: createModel({
+                    body: Kizuna.model({
                         title: 'CreateUserInput',
                         schema: z.object({ name: z.string(), email: z.string().optional() }),
                     }),
@@ -1394,7 +1395,7 @@ describe('Kotlin generator — grouped request components (params/body/query/hea
                 send: {
                     method: 'POST',
                     path: '/send',
-                    body: createModel({
+                    body: Kizuna.model({
                         title: 'BigInput',
                         schema: z.object({
                             a: z.string(),
@@ -1461,7 +1462,7 @@ describe('Kotlin generator — grouped request components (params/body/query/hea
 });
 
 describe('Kotlin generator — request context', () => {
-    const analytics = createRequestContext({
+    const analytics = Kizuna.requestContext({
         headers: z.object({
             'x-session-id': z.string().optional(),
             'x-tenant': z.string(),
@@ -1471,7 +1472,7 @@ describe('Kotlin generator — request context', () => {
         }),
     });
 
-    const { k: ctxK } = kizuna({
+    const { k: ctxK } = Kizuna.init({
         requestContext: {
             analytics,
         },
@@ -1657,7 +1658,7 @@ describe('Kotlin generator — unknownEnumCase', () => {
                     method: 'GET',
                     path: '/orders/:id',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'Order',
                             schema: z.object({
                                 id: z.string(),
@@ -1700,7 +1701,7 @@ describe('Kotlin generator — union variants owned by a name-prefix class', () 
                     method: 'GET',
                     path: '/users/:id',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'User',
                             schema: z.object({
                                 id: z.string(),
@@ -1712,7 +1713,7 @@ describe('Kotlin generator — union variants owned by a name-prefix class', () 
                     method: 'GET',
                     path: '/activity',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'UserActivityEvent',
                             schema: z.discriminatedUnion('kind', [
                                 z.object({
@@ -1742,7 +1743,7 @@ describe('Kotlin generator — union variants owned by a name-prefix class', () 
                     method: 'GET',
                     path: '/users/:id',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'User',
                             schema: z.object({
                                 id: z.string(),
@@ -1754,7 +1755,7 @@ describe('Kotlin generator — union variants owned by a name-prefix class', () 
                     method: 'GET',
                     path: '/session',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'UserSessionEvent',
                             schema: z.discriminatedUnion('kind', [
                                 z.object({

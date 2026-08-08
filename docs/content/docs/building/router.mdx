@@ -89,7 +89,7 @@ Each handler receives an object with the validated inputs for that route:
 
 ## Identity context
 
-When the contract's [auth map](/docs/auth) secures a route, the handler receives the identity's context — whatever its guard returned — under `auth`, keyed by the identity's name. There's nothing to look up or cast; the guard already ran, so the value is simply there, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/create-request-context) arrive the same way, under `requestContext` on every route.
+When the contract's [auth map](/docs/auth) secures a route, the handler receives the identity's context — whatever its guard returned — under `auth`, keyed by the identity's name. There's nothing to look up or cast; the guard already ran, so the value is simply there, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/kizuna-request-context) arrive the same way, under `requestContext` on every route.
 
 ```ts
 listMembers: ({ auth }) => ({
@@ -229,7 +229,7 @@ Each issue includes a `code` that tells you _why_ the field failed — not just 
 | `not_multiple_of`       | Failed `multipleOf()`                     |
 | `custom`                | `.refine()` or `.superRefine()` check     |
 
-User-defined checks (`.refine()`) report as `custom` by default. To emit a **typed** code instead — like `invalid_phone_number` above — declare it in `validation.issueCodes` on [`kizuna`](/docs/reference/kizuna) and raise it with [`addCodedIssue`](/docs/reference/add-coded-issue). It then shows up in `errors[].code` as a typed literal on both the server and the generated client, not a bare `string`.
+User-defined checks (`.refine()`) report as `custom` by default. To emit a **typed** code instead — like `invalid_phone_number` above — declare it in `validation.issueCodes` on [`Kizuna.init`](/docs/reference/kizuna-init) and raise it with [`k.issue`](/docs/reference/k-issue). It then shows up in `errors[].code` as a typed literal on both the server and the generated client, not a bare `string`.
 
 The `message` and `path` fields come directly from your Zod schemas. If you use custom messages (e.g. `z.string().min(1, "Name is required")`), those are what the client receives.
 

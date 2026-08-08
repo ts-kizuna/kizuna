@@ -44,9 +44,9 @@ interface ValidationError {
 }
 ```
 
-`code` is typed as `ValidationIssueCode` — the built-in Zod codes are offered as autocomplete suggestions, while any custom string (e.g. one emitted via [`addCodedIssue`](/docs/reference/add-coded-issue)) is still assignable.
+`code` is typed as `ValidationIssueCode` — the built-in Zod codes are offered as autocomplete suggestions, while any custom string (e.g. one emitted via [`k.issue`](/docs/reference/k-issue)) is still assignable.
 
-Common error codes: `invalid_type`, `too_small`, `too_big`, `invalid_string_format`, `unrecognized_keys`, `not_multiple_of`, `custom`. To emit your own machine-readable code from a `.superRefine()` check, see [`addCodedIssue`](/docs/reference/add-coded-issue).
+Common error codes: `invalid_type`, `too_small`, `too_big`, `invalid_string_format`, `unrecognized_keys`, `not_multiple_of`, `custom`. To emit your own machine-readable code from a `.superRefine()` check, see [`k.issue`](/docs/reference/k-issue).
 
 ## Example
 

@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { createRequestContext } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 
 /**
  * PostHog ids clients send once, on the client initializer; every handler
  * receives them resolved.
  */
-export const analytics = createRequestContext({
+export const analytics = Kizuna.requestContext({
     headers: z.object({
         'x-posthog-session-id': z.string().optional(),
         'x-posthog-distinct-id': z.string().optional(),
