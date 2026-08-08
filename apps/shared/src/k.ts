@@ -1,9 +1,9 @@
-import { kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags.js';
 import { user, member, inviteToken } from './identities.js';
 import { analytics } from './request-contexts.js';
 
-export const { k } = kizuna({
+export const { k } = Kizuna.init({
     identities: {
         user,
         member,

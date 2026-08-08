@@ -106,7 +106,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
 
 /**
  * Define a group of routes under a tag. Pass the tag set declared with
- * {@link createTags} for completion on the group tag and route-level `tags`; the
+ * `Kizuna.tags` for completion on the group tag and route-level `tags`; the
  * tag is stamped onto every route in the group.
  */
 export function tagRoutes<const T extends Routes<TagKeysOf<Set>>, Set extends TagSet>(

@@ -4,14 +4,14 @@ import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
-import { kizuna, createTags, createModel, createIdentity, type Contract } from '@ts-kizuna/core';
+import { Kizuna, type Contract } from '@ts-kizuna/core';
 import { contractFingerprint } from '@ts-kizuna/core/generator';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateOpenApi, type GenerateOpenApiOptions } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });
@@ -209,7 +209,7 @@ describe('generateOpenApi', () => {
 });
 
 describe('Zod meta() in OpenAPI output', () => {
-    const Tagged = createModel({
+    const Tagged = Kizuna.model({
         title: 'TaggedUser',
         schema: z.object({
             id: z.string().meta({
@@ -260,7 +260,7 @@ describe('Zod meta() in OpenAPI output', () => {
         expect(properties['name']?.description).toBe('Display name');
     });
 
-    it('ignores a raw .meta({ id }) set without createModel', () => {
+    it('ignores a raw .meta({ id }) set without Kizuna.model', () => {
         const rawTagged = z
             .object({
                 id: z.string(),
@@ -367,8 +367,8 @@ describe('operation metadata passthrough', () => {
     });
 
     it('merges route-level tags with the group tag', () => {
-        const { k } = kizuna({
-            tags: createTags({
+        const { k } = Kizuna.init({
+            tags: Kizuna.tags({
                 users: {
                     title: 'Users',
                 },
@@ -399,14 +399,14 @@ describe('operation metadata passthrough', () => {
 
 describe('discriminated unions', () => {
     it('is a valid OpenAPI 3.1 document', async () => {
-        const Image = createModel({
+        const Image = Kizuna.model({
             title: 'ValidImage',
             schema: z.object({
                 type: z.literal('image'),
                 src: z.string(),
             }),
         });
-        const Video = createModel({
+        const Video = Kizuna.model({
             title: 'ValidVideo',
             schema: z.object({
                 type: z.literal('video'),
@@ -430,14 +430,14 @@ describe('discriminated unions', () => {
     });
 
     it('emits oneOf + discriminator with mapping when variants are id-tagged', () => {
-        const Image = createModel({
+        const Image = Kizuna.model({
             title: 'DiscImage',
             schema: z.object({
                 type: z.literal('image'),
                 src: z.string(),
             }),
         });
-        const Video = createModel({
+        const Video = Kizuna.model({
             title: 'DiscVideo',
             schema: z.object({
                 type: z.literal('video'),
@@ -509,21 +509,21 @@ describe('discriminated unions', () => {
     });
 
     it('attaches discriminator to a registered union via components.schemas', () => {
-        const EmailEvent = createModel({
+        const EmailEvent = Kizuna.model({
             title: 'EmailEvent',
             schema: z.object({
                 channel: z.literal('email'),
                 to: z.string(),
             }),
         });
-        const SmsEvent = createModel({
+        const SmsEvent = Kizuna.model({
             title: 'SmsEvent',
             schema: z.object({
                 channel: z.literal('sms'),
                 phone: z.string(),
             }),
         });
-        const NotificationEvent = createModel({
+        const NotificationEvent = Kizuna.model({
             title: 'NotificationEvent',
             schema: z.discriminatedUnion('channel', [EmailEvent, SmsEvent]),
         });
@@ -943,8 +943,8 @@ describe('response headers', () => {
 
 describe('contract-level tag grouping', () => {
     it('applies the group tag to all routes in that group', () => {
-        const { k } = kizuna({
-            tags: createTags({
+        const { k } = Kizuna.init({
+            tags: Kizuna.tags({
                 users: {
                     title: 'Users',
                 },
@@ -976,8 +976,8 @@ describe('contract-level tag grouping', () => {
     });
 
     it('accumulates tags from nested tagged groups', () => {
-        const { k } = kizuna({
-            tags: createTags({
+        const { k } = Kizuna.init({
+            tags: Kizuna.tags({
                 users: {
                     title: 'Users',
                 },
@@ -1006,8 +1006,8 @@ describe('contract-level tag grouping', () => {
     });
 
     it('collects tag descriptions into the document tags', () => {
-        const { k } = kizuna({
-            tags: createTags({
+        const { k } = Kizuna.init({
+            tags: Kizuna.tags({
                 users: {
                     title: 'Users',
                     description: 'User management endpoints',
@@ -1036,8 +1036,8 @@ describe('contract-level tag grouping', () => {
     });
 
     it('an untagged sub-group inside a tagged group inherits the outer tag', () => {
-        const { k } = kizuna({
-            tags: createTags({
+        const { k } = Kizuna.init({
+            tags: Kizuna.tags({
                 users: {
                     title: 'Users',
                 },
@@ -1161,14 +1161,14 @@ describe('automatic validation error response', () => {
 });
 
 describe('deprecation on a component reached via the schemas map', () => {
-    const UserSchema = createModel({
+    const UserSchema = Kizuna.model({
         title: 'User',
         schema: z.object({
             id: z.string(),
             email: z.string(),
         }),
     });
-    const AccountSchema = createModel({
+    const AccountSchema = Kizuna.model({
         title: 'Account',
         schema: z.object({
             owner: z.object({
@@ -1385,14 +1385,14 @@ describe('binary response bodies', () => {
 });
 
 describe('security from the contract', () => {
-    const user = createIdentity.bearer({
+    const user = Kizuna.identity.bearer({
         context: z.object({
             userId: z.string(),
         }),
         bearerFormat: 'JWT',
     });
 
-    const member = createIdentity.apiKey({
+    const member = Kizuna.identity.apiKey({
         name: 'x-workspace-token',
         in: 'header',
         context: z.object({
@@ -1404,7 +1404,7 @@ describe('security from the contract', () => {
     });
 
     const makeSecuredContract = () => {
-        const { k: securedK } = kizuna({
+        const { k: securedK } = Kizuna.init({
             identities: {
                 user,
                 member,
@@ -1527,7 +1527,7 @@ describe('security from the contract', () => {
     });
 
     it('emits security resolved through a nested cascade', () => {
-        const { k: nestedK } = kizuna({
+        const { k: nestedK } = Kizuna.init({
             identities: {
                 user,
             },
@@ -1596,19 +1596,19 @@ describe('security from the contract', () => {
 
 describe('shared scheme names', () => {
     it('emits one securitySchemes entry for identities sharing a scheme', () => {
-        const admin = createIdentity.bearer({
+        const admin = Kizuna.identity.bearer({
             scheme: 'user',
             context: z.object({
                 userId: z.string(),
             }),
         });
-        const viewer = createIdentity.bearer({
+        const viewer = Kizuna.identity.bearer({
             scheme: 'user',
             context: z.object({
                 userId: z.string(),
             }),
         });
-        const { k: sharedK } = kizuna({
+        const { k: sharedK } = Kizuna.init({
             identities: {
                 admin,
                 viewer,
@@ -1666,20 +1666,20 @@ describe('shared scheme names', () => {
 });
 
 describe('custom identities (no OpenAPI scheme)', () => {
-    const user = createIdentity.bearer({
+    const user = Kizuna.identity.bearer({
         context: z.object({
             userId: z.string(),
         }),
     });
 
-    const inviteToken = createIdentity.custom({
+    const inviteToken = Kizuna.identity.custom({
         context: z.object({
             inviteId: z.string(),
         }),
     });
 
     const makeContract = () => {
-        const { k: customK } = kizuna({
+        const { k: customK } = Kizuna.init({
             identities: {
                 user,
                 inviteToken,

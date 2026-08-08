@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createModel } from './model.js';
 import { readMetaId, readMetaDescription } from './generator.js';
+import { Kizuna } from './namespace.js';
 
-describe('createModel', () => {
+describe('Kizuna.model', () => {
     it('sets the meta id from title', () => {
-        const User = createModel({
+        const User = Kizuna.model({
             title: 'User',
             schema: z.object({
                 id: z.string(),
@@ -16,7 +16,7 @@ describe('createModel', () => {
     });
 
     it('sets the meta description', () => {
-        const User = createModel({
+        const User = Kizuna.model({
             title: 'User',
             description: 'A user in the system',
             schema: z.object({
@@ -27,7 +27,7 @@ describe('createModel', () => {
     });
 
     it('works without description', () => {
-        const EventKind = createModel({
+        const EventKind = Kizuna.model({
             title: 'EventKind',
             schema: z.enum(['login', 'logout', 'signup']),
         });
@@ -36,7 +36,7 @@ describe('createModel', () => {
     });
 
     it('works with enum schemas', () => {
-        const Status = createModel({
+        const Status = Kizuna.model({
             title: 'Status',
             schema: z.enum(['active', 'inactive']),
         });
@@ -54,7 +54,7 @@ describe('createModel', () => {
             channel: z.literal('sms'),
             phone: z.string(),
         });
-        const Notification = createModel({
+        const Notification = Kizuna.model({
             title: 'Notification',
             schema: z.discriminatedUnion('channel', [Email, Sms]),
         });
@@ -68,7 +68,7 @@ describe('createModel', () => {
     });
 
     it('returns a schema usable in routes', () => {
-        const User = createModel({
+        const User = Kizuna.model({
             title: 'User',
             schema: z.object({
                 id: z.string(),

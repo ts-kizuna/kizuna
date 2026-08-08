@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 
 /**
- * A request context declaration from {@link createRequestContext}: the schema
+ * A request context declaration from `Kizuna.requestContext`: the schema
  * of a request-scoped value every handler receives, and optionally the request
  * headers it derives from. Resolved per adapter with
  * `server.requestContext` and wired on `server.api` under
@@ -32,7 +32,7 @@ interface RequestContextConfig<ContextSchema extends z.ZodType, HeadersSchema ex
 
 /**
  * Declare a request-scoped value — an analytics id, a logger, a tenant. Register
- * it on `kizuna` under `requestContext`; handlers receive it typed under its
+ * it on `Kizuna.init` under `requestContext`; handlers receive it typed under its
  * registered name. It never gates a request.
  *
  * Pass a schema alone for a server-derived value, or `{ context, headers }`
@@ -40,7 +40,7 @@ interface RequestContextConfig<ContextSchema extends z.ZodType, HeadersSchema ex
  * them once, on the client initializer.
  *
  * @example
- * export const analytics = createRequestContext({
+ * export const analytics = Kizuna.requestContext({
  *     headers: z.object({
  *         'x-posthog-session-id': z.string().optional(),
  *     }),

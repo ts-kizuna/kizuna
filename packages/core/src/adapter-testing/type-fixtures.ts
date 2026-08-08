@@ -1,10 +1,10 @@
 import { z } from 'zod';
 // Not `../kizuna.js`: an identity's credential is branded, so a contract built from `src` hands the adapters identities
 // their own `server.guard` cannot resolve.
-import { createIdentity, createRequestContext, createTags, kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });
@@ -53,13 +53,13 @@ export const inferenceGroupContract = k.contract({
     },
 });
 
-export const userIdentity = createIdentity.bearer({
+export const userIdentity = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
 });
 
-export const memberIdentity = createIdentity.apiKey({
+export const memberIdentity = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -70,7 +70,7 @@ export const memberIdentity = createIdentity.apiKey({
     }),
 });
 
-const { k: securedK } = kizuna({
+const { k: securedK } = Kizuna.init({
     identities: {
         user: userIdentity,
         member: memberIdentity,
@@ -138,12 +138,12 @@ export const securedContract = securedK.contract({
     },
 });
 
-export const apiConsumerIdentity = createIdentity.apiKey({
+export const apiConsumerIdentity = Kizuna.identity.apiKey({
     name: 'x-api-key',
     in: 'header',
 });
 
-const { k: gateK } = kizuna({
+const { k: gateK } = Kizuna.init({
     identities: {
         user: userIdentity,
         apiConsumer: apiConsumerIdentity,
@@ -193,13 +193,13 @@ export const gateContract = gateK.contract({
     },
 });
 
-export const analyticsContext = createRequestContext(
+export const analyticsContext = Kizuna.requestContext(
     z.object({
         sessionId: z.string().nullable(),
     })
 );
 
-const { k: requestContextK } = kizuna({
+const { k: requestContextK } = Kizuna.init({
     identities: {
         user: userIdentity,
     },

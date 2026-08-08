@@ -30,14 +30,12 @@ import type {
     Contract,
     TagOptions,
     SecurityScheme,
-    HandlersFromAuth,
     GuardSuccess,
     CredentialOf,
-    GuardParams,
     RequestContextSchema,
     RequestContextHeaderValues,
-    RequestContextValues,
 } from '@ts-kizuna/core';
+import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export { NextRequest, NextResponse } from 'next/server';

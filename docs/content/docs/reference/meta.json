@@ -1,22 +1,25 @@
 {
     "title": "API Reference",
     "pages": [
-        "kizuna",
-        "create-model",
-        "create-tags",
-        "create-identity",
+        "kizuna-init",
+        "kizuna-tags",
+        "kizuna-identity",
+        "kizuna-request-context",
+        "kizuna-model",
+        "k-routes",
+        "k-auth",
+        "k-contract",
+        "k-issue",
         "create-server",
-        "create-request-context",
+        "create-client",
         "problem-details-schema",
         "binary-and-file-schemas",
-        "create-client",
         "is-validation-error",
-        "add-coded-issue",
         "generate-openapi",
         "generate-swift-client",
         "generate-kotlin-client",
+        "create-mcp-server",
         "create-mcp-endpoint",
-        "fastify-kizuna-mcp",
-        "create-mcp-server"
+        "fastify-kizuna-mcp"
     ]
 }

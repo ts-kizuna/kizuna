@@ -3,13 +3,13 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags, createModel, createRequestContext, type Contract } from '@ts-kizuna/core';
+import { Kizuna, type Contract } from '@ts-kizuna/core';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateSwiftClient } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });
@@ -223,7 +223,7 @@ describe('Swift generator — namespace wrapper', () => {
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
-                    200: createModel({ title: 'Error', schema: z.object({ id: z.string() }) }),
+                    200: Kizuna.model({ title: 'Error', schema: z.object({ id: z.string() }) }),
                 },
             },
         });
@@ -733,7 +733,7 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/videos/:id',
                 responses: {
-                    200: createModel({
+                    200: Kizuna.model({
                         title: 'Video',
                         schema: z.object({
                             id: z.string(),
@@ -760,7 +760,7 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/files/:id',
                 responses: {
-                    200: createModel({
+                    200: Kizuna.model({
                         title: 'StoredFile',
                         schema: z.object({
                             id: z.string(),
@@ -792,7 +792,7 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/orders/:id',
                 responses: {
-                    200: createModel({
+                    200: Kizuna.model({
                         title: 'Order',
                         schema: z.object({
                             id: z.string(),
@@ -821,7 +821,7 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/pages/:id',
                 responses: {
-                    200: createModel({
+                    200: Kizuna.model({
                         title: 'Page',
                         schema: z.object({
                             id: z.string(),
@@ -846,7 +846,7 @@ describe('Swift generator — owned type nesting', () => {
     });
 
     it('does not nest an inline object that has its own meta.id', () => {
-        const Image = createModel({
+        const Image = Kizuna.model({
             title: 'Image',
             schema: z.object({
                 url: z.string(),
@@ -858,7 +858,7 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/pages/:id',
                 responses: {
-                    200: createModel({
+                    200: Kizuna.model({
                         title: 'Page',
                         schema: z.object({
                             id: z.string(),
@@ -889,7 +889,7 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/pages/:id',
                 responses: {
-                    200: createModel({
+                    200: Kizuna.model({
                         title: 'Page',
                         schema: z.object({
                             settings: z.object({
@@ -919,7 +919,7 @@ describe('Swift generator — owned type nesting', () => {
                 method: 'GET',
                 path: '/order-items/:id',
                 responses: {
-                    200: createModel({
+                    200: Kizuna.model({
                         title: 'FittingProductOrderItem',
                         schema: z.object({
                             type: z.literal('fittingItem'),
@@ -1279,7 +1279,7 @@ describe('Swift generator — grouped request components (params/body/query/head
             createUser: {
                 method: 'POST',
                 path: '/users',
-                body: createModel({ title: 'CreateUserInput', schema: z.object({ name: z.string(), email: z.string().optional() }) }),
+                body: Kizuna.model({ title: 'CreateUserInput', schema: z.object({ name: z.string(), email: z.string().optional() }) }),
                 responses: {
                     201: z.object({ id: z.string() }),
                 },
@@ -1302,11 +1302,11 @@ describe('Swift generator — grouped request components (params/body/query/head
                 method: 'POST',
                 path: '/notify',
                 body: z.discriminatedUnion('channel', [
-                    createModel({
+                    Kizuna.model({
                         title: 'EmailEvent',
                         schema: z.object({ channel: z.literal('email'), to: z.string(), subject: z.string() }),
                     }),
-                    createModel({ title: 'SmsEvent', schema: z.object({ channel: z.literal('sms'), phone: z.string() }) }),
+                    Kizuna.model({ title: 'SmsEvent', schema: z.object({ channel: z.literal('sms'), phone: z.string() }) }),
                 ]),
                 responses: {
                     202: z.object({ accepted: z.boolean() }),
@@ -1325,22 +1325,22 @@ describe('Swift generator — grouped request components (params/body/query/head
     });
 
     it('emits union members as top-level structs so direct field references resolve', () => {
-        const Video = createModel({
+        const Video = Kizuna.model({
             title: 'Video',
             schema: z.object({
                 encodingStatus: z.enum(['encoding', 'encoded', 'failed']),
                 url: z.string(),
             }),
         });
-        const ImageAttachment = createModel({
+        const ImageAttachment = Kizuna.model({
             title: 'ImageAttachment',
             schema: z.object({ kind: z.literal('image'), url: z.string(), order: z.string() }),
         });
-        const VideoAttachment = createModel({
+        const VideoAttachment = Kizuna.model({
             title: 'VideoAttachment',
             schema: Video.extend({ kind: z.literal('video'), order: z.string() }),
         });
-        const Attachment = createModel({
+        const Attachment = Kizuna.model({
             title: 'Attachment',
             schema: z.discriminatedUnion('kind', [ImageAttachment, VideoAttachment]),
         });
@@ -1350,7 +1350,7 @@ describe('Swift generator — grouped request components (params/body/query/head
                     method: 'GET',
                     path: '/messages/:id',
                     responses: {
-                        200: createModel({
+                        200: Kizuna.model({
                             title: 'Message',
                             schema: z.object({
                                 attachments: z.array(Attachment),
@@ -1424,7 +1424,7 @@ describe('Swift generator — positional request groups (required-first, single 
 });
 
 describe('Swift generator — request context', () => {
-    const analytics = createRequestContext({
+    const analytics = Kizuna.requestContext({
         headers: z.object({
             'x-session-id': z.string().optional(),
             'x-tenant': z.string(),
@@ -1434,7 +1434,7 @@ describe('Swift generator — request context', () => {
         }),
     });
 
-    const { k: ctxK } = kizuna({
+    const { k: ctxK } = Kizuna.init({
         requestContext: {
             analytics,
         },
@@ -1634,7 +1634,7 @@ describe('Swift generator — unknownEnumCase', () => {
                 method: 'GET',
                 path: '/orders/:id',
                 responses: {
-                    200: createModel({
+                    200: Kizuna.model({
                         title: 'Order',
                         schema: z.object({
                             id: z.string(),
@@ -1677,7 +1677,7 @@ describe('Swift generator — union variants nest under their union', () => {
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
-                    200: createModel({
+                    200: Kizuna.model({
                         title: 'User',
                         schema: z.object({
                             id: z.string(),
@@ -1689,7 +1689,7 @@ describe('Swift generator — union variants nest under their union', () => {
                 method: 'GET',
                 path: '/activity',
                 responses: {
-                    200: createModel({
+                    200: Kizuna.model({
                         title: 'UserActivityEvent',
                         schema: z.discriminatedUnion('kind', [
                             z.object({

@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { kizuna } from './kizuna.js';
-import { createTags } from './tags.js';
 import { ROUTES_TAG, type Routes } from './types.js';
+import { Kizuna } from './namespace.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         users: {
             title: 'Users',
             description: 'User management endpoints',

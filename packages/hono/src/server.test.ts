@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { createHonoEndpoints, createServer } from './server.js';
 import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });

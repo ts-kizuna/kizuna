@@ -26,14 +26,14 @@
         "default": "./dist/schemas.cjs"
       }
     },
-    "./zod": {
+    "./authoring-names": {
       "import": {
-        "types": "./dist/zod.d.mts",
-        "default": "./dist/zod.mjs"
+        "types": "./dist/authoring-names.d.mts",
+        "default": "./dist/authoring-names.mjs"
       },
       "require": {
-        "types": "./dist/zod.d.cts",
-        "default": "./dist/zod.cjs"
+        "types": "./dist/authoring-names.d.cts",
+        "default": "./dist/authoring-names.cjs"
       }
     },
     "./adapter": {
@@ -69,7 +69,7 @@
     "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/adapter.ts src/generator.ts src/schemas.ts src/zod.ts src/load-deprecations.ts --format esm,cjs --dts --clean",
+    "build": "tsdown src/index.ts src/adapter.ts src/generator.ts src/schemas.ts src/authoring-names.ts src/load-deprecations.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

@@ -1,13 +1,11 @@
 ---
-title: addCodedIssue
-description: Emit a Zod validation issue with a custom machine-readable code, cast-free.
+title: k.issue
+description: Emit a validation issue with a machine-readable code, checked against your declared issueCodes.
 ---
 
 Emit a single Zod validation issue carrying a custom machine-readable `code`. The code is surfaced verbatim in the `errors[].code` field of kizuna's [`ValidationErrorSchema`](/docs/reference/is-validation-error).
 
-```ts
-import { addCodedIssue } from '@ts-kizuna/core/zod';
-```
+The code is checked against the `issueCodes` you declared on `Kizuna.init`, so a typo is a compile error rather than a silently accepted string.
 
 ## Why it exists
 
@@ -19,12 +17,12 @@ ctx.addIssue({ code: 'invalid_phone_number', message: 'Invalid phone number', in
     as unknown as Parameters<typeof ctx.addIssue>[0]);
 ```
 
-`addCodedIssue` owns that cast internally so call sites stay clean.
+`k.issue` owns that cast internally so call sites stay clean.
 
 ## Parameters
 
 ```ts
-addCodedIssue<Input>(
+k.issue<Input>(
     ctx: z.core.$RefinementCtx<Input>,
     issue: { code: string; message: string; input: Input },
 ): void
@@ -42,12 +40,11 @@ addCodedIssue<Input>(
 ```ts
 import { z } from 'zod';
 import { isValidPhoneNumber } from 'libphonenumber-js';
-import { addCodedIssue } from '@ts-kizuna/core/zod';
 
 const CreateContactSchema = z.object({
     phone: z.string().superRefine((value, ctx) => {
         if (isValidPhoneNumber(value)) return;
-        addCodedIssue(ctx, {
+        k.issue(ctx, {
             code: 'invalid_phone_number',
             message: 'Invalid phone number',
             input: value,
@@ -78,14 +75,14 @@ A request whose body fails this refinement returns `400` with the custom code in
 
 By default `errors[].code` is typed as [`ValidationIssueCode`](/docs/reference/is-validation-error) — the built-in Zod codes are suggested in autocomplete and any custom string is accepted, but your `invalid_phone_number` is not _suggested_ (it lives only inside the refinement callback, where TypeScript can't see it).
 
-To make the client suggest your custom codes, declare them on `kizuna`'s `validation.issueCodes` for that API and pass the contract to [`createClient`](/docs/reference/create-client):
+To make the client suggest your custom codes, declare them on `Kizuna.init`'s `validation.issueCodes` for that API and pass the contract to [`createClient`](/docs/reference/create-client):
 
 ```ts
 // k.ts
-import { kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 
-export const { k } = kizuna({
+export const { k } = Kizuna.init({
     tags,
     validation: {
         issueCodes: ['invalid_phone_number'],
@@ -116,6 +113,6 @@ if (result.status === 400 && isValidationError(result.body)) {
 }
 ```
 
-Each API has its own `kizuna` factory, so codes stay scoped per API rather than leaking across them.
+Each API has its own `Kizuna.init` call, so codes stay scoped per API rather than leaking across them.
 
 See [`isValidationError`](/docs/reference/is-validation-error) for how clients consume these codes.

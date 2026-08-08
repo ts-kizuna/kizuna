@@ -1,0 +1,68 @@
+---
+title: k.routes
+description: Define a group of routes under one tag, with full path-param and response checking.
+---
+
+`k.routes(tag, defs)` defines a group of routes under one tag. The tag must be a key of the set you passed to `Kizuna.init`, and TypeScript completes it.
+
+```ts
+// routes.ts
+import { z } from 'zod';
+import { k } from './k';
+
+export const usersRoutes = k.routes('users', {
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        query: z.object({
+            page: z.number().int().min(1).default(1),
+            limit: z.number().int().min(1).max(100).default(10),
+        }),
+        responses: {
+            200: z.object({
+                users: z.array(UserSchema),
+                total: z.number(),
+            }),
+        },
+    },
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        body: z.object({
+            name: z.string().min(1),
+            email: z.email(),
+        }),
+        responses: {
+            201: UserSchema,
+            400: ProblemDetailsSchema,
+        },
+    },
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
+            404: ProblemDetailsSchema,
+        },
+    },
+});
+```
+
+## Route definition fields
+
+| Field         | Required | Type                                                                                           |
+| ------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `method`      | Yes      | `'GET'` `'POST'` `'PUT'` `'PATCH'` `'DELETE'` `'HEAD'` `'OPTIONS'`                             |
+| `path`        | Yes      | URL path — use `:name` for path parameters                                                     |
+| `pathParams`  | —        | Zod schema for the path parameters, keyed by placeholder name                                  |
+| `body`        | —        | Zod schema for the request body                                                                |
+| `query`       | —        | Zod schema for the query string                                                                |
+| `headers`     | —        | Zod schema for request headers                                                                 |
+| `responses`   | Yes      | Response schemas keyed by status code                                                          |
+| `contentType` | —        | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
+| `summary`     | —        | Short description shown in OpenAPI                                                             |
+| `tags`        | —        | OpenAPI tag keys (from the tag set), resolved to titles in the spec                            |
+
+`pathParams` keys must be exactly the `:name` placeholders in `path`. A key the path does not have, or a placeholder the schema does not declare, is a type error on `pathParams`, and `k.routes` throws the same mismatch at runtime.
+
+Auth is deliberately absent from this table. A route's `security` is owned by the contract's `auth` map — writing `security` inline in `k.routes` is a type error. This keeps the whole API's auth policy in one place instead of scattered across route files.

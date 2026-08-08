@@ -10,7 +10,7 @@ import { createModel } from './model.js';
  * ```ts
  * import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
  *
- * const routes = createRoutes({
+ * const routes = k.routes({
  *     getUser: {
  *         method: 'GET',
  *         path: '/users/:id',
@@ -32,10 +32,10 @@ import { createModel } from './model.js';
  * }
  * ```
  *
- * or as a named component (appears in the OpenAPI spec) via `createModel`:
+ * or as a named component (appears in the OpenAPI spec) via `Kizuna.model`:
  *
  * ```ts
- * export const ConflictError = createModel({
+ * export const ConflictError = Kizuna.model({
  *     title: 'ConflictError',
  *     schema: ProblemDetailsSchema.extend({
  *         conflictingId: z.string(),

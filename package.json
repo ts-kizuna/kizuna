@@ -19,7 +19,7 @@
     "kotlin:build": "pnpm --filter @ts-kizuna-demo/kotlin build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "pnpm --filter @ts-kizuna/eslint-plugin build && eslint .",
+    "lint": "pnpm --filter @ts-kizuna/core --filter @ts-kizuna/eslint-plugin build && eslint .",
     "lint:fix": "pnpm --filter @ts-kizuna/eslint-plugin build && eslint . --fix",
     "docs": "pnpm --filter docs dev",
     "release": "release-it"

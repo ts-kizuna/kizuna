@@ -1,14 +1,14 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import { z } from 'zod';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { assembleApi } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { fastifyKizunaMcp } from './fastify.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });

@@ -19,7 +19,8 @@ import {
     resolveResponseContentType,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
-import { type Contract, type SecurityRequirement, type TagOptions, getStatusText } from '@ts-kizuna/core';
+import { getStatusText } from '@ts-kizuna/core';
+import type { Contract, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
 
 /**
  * The OpenAPI Specification version declared in the document's `openapi` field.

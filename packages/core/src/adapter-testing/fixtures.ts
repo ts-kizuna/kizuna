@@ -1,13 +1,11 @@
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '../error-response.js';
-import { createIdentity } from '../identity.js';
-import { kizuna } from '../kizuna.js';
-import { createTags } from '../tags.js';
+import { Kizuna } from '../namespace.js';
 import type { Router } from '../handler-pipeline.js';
 import type { GuardDeny } from '../adapter.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });
@@ -196,13 +194,13 @@ export const sessionToken = 'tok_ada';
  */
 export const sessionAuthorization = `Bearer ${sessionToken}`;
 
-export const userIdentity = createIdentity.bearer({
+export const userIdentity = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
 });
 
-export const memberIdentity = createIdentity.apiKey({
+export const memberIdentity = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -216,7 +214,7 @@ export const memberIdentity = createIdentity.apiKey({
 export const ownerToken = 'wst_owner';
 export const adminToken = 'wst_admin';
 
-const { k: securedK } = kizuna({
+const { k: securedK } = Kizuna.init({
     identities: {
         user: userIdentity,
         member: memberIdentity,

@@ -1,9 +1,9 @@
 ---
-title: createRequestContext
+title: Kizuna.requestContext
 description: Provide request-scoped values — analytics ids, loggers, tenants — to every handler, typed.
 ---
 
-Not everything that runs before a handler is auth. Analytics ids, request loggers, tenant lookups — values every handler wants, gating nothing. Declare them with `createRequestContext`, register them on `kizuna`, resolve each with the adapter's `server.requestContext`, and every handler receives them typed under `requestContext`, keyed by their name.
+Not everything that runs before a handler is auth. Analytics ids, request loggers, tenant lookups — values every handler wants, gating nothing. Declare them with `Kizuna.requestContext`, register them on `Kizuna.init`, resolve each with the adapter's `server.requestContext`, and every handler receives them typed under `requestContext`, keyed by their name.
 
 <AdapterTabs functionName="createServer" />
 
@@ -11,9 +11,9 @@ A declaration can bind to request `headers`. Those headers stay off the routes a
 
 ```ts title="packages/contract/src/request-contexts.ts"
 import { z } from 'zod';
-import { createRequestContext } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 
-export const analytics = createRequestContext({
+export const analytics = Kizuna.requestContext({
     headers: z.object({
         'x-posthog-session-id': z.string().optional(),
     }),
@@ -26,7 +26,7 @@ export const analytics = createRequestContext({
 ```ts title="packages/contract/src/k.ts"
 import { analytics } from './request-contexts';
 
-export const { k } = kizuna({
+export const { k } = Kizuna.init({
     requestContext: {
         analytics,
     },

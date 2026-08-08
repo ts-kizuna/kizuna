@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
-import { createIdentity } from './identity.js';
 import { isSecurityScheme, type ContextOf } from './security-scheme.js';
+import { Kizuna } from './namespace.js';
 
 const context = z.object({
     userId: z.string(),
@@ -9,7 +9,7 @@ const context = z.object({
 
 describe('identity builders', () => {
     it('bearer produces an http bearer scheme object', () => {
-        const user = createIdentity.bearer({
+        const user = Kizuna.identity.bearer({
             context,
             bearerFormat: 'JWT',
             description: 'Session token',
@@ -25,7 +25,7 @@ describe('identity builders', () => {
     });
 
     it('apiKey produces an apiKey scheme object with name and location', () => {
-        const member = createIdentity.apiKey({
+        const member = Kizuna.identity.apiKey({
             name: 'x-workspace-token',
             in: 'header',
             context,
@@ -39,7 +39,7 @@ describe('identity builders', () => {
     });
 
     it('basic produces an http basic scheme object', () => {
-        const admin = createIdentity.basic({
+        const admin = Kizuna.identity.basic({
             context,
         });
         expect(admin.openapi).toEqual({
@@ -59,7 +59,7 @@ describe('identity builders', () => {
                 },
             },
         };
-        const oauthUser = createIdentity.oauth2({
+        const oauthUser = Kizuna.identity.oauth2({
             flows,
             context,
         });
@@ -71,7 +71,7 @@ describe('identity builders', () => {
     });
 
     it('openIdConnect carries its discovery url', () => {
-        const oidcUser = createIdentity.openIdConnect({
+        const oidcUser = Kizuna.identity.openIdConnect({
             openIdConnectUrl: 'https://auth.example.com/.well-known/openid-configuration',
             context,
         });
@@ -83,7 +83,7 @@ describe('identity builders', () => {
     });
 
     it('custom carries no OpenAPI scheme', () => {
-        const inviteToken = createIdentity.custom({
+        const inviteToken = Kizuna.identity.custom({
             context: z.object({
                 inviteId: z.string(),
             }),
@@ -97,7 +97,7 @@ describe('identity builders', () => {
         const access = z.object({
             role: z.enum(['owner', 'admin']),
         });
-        const member = createIdentity.bearer({
+        const member = Kizuna.identity.bearer({
             context,
             access,
         });
@@ -105,7 +105,7 @@ describe('identity builders', () => {
     });
 
     it('builds an authentication-only identity with no context', () => {
-        const apiConsumer = createIdentity.apiKey({
+        const apiConsumer = Kizuna.identity.apiKey({
             name: 'x-api-key',
             in: 'header',
         });
@@ -122,7 +122,7 @@ describe('identity builders', () => {
     });
 
     it('a bearer identity may omit its context', () => {
-        const gate = createIdentity.bearer({});
+        const gate = Kizuna.identity.bearer({});
         expect(gate.context).toBeUndefined();
         expectTypeOf<ContextOf<typeof gate>>().toEqualTypeOf<{}>();
     });
@@ -130,7 +130,7 @@ describe('identity builders', () => {
 
 describe('isSecurityScheme', () => {
     it('recognizes identities as security schemes', () => {
-        const user = createIdentity.bearer({
+        const user = Kizuna.identity.bearer({
             context,
         });
         expect(isSecurityScheme(user)).toBe(true);

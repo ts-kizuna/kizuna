@@ -17,11 +17,11 @@ ts-kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RF
 
 Use full English words.
 
-- No single-letter names (`u`, `x`, `s`, `r`, `v`, `k`, `i`). Use `user`, `candidate`, `server`, `result`, `value`, `key`, `index`.
+- No single-letter names (`u`, `x`, `s`, `r`, `v`, `i`). Use `user`, `candidate`, `server`, `result`, `value`, `index`.
 - No truncated abbreviations (`idx`, `cfg`, `usr`). Spell it out.
 - Name callback parameters after what they represent: `users.find((candidate) => ...)`.
 
-Exceptions: `_` for unused, `req`/`res`/`next` in Express handlers, `_`-prefixed unused params.
+Exceptions: `_` for unused, `req`/`res`/`next` in Express handlers, `_`-prefixed unused params, and namespace tokens (`k`, `z`).
 
 # Object literals
 

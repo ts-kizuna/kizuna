@@ -63,10 +63,10 @@ generateOpenApi(contract, {
 
 ## Security
 
-Security comes from the contract, not from generator options. The [identities](/docs/auth) you register on `kizuna` are emitted as `components.securitySchemes`, and the contract's auth map becomes each operation's `security` — with oauth2 scopes included. There is nothing to declare here, and the spec can never disagree with what the server actually enforces.
+Security comes from the contract, not from generator options. The [identities](/docs/auth) you register on `Kizuna.init` are emitted as `components.securitySchemes`, and the contract's auth map becomes each operation's `security` — with oauth2 scopes included. There is nothing to declare here, and the spec can never disagree with what the server actually enforces.
 
 ```ts
-export const user = createIdentity.bearer({
+export const user = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
@@ -87,7 +87,7 @@ paths:
                 - user: []
 ```
 
-Routes marked `false` in the auth map get no `security` entry — they document as public, because they are. A [`custom`](/docs/reference/create-identity#custom-identities) identity also emits no `security` (OpenAPI can't describe its credential), but its routes carry an `x-kizuna-guarded` extension, so protected-out-of-band stays distinct from public.
+Routes marked `false` in the auth map get no `security` entry — they document as public, because they are. A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity also emits no `security` (OpenAPI can't describe its credential), but its routes carry an `x-kizuna-guarded` extension, so protected-out-of-band stays distinct from public.
 
 ## Serving with Scalar (Express)
 

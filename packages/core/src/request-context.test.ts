@@ -1,22 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { kizuna } from './kizuna.js';
-import { createIdentity } from './identity.js';
-import { createRequestContext } from './request-context.js';
 import { createAdapter, type AdapterRequest, type AdapterResult, type RequestContextMap, type GuardMap } from './adapter.js';
+import { Kizuna } from './namespace.js';
 
-const user = createIdentity.bearer({
+const user = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
 });
 
-const { k } = kizuna({
+const { k } = Kizuna.init({
     identities: {
         user,
     },
     requestContext: {
-        analytics: createRequestContext(
+        analytics: Kizuna.requestContext(
             z.object({
                 sessionId: z.string().nullable(),
             })

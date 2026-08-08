@@ -6,7 +6,7 @@ import { createMcpServer, type McpServerOptions } from './server.js';
 
 export interface McpEndpointOptions {
     /**
-     * The api from `defineApi`.
+     * The api from `Kizuna.init`.
      */
     api: Routes & ApiWithRouter;
 

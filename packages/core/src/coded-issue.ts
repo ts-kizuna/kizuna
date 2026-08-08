@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ValidationIssueCode } from './validation-error.js';
+import type { BuiltinIssueCode, ValidationIssueCode } from './validation-error.js';
 
 /**
  * A validation issue carrying a custom machine-readable {@link code}.
@@ -26,6 +26,26 @@ export interface CodedIssue<Input> {
 }
 
 /**
+ * A validation issue whose `code` is checked against the issue codes declared on
+ * `Kizuna.init`, plus Zod's built-ins. This is what `k.issue` accepts.
+ */
+export interface RegisteredIssue<Codes extends string, Input> {
+    /**
+     * Machine-readable error classification, from `validation.issueCodes` or
+     * Zod's built-ins.
+     */
+    code: Codes | BuiltinIssueCode;
+    /**
+     * Human-readable description of the validation failure.
+     */
+    message: string;
+    /**
+     * The value that failed validation.
+     */
+    input: Input;
+}
+
+/**
  * Emit a single validation issue with a custom machine-readable `code`.
  *
  * Zod's runtime accepts any `code` string, but its types restrict
@@ -33,20 +53,7 @@ export interface CodedIssue<Input> {
  * type-check without a cast. This helper owns that cast in one place so call
  * sites stay cast-free.
  *
- * ```ts
- * import { z } from 'zod';
- * import { isValidPhoneNumber } from 'libphonenumber-js';
- * import { addCodedIssue } from '@ts-kizuna/core/zod';
- *
- * const phoneNumber = z.string().superRefine((value, ctx) => {
- *     if (isValidPhoneNumber(value)) return;
- *     addCodedIssue(ctx, {
- *         code: 'invalid_phone_number',
- *         message: 'Invalid phone number',
- *         input: value,
- *     });
- * });
- * ```
+ * Application code uses `k.issue`, which narrows `code` to the declared codes.
  */
 export function addCodedIssue<Input>(ctx: z.core.$RefinementCtx<Input>, issue: CodedIssue<Input>): void {
     ctx.addIssue(issue as unknown as Parameters<typeof ctx.addIssue>[0]);
