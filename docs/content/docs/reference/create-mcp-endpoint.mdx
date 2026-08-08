@@ -1,6 +1,6 @@
 ---
 title: createMcpEndpoint
-description: Mount an MCP endpoint on Express, Hono, or Next.js so AI assistants can call your API as tools.
+description: Mount an MCP endpoint on Express, Hono, Fastify, or Next.js so AI assistants can call your API as tools.
 ---
 
 Mount a [Model Context Protocol](https://modelcontextprotocol.io) endpoint on your existing app. Each route becomes an MCP tool that AI assistants can discover and call.
@@ -13,11 +13,10 @@ Mount a [Model Context Protocol](https://modelcontextprotocol.io) endpoint on yo
     adapters={[
         { label: 'Express', package: '@ts-kizuna/mcp/express' },
         { label: 'Hono', package: '@ts-kizuna/mcp/hono' },
+        { label: 'Fastify', package: '@ts-kizuna/mcp/fastify' },
         { label: 'Next.js', package: '@ts-kizuna/mcp/next' },
     ]}
 />
-
-For Fastify, see [`fastifyKizunaMcp`](/docs/reference/fastify-kizuna-mcp).
 
 ## Express
 
@@ -25,24 +24,23 @@ For Fastify, see [`fastifyKizunaMcp`](/docs/reference/fastify-kizuna-mcp).
 createMcpEndpoint(api: Api, app: Express, options?: McpEndpointOptions): void
 ```
 
-| Parameter | Type                 | Required | Description                                                              |
-| --------- | -------------------- | -------- | ------------------------------------------------------------------------ |
-| `api`     | `Api`                | Yes      | API created with [`server.api`](/docs/reference/create-server#serverapi) |
-| `app`     | `Express`            | Yes      | Express application instance                                             |
-| `options` | `McpEndpointOptions` | No       | Configuration options                                                    |
+| Parameter | Type                 | Required | Description                                                 |
+| --------- | -------------------- | -------- | ----------------------------------------------------------- |
+| `api`     | `Api`                | Yes      | API created with [`server.api`](/docs/reference/server-api) |
+| `app`     | `Express`            | Yes      | Express application instance                                |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                       |
 
 Mounts the MCP protocol handler at `/mcp` by default.
 
 ```ts title="src/index.ts"
 import express from 'express';
-import { createExpressEndpoints } from '@ts-kizuna/express';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
 import { api } from './lib/api';
 
 const app = express();
 app.use(express.json());
 
-createExpressEndpoints(api, app);
+api.mount(app);
 createMcpEndpoint(api, app);
 
 app.listen(3000);
@@ -54,26 +52,52 @@ app.listen(3000);
 createMcpEndpoint(api: Api, app: Hono, options?: McpEndpointOptions): void
 ```
 
-| Parameter | Type                 | Required | Description                                                              |
-| --------- | -------------------- | -------- | ------------------------------------------------------------------------ |
-| `api`     | `Api`                | Yes      | API created with [`server.api`](/docs/reference/create-server#serverapi) |
-| `app`     | `Hono`               | Yes      | Hono application instance                                                |
-| `options` | `McpEndpointOptions` | No       | Configuration options                                                    |
+| Parameter | Type                 | Required | Description                                                 |
+| --------- | -------------------- | -------- | ----------------------------------------------------------- |
+| `api`     | `Api`                | Yes      | API created with [`server.api`](/docs/reference/server-api) |
+| `app`     | `Hono`               | Yes      | Hono application instance                                   |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                       |
 
 Mounts the MCP protocol handler at `/mcp` by default.
 
 ```ts title="src/index.ts"
 import { Hono } from 'hono';
-import { createHonoEndpoints } from '@ts-kizuna/hono';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/hono';
 import { api } from './lib/api';
 
 const app = new Hono();
 
-createHonoEndpoints(api, app);
+api.mount(app);
 createMcpEndpoint(api, app);
 
 export default app;
+```
+
+## Fastify
+
+```ts
+createMcpEndpoint(api: Api, app: FastifyInstance, options?: McpEndpointOptions): Promise<void>
+```
+
+| Parameter | Type                 | Required | Description                                                 |
+| --------- | -------------------- | -------- | ----------------------------------------------------------- |
+| `api`     | `Api`                | Yes      | API created with [`server.api`](/docs/reference/server-api) |
+| `app`     | `FastifyInstance`    | Yes      | Fastify instance                                            |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                       |
+
+Registers the endpoint through `app.register`, so Fastify's encapsulation applies as usual. Await it, as you would any Fastify registration.
+
+```ts title="src/index.ts"
+import Fastify from 'fastify';
+import { createMcpEndpoint } from '@ts-kizuna/mcp/fastify';
+import { api } from './lib/api';
+
+const app = Fastify();
+
+await api.mount(app);
+await createMcpEndpoint(api, app);
+
+await app.listen({ port: 3000 });
 ```
 
 ## Next.js
@@ -82,10 +106,10 @@ export default app;
 createMcpEndpoint(api: Api, options?: McpEndpointOptions): { GET, POST, DELETE }
 ```
 
-| Parameter | Type                 | Required | Description                                                              |
-| --------- | -------------------- | -------- | ------------------------------------------------------------------------ |
-| `api`     | `Api`                | Yes      | API created with [`server.api`](/docs/reference/create-server#serverapi) |
-| `options` | `McpEndpointOptions` | No       | Configuration options                                                    |
+| Parameter | Type                 | Required | Description                                                 |
+| --------- | -------------------- | -------- | ----------------------------------------------------------- |
+| `api`     | `Api`                | Yes      | API created with [`server.api`](/docs/reference/server-api) |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                       |
 
 Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HTTP transport requires.
 
@@ -107,7 +131,7 @@ export const { GET, POST, DELETE } = createMcpEndpoint(api);
 
 ## Secured routes
 
-Secured tools authenticate via the MCP transport request's headers, running the same [guards](/docs/reference/create-server#serverguard) as their HTTP endpoints. The endpoint reads each identity's credential from those headers (`credentialHeaders`, populated automatically) and runs the guard per tool call — the handler receives the identity's context exactly as it would over HTTP, and a `deny(...)` becomes a tool error result.
+Secured tools authenticate via the MCP transport request's headers, running the same [guards](/docs/reference/server-guard) as their HTTP endpoints. The endpoint reads each identity's credential from those headers (`credentialHeaders`, populated automatically) and runs the guard per tool call — the handler receives the identity's context exactly as it would over HTTP, and a `deny(...)` becomes a tool error result.
 
 Configure the MCP client to send the credential on its connection, for example an `Authorization` header:
 

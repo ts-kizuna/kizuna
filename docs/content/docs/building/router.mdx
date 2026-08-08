@@ -7,7 +7,7 @@ The handlers are your server's implementation of the contract, one function per 
 
 ## `server.router`
 
-`server.router(router)` types the handler tree against the contract, one function per route, grouped to mirror the contract. The `server` handle comes from `createServer(contract)`.
+`server.router(router)` types the handler tree against the contract, one function per route, grouped to mirror the contract. The `server` handle comes from `KizunaServer.init(contract)`.
 
 Each group lives in its own file, typed against its group in the contract with the [`Router`](#routehandler-and-router-types) type so inputs and responses stay inferred:
 
@@ -152,7 +152,7 @@ return {
 
 ## Error responses
 
-Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` in your routes to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/create-server#serverguard) in guards and all built-in kizuna errors.
+Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` in your routes to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/server-guard) in guards and all built-in kizuna errors.
 
 ```ts title="src/contract.ts"
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
@@ -275,8 +275,8 @@ Type `Router` against the contract, which carries the auth map and request conte
 
 ## Reference
 
-- [`server.router`](/docs/reference/create-server#serverrouter)
-- [`RouteHandler` and `Router` types](/docs/reference/create-server#serverrouter)
+- [`server.router`](/docs/reference/server-router)
+- [`RouteHandler` and `Router` types](/docs/reference/server-router)
 - [`isValidationError`](/docs/reference/is-validation-error)
 
 ## Next steps

@@ -3,7 +3,7 @@ title: k.contract
 description: Assemble route groups into the Contract your server, clients, and generators all read.
 ---
 
-`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/create-client), [server](/docs/reference/create-server#serverapi), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `Kizuna.init`.
+`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/create-client), [server](/docs/reference/server-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `Kizuna.init`.
 
 ```ts
 // contract.ts
@@ -93,4 +93,4 @@ members: {
 },
 ```
 
-`k.contract` resolves the map onto every route's `security` (and `accessGate` where fields are constrained), which the [guards](/docs/reference/create-server#serverguard), [router](/docs/reference/create-server#serverrouter) types, and [OpenAPI spec](/docs/reference/generate-openapi) all read.
+`k.contract` resolves the map onto every route's `security` (and `accessGate` where fields are constrained), which the [guards](/docs/reference/server-guard), [router](/docs/reference/server-router) types, and [OpenAPI spec](/docs/reference/generate-openapi) all read.

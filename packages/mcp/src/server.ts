@@ -400,7 +400,7 @@ const executeToolCall = async (
  * const server = createMcpServer(api);
  * ```
  */
-export const createMcpServer = (api: Routes & ApiWithRouter, options?: McpServerOptions): McpServer => {
+export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions): McpServer => {
     const router = api[ROUTER_META];
     const guards = (api as unknown as Record<typeof GUARDS_META, GuardMap | undefined>)[GUARDS_META];
     const schemes = (api as unknown as Record<typeof SCHEMES_META, Record<string, SecurityScheme> | undefined>)[SCHEMES_META];
@@ -411,7 +411,7 @@ export const createMcpServer = (api: Routes & ApiWithRouter, options?: McpServer
         version: options?.version ?? '1.0.0',
     });
 
-    const definitions = buildToolDefinitions(api, options);
+    const definitions = buildToolDefinitions(api.routes, options);
 
     for (const definition of definitions) {
         server.registerTool(

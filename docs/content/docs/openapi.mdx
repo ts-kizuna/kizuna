@@ -95,7 +95,6 @@ Routes marked `false` in the auth map get no `security` entry — they document 
 import express from 'express';
 import { apiReference } from '@scalar/express-api-reference';
 import { generateOpenApi } from '@ts-kizuna/openapi';
-import { createExpressEndpoints } from '@ts-kizuna/express';
 import { api } from './lib/server';
 import { contract } from '@shared/contract';
 
@@ -120,7 +119,7 @@ app.use(
     })
 );
 
-createExpressEndpoints(api, app);
+api.mount(app);
 app.listen(3000);
 ```
 

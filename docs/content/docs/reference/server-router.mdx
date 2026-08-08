@@ -1,0 +1,24 @@
+---
+title: server.router
+description: Type a route group or a whole handler tree against the contract.
+---
+
+`server.router(router)` types the handler tree against the contract, one function per route, grouped to mirror the contract. Pass a group key first to type a single group in its own file.
+
+```ts title="src/lib/router.ts"
+import { server } from './server';
+
+export const router = server.router({
+    users: {
+        listUsers: ({ query }) => ({
+            status: 200,
+            body: {
+                users: [],
+                total: 0,
+            },
+        }),
+    },
+});
+```
+
+Routes the contract's `auth` map secures receive each required identity's context in the handler args, under `auth`, keyed by the identity's name. See the [Router guide](/docs/building/router) for handler arguments, identity context, and the `RouteHandler` / `Router` types.

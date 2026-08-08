@@ -1,4 +1,4 @@
-import { createServer } from '@ts-kizuna/next';
+import { KizunaServer } from '@ts-kizuna/next';
 import { contract } from '@ts-kizuna-demo/shared';
 
-export const { server } = createServer(contract);
+export const { server } = KizunaServer.init(contract);

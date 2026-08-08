@@ -341,11 +341,7 @@ const buildMapFromRoutesLiteral = (routesLiteral: ts.ObjectLiteralExpression, re
 
 const findRouterCallInNode = (node: ts.Node): ts.CallExpression | undefined => {
     if (ts.isCallExpression(node)) {
-        if (
-            ts.isPropertyAccessExpression(node.expression) &&
-            ts.isIdentifier(node.expression.name) &&
-            node.expression.name.text === 'router'
-        ) {
+        if (isMemberCall(node, AUTHORING_NAMES.router)) {
             return node;
         }
         if (isContractChainCall(node) || isRoutesChainCall(node)) {

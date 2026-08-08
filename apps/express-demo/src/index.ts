@@ -1,6 +1,5 @@
 import express from 'express';
 import { apiReference } from '@scalar/express-api-reference';
-import { createExpressEndpoints } from '@ts-kizuna/express';
 
 import { api } from './lib/api';
 import { openApiSpec } from './lib/openApi';
@@ -56,7 +55,7 @@ app.get('/', (_req, res) => {
 </html>`);
 });
 
-createExpressEndpoints(api, app);
+api.mount(app);
 
 const port = Number(process.env.PORT ?? 8000);
 app.listen(port, () => {

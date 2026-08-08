@@ -10,7 +10,11 @@
         "k-auth",
         "k-contract",
         "k-issue",
-        "create-server",
+        "kizuna-server-init",
+        "server-guard",
+        "server-router",
+        "server-request-context",
+        "server-api",
         "create-client",
         "problem-details-schema",
         "binary-and-file-schemas",
@@ -19,7 +23,6 @@
         "generate-swift-client",
         "generate-kotlin-client",
         "create-mcp-server",
-        "create-mcp-endpoint",
-        "fastify-kizuna-mcp"
+        "create-mcp-endpoint"
     ]
 }

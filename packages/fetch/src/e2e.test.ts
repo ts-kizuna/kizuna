@@ -5,7 +5,7 @@ import type { Server, AddressInfo } from 'node:net';
 import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createClient, type Client } from '@ts-kizuna/fetch';
-import { createExpressEndpoints, createServer } from '@ts-kizuna/express';
+import { KizunaServer } from '@ts-kizuna/express';
 
 const { k } = Kizuna.init({
     tags: Kizuna.tags({
@@ -56,7 +56,7 @@ describe('end-to-end: typed client → Express server', () => {
         const app = express();
         app.use(express.json());
 
-        const api = createServer(contract).server.api({
+        const api = KizunaServer.init(contract).server.api({
             router: {
                 createUser: ({ body }) => {
                     const id = String(users.size + 1);
@@ -89,7 +89,7 @@ describe('end-to-end: typed client → Express server', () => {
             },
         });
 
-        createExpressEndpoints(api, app);
+        api.mount(app);
 
         await new Promise<void>((resolve) => {
             server = app.listen(0, () => resolve());
@@ -174,7 +174,7 @@ describe('end-to-end: response headers', () => {
         const app = express();
         app.use(express.json());
 
-        const api = createServer(contractWithResponseHeaders).server.api({
+        const api = KizunaServer.init(contractWithResponseHeaders).server.api({
             router: {
                 getUser: ({ params, headers, res }) => {
                     const requestId = headers['x-request-id'];
@@ -190,7 +190,7 @@ describe('end-to-end: response headers', () => {
             },
         });
 
-        createExpressEndpoints(api, app);
+        api.mount(app);
 
         await new Promise<void>((resolve) => {
             server = app.listen(0, () => resolve());
@@ -262,7 +262,7 @@ describe('end-to-end: typed client → secured Express route', () => {
         const app = express();
         app.use(express.json());
 
-        const { server: securedServer } = createServer(securedContract);
+        const { server: securedServer } = KizunaServer.init(securedContract);
 
         const requireUser = securedServer.guard('user', ({ bearer, deny }) => {
             if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
@@ -287,7 +287,7 @@ describe('end-to-end: typed client → secured Express route', () => {
             },
         });
 
-        createExpressEndpoints(api, app);
+        api.mount(app);
 
         await new Promise<void>((resolve) => {
             server = app.listen(0, () => resolve());

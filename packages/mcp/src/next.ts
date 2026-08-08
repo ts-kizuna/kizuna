@@ -60,10 +60,10 @@ const methodNotAllowed = (message: string): Response =>
  * @example
  * ```ts
  * // app/mcp/route.ts
- * export const { GET, POST, DELETE } = mcpEndpoints(api);
+ * export const { GET, POST, DELETE } = createMcpEndpoint(api);
  * ```
  */
-export const createMcpEndpoint = (api: Routes & ApiWithRouter, options?: McpEndpointOptions): McpEndpoints => {
+export const createMcpEndpoint = (api: ApiWithRouter, options?: McpEndpointOptions): McpEndpoints => {
     const POST: HttpHandler = async (request: Request) => {
         const server = createMcpServer(api, {
             ...options,

@@ -5,7 +5,7 @@ import { Kizuna } from '@ts-kizuna/core';
 import { assembleApi } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { fastifyKizunaMcp } from './fastify.js';
+import { createMcpEndpoint } from './fastify.js';
 
 const { k } = Kizuna.init({
     tags: Kizuna.tags({
@@ -123,9 +123,7 @@ const api = assembleApi(contract, {
 const startServer = async (): Promise<{ port: number; app: FastifyInstance }> => {
     const app = Fastify();
 
-    app.register(fastifyKizunaMcp, {
-        api,
-    });
+    await createMcpEndpoint(api, app);
 
     const address = await app.listen({
         port: 0,
@@ -149,7 +147,7 @@ const connectClient = async (port: number): Promise<Client> => {
     return client;
 };
 
-describe('fastifyKizunaMcp — Fastify e2e', () => {
+describe('createMcpEndpoint — Fastify e2e', () => {
     let app: FastifyInstance | undefined;
     let client: Client | undefined;
 
@@ -198,8 +196,7 @@ describe('fastifyKizunaMcp — Fastify e2e', () => {
     it('mounts at custom path', async () => {
         const customApp = Fastify();
 
-        customApp.register(fastifyKizunaMcp, {
-            api,
+        await createMcpEndpoint(api, customApp, {
             path: '/api/mcp',
         });
 

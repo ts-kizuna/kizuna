@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { createServer, fastifyKizuna } from './server.js';
+import { KizunaServer } from './server.js';
 import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const { k } = Kizuna.init({
@@ -28,7 +28,7 @@ describe('Fastify — handler context', () => {
         const contextContract = k.contract({
             routes: contextRoutes,
         });
-        const contextApi = createServer(contextContract).server.api({
+        const contextApi = KizunaServer.init(contextContract).server.api({
             router: {
                 echo: ({ request }) => ({
                     status: 200,
@@ -38,9 +38,7 @@ describe('Fastify — handler context', () => {
                 }),
             },
         });
-        contextApp.register(fastifyKizuna, {
-            api: contextApi,
-        });
+        await contextApi.mount(contextApp);
         await contextApp.ready();
 
         const response = await contextApp.inject({
@@ -55,11 +53,10 @@ describe('Fastify — handler context', () => {
 
 testAdapterFeatures({
     name: 'fastify',
-    createServerApi: (contract, options) => createServer(contract).server.api(options),
+    initServerApi: (contract, options) => KizunaServer.init(contract).server.api(options),
     mount: async (api, { responseValidation }) => {
         const app = Fastify();
-        await app.register(fastifyKizuna, {
-            api,
+        await api.mount(app, {
             responseValidation,
         });
         await app.ready();

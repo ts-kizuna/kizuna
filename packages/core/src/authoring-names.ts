@@ -10,10 +10,12 @@ export const AUTHORING_NAMES = {
     model: 'model',
     routes: 'routes',
     contract: 'contract',
+    router: 'router',
 } as const satisfies {
     model: keyof typeof Kizuna;
     routes: keyof K;
     contract: keyof K;
+    router: string;
 };
 
 /**

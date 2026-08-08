@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginAsync } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import {
     type AdapterRequest,
@@ -35,12 +35,21 @@ import type {
 } from '@ts-kizuna/core';
 import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
 
-export type FastifyApi<R extends Routes = Routes> = R &
-    ApiWithRouter & {
-        readonly [GUARDS_META]?: unknown;
-        readonly [SCHEMES_META]?: unknown;
-        readonly [REQUEST_CONTEXT_META]?: unknown;
-    };
+export type FastifyApi<R extends Routes = Routes> = ApiWithRouter<R> & {
+    readonly [GUARDS_META]?: unknown;
+    readonly [SCHEMES_META]?: unknown;
+    readonly [REQUEST_CONTEXT_META]?: unknown;
+    /**
+     * Register every contract route on a Fastify instance. Calls
+     * `app.register` internally, so encapsulation behaves as Fastify expects.
+     */
+    mount: (app: FastifyInstance, options?: FastifyOptions) => Promise<void>;
+    /**
+     * The same routes as a Fastify plugin, for composing inside your own plugin
+     * tree: `app.register(api.plugin, { prefix: '/v1' })`.
+     */
+    plugin: FastifyPluginAsync<FastifyOptions>;
+};
 
 export interface FastifyHandlerContext {
     request: FastifyRequest;
@@ -184,11 +193,9 @@ export interface KizunaPluginOptions extends FastifyOptions {
  *
  * @example
  * const app = Fastify();
- * app.register(fastifyKizuna, {
- *     api,
- * });
+ * await api.mount(app);
  */
-export const fastifyKizuna = fastifyPlugin(
+const fastifyKizuna = fastifyPlugin(
     async (app: FastifyInstance, options: KizunaPluginOptions) => {
         const { api } = options;
         const resolvedRouter = api[ROUTER_META] as CoreRouter<Routes, FastifyHandlerContext>;
@@ -197,7 +204,7 @@ export const fastifyKizuna = fastifyPlugin(
         const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<FastifyHandlerContext> | undefined;
 
         // Fastify's auto-exposed HEAD collides with a declared one, but it skips paths that already have HEAD.
-        const declaredRoutes = [...adapter.eachRoute(api as unknown as Routes, resolvedRouter)].sort(
+        const declaredRoutes = [...adapter.eachRoute(api.routes, resolvedRouter)].sort(
             (left, right) => Number(right.route.method === 'HEAD') - Number(left.route.method === 'HEAD')
         );
 
@@ -226,7 +233,7 @@ export const fastifyKizuna = fastifyPlugin(
                     };
 
                     await adapter.handle({
-                        routes: api as unknown as Routes,
+                        routes: api.routes,
                         router: resolvedRouter,
                         request: adapterRequest,
                         responseContext: {
@@ -295,10 +302,10 @@ export interface Server<
     api(
         options: {
             router: Router<ServerContract<R, Schemes, Auth, RequestContext>>;
-            guards?: NoInfer<GuardsForSchemes<Schemes>>;
-        } & (string extends keyof RequestContext
-            ? { requestContext?: undefined }
-            : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<FastifyHandlerContext> }> })
+        } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) &
+            (string extends keyof RequestContext
+                ? { requestContext?: undefined }
+                : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<FastifyHandlerContext> }> })
     ): FastifyApi<R>;
 }
 
@@ -307,7 +314,7 @@ export interface Server<
  * `k`.
  *
  * @example
- * const { server } = createServer(contract);
+ * const { server } = KizunaServer.init(contract);
  *
  * const requireUser = server.guard('user', ({ bearer, deny }) => {
  *     const session = bearer && sessions.get(bearer.token);
@@ -321,7 +328,7 @@ export interface Server<
  *     },
  * });
  */
-export const createServer = <
+const init = <
     const R extends Routes,
     Schemes extends Record<string, SecurityScheme>,
     Auth,
@@ -333,7 +340,26 @@ export const createServer = <
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
-        api: (options: ApiParts) => assembleApi(contract, options),
+        api: (options: ApiParts) => {
+            const api = assembleApi(contract, options) as FastifyApi<R>;
+            const plugin = fastifyPlugin(
+                async (app: FastifyInstance, pluginOptions: FastifyOptions) => {
+                    await fastifyKizuna(app, { ...pluginOptions, api });
+                },
+                { name: '@ts-kizuna/fastify' }
+            );
+            return Object.assign(api, {
+                plugin,
+                mount: async (app: FastifyInstance, mountOptions?: FastifyOptions) => {
+                    await app.register(plugin, mountOptions ?? {});
+                },
+            });
+        },
     };
     return { server: server as unknown as Server<R, Schemes, Auth, RequestContext> };
 };
+
+/**
+ * Bind a contract to a server handle. The serving counterpart to `Kizuna.init`.
+ */
+export const KizunaServer = { init };

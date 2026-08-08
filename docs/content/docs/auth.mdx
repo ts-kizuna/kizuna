@@ -82,7 +82,7 @@ members: {
 },
 ```
 
-Split into its own file, a handler keeps the typed `auth` via [`RouteHandler`](/docs/reference/create-server#serverrouter)`<typeof contract.routes.members.listMembers>`.
+Split into its own file, a handler keeps the typed `auth` via [`RouteHandler`](/docs/reference/server-router)`<typeof contract.routes.members.listMembers>`.
 
 ## Identities
 
@@ -207,7 +207,7 @@ export const requireMember = server.guard('member', async ({ apiKey, params, den
 });
 ```
 
-The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/create-server#serverguard). For request-scoped values that gate nothing (analytics ids, loggers), use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) instead.
+The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) instead.
 
 ## What falls out for free
 
@@ -253,6 +253,6 @@ const apiClient = createClient(contract, {
 
 - [`Kizuna.identity`](/docs/reference/kizuna-identity)
 - [`Kizuna.init`](/docs/reference/k-contract#the-auth-map) — the auth map's value forms
-- [`server.guard`](/docs/reference/create-server#serverguard)
-- [`server.api`](/docs/reference/create-server#serverapi)
+- [`server.guard`](/docs/reference/server-guard)
+- [`server.api`](/docs/reference/server-api)
 - [`createClient`](/docs/reference/create-client)
