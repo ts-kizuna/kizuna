@@ -27,7 +27,7 @@ If the contract declares identities, pass one guard per identity under `guards`.
 
 ## Request context
 
-For request-scoped values every handler needs (analytics ids, a logger, a tenant), declare them with [`createRequestContext`](/docs/reference/create-request-context), register them on `kizuna`, and resolve each with `server.requestContext`. Resolvers run on every route, never deny, and handlers receive their values typed under each name.
+For request-scoped values every handler needs (analytics ids, a logger, a tenant), declare them with [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), register them on `Kizuna.init`, and resolve each with `server.requestContext`. Resolvers run on every route, never deny, and handlers receive their values typed under each name.
 
 ## Middleware
 

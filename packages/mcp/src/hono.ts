@@ -47,7 +47,7 @@ export interface McpEndpointOptions {
  * @example
  * ```ts
  * const app = new Hono();
- * mountMcp(api, app);
+ * createMcpEndpoint(api, app);
  * ```
  */
 export const createMcpEndpoint = (api: Routes & ApiWithRouter, app: AppLike, options?: McpEndpointOptions): void => {

@@ -233,14 +233,14 @@ export const readMeta = (schema: z.core.$ZodType): Record<string, unknown> | und
 const modelSchemas = new WeakSet<z.core.$ZodType>();
 
 /**
- * Marks a schema as a `createModel` model.
+ * Marks a schema as a `Kizuna.model` model.
  */
 export const markModelSchema = (schema: z.core.$ZodType): void => {
     modelSchemas.add(schema);
 };
 
 /**
- * Returns a `createModel` schema's `id` metadata, or undefined.
+ * Returns a `Kizuna.model` schema's `id` metadata, or undefined.
  */
 export const readMetaId = (schema: z.core.$ZodType): string | undefined => {
     if (!modelSchemas.has(schema)) return undefined;
@@ -257,7 +257,7 @@ export const readMetaDescription = (schema: z.core.$ZodType): string | undefined
 };
 
 /**
- * The `createModel` schemas in the global registry, keyed by their `id`.
+ * The `Kizuna.model` schemas in the global registry, keyed by their `id`.
  */
 export const globalRegistrySchemas = (): Map<string, z.core.$ZodType> => {
     const idMap = (z.core.globalRegistry as unknown as { _idmap: Map<string, z.core.$ZodType> })._idmap;

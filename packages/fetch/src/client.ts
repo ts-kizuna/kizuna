@@ -11,7 +11,7 @@ import type {
     SecurityScheme,
 } from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
-import { buildPath, isRouteDefinition } from '@ts-kizuna/core';
+import { buildPath, isRouteDefinition } from '@ts-kizuna/core/adapter';
 
 type ResponseUnion<R extends RouteDefinition> = {
     [S in keyof R['responses']]: {

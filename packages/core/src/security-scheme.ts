@@ -49,7 +49,7 @@ export type OpenApiSecuritySchemeObject =
       };
 
 /**
- * A security scheme declared with the {@link createIdentity} builders. It carries two
+ * A security scheme declared with the `Kizuna.identity` builders. It carries two
  * things:
  *
  * - the OpenAPI definition (`type`, `scheme`, …), emitted under

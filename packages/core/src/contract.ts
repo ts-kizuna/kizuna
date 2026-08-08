@@ -28,7 +28,7 @@ export interface Contract<
      */
     auth?: Auth;
     /**
-     * The tag set declared with {@link createTags}. Routes reference its keys; the
+     * The tag set declared with `Kizuna.tags`. Routes reference its keys; the
      * OpenAPI generator resolves each key to its title and description.
      */
     tags?: TagSet<Tags>;

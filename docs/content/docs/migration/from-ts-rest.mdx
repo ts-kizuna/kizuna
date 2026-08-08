@@ -16,9 +16,9 @@ ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneer
 
 ## Routes
 
-### `initContract` → `kizuna` + `k.routes`
+### `initContract` -> `Kizuna.init` + `k.routes`
 
-`initContract` does not exist in ts-kizuna. Create the `kizuna` factory once, then define groups with `k.routes`.
+`initContract` does not exist in ts-kizuna. Bind your surface with `Kizuna.init` once, then define groups with `k.routes`.
 
 ```ts
 // ts-rest
@@ -29,13 +29,13 @@ export const contract = c.router({ ... });
 
 ```ts
 // ts-kizuna
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 
-const tags = createTags({
+const tags = Kizuna.tags({
     users: 'Users',
 });
 
-export const { k } = kizuna({
+export const { k } = Kizuna.init({
     tags,
 });
 
@@ -57,7 +57,7 @@ export const users = k.routes('users', { ... });
 export const health = k.routes('health', { ... });
 ```
 
-The tag passed to `k.routes` (a key of your `createTags` set) sets the OpenAPI tag for all routes in that group.
+The tag passed to `k.routes` (a key of your `Kizuna.tags` set) sets the OpenAPI tag for all routes in that group.
 
 ### `c.noBody()` → `z.void()`
 

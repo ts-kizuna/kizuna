@@ -1,16 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { kizuna } from './kizuna.js';
-import { createIdentity } from './identity.js';
 import type { RouteDefinition, Routes } from './types.js';
+import { Kizuna } from './namespace.js';
 
-const user = createIdentity.bearer({
+const user = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
 });
 
-const member = createIdentity.apiKey({
+const member = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -32,7 +31,7 @@ const routeDefinition = (path: `/${string}`) => ({
 });
 
 const makeRoutes = () => {
-    const { k } = kizuna({
+    const { k } = Kizuna.init({
         identities: {
             user,
             member,
@@ -54,7 +53,7 @@ const makeRoutes = () => {
 const routeOf = (routes: Routes, key: string): RouteDefinition => routes[key] as RouteDefinition;
 
 const makeNestedRoutes = () => {
-    const { k } = kizuna({
+    const { k } = Kizuna.init({
         identities: {
             user,
             member,
@@ -239,7 +238,7 @@ describe('k.contract auth resolution', () => {
     });
 
     it('leaves routes untouched when no auth map is passed', () => {
-        const { k } = kizuna();
+        const { k } = Kizuna.init();
         const routes = k.routes({
             listItems: routeDefinition('/items'),
         });

@@ -1,20 +1,20 @@
 ---
-title: kizuna
+title: Kizuna.init
 description: Create the typed factory for one API surface — its tags, validation codes, route groups, and contract.
 ---
 
-`kizuna` builds the typed factory for one API. Destructure `k` from it, then use `k.routes` to define route groups and `k.contract` to assemble them. Set it up once and import `k` wherever you define routes.
+`Kizuna.init` binds one API surface. Destructure `k` from it, then use `k.routes` to define route groups and `k.contract` to assemble them. Set it up once and import `k` wherever you define routes.
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
 ```ts
-import { kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 ```
 
 ## Parameters
 
 ```ts
-kizuna(config?: {
+Kizuna.init(config?: {
     identities?: Record<string, Identity>;
     requestContext?: Record<string, RequestContext>;
     tags?: TagSet;
@@ -22,12 +22,12 @@ kizuna(config?: {
 }): { k: K }
 ```
 
-| Field                   | Type                             | Description                                                                                                                                                    |
-| ----------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `identities`            | `Record<string, Identity>`       | Optional. The API's identities from the [`createIdentity` builders](/docs/reference/create-identity). The keys become the names the `auth` map and guards use. |
-| `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`createRequestContext`](/docs/reference/create-request-context) — request-scoped values every handler receives.                   |
-| `tags`                  | `TagSet`                         | Optional. A tag set from [`createTags`](/docs/reference/create-tags). Its keys become the allowed group tags.                                                  |
-| `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `addCodedIssue`. Captured as a literal union.                                         |
+| Field                   | Type                             | Description                                                                                                                                                     |
+| ----------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `identities`            | `Record<string, Identity>`       | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names the `auth` map and guards use. |
+| `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) — request-scoped values every handler receives.                   |
+| `tags`                  | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                  |
+| `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                |
 
 ## Returns
 
@@ -44,12 +44,12 @@ Set the factory up once — usually in a `k.ts` file — then import `k` whereve
 
 ```ts
 // k.ts
-import { kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 import { user, member } from './identities';
 import { analytics } from './request-contexts';
 
-export const { k } = kizuna({
+export const { k } = Kizuna.init({
     identities: {
         user,
         member,
@@ -66,7 +66,7 @@ export const { k } = kizuna({
 
 ## Defining route groups
 
-`k.routes(tag, defs)` defines a group of routes under one tag. The tag must be a key of the set you passed to `kizuna`, and TypeScript completes it.
+`k.routes(tag, defs)` defines a group of routes under one tag. The tag must be a key of the set you passed to `Kizuna.init`, and TypeScript completes it.
 
 ```ts
 // routes.ts
@@ -132,7 +132,7 @@ Auth is deliberately absent from this table. A route's `security` is owned by th
 
 ## Assembling the contract
 
-`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/create-client), [server](/docs/reference/create-server#serverapi), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `kizuna`.
+`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/create-client), [server](/docs/reference/create-server#serverapi), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `Kizuna.init`.
 
 ```ts
 // contract.ts
@@ -149,11 +149,11 @@ export const contract = k.contract({
 });
 ```
 
-The declared `issueCodes` widen `errors[].code` on `400` responses to `ValidationIssueCode | <your codes>`, so the client suggests them in autocomplete. Emit them at runtime with [`addCodedIssue`](/docs/reference/add-coded-issue). Because the factory is per API, codes and tags stay scoped to their API rather than leaking across the multiple kizuna APIs a project may define.
+The declared `issueCodes` widen `errors[].code` on `400` responses to `ValidationIssueCode | <your codes>`, so the client suggests them in autocomplete. Emit them at runtime with [`k.issue`](/docs/reference/k-issue). Because the factory is per API, codes and tags stay scoped to their API rather than leaking across the multiple kizuna APIs a project may define.
 
 ## The auth map
 
-The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `kizuna`. It is **exhaustive over groups** — every key in `routes` must appear, and public takes an explicit `false`, so a new group can't ship unsecured by omission. For the full walkthrough, see the [Auth guide](/docs/auth).
+The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `Kizuna.init`. It is **exhaustive over groups** — every key in `routes` must appear, and public takes an explicit `false`, so a new group can't ship unsecured by omission. For the full walkthrough, see the [Auth guide](/docs/auth).
 
 ```ts
 export const contract = k.contract({
@@ -242,13 +242,13 @@ export const contract = k.contract({
 
 ## Request context
 
-`requestContext` registers declarations from [`createRequestContext`](/docs/reference/create-request-context) — request-scoped values like analytics ids or a logger. Every handler receives them typed under `requestContext`, keyed by their name; each is resolved per request by a [`server.requestContext`](/docs/reference/create-server#serverrequestcontext) resolver wired on `server.api`.
+`requestContext` registers declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) — request-scoped values like analytics ids or a logger. Every handler receives them typed under `requestContext`, keyed by their name; each is resolved per request by a [`server.requestContext`](/docs/reference/create-server#serverrequestcontext) resolver wired on `server.api`.
 
 ```ts title="request-contexts.ts"
 import { z } from 'zod';
-import { createRequestContext } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 
-export const analytics = createRequestContext(
+export const analytics = Kizuna.requestContext(
     z.object({
         sessionId: z.string().nullable(),
     })
@@ -258,7 +258,7 @@ export const analytics = createRequestContext(
 ```ts title="k.ts"
 import { analytics } from './request-contexts';
 
-export const { k } = kizuna({
+export const { k } = Kizuna.init({
     requestContext: {
         analytics,
     },

@@ -52,7 +52,7 @@ describe.each([
         expect(await messageIdsFor('contract-inline.ts', parserOptions)).toEqual(['coerce']);
     });
 
-    it('uses the direct variant on createModel fields', async () => {
+    it('uses the direct variant on Kizuna.model fields', async () => {
         expect(await messageIdsFor('contract-model.ts', parserOptions)).toEqual(['coerce', 'jsdocTag', 'duplicateDeprecated']);
     });
 });

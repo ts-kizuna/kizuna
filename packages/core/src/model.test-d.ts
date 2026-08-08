@@ -1,9 +1,9 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { createModel } from './model.js';
+import { Kizuna } from './namespace.js';
 
-test('createModel preserves object schema type', () => {
-    const User = createModel({
+test('Kizuna.model preserves object schema type', () => {
+    const User = Kizuna.model({
         title: 'User',
         schema: z.object({
             id: z.string(),
@@ -16,16 +16,16 @@ test('createModel preserves object schema type', () => {
     }>();
 });
 
-test('createModel preserves enum schema type', () => {
-    const EventKind = createModel({
+test('Kizuna.model preserves enum schema type', () => {
+    const EventKind = Kizuna.model({
         title: 'EventKind',
         schema: z.enum(['login', 'logout', 'signup']),
     });
     expectTypeOf<z.infer<typeof EventKind>>().toEqualTypeOf<'login' | 'logout' | 'signup'>();
 });
 
-test('createModel preserves optional fields', () => {
-    const User = createModel({
+test('Kizuna.model preserves optional fields', () => {
+    const User = Kizuna.model({
         title: 'User',
         schema: z.object({
             id: z.string(),
@@ -38,8 +38,8 @@ test('createModel preserves optional fields', () => {
     }>();
 });
 
-test('createModel result is assignable to z.ZodType', () => {
-    const User = createModel({
+test('Kizuna.model result is assignable to z.ZodType', () => {
+    const User = Kizuna.model({
         title: 'User',
         schema: z.object({
             id: z.string(),
@@ -48,8 +48,8 @@ test('createModel result is assignable to z.ZodType', () => {
     expectTypeOf(User).toMatchTypeOf<z.ZodType>();
 });
 
-test('createModel result is usable in z.array', () => {
-    const User = createModel({
+test('Kizuna.model result is usable in z.array', () => {
+    const User = Kizuna.model({
         title: 'User',
         schema: z.object({
             id: z.string(),

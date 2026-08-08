@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { ESLintUtils, type TSESTree } from '@typescript-eslint/utils';
 import ts from 'typescript';
+import { AUTHORING_NAMES } from '@ts-kizuna/core/authoring-names';
 import { collectSchemaIssues, type SchemaIssue, type SchemaResolver } from '../schema-violations.js';
 
 const SCHEMA_KEYS: ReadonlySet<string> = new Set(['body', 'query', 'pathParams', 'headers']);
@@ -97,7 +98,7 @@ const calleeName = (node: TSESTree.CallExpression): string | undefined => {
 
 const schemaNodesOf = (call: TSESTree.CallExpression): TSESTree.Node[] => {
     const name = calleeName(call);
-    if (name === 'createModel') {
+    if (name === AUTHORING_NAMES.model) {
         const config = call.arguments[0];
         if (config?.type !== 'ObjectExpression') return [];
         const schema = config.properties.find(
@@ -107,7 +108,7 @@ const schemaNodesOf = (call: TSESTree.CallExpression): TSESTree.Node[] => {
         return schema ? [schema.value] : [];
     }
 
-    if (name !== 'createContract' && name !== 'routes') return [];
+    if (name !== AUTHORING_NAMES.routes && name !== AUTHORING_NAMES.contract) return [];
 
     const nodes: TSESTree.Node[] = [];
     const visit = (node: TSESTree.Node): void => {

@@ -3,14 +3,14 @@ import { z } from 'zod';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import type { Server } from 'node:http';
-import { kizuna, createTags } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { assembleApi } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createMcpEndpoint } from './hono.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });

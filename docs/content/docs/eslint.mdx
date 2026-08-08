@@ -49,7 +49,7 @@ query: z.object({
 
 ## `no-unsupported-schema`
 
-Flags `body`, `query`, `pathParams`, `headers`, and response schemas in your routes — plus `createModel` schemas, inline or imported — that use something ts-kizuna can't support. It follows imports, so the error lands on the offending field when it's local, or on the reference when the schema comes from another file.
+Flags `body`, `query`, `pathParams`, `headers`, and response schemas in your routes — plus `Kizuna.model` schemas, inline or imported — that use something ts-kizuna can't support. It follows imports, so the error lands on the offending field when it's local, or on the reference when the schema comes from another file.
 
 ### `z.coerce`
 

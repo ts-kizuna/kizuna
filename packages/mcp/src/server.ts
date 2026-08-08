@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { flattenRoutes, validateRequest } from '@ts-kizuna/core';
+import { flattenRoutes, validateRequest } from '@ts-kizuna/core/adapter';
 import {
     ResponseError,
     type AdapterRequest,

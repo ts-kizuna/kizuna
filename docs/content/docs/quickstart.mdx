@@ -31,15 +31,17 @@ Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
 ## 1. Define the routes
 
-Create the `kizuna` factory once and export `k` — then group your routes with `k.routes`. Keep each piece in its own file (a package both your server and client import).
+Bind your API surface once with `Kizuna.init` and export `k` — then group your routes with `k.routes`. Keep each piece in its own file (a package both your server and client import).
 
 ```ts title="k.ts"
-import { kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 
-export const { k } = kizuna();
+export const { k } = Kizuna.init();
 ```
 
-`kizuna` takes optional tags and validation settings — see [`kizuna`](/docs/reference/kizuna) for the full options.
+`Kizuna.init` takes optional tags, identities, request contexts and validation settings — see [`Kizuna.init`](/docs/reference/kizuna-init) for the full options.
+
+Because this setup declares no tags, `k.routes` is called with just the route map. Once you declare tags, pass the tag name first — `k.routes('users', { ... })` — and TypeScript checks it against the tags you declared. See [Contract](/docs/building/contract) for the tagged form.
 
 Each route pairs a method and path with Zod schemas:
 
@@ -94,7 +96,7 @@ export const usersRoutes = k.routes({
 
 ## 2. Bundle them into a contract
 
-The contract is the one object you hand to both the server and the client. `k.contract` assembles your route groups; it carries the tags and any [custom validation codes](/docs/reference/add-coded-issue) you configured on `kizuna`. Give it its own file — `contract.ts`.
+The contract is the one object you hand to both the server and the client. `k.contract` assembles your route groups; it carries the tags and any [custom validation codes](/docs/reference/k-issue) you configured on `Kizuna.init`. Give it its own file — `contract.ts`.
 
 ```ts title="contract.ts"
 import { k } from './k';

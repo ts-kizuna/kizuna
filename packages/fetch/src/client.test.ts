@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags, createModel, createRequestContext } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { createClient } from './client.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });
@@ -612,7 +612,7 @@ describe('createClient — relative baseUrl', () => {
 });
 
 describe('requestContext on the client initializer', () => {
-    const analytics = createRequestContext({
+    const analytics = Kizuna.requestContext({
         headers: z.object({
             'x-session-id': z.string().optional(),
         }),
@@ -621,7 +621,7 @@ describe('requestContext on the client initializer', () => {
         }),
     });
 
-    const { k: ctxK } = kizuna({
+    const { k: ctxK } = Kizuna.init({
         requestContext: {
             analytics,
         },
@@ -677,17 +677,17 @@ const activityRoutes = k.routes('api', {
         method: 'GET',
         path: '/activity',
         responses: {
-            200: createModel({
+            200: Kizuna.model({
                 title: 'UserActivityEvent',
                 schema: z.discriminatedUnion('kind', [
-                    createModel({
+                    Kizuna.model({
                         title: 'UserActivityEventStarted',
                         schema: z.object({
                             kind: z.literal('started'),
                             at: z.string(),
                         }),
                     }),
-                    createModel({
+                    Kizuna.model({
                         title: 'UserActivityEventDone',
                         schema: z.object({
                             kind: z.literal('done'),

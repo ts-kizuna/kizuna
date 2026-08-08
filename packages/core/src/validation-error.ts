@@ -22,13 +22,20 @@ export const BUILTIN_VALIDATION_ISSUE_CODES = [
 ] as const;
 
 /**
+ * One of Zod's built-in issue codes, with no escape hatch for arbitrary strings.
+ * `k.issue` accepts this union plus the codes declared on `Kizuna.init`.
+ */
+export type BuiltinIssueCode = (typeof BUILTIN_VALIDATION_ISSUE_CODES)[number];
+
+/**
  * Machine-readable error classification.
  *
  * Built-in Zod codes are offered as autocomplete suggestions, while any custom
  * string remains assignable — the `string & {}` branch keeps the literal
- * suggestions from collapsing into a bare `string`.
+ * suggestions from collapsing into a bare `string`. Emit codes with `k.issue`,
+ * which is narrower.
  */
-export type ValidationIssueCode = (typeof BUILTIN_VALIDATION_ISSUE_CODES)[number] | (string & {});
+export type ValidationIssueCode = BuiltinIssueCode | (string & {});
 
 /**
  * Machine-readable error classification from Zod.
@@ -53,7 +60,7 @@ const ValidationIssueCodeSchema = z.union([
  * ```ts
  * import { ValidationErrorSchema } from '@ts-kizuna/core/schemas';
  *
- * const routes = createRoutes({
+ * const routes = k.routes({
  *     createUser: {
  *         method: 'POST',
  *         path: '/users',

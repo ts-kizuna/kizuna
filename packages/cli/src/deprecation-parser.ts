@@ -1,13 +1,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ts from 'typescript';
+import { AUTHORING_NAMES, CONTRACT_EXPORT_NAMES } from '@ts-kizuna/core/authoring-names';
 import {
     type DeprecationMap,
     type SerializedDeprecationMap,
     serializeDeprecationMap,
     contractFingerprint,
 } from '@ts-kizuna/core/generator';
-import { type Contract } from '@ts-kizuna/core';
+import type { Contract } from '@ts-kizuna/core';
 
 const SCHEMA_KEYS: ReadonlySet<string> = new Set(['body', 'query', 'headers']);
 
@@ -101,7 +102,7 @@ const readAstMetaId = (expr: ts.Expression): string | undefined => {
     if (!ts.isCallExpression(expr)) return undefined;
     const firstArg = expr.arguments[0];
 
-    if (ts.isIdentifier(expr.expression) && expr.expression.text === 'createModel') {
+    if (isModelCall(expr)) {
         if (!firstArg || !ts.isObjectLiteralExpression(firstArg)) return undefined;
         return readObjectStringProperty(firstArg, 'title');
     }
@@ -126,24 +127,12 @@ const firstObjectLiteralIn = (node: ts.Node, resolve: IdentifierResolver, visite
         return firstObjectLiteralIn(referenced, resolve, visited);
     }
     if (ts.isCallExpression(node)) {
-        if (ts.isIdentifier(node.expression) && node.expression.text === 'createContract') {
-            const routesArg = routesArgFrom(node);
-            if (routesArg) return firstObjectLiteralIn(routesArg, resolve, visited);
-            return undefined;
-        }
-        if (ts.isIdentifier(node.expression) && node.expression.text === 'createRoutes') {
-            // createRoutes(tagSet, key, routes) | createRoutes(tagSet, routes) | createRoutes(routes)
-            // — the route map is always the final argument.
-            const routesArg = node.arguments[node.arguments.length - 1];
-            if (routesArg) return firstObjectLiteralIn(routesArg, resolve, visited);
-            return undefined;
-        }
         if (isContractChainCall(node) || isRoutesChainCall(node)) {
             const routesArg = routesArgFrom(node);
             if (routesArg) return firstObjectLiteralIn(routesArg, resolve, visited);
             return undefined;
         }
-        if (ts.isIdentifier(node.expression) && node.expression.text === 'createModel') {
+        if (isModelCall(node)) {
             const modelSchema = extractCreateModelSchema(node);
             return modelSchema ? firstObjectLiteralIn(modelSchema, resolve, visited) : undefined;
         }
@@ -192,8 +181,7 @@ const makeScopedResolver = (
 };
 
 const extractCreateModelSchema = (node: ts.Node): ts.Expression | undefined => {
-    if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression)) return undefined;
-    if (node.expression.text !== 'createModel') return undefined;
+    if (!ts.isCallExpression(node) || !isModelCall(node)) return undefined;
     const firstArg = node.arguments[0];
     if (!firstArg || !ts.isObjectLiteralExpression(firstArg)) return undefined;
     for (const property of firstArg.properties) {
@@ -205,7 +193,7 @@ const extractCreateModelSchema = (node: ts.Node): ts.Expression | undefined => {
 
 /**
  * Walks a schema expression's fields, calling `visit` with each field's dot-path
- * and its property node. Resolves identifiers, `createModel`, generic wrapper
+ * and its property node. Resolves identifiers, `Kizuna.model`, generic wrapper
  * functions (e.g. `Pagination(Item)`), and `.extend()`; recurses into nested
  * objects.
  */
@@ -360,9 +348,6 @@ const findRouterCallInNode = (node: ts.Node): ts.CallExpression | undefined => {
         ) {
             return node;
         }
-        if (ts.isIdentifier(node.expression) && node.expression.text === 'createContract') {
-            return node;
-        }
         if (isContractChainCall(node) || isRoutesChainCall(node)) {
             return node;
         }
@@ -375,18 +360,26 @@ const findRouterCallInNode = (node: ts.Node): ts.CallExpression | undefined => {
     return found;
 };
 
-const isRoutesChainCall = (node: ts.CallExpression): boolean =>
-    ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.name) && node.expression.name.text === 'routes';
+/**
+ * True when `node` calls `member` on any receiver, e.g. `k.routes(...)`.
+ */
+const isMemberCall = (node: ts.CallExpression, member: string): boolean =>
+    ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.name) && node.expression.name.text === member;
 
-const isContractChainCall = (node: ts.CallExpression): boolean =>
-    ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.name) && node.expression.name.text === 'contract';
+const isRoutesChainCall = (node: ts.CallExpression): boolean => isMemberCall(node, AUTHORING_NAMES.routes);
+
+const isContractChainCall = (node: ts.CallExpression): boolean => isMemberCall(node, AUTHORING_NAMES.contract);
+
+const isModelCall = (node: ts.CallExpression): boolean => isMemberCall(node, AUTHORING_NAMES.model);
+
+const isContractExportName = (name: string): boolean => (CONTRACT_EXPORT_NAMES as readonly string[]).includes(name);
 
 const routesArgFrom = (call: ts.CallExpression): ts.Expression | undefined => {
     // k.routes(tag, routes) | k.routes(routes) — the route map is the final argument.
     if (isRoutesChainCall(call)) return call.arguments[call.arguments.length - 1];
     // k.contract({ routes: X }) — unwrap the `routes` property so the walker sees the
     // route map, not the `{ routes, validation }` wrapper.
-    if (isContractChainCall(call) || (ts.isIdentifier(call.expression) && call.expression.text === 'createContract')) {
+    if (isContractChainCall(call)) {
         const arg = call.arguments[0];
         if (arg && ts.isObjectLiteralExpression(arg)) {
             for (const prop of arg.properties) {
@@ -395,10 +388,6 @@ const routesArgFrom = (call: ts.CallExpression): ts.Expression | undefined => {
             }
         }
         return arg;
-    }
-    // createRoutes(tagSet, key, routes) | createRoutes(tagSet, routes) | createRoutes(routes)
-    if (ts.isIdentifier(call.expression) && call.expression.text === 'createRoutes') {
-        return call.arguments[call.arguments.length - 1];
     }
     const firstArg = call.arguments[0];
     if (!firstArg) return undefined;
@@ -420,7 +409,7 @@ const collectExportedRoutesLiterals = (
         for (const declaration of statement.declarationList.declarations) {
             if (!ts.isIdentifier(declaration.name)) continue;
             const exportName = declaration.name.text;
-            if (exportName !== 'contract' && exportName !== 'api') continue;
+            if (!isContractExportName(exportName)) continue;
             if (!declaration.initializer) continue;
 
             let initializer: ts.Expression = declaration.initializer;
@@ -432,7 +421,7 @@ const collectExportedRoutesLiterals = (
             if (!ts.isCallExpression(initializer)) continue;
             const callee = initializer.expression;
 
-            if (isContractChainCall(initializer) || (ts.isIdentifier(callee) && callee.text === 'createContract')) {
+            if (isContractChainCall(initializer)) {
                 const routesArg = routesArgFrom(initializer);
                 const lit = routesArg ? firstObjectLiteralIn(routesArg, resolve, new Set()) : undefined;
                 if (lit) into.push(lit);
@@ -449,7 +438,7 @@ const collectExportedRoutesLiterals = (
         if (!exportClause || !ts.isNamedExports(exportClause)) continue;
         const hasContractExport = exportClause.elements.some((element) => {
             const exportedName = element.name.text;
-            return exportedName === 'contract' || exportedName === 'api';
+            return isContractExportName(exportedName);
         });
         if (!hasContractExport) continue;
         const importedPath = resolveImportPath(path.dirname(sourceFile.fileName), specifier);

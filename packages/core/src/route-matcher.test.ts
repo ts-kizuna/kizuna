@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags } from '@ts-kizuna/core';
 import { assembleApi } from './adapter.js';
 import { matchRoute } from './route-matcher.js';
+import { Kizuna } from './namespace.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });

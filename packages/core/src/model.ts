@@ -23,7 +23,7 @@ export interface ModelOptions<T extends z.ZodType> {
  * Name a Zod schema for OpenAPI and code generation.
  *
  * ```ts
- * const UserSchema = createModel({
+ * const UserSchema = Kizuna.model({
  *     title: 'User',
  *     description: 'A user in the system',
  *     schema: z.object({

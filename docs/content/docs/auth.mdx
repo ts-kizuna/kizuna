@@ -7,9 +7,9 @@ Auth lives in the contract: **identities** say who can call your API, the **auth
 
 ```ts title="packages/contract/src/identities.ts"
 import { z } from 'zod';
-import { createIdentity } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 
-export const user = createIdentity.bearer({
+export const user = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
@@ -17,11 +17,11 @@ export const user = createIdentity.bearer({
 ```
 
 ```ts title="packages/contract/src/k.ts"
-import { kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 import { user } from './identities';
 
-export const { k } = kizuna({
+export const { k } = Kizuna.init({
     identities: {
         user,
     },
@@ -89,7 +89,7 @@ Split into its own file, a handler keeps the typed `auth` via [`RouteHandler`](/
 One builder per authentication method: `bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`, and `custom`. Each optionally takes `context` (what a guard returns and handlers receive) and `access` (fields the auth map may gate per route):
 
 ```ts title="packages/contract/src/identities.ts"
-export const member = createIdentity.apiKey({
+export const member = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -104,7 +104,7 @@ export const member = createIdentity.apiKey({
 Omit `context` for an authentication-only identity — a pure gate like an API key that only proves the caller is a known client. Its guard returns nothing on success (or `deny(...)`), and routes secured by it receive no handler arg for it:
 
 ```ts title="packages/contract/src/identities.ts"
-export const apiConsumer = createIdentity.apiKey({
+export const apiConsumer = Kizuna.identity.apiKey({
     name: 'x-api-key',
     in: 'header',
 });
@@ -113,14 +113,14 @@ export const apiConsumer = createIdentity.apiKey({
 When the credential doesn't fit any OpenAPI scheme — a capability-URL token in a path segment, say — use `custom`. Its guard reads the credential itself, and the route stays explicitly guarded instead of falling back to `false`:
 
 ```ts title="packages/contract/src/identities.ts"
-export const inviteToken = createIdentity.custom({
+export const inviteToken = Kizuna.identity.custom({
     context: z.object({
         inviteId: z.string(),
     }),
 });
 ```
 
-All builders and their fields, including how `custom` shows up in the spec: [`createIdentity`](/docs/reference/create-identity).
+All builders and their fields, including how `custom` shows up in the spec: [`Kizuna.identity`](/docs/reference/kizuna-identity).
 
 ## The auth map
 
@@ -207,7 +207,7 @@ export const requireMember = server.guard('member', async ({ apiKey, params, den
 });
 ```
 
-The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/create-server#serverguard). For request-scoped values that gate nothing (analytics ids, loggers), use [`createRequestContext`](/docs/reference/create-request-context) instead.
+The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/create-server#serverguard). For request-scoped values that gate nothing (analytics ids, loggers), use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) instead.
 
 ## What falls out for free
 
@@ -251,8 +251,8 @@ const apiClient = createClient(contract, {
 
 ## Reference
 
-- [`createIdentity`](/docs/reference/create-identity)
-- [`kizuna`](/docs/reference/kizuna#the-auth-map) — the auth map's value forms
+- [`Kizuna.identity`](/docs/reference/kizuna-identity)
+- [`Kizuna.init`](/docs/reference/kizuna-init#the-auth-map) — the auth map's value forms
 - [`server.guard`](/docs/reference/create-server#serverguard)
 - [`server.api`](/docs/reference/create-server#serverapi)
 - [`createClient`](/docs/reference/create-client)

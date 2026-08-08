@@ -110,14 +110,14 @@ const usersRoutes = k.routes('users', {
 });
 ```
 
-To reuse the extended schema across routes — and give it a name in the generated OpenAPI spec — wrap it in [`createModel`](/docs/reference/create-model):
+To reuse the extended schema across routes — and give it a name in the generated OpenAPI spec — wrap it in [`Kizuna.model`](/docs/reference/kizuna-model):
 
 ```ts
 import { z } from 'zod';
-import { createModel } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 
-const ConflictError = createModel({
+const ConflictError = Kizuna.model({
     title: 'ConflictError',
     schema: ProblemDetailsSchema.extend({
         conflictingId: z.string(),

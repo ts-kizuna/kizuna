@@ -17,10 +17,10 @@ import { generateOpenApi } from '@ts-kizuna/openapi';
 generateOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer
 ```
 
-| Parameter  | Type                     | Description                                              |
-| ---------- | ------------------------ | -------------------------------------------------------- |
-| `contract` | `Contract`               | The contract from [`k.contract`](/docs/reference/kizuna) |
-| `options`  | `GenerateOpenApiOptions` | OpenAPI generation options                               |
+| Parameter  | Type                     | Description                                                   |
+| ---------- | ------------------------ | ------------------------------------------------------------- |
+| `contract` | `Contract`               | The contract from [`k.contract`](/docs/reference/kizuna-init) |
+| `options`  | `GenerateOpenApiOptions` | OpenAPI generation options                                    |
 
 ## Options
 
@@ -72,7 +72,7 @@ app.get('/openapi.json', (_req, res) => {
 
 ## Security emission
 
-Security is generated from the contract, not configured on the generator. Every [identity](/docs/reference/create-identity) registered on [`kizuna`](/docs/reference/kizuna) is emitted under `components.securitySchemes`, and every route the [`auth` map](/docs/reference/kizuna#the-auth-map) secures references those names in its `security` — with OAuth scopes where the map declares them. Public routes (`false`) get none.
+Security is generated from the contract, not configured on the generator. Every [identity](/docs/reference/kizuna-identity) registered on [`Kizuna.init`](/docs/reference/kizuna-init) is emitted under `components.securitySchemes`, and every route the [`auth` map](/docs/reference/kizuna-init#the-auth-map) secures references those names in its `security` — with OAuth scopes where the map declares them. Public routes (`false`) get none.
 
 With the `user` (bearer) and `member` (API key) identities and `workspace: 'member'` in the auth map, the document contains:
 
@@ -93,7 +93,7 @@ paths:
                 - member: []
 ```
 
-A [`custom`](/docs/reference/create-identity#custom-identities) identity is the exception: OpenAPI can't describe its credential, so it emits no `securityScheme` and no `security`. Its routes instead carry an `x-kizuna-guarded` extension, keeping a protected-out-of-band route distinct from a public one.
+A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity is the exception: OpenAPI can't describe its credential, so it emits no `securityScheme` and no `security`. Its routes instead carry an `x-kizuna-guarded` extension, keeping a protected-out-of-band route distinct from a public one.
 
 Because the spec and the runtime [guards](/docs/reference/create-server#serverguard) both derive from the auth map, documented security is enforced security — there is nothing to keep in sync.
 

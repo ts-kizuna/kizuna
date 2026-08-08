@@ -1,10 +1,10 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { kizuna, createTags, createModel, createRequestContext, type ValidationError } from '@ts-kizuna/core';
+import { Kizuna, type ValidationError } from '@ts-kizuna/core';
 import { createClient } from './client.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });
@@ -647,7 +647,7 @@ test('routes without a pathParams schema keep template-derived params', () => {
     expectTypeOf<Parameters<typeof client.getUser>[0]['params']>().toEqualTypeOf<{ id: string }>();
 });
 
-const analyticsContext = createRequestContext({
+const analyticsContext = Kizuna.requestContext({
     headers: z.object({
         'x-session-id': z.string().optional(),
     }),
@@ -656,7 +656,7 @@ const analyticsContext = createRequestContext({
     }),
 });
 
-const tenantContext = createRequestContext({
+const tenantContext = Kizuna.requestContext({
     headers: z.object({
         'x-tenant': z.string(),
     }),
@@ -665,7 +665,7 @@ const tenantContext = createRequestContext({
     }),
 });
 
-const { k: optionalCtxK } = kizuna({
+const { k: optionalCtxK } = Kizuna.init({
     requestContext: {
         analytics: analyticsContext,
     },
@@ -687,7 +687,7 @@ const optionalCtxContract = optionalCtxK.contract({
     },
 });
 
-const { k: requiredCtxK } = kizuna({
+const { k: requiredCtxK } = Kizuna.init({
     requestContext: {
         analytics: analyticsContext,
         tenant: tenantContext,
@@ -755,17 +755,17 @@ const activityRoutes = k.routes('api', {
         method: 'GET',
         path: '/activity',
         responses: {
-            200: createModel({
+            200: Kizuna.model({
                 title: 'UserActivityEvent',
                 schema: z.discriminatedUnion('kind', [
-                    createModel({
+                    Kizuna.model({
                         title: 'UserActivityEventStarted',
                         schema: z.object({
                             kind: z.literal('started'),
                             at: z.string(),
                         }),
                     }),
-                    createModel({
+                    Kizuna.model({
                         title: 'UserActivityEventDone',
                         schema: z.object({
                             kind: z.literal('done'),

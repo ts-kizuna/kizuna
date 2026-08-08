@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { tagRoutes } from './routes.js';
-import { createTags } from './tags.js';
+import { Kizuna } from './namespace.js';
 
 const routes = tagRoutes({
     getUser: {
@@ -48,7 +48,7 @@ test('path must start with /', () => {
     tagRoutes({ bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } } });
 });
 
-const tags = createTags({
+const tags = Kizuna.tags({
     users: {
         title: 'Users',
         description: 'User management endpoints',

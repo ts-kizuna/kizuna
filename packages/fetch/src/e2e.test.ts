@@ -2,13 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import express from 'express';
 import { z } from 'zod';
 import type { Server, AddressInfo } from 'node:net';
-import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createClient, type Client } from '@ts-kizuna/fetch';
 import { createExpressEndpoints, createServer } from '@ts-kizuna/express';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });
@@ -220,13 +220,13 @@ describe('end-to-end: response headers', () => {
     });
 });
 
-const userIdentity = createIdentity.bearer({
+const userIdentity = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
 });
 
-const { k: securedK } = kizuna({
+const { k: securedK } = Kizuna.init({
     identities: {
         user: userIdentity,
     },

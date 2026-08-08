@@ -1,12 +1,11 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { kizuna } from './kizuna.js';
-import { createTags } from './tags.js';
 import { ProblemDetailsSchema } from './error-response.js';
 import type { RouteHandler, HandlerArgs, HandlerReturn, Router } from './handler-pipeline.js';
+import { Kizuna } from './namespace.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         api: 'API',
     }),
 });

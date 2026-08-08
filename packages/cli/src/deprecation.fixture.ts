@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { kizuna, createTags, createModel } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/core';
 import { createClient } from '../../fetch/src/client.js';
 
 const Paginated = <T extends z.ZodType>(itemSchema: T) =>
@@ -16,7 +16,7 @@ const UserSchema = z.object({
     email: z.string(),
 });
 
-const NamedUserSchema = createModel({
+const NamedUserSchema = Kizuna.model({
     title: 'User',
     schema: z.object({
         id: z.string(),
@@ -31,7 +31,7 @@ const ExtendedUserSchema = UserSchema.extend({
     fullName: z.string(),
 });
 
-export const tags = createTags({
+export const tags = Kizuna.tags({
     api: {
         title: 'API',
     },
@@ -43,7 +43,7 @@ export const tags = createTags({
     },
 });
 
-const { k } = kizuna({ tags });
+const { k } = Kizuna.init({ tags });
 
 const healthRoutes = k.routes('health', {
     check: {

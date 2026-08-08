@@ -1,7 +1,5 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { kizuna } from './kizuna.js';
-import { createIdentity, type CredentialOf } from './identity.js';
 import type {
     HandlersFromAuth,
     HandlerReturn,
@@ -11,14 +9,16 @@ import type {
     BrandedHandlerContext,
 } from './handler-pipeline.js';
 import type { RouteDefinition } from './types.js';
+import { Kizuna } from './namespace.js';
+import { type CredentialOf } from './identity.js';
 
-const user = createIdentity.bearer({
+const user = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
 });
 
-const member = createIdentity.apiKey({
+const member = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -29,7 +29,7 @@ const member = createIdentity.apiKey({
     }),
 });
 
-const { k } = kizuna({
+const { k } = Kizuna.init({
     identities: {
         user,
         member,
@@ -108,7 +108,7 @@ test('a route entry inherits the * default identities', () => {
 });
 
 test('an auth-less contract degrades to plain handlers', () => {
-    const { k: plainK } = kizuna();
+    const { k: plainK } = Kizuna.init();
     const items = plainK.routes({
         listItems: {
             method: 'GET',
@@ -371,13 +371,13 @@ test('the standalone RouteHandler matches the Router tree it drops into', () => 
     >();
 });
 
-const inviteToken = createIdentity.custom({
+const inviteToken = Kizuna.identity.custom({
     context: z.object({
         inviteId: z.string(),
     }),
 });
 
-const { k: inviteK } = kizuna({
+const { k: inviteK } = Kizuna.init({
     identities: {
         inviteToken,
     },

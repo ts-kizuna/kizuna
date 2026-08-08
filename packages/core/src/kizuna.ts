@@ -1,5 +1,7 @@
+import type { z } from 'zod';
 import { tagRoutes } from './routes.js';
 import { assembleContract, type Contract } from './contract.js';
+import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { type TagSet, type TagOptions } from './tags.js';
 import type { Routes, RouteDefinition, SecurityRequirement, AccessGate, AuthoredRoutes } from './types.js';
@@ -181,20 +183,34 @@ const applyGroupAuth = (group: Routes, groupAuth: GroupAuth, path: string): void
 };
 
 /**
- * The handle `kizuna` returns. `k.routes` defines route groups; `k.contract`
- * assembles them into the contract.
+ * The four things `Kizuna.init` binds.
  */
-export interface K<
-    Tags extends Record<string, TagOptions>,
-    Codes extends string,
-    Identities extends Record<string, SecurityScheme> = Record<string, never>,
-    RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
-> {
+export interface KizunaSpec {
+    tags: Record<string, TagOptions>;
+    codes: string;
+    identities: Record<string, SecurityScheme>;
+    requestContext: Record<string, RequestContextSchema>;
+}
+
+/**
+ * The tag names declared on a spec, e.g. `'health' | 'users'`.
+ */
+export type TagNamesOf<Spec extends KizunaSpec> = Extract<keyof Spec['tags'], string>;
+
+/**
+ * The identity names declared on a spec, e.g. `'user' | 'member'`.
+ */
+export type IdentityNamesOf<Spec extends KizunaSpec> = Extract<keyof Spec['identities'], string>;
+
+/**
+ * The handle `Kizuna.init` returns.
+ */
+export interface K<Spec extends KizunaSpec = KizunaSpec> {
     /**
-     * Define a group of routes. Pass a tag (one of the keys from `createTags`)
+     * Define a group of routes. Pass a tag (one of the keys from `Kizuna.tags`)
      * to group them in the OpenAPI document, or omit it for an untagged group.
      */
-    routes<const T extends AuthoredRoutes<Extract<keyof Tags, string>>>(tag: Extract<keyof Tags, string>, defs: T & PathParamsCheck<T>): T;
+    routes<const T extends AuthoredRoutes<TagNamesOf<Spec>>>(tag: TagNamesOf<Spec>, defs: T & PathParamsCheck<T>): T;
     routes<const T extends AuthoredRoutes>(defs: T & PathParamsCheck<T>): T;
     /**
      * The `auth` map, typed against the routes and identities. Define it wherever
@@ -206,12 +222,9 @@ export interface K<
      *     members: 'user',
      * });
      */
-    auth<
-        const R extends Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
-        const A extends AuthMap<Extract<keyof Identities, string>, R>,
-    >(
+    auth<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>, const A extends AuthMap<IdentityNamesOf<Spec>, R>>(
         routes: R,
-        map: A & ValidAuthMap<A, R, Extract<keyof Identities, string>>
+        map: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>
     ): A;
     /**
      * Assemble route groups into a contract. The `auth` map assigns each group
@@ -219,23 +232,53 @@ export interface K<
      * `k.contract` resolves it onto every route's `security` and `accessGate`.
      */
     contract<
-        const R extends Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
-        const A extends AuthMap<Extract<keyof Identities, string>, R>,
+        const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
+        const A extends AuthMap<IdentityNamesOf<Spec>, R>,
     >(definition: {
         routes: R;
-        auth: A & ValidAuthMap<A, R, Extract<keyof Identities, string>>;
-    }): Contract<RoutesWithHandlerContext<R, Identities, A, RequestContext>, Tags, Codes, Identities, A, RequestContext>;
-    contract<const R extends Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>>(definition: {
+        auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
+    }): Contract<
+        RoutesWithHandlerContext<R, Spec['identities'], A, Spec['requestContext']>,
+        Spec['tags'],
+        Spec['codes'],
+        Spec['identities'],
+        A,
+        Spec['requestContext']
+    >;
+    contract<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>>(definition: {
         routes: R;
-    }): Contract<RoutesWithHandlerContext<R, Identities, unknown, RequestContext>, Tags, Codes, Identities, unknown, RequestContext>;
+    }): Contract<
+        RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext']>,
+        Spec['tags'],
+        Spec['codes'],
+        Spec['identities'],
+        unknown,
+        Spec['requestContext']
+    >;
+    /**
+     * Emit a validation issue with a machine-readable `code`, checked against the
+     * codes declared under `validation.issueCodes`.
+     *
+     * @example
+     * const phone = z.string().superRefine((value, ctx) => {
+     *     if (isValidPhoneNumber(value)) return;
+     *     k.issue(ctx, {
+     *         code: 'invalid_phone_number',
+     *         message: 'Invalid phone number',
+     *         input: value,
+     *     });
+     * });
+     */
+    issue<Input>(ctx: z.core.$RefinementCtx<Input>, issue: RegisteredIssue<Spec['codes'], Input>): void;
 }
 
 /**
- * The typed factory for one API surface. Destructure `k`, then use `k.routes` to
- * define route groups and `k.contract` to assemble them into the contract.
+ * Bind one API surface: its tags, identities, request contexts and custom
+ * validation issue codes. Destructure `k`, then use `k.routes` to define route
+ * groups, `k.auth` to type the auth map, and `k.contract` to assemble them.
  *
  * @example
- * const { k } = kizuna({
+ * export const { k } = Kizuna.init({
  *     identities: {
  *         user,
  *     },
@@ -245,7 +288,7 @@ export interface K<
  *     },
  * });
  */
-export const kizuna = <
+export const init = <
     const Tags extends Record<string, TagOptions> = Record<string, never>,
     const Codes extends string = never,
     const Identities extends Record<string, SecurityScheme> = Record<string, never>,
@@ -257,7 +300,21 @@ export const kizuna = <
     validation?: {
         issueCodes?: readonly Codes[];
     };
-}): { k: K<Tags, Codes, Identities, RequestContext> } => {
+}): {
+    k: K<{
+        tags: Tags;
+        codes: Codes;
+        identities: Identities;
+        requestContext: RequestContext;
+    }>;
+} => {
+    type Spec = {
+        tags: Tags;
+        codes: Codes;
+        identities: Identities;
+        requestContext: RequestContext;
+    };
+
     const tagSet: TagSet<Tags> = config?.tags ?? { __brand: 'TagSet', tags: {} as Tags };
 
     const routes = ((tagOrDefs: string | Routes, defs?: Routes) => {
@@ -265,7 +322,7 @@ export const kizuna = <
             return tagRoutes(tagOrDefs as Routes);
         }
         return tagRoutes(tagSet, tagOrDefs as Extract<keyof Tags, string>, defs as Routes<Extract<keyof Tags, string>>);
-    }) as K<Tags, Codes, Identities, RequestContext>['routes'];
+    }) as K<Spec>['routes'];
 
     const contract = (definition: { routes: Routes; auth?: Record<string, GroupAuth> }) => {
         const { routes: contractRoutes, auth } = definition;
@@ -295,10 +352,11 @@ export const kizuna = <
         });
     };
 
-    const k: K<Tags, Codes, Identities, RequestContext> = {
+    const k: K<Spec> = {
         routes,
         auth: (_routes, map) => map,
-        contract: contract as K<Tags, Codes, Identities, RequestContext>['contract'],
+        contract: contract as K<Spec>['contract'],
+        issue: addCodedIssue,
     };
 
     return { k };

@@ -1,10 +1,9 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { kizuna } from './kizuna.js';
-import { createTags } from './tags.js';
+import { Kizuna } from './namespace.js';
 
-const { k } = kizuna({
-    tags: createTags({
+const { k } = Kizuna.init({
+    tags: Kizuna.tags({
         users: 'Users',
     }),
 });
