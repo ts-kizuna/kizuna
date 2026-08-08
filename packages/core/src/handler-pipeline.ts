@@ -3,79 +3,7 @@ import { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand, type Route
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { IdentityAccess } from './identity.js';
-import { readDef, readObjectShape, resolveBaseType, WRAPPER_TYPES } from './zod-internals.js';
-
-const resolveArrayElement = (schema: z.core.$ZodType): z.core.$ZodType | undefined => {
-    const def = readDef(schema);
-    if (def.type === 'array' && def.element) {
-        return def.element;
-    }
-    if (def.type && WRAPPER_TYPES.has(def.type) && def.innerType) {
-        return resolveArrayElement(def.innerType);
-    }
-    if (def.type === 'pipe' && def.in) {
-        return resolveArrayElement(def.in);
-    }
-    return undefined;
-};
-
-const coerceValue = (value: unknown, baseType: string): unknown => {
-    if (typeof value !== 'string') return value;
-    if (baseType === 'number' || baseType === 'int') {
-        const coerced = Number(value);
-        return Number.isNaN(coerced) ? value : coerced;
-    }
-    if (baseType === 'boolean') {
-        if (value === 'true') return true;
-        if (value === 'false') return false;
-    }
-    if (baseType === 'bigint') {
-        try {
-            return BigInt(value);
-        } catch {
-            // Invalid bigint — leave it for Zod to reject.
-            return value;
-        }
-    }
-    if (baseType === 'date') {
-        const date = new Date(value);
-        return Number.isNaN(date.getTime()) ? value : date;
-    }
-    return value;
-};
-
-const coerceStringValues = (input: unknown, schema: z.ZodType): unknown => {
-    if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
-    const shape = readObjectShape(schema);
-    if (!shape) return input;
-    const record = input as Record<string, unknown>;
-    const result: Record<string, unknown> = {};
-    let changed = false;
-    for (const key of Object.keys(record)) {
-        const fieldSchema = shape[key];
-        if (!fieldSchema) {
-            result[key] = record[key];
-            continue;
-        }
-        const baseType = resolveBaseType(fieldSchema);
-        if (baseType === 'array') {
-            const elementSchema = resolveArrayElement(fieldSchema);
-            if (elementSchema && Array.isArray(record[key])) {
-                const elementType = resolveBaseType(elementSchema);
-                const coerced = (record[key] as unknown[]).map((item) => coerceValue(item, elementType));
-                result[key] = coerced;
-                changed = true;
-            } else {
-                result[key] = record[key];
-            }
-        } else {
-            const coerced = coerceValue(record[key], baseType);
-            result[key] = coerced;
-            if (coerced !== record[key]) changed = true;
-        }
-    }
-    return changed ? result : input;
-};
+import { applyCoercion, coercionPlanFor } from './coercion.js';
 
 type ProblemDetailsEnvelope = { type: string; title: string; status: number; detail: string };
 
@@ -407,8 +335,6 @@ export interface ValidationFailure {
     issues: z.core.$ZodIssue[];
 }
 
-const COERCED_STAGES: ReadonlySet<ValidationStage> = new Set(['params', 'query', 'headers']);
-
 const STAGE_MESSAGES: Record<ValidationStage, string> = {
     params: 'Invalid path parameters',
     query: 'Invalid query parameters',
@@ -425,26 +351,30 @@ export const validateRequest = (
     route: RouteDefinition,
     raw: RawInputs
 ): { ok: true; parsed: RawInputs } | { ok: false; error: ValidationFailure } => {
-    const order: ReadonlyArray<{ stage: ValidationStage; schema: z.ZodType | undefined; input: unknown }> = [
+    const order: ReadonlyArray<{ stage: ValidationStage; schema: z.ZodType | undefined; input: unknown; coerced: boolean }> = [
         {
             stage: 'params',
             schema: route.pathParams,
             input: raw.params,
+            coerced: true,
         },
         {
             stage: 'query',
             schema: route.query,
             input: raw.query,
+            coerced: true,
         },
         {
             stage: 'headers',
             schema: route.headers,
             input: raw.headers,
+            coerced: true,
         },
         {
             stage: 'body',
             schema: route.body,
             input: raw.body,
+            coerced: false,
         },
     ];
 
@@ -457,7 +387,7 @@ export const validateRequest = (
 
     for (const step of order) {
         if (!step.schema) continue;
-        const input = COERCED_STAGES.has(step.stage) ? coerceStringValues(step.input, step.schema) : step.input;
+        const input = step.coerced ? applyCoercion(step.input, coercionPlanFor(step.schema)) : step.input;
         const result = step.schema.safeParse(input);
         if (!result.success) {
             return {
