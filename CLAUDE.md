@@ -73,6 +73,7 @@ First-party adapters (in `packages/`) always ship with:
 - **MCP integration** — a framework-specific file in `packages/mcp/src/` with its own export in `packages/mcp/package.json`
 - **Demo app** — a working example app in `apps/` (e.g. `apps/express-demo`, `apps/hono-demo`)
 - **Documentation** — an adapter page in `docs/content/docs/adapters/`, plus updates to every doc page that lists adapters
+- **Shared suites**: a `testAdapterFeatures(...)` call in its `*.test.ts` and a `checkAdapterTypeFeatures(...)` call in its `*.test-d.ts`, both from `packages/core/src/adapter-testing/`. Both catalogues are exhaustive, so adding a feature to either one breaks every adapter until each answers it. Legitimate framework differences belong in `ADAPTER_BEHAVIOUR` or in a plain `test()` beside the catalogue call, never silently dropped.
 
 # Documentation
 
