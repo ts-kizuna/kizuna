@@ -35,12 +35,15 @@ import type {
 } from '@ts-kizuna/core';
 import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
 
-export type ExpressApi<R extends Routes = Routes> = R &
-    ApiWithRouter & {
-        readonly [GUARDS_META]?: unknown;
-        readonly [SCHEMES_META]?: unknown;
-        readonly [REQUEST_CONTEXT_META]?: unknown;
-    };
+export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
+    readonly [GUARDS_META]?: unknown;
+    readonly [SCHEMES_META]?: unknown;
+    readonly [REQUEST_CONTEXT_META]?: unknown;
+    /**
+     * Register every contract route on an Express app or router.
+     */
+    mount: (app: AppLike, options?: ExpressOptions) => ExpressRouter;
+};
 
 /**
  * The Express request and response passed to each handler.
@@ -190,16 +193,16 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
  * Mount a ts-kizuna API onto an Express app.
  *
  * @example
- * createExpressEndpoints(api, app);
+ * api.mount(app);
  */
-export function createExpressEndpoints(api: ExpressApi, app: AppLike, options?: ExpressOptions): ExpressRouter {
+function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOptions): ExpressRouter {
     const resolvedRouter = api[ROUTER_META] as CoreRouter<Routes, ExpressHandlerContext>;
     const guards = api[GUARDS_META] as GuardMap<ExpressHandlerContext> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<ExpressHandlerContext> | undefined;
 
     const expressRouter = createExpressRouter();
-    for (const { routeKey, route } of adapter.eachRoute(api as unknown as Routes, resolvedRouter)) {
+    for (const { routeKey, route } of adapter.eachRoute(api.routes, resolvedRouter)) {
         const method = route.method.toLowerCase() as 'get' | 'head' | 'post' | 'put' | 'patch' | 'delete' | 'options';
         expressRouter[method](
             route.path,
@@ -222,7 +225,7 @@ export function createExpressEndpoints(api: ExpressApi, app: AppLike, options?: 
                     readBody: () => req.body,
                 };
                 await adapter.handle({
-                    routes: api as unknown as Routes,
+                    routes: api.routes,
                     router: resolvedRouter,
                     request: adapterRequest,
                     responseContext: {
@@ -291,10 +294,10 @@ export interface Server<
     api(
         options: {
             router: Router<ServerContract<R, Schemes, Auth, RequestContext>>;
-            guards?: NoInfer<GuardsForSchemes<Schemes>>;
-        } & (string extends keyof RequestContext
-            ? { requestContext?: undefined }
-            : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<ExpressHandlerContext> }> })
+        } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) &
+            (string extends keyof RequestContext
+                ? { requestContext?: undefined }
+                : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<ExpressHandlerContext> }> })
     ): ExpressApi<R>;
 }
 
@@ -303,7 +306,7 @@ export interface Server<
  * `k`.
  *
  * @example
- * const { server } = createServer(contract);
+ * const { server } = KizunaServer.init(contract);
  *
  * const requireUser = server.guard('user', ({ bearer, deny }) => {
  *     const session = bearer && sessions.get(bearer.token);
@@ -317,7 +320,7 @@ export interface Server<
  *     },
  * });
  */
-export const createServer = <
+const init = <
     const R extends Routes,
     Schemes extends Record<string, SecurityScheme>,
     Auth,
@@ -329,7 +332,17 @@ export const createServer = <
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
-        api: (options: ApiParts) => assembleApi(contract, options),
+        api: (options: ApiParts) => {
+            const api = assembleApi(contract, options) as ExpressApi<R>;
+            return Object.assign(api, {
+                mount: (app: AppLike, mountOptions?: ExpressOptions) => mountExpress(api, app, mountOptions),
+            });
+        },
     };
     return { server: server as unknown as Server<R, Schemes, Auth, RequestContext> };
 };
+
+/**
+ * Bind a contract to a server handle. The serving counterpart to `Kizuna.init`.
+ */
+export const KizunaServer = { init };

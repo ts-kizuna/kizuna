@@ -278,14 +278,13 @@ type NextApiWithRouter = ApiWithRouter & {
     readonly [REQUEST_CONTEXT_META]?: unknown;
 };
 
-export type NextApi<R extends Routes = Routes> = R &
-    ApiWithRouter & {
-        readonly [_ON_ERROR]?: NextHandlerOptions['onError'];
-        readonly [GUARDS_META]?: unknown;
-        readonly [SCHEMES_META]?: unknown;
-        readonly [REQUEST_CONTEXT_META]?: unknown;
-        mount: (options?: NextHandlerOptions) => HttpHandlers;
-    };
+export type NextApi<R extends Routes = Routes> = ApiWithRouter<R> & {
+    readonly [_ON_ERROR]?: NextHandlerOptions['onError'];
+    readonly [GUARDS_META]?: unknown;
+    readonly [SCHEMES_META]?: unknown;
+    readonly [REQUEST_CONTEXT_META]?: unknown;
+    mount: (options?: NextHandlerOptions) => HttpHandlers;
+};
 
 /**
  * Create endpoints for a Next.js App Router catch-all route.
@@ -296,14 +295,14 @@ export type NextApi<R extends Routes = Routes> = R &
  *     basePath: '/api',
  * });
  */
-export function createNextEndpoints(api: NextApiWithRouter, options?: NextHandlerOptions): HttpHandlers {
+function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions): HttpHandlers {
     const guards = api[GUARDS_META] as GuardMap<NextHandlerContext> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<NextHandlerContext> | undefined;
     const handler = (request: NextRequest) =>
         handleNextRequest(
             request,
-            api as unknown as Routes,
+            api.routes,
             api[ROUTER_META] as CoreRouter<Routes, NextHandlerContext>,
             {
                 basePath: options?.basePath,
@@ -383,11 +382,11 @@ export interface Server<
     api(
         options: {
             router: Router<ServerContract<R, Schemes, Auth, RequestContext>>;
-            guards?: NoInfer<GuardsForSchemes<Schemes>>;
-            onError?: NextHandlerOptions['onError'];
-        } & (string extends keyof RequestContext
-            ? { requestContext?: undefined }
-            : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<NextHandlerContext> }> })
+        } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) & {
+                onError?: NextHandlerOptions['onError'];
+            } & (string extends keyof RequestContext
+                ? { requestContext?: undefined }
+                : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<NextHandlerContext> }> })
     ): NextApi<R>;
 }
 
@@ -396,7 +395,7 @@ export interface Server<
  * `k`.
  *
  * @example
- * const { server } = createServer(contract);
+ * const { server } = KizunaServer.init(contract);
  *
  * const requireUser = server.guard('user', ({ bearer, deny }) => {
  *     const session = bearer && sessions.get(bearer.token);
@@ -410,7 +409,7 @@ export interface Server<
  *     },
  * });
  */
-export const createServer = <
+const init = <
     const R extends Routes,
     Schemes extends Record<string, SecurityScheme>,
     Auth,
@@ -426,9 +425,14 @@ export const createServer = <
             Object.assign(assembleApi(contract, parts), {
                 [_ON_ERROR]: onError,
                 mount(mountOptions?: NextHandlerOptions) {
-                    return createNextEndpoints(this as unknown as NextApiWithRouter, mountOptions);
+                    return mountNext(this as unknown as NextApiWithRouter, mountOptions);
                 },
             }),
     };
     return { server: server as unknown as Server<R, Schemes, Auth, RequestContext> };
 };
+
+/**
+ * Bind a contract to a server handle. The serving counterpart to `Kizuna.init`.
+ */
+export const KizunaServer = { init };

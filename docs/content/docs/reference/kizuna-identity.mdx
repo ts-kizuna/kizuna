@@ -3,7 +3,7 @@ title: Kizuna.identity
 description: Define who can call your API — an OpenAPI security scheme, the context a passing guard provides, and the access fields routes may constrain.
 ---
 
-An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/create-server#serverguard) provides to handlers), and an optional `access` schema (the fields the [`auth` map](/docs/reference/k-contract#the-auth-map) may constrain per route). Omit `context` for an authentication-only identity — a pure gate with no data to hand the handler. For the full walkthrough, see the [Auth guide](/docs/auth).
+An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/server-guard) provides to handlers), and an optional `access` schema (the fields the [`auth` map](/docs/reference/k-contract#the-auth-map) may constrain per route). Omit `context` for an authentication-only identity — a pure gate with no data to hand the handler. For the full walkthrough, see the [Auth guide](/docs/auth).
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -77,7 +77,7 @@ export const apiConsumer = Kizuna.identity.apiKey({
 });
 ```
 
-Its [guard](/docs/reference/create-server#serverguard) returns nothing on success (or `deny(...)` to reject) — no `return {}` boilerplate:
+Its [guard](/docs/reference/server-guard) returns nothing on success (or `deny(...)` to reject) — no `return {}` boilerplate:
 
 ```ts
 export const requireApiKey = server.guard('apiConsumer', ({ apiKey, deny }) => {
@@ -158,7 +158,7 @@ export const contract = k.contract({
 });
 ```
 
-See the [`auth` map reference](/docs/reference/k-contract#the-auth-map) for every value form. From there, each identity needs exactly one [guard](/docs/reference/create-server#serverguard), registered on [`server.api`](/docs/reference/create-server#serverapi).
+See the [`auth` map reference](/docs/reference/k-contract#the-auth-map) for every value form. From there, each identity needs exactly one [guard](/docs/reference/server-guard), registered on [`server.api`](/docs/reference/server-api).
 
 ## OpenAPI emission
 

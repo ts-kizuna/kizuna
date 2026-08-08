@@ -27,10 +27,10 @@ export default withKizuna(nextConfig);
 Then create a catch-all route at `src/app/api/[...ts-kizuna]/route.ts`. The adapter exports handlers for every HTTP method, which Next.js dispatches automatically.
 
 ```ts title="src/lib/server.ts"
-import { createServer } from '@ts-kizuna/next';
+import { KizunaServer } from '@ts-kizuna/next';
 import { contract } from '@shared/contract';
 
-export const { server } = createServer(contract);
+export const { server } = KizunaServer.init(contract);
 ```
 
 ```ts title="src/lib/router.ts"
@@ -87,10 +87,9 @@ export const api = server.api({
 ```
 
 ```ts title="src/app/api/[...ts-kizuna]/route.ts"
-import { createNextEndpoints } from '@ts-kizuna/next';
 import { api } from '../../../lib/api';
 
-export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
     basePath: '/api',
 });
 ```
@@ -136,10 +135,10 @@ For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/ref
 
 ## Options
 
-Pass options to `createNextEndpoints`:
+Pass options to `api.mount`:
 
 ```ts
-createNextEndpoints(api, {
+api.mount({
     basePath: '/api',
     responseValidation: false,
 });
@@ -154,7 +153,7 @@ createNextEndpoints(api, {
 
 ## `onError`
 
-Set `onError` on `server.api` (or pass it to `createNextEndpoints`) to send a custom response instead of the default 500:
+Set `onError` on `server.api` (or pass it to `api.mount`) to send a custom response instead of the default 500:
 
 ```ts title="src/lib/api.ts"
 import { server } from './server';
@@ -232,7 +231,7 @@ uploadAvatar: async ({ body }) => {
 
 ## Reference
 
-- [`createServer`](/docs/reference/create-server)
-- [`server.router`](/docs/reference/create-server#serverrouter)
-- [`server.api`](/docs/reference/create-server#serverapi)
-- [`server.guard`](/docs/reference/create-server#serverguard)
+- [`KizunaServer.init`](/docs/reference/kizuna-server-init)
+- [`server.router`](/docs/reference/server-router)
+- [`server.api`](/docs/reference/server-api)
+- [`server.guard`](/docs/reference/server-guard)

@@ -5,7 +5,7 @@ description: Provide request-scoped values — analytics ids, loggers, tenants �
 
 Not everything that runs before a handler is auth. Analytics ids, request loggers, tenant lookups — values every handler wants, gating nothing. Declare them with `Kizuna.requestContext`, register them on `Kizuna.init`, resolve each with the adapter's `server.requestContext`, and every handler receives them typed under `requestContext`, keyed by their name.
 
-<AdapterTabs functionName="createServer" />
+<AdapterTabs functionName="KizunaServer" />
 
 A declaration can bind to request `headers`. Those headers stay off the routes and out of the OpenAPI document, but the clients type them: the fetch client takes them on `createClient`, and the generated Swift and Kotlin clients take them in their initializers — so a caller sets them once, and the resolver reads them validated.
 

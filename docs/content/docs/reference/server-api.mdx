@@ -1,0 +1,31 @@
+---
+title: server.api
+description: Assemble the router, guards and request context into the api object you mount.
+---
+
+`server.api({ router, guards, requestContext })` binds the router and guards into the API object an adapter mounts.
+
+```ts title="src/lib/api.ts"
+import { server } from './server';
+import { router } from './router';
+import { requireUser, requireMember } from './guards';
+
+export const api = server.api({
+    router,
+    guards: {
+        user: requireUser,
+        member: requireMember,
+    },
+});
+```
+
+`guards` is keyed by identity name and, when provided, must cover every identity the auth map uses. Mount the returned object with the adapter's mount verb:
+
+| Adapter | Mount                                            |
+| ------- | ------------------------------------------------ |
+| Express | [`api.mount(app)`](/docs/adapters/express)       |
+| Fastify | [`await api.mount(app)`](/docs/adapters/fastify) |
+| Hono    | [`api.mount(app)`](/docs/adapters/hono)          |
+| Next.js | [`api.mount()`](/docs/adapters/next)             |
+
+See the [Mounting guide](/docs/building/mounting) for full setup with each adapter.

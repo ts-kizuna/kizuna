@@ -13,16 +13,16 @@ description: Mount a ts-kizuna API on a Hono application.
 
 The standard setup:
 
-- `createServer` binds the contract to a `server` handle
+- `KizunaServer.init` binds the contract to a `server` handle
 - `server.router` binds typed implementations to the contract
 - `server.api` combines the router and guards into an API object
-- `createHonoEndpoints` mounts the API on a Hono app
+- `api.mount(app)` mounts the API on a Hono app
 
 ```ts title="src/lib/server.ts"
-import { createServer } from '@ts-kizuna/hono';
+import { KizunaServer } from '@ts-kizuna/hono';
 import { contract } from '@shared/contract';
 
-export const { server } = createServer(contract);
+export const { server } = KizunaServer.init(contract);
 ```
 
 ```ts title="src/lib/router.ts"
@@ -80,11 +80,10 @@ export const api = server.api({
 
 ```ts title="src/index.ts"
 import { Hono } from 'hono';
-import { createHonoEndpoints } from '@ts-kizuna/hono';
 import { api } from './lib/api';
 
 const app = new Hono();
-createHonoEndpoints(api, app);
+api.mount(app);
 
 export default app;
 ```
@@ -149,7 +148,7 @@ For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/ref
 ## Options
 
 ```ts
-createHonoEndpoints(api, app, {
+api.mount(app, {
     responseValidation: false,
 });
 ```
@@ -192,7 +191,7 @@ const router: Router<typeof contract> = { ... };
 
 ## Reference
 
-- [`createServer`](/docs/reference/create-server)
-- [`server.router`](/docs/reference/create-server#serverrouter)
-- [`server.api`](/docs/reference/create-server#serverapi)
-- [`server.guard`](/docs/reference/create-server#serverguard)
+- [`KizunaServer.init`](/docs/reference/kizuna-server-init)
+- [`server.router`](/docs/reference/server-router)
+- [`server.api`](/docs/reference/server-api)
+- [`server.guard`](/docs/reference/server-guard)

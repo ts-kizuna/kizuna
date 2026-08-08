@@ -50,7 +50,7 @@ export interface McpEndpointOptions {
  * createMcpEndpoint(api, app);
  * ```
  */
-export const createMcpEndpoint = (api: Routes & ApiWithRouter, app: AppLike, options?: McpEndpointOptions): void => {
+export const createMcpEndpoint = (api: ApiWithRouter, app: AppLike, options?: McpEndpointOptions): void => {
     const mountPath = options?.path ?? '/mcp';
 
     app.post(mountPath, async (request: Request, response: Response) => {

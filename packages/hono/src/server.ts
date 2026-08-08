@@ -37,12 +37,15 @@ import type {
 } from '@ts-kizuna/core';
 import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
 
-export type HonoApi<R extends Routes = Routes> = R &
-    ApiWithRouter & {
-        readonly [GUARDS_META]?: unknown;
-        readonly [SCHEMES_META]?: unknown;
-        readonly [REQUEST_CONTEXT_META]?: unknown;
-    };
+export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
+    readonly [GUARDS_META]?: unknown;
+    readonly [SCHEMES_META]?: unknown;
+    readonly [REQUEST_CONTEXT_META]?: unknown;
+    /**
+     * Register every contract route on a Hono app.
+     */
+    mount: <E extends Env = Env>(app: Hono<E>, options?: HonoOptions) => void;
+};
 
 export interface HonoHandlerContext<E extends Env = Env> {
     c: Context<E>;
@@ -159,18 +162,15 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
  *
  * @example
  * const app = new Hono();
- * createHonoEndpoints(api, app);
+ * api.mount(app);
  */
-export function createHonoEndpoints<E extends Env = Env>(api: HonoApi, app: Hono<E>, options?: HonoOptions): void {
+function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, options?: HonoOptions): void {
     const resolvedRouter = api[ROUTER_META] as CoreRouter<Routes, HonoHandlerContext<E>>;
     const guards = api[GUARDS_META] as GuardMap<HonoHandlerContext<Env>> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<HonoHandlerContext<Env>> | undefined;
 
-    for (const { routeKey, route } of honoAdapter.eachRoute(
-        api as unknown as Routes,
-        resolvedRouter as CoreRouter<Routes, HonoHandlerContext<Env>>
-    )) {
+    for (const { routeKey, route } of honoAdapter.eachRoute(api.routes, resolvedRouter as CoreRouter<Routes, HonoHandlerContext<Env>>)) {
         const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
         const kizunaHandler = async (c: Context<E>) => {
             const url = new URL(c.req.url);
@@ -190,7 +190,7 @@ export function createHonoEndpoints<E extends Env = Env>(api: HonoApi, app: Hono
             };
 
             return honoAdapter.handle({
-                routes: api as unknown as Routes,
+                routes: api.routes,
                 router: resolvedRouter as CoreRouter<Routes, HonoHandlerContext<Env>>,
                 request: adapterRequest,
                 responseContext: {
@@ -260,10 +260,10 @@ export interface Server<
     api(
         options: {
             router: Router<ServerContract<R, Schemes, Auth, RequestContext>, E>;
-            guards?: NoInfer<GuardsForSchemes<Schemes, E>>;
-        } & (string extends keyof RequestContext
-            ? { requestContext?: undefined }
-            : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<HonoHandlerContext<E>> }> })
+        } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes, E>> }) &
+            (string extends keyof RequestContext
+                ? { requestContext?: undefined }
+                : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<HonoHandlerContext<E>> }> })
     ): HonoApi<R>;
 }
 
@@ -272,7 +272,7 @@ export interface Server<
  * `k`.
  *
  * @example
- * const { server } = createServer(contract);
+ * const { server } = KizunaServer.init(contract);
  *
  * const requireUser = server.guard('user', ({ bearer, deny }) => {
  *     const session = bearer && sessions.get(bearer.token);
@@ -286,7 +286,7 @@ export interface Server<
  *     },
  * });
  */
-export const createServer = <
+const init = <
     const R extends Routes,
     Schemes extends Record<string, SecurityScheme>,
     Auth,
@@ -299,7 +299,17 @@ export const createServer = <
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
-        api: (options: ApiParts) => assembleApi(contract, options),
+        api: (options: ApiParts) => {
+            const api = assembleApi(contract, options) as HonoApi<R>;
+            return Object.assign(api, {
+                mount: <E extends Env = Env>(app: Hono<E>, mountOptions?: HonoOptions) => mountHono(api, app, mountOptions),
+            });
+        },
     };
     return { server: server as unknown as Server<R, Schemes, Auth, RequestContext, E> };
 };
+
+/**
+ * Bind a contract to a server handle. The serving counterpart to `Kizuna.init`.
+ */
+export const KizunaServer = { init };

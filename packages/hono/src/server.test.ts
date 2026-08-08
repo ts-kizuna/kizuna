@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { createHonoEndpoints, createServer } from './server.js';
+import { KizunaServer } from './server.js';
 import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const { k } = Kizuna.init({
@@ -28,7 +28,7 @@ describe('Hono — handler context', () => {
         const contextContract = k.contract({
             routes: contextRoutes,
         });
-        const contextApi = createServer(contextContract).server.api({
+        const contextApi = KizunaServer.init(contextContract).server.api({
             router: {
                 echo: ({ c }) => ({
                     status: 200,
@@ -38,7 +38,7 @@ describe('Hono — handler context', () => {
                 }),
             },
         });
-        createHonoEndpoints(contextApi, contextApp);
+        contextApi.mount(contextApp);
 
         const response = await contextApp.request('/echo');
         expect(response.status).toBe(200);
@@ -49,10 +49,10 @@ describe('Hono — handler context', () => {
 
 testAdapterFeatures({
     name: 'hono',
-    createServerApi: (contract, options) => createServer(contract).server.api(options),
+    initServerApi: (contract, options) => KizunaServer.init(contract).server.api(options),
     mount: (api, { responseValidation }) => {
         const app = new Hono();
-        createHonoEndpoints(api, app, {
+        api.mount(app, {
             responseValidation,
         });
         return {

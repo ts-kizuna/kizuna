@@ -44,7 +44,14 @@ export const SCHEMES_META: unique symbol = Symbol('ts-kizuna.schemes');
 export const REQUEST_CONTEXT_META: unique symbol = Symbol('ts-kizuna.request-context');
 
 export type ApiDefinition = { readonly [API_META]: true };
-export type ApiWithRouter = ApiDefinition & { readonly [ROUTER_META]: Record<string, unknown> };
+export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
+    /**
+     * The contract's route tree. Read it here rather than off the api object: the
+     * api carries the parts that serve the routes, it is not the routes itself.
+     */
+    readonly routes: R;
+    readonly [ROUTER_META]: Record<string, unknown>;
+};
 
 /**
  * The marker a guard's `deny(status, detail)` returns. Distinguishes a denial
@@ -146,21 +153,19 @@ export const assembleApi = <const R extends Routes>(
         securitySchemes?: Record<string, SecurityScheme>;
     },
     parts: ApiParts
-): R & ApiWithRouter => {
+): ApiWithRouter<R> => {
     assertNoDuplicateRoutes(contract.routes);
     for (const { route } of flattenRoutes(contract.routes)) {
         resolveCoercionPlans(route);
     }
-    return Object.assign(
-        { ...contract.routes },
-        {
-            [API_META]: true,
-            [ROUTER_META]: parts.router,
-            [GUARDS_META]: parts.guards,
-            [SCHEMES_META]: contract.securitySchemes,
-            [REQUEST_CONTEXT_META]: parts.requestContext,
-        }
-    ) as unknown as R & ApiWithRouter;
+    return {
+        routes: contract.routes,
+        [API_META]: true,
+        [ROUTER_META]: parts.router,
+        [GUARDS_META]: parts.guards,
+        [SCHEMES_META]: contract.securitySchemes,
+        [REQUEST_CONTEXT_META]: parts.requestContext,
+    } as ApiWithRouter<R>;
 };
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
 export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
@@ -722,14 +727,22 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
     },
     eachRoute: function* (routes, router) {
         const sorted = sortFlattenedRoutes(flattenRoutes(routes));
+        let mounted = 0;
         for (const { routeKey, route } of sorted) {
             const handler = resolveHandler(router, routeKey);
             if (typeof handler !== 'function') continue;
+            mounted += 1;
             yield {
                 routeKey,
                 route,
                 handler: handler as RouteHandler<RouteDefinition, HandlerContext>,
             };
+        }
+        if (sorted.length > 0 && mounted === 0) {
+            throw new Error(
+                `ts-kizuna mounted 0 of ${sorted.length} routes: no handler resolved for any route key (first was '${sorted[0]!.routeKey}'). ` +
+                    `The router's shape does not match the contract's route keys.`
+            );
         }
     },
 });

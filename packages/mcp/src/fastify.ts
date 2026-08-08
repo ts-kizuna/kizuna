@@ -8,7 +8,7 @@ export interface McpEndpointOptions {
     /**
      * The api from `Kizuna.init`.
      */
-    api: Routes & ApiWithRouter;
+    api: ApiWithRouter;
 
     /**
      * Path where the MCP endpoint is mounted.
@@ -45,12 +45,10 @@ export interface McpEndpointOptions {
  *
  * @example
  * ```ts
- * app.register(mcpPlugin, {
- *     api,
- * });
+ * await mcp(api).mount(app);
  * ```
  */
-export const fastifyKizunaMcp = async (app: FastifyInstance, options: McpEndpointOptions): Promise<void> => {
+const register = async (app: FastifyInstance, options: McpEndpointOptions): Promise<void> => {
     const { api } = options;
     const mountPath = options.path ?? '/mcp';
 
@@ -92,4 +90,20 @@ export const fastifyKizunaMcp = async (app: FastifyInstance, options: McpEndpoin
             id: null,
         });
     });
+};
+
+/**
+ * Register the MCP endpoint on a Fastify instance.
+ *
+ * @example
+ * ```ts
+ * await createMcpEndpoint(api, app);
+ * ```
+ */
+export const createMcpEndpoint = async (
+    api: ApiWithRouter,
+    app: FastifyInstance,
+    options?: Omit<McpEndpointOptions, 'api'>
+): Promise<void> => {
+    await app.register(async (instance) => register(instance, { ...options, api } as McpEndpointOptions));
 };

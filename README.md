@@ -85,7 +85,7 @@ export const contract = k.contract({
 // server.ts
 import { contract } from './contract';
 
-export const { server } = createServer(contract);
+export const { server } = KizunaServer.init(contract);
 ```
 
 ```ts
@@ -143,7 +143,7 @@ Then mount it on your app:
 const app = express();
 app.use(express.json());
 
-createExpressEndpoints(api, app);
+api.mount(app);
 app.listen(3000);
 ```
 

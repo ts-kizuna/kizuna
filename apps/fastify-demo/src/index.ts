@@ -1,6 +1,5 @@
 import Fastify from 'fastify';
-import { fastifyKizuna } from '@ts-kizuna/fastify';
-import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
+import { createMcpEndpoint } from '@ts-kizuna/mcp/fastify';
 import fastifyApiReference from '@scalar/fastify-api-reference';
 
 import { api } from './lib/api';
@@ -49,12 +48,8 @@ app.get('/', async (_request, reply) => {
 </html>`);
 });
 
-app.register(fastifyKizuna, {
-    api,
-});
-app.register(fastifyKizunaMcp, {
-    api,
-});
+await api.mount(app);
+await createMcpEndpoint(api, app);
 
 const port = Number(process.env.PORT ?? 8002);
 app.listen(

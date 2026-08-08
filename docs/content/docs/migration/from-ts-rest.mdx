@@ -149,9 +149,9 @@ const router = s.router(contract, { ... });
 
 ```ts
 // ts-kizuna
-import { createServer } from '@ts-kizuna/express';
+import { KizunaServer } from '@ts-kizuna/express';
 
-const { server } = createServer(contract);
+const { server } = KizunaServer.init(contract);
 
 const router = server.router({ ... });
 
@@ -182,21 +182,19 @@ const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ par
 
 ## Express adapter
 
-### `createExpressEndpoints` → `createExpressEndpoints`
+### `createExpressEndpoints` → `api.mount`
 
 ```ts
 // ts-rest
-import { createExpressEndpoints } from '@ts-rest/express';
 createExpressEndpoints(contract, router, app);
 ```
 
 ```ts
 // ts-kizuna
-import { createExpressEndpoints } from '@ts-kizuna/express';
-createExpressEndpoints(api, app);
+api.mount(app);
 ```
 
-In ts-kizuna, `createExpressEndpoints` takes the `api` object (produced by `server.api`) rather than separate routes and handler arguments.
+In ts-kizuna, `api.mount(app)` is a method on the `api` object (produced by `server.api`) rather than a function taking separate routes and handler arguments.
 
 ## Next.js adapter
 
@@ -217,10 +215,9 @@ export { handler as GET, handler as POST, handler as PUT, handler as PATCH, hand
 
 ```ts
 // ts-kizuna — App Router catch-all
-import { createNextEndpoints } from '@ts-kizuna/next';
 import { api } from '../../lib/server';
 
-export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
     basePath: '/api',
 });
 ```

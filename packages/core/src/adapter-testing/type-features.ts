@@ -53,7 +53,7 @@ export const ADAPTER_TYPE_FEATURES = {
         summary: 'An identity the contract does not declare is refused.',
     },
     'guards.completeMap': {
-        summary: '`server.api` requires a guard for every identity the contract declares.',
+        summary: '`server.api` requires `guards`, with an entry per identity, when the contract declares any.',
     },
     'requestContext.handlerArg': {
         summary: 'Handlers receive typed `requestContext` on every route.',

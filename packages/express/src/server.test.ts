@@ -1,15 +1,15 @@
 import express from 'express';
 import request from 'supertest';
-import { createExpressEndpoints, createServer } from './server.js';
+import { KizunaServer } from './server.js';
 import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 testAdapterFeatures({
     name: 'express',
-    createServerApi: (contract, options) => createServer(contract).server.api(options),
+    initServerApi: (contract, options) => KizunaServer.init(contract).server.api(options),
     mount: (api, { responseValidation }) => {
         const app = express();
         app.use(express.json());
-        createExpressEndpoints(api, app, {
+        api.mount(app, {
             responseValidation,
         });
         return {

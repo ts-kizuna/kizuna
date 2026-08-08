@@ -13,16 +13,16 @@ description: Mount a ts-kizuna API on an Express 5 application.
 
 The standard setup:
 
-- `createServer` binds the contract to a `server` handle
+- `KizunaServer.init` binds the contract to a `server` handle
 - `server.router` binds typed implementations to the contract
 - `server.api` combines the router and guards into an API object
-- `createExpressEndpoints` mounts the API on an Express app
+- `api.mount(app)` mounts the API on an Express app
 
 ```ts title="src/lib/server.ts"
-import { createServer } from '@ts-kizuna/express';
+import { KizunaServer } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 
-export const { server } = createServer(contract);
+export const { server } = KizunaServer.init(contract);
 ```
 
 ```ts title="src/lib/router.ts"
@@ -80,13 +80,12 @@ export const api = server.api({
 
 ```ts title="src/index.ts"
 import express from 'express';
-import { createExpressEndpoints } from '@ts-kizuna/express';
 import { api } from './lib/api';
 
 const app = express();
 app.use(express.json());
 
-createExpressEndpoints(api, app);
+api.mount(app);
 
 app.listen(3000);
 ```
@@ -132,7 +131,7 @@ For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/ref
 ## Options
 
 ```ts
-createExpressEndpoints(api, app, {
+api.mount(app, {
     responseValidation: false,
 });
 ```
@@ -184,12 +183,12 @@ app.post('/avatar', upload.single('file'), (req, res, next) => {
     next();
 });
 
-createExpressEndpoints(api, app);
+api.mount(app);
 ```
 
 ## Reference
 
-- [`createServer`](/docs/reference/create-server)
-- [`server.router`](/docs/reference/create-server#serverrouter)
-- [`server.api`](/docs/reference/create-server#serverapi)
-- [`server.guard`](/docs/reference/create-server#serverguard)
+- [`KizunaServer.init`](/docs/reference/kizuna-server-init)
+- [`server.router`](/docs/reference/server-router)
+- [`server.api`](/docs/reference/server-api)
+- [`server.guard`](/docs/reference/server-guard)

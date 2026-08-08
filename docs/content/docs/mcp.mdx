@@ -11,14 +11,13 @@ description: Mount an MCP endpoint on your Express, Fastify, Hono, or Next.js ap
 
 ```ts title="src/index.ts"
 import express from 'express';
-import { createExpressEndpoints } from '@ts-kizuna/express';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
 import { api } from './lib/api';
 
 const app = express();
 app.use(express.json());
 
-createExpressEndpoints(api, app);
+api.mount(app);
 createMcpEndpoint(api, app);
 
 app.listen(3000);
@@ -30,18 +29,13 @@ app.listen(3000);
 
 ```ts title="src/index.ts"
 import Fastify from 'fastify';
-import { fastifyKizuna } from '@ts-kizuna/fastify';
-import { fastifyKizunaMcp } from '@ts-kizuna/mcp/fastify';
+import { createMcpEndpoint } from '@ts-kizuna/mcp/fastify';
 import { api } from './lib/api';
 
 const app = Fastify();
 
-app.register(fastifyKizuna, {
-    api,
-});
-app.register(fastifyKizunaMcp, {
-    api,
-});
+await api.mount(app);
+await createMcpEndpoint(api, app);
 
 app.listen({
     port: 3000,
@@ -54,13 +48,12 @@ Mounts at `/mcp` by default, configurable with the `path` option.
 
 ```ts title="src/index.ts"
 import { Hono } from 'hono';
-import { createHonoEndpoints } from '@ts-kizuna/hono';
 import { createMcpEndpoint } from '@ts-kizuna/mcp/hono';
 import { api } from './lib/api';
 
 const app = new Hono();
 
-createHonoEndpoints(api, app);
+api.mount(app);
 createMcpEndpoint(api, app);
 
 export default app;
