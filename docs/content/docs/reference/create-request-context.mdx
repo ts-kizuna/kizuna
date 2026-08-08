@@ -3,9 +3,9 @@ title: createRequestContext
 description: Provide request-scoped values — analytics ids, loggers, tenants — to every handler, typed.
 ---
 
-Not everything that runs before a handler is auth. Analytics ids, request loggers, tenant lookups — values every handler wants, gating nothing. Declare them with `createRequestContext`, register them on `kizuna`, resolve each with the adapter's `createRequestContextResolver`, and every handler receives them typed under `requestContext`, keyed by their name.
+Not everything that runs before a handler is auth. Analytics ids, request loggers, tenant lookups — values every handler wants, gating nothing. Declare them with `createRequestContext`, register them on `kizuna`, resolve each with the adapter's `server.requestContext`, and every handler receives them typed under `requestContext`, keyed by their name.
 
-<AdapterTabs functionName="createRequestContextResolver" />
+<AdapterTabs functionName="createServer" />
 
 A declaration can bind to request `headers`. Those headers stay off the routes and out of the OpenAPI document, but the clients type them: the fetch client takes them on `createClient`, and the generated Swift and Kotlin clients take them in their initializers — so a caller sets them once, and the resolver reads them validated.
 
@@ -80,4 +80,4 @@ let client = APIClient(baseURL: url, requestContext: .init(xPosthogSessionId: se
 val client = APIClient(baseUrl = baseUrl, requestContext = APIClient.RequestContext(xPosthogSessionId = sessionId))
 ```
 
-Resolvers run on every route — public ones included — before the guards, and never deny a request. They receive the adapter's native request objects, the route's `params`, and the declared `headers` (validated). The return is checked against the `context` schema, and `createApi` requires a resolver for every declared key. Request context never appears in the OpenAPI document.
+Resolvers run on every route — public ones included — before the guards, and never deny a request. They receive the adapter's native request objects, the route's `params`, and the declared `headers` (validated). The return is checked against the `context` schema, and `server.api` requires a resolver for every declared key. Request context never appears in the OpenAPI document.

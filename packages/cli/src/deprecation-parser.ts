@@ -406,12 +406,8 @@ const routesArgFrom = (call: ts.CallExpression): ts.Expression | undefined => {
     return firstArg;
 };
 
-const routesArgFromCreateApi = (call: ts.CallExpression): ts.Expression | undefined => {
-    return call.arguments[0];
-};
-
-// Collects route object literals from all contract/api exports in the file.
-// Handles both `createContract` and `createApi`, and follows `export { contract } from './other.js'` re-exports.
+// Collects route object literals from every `contract`/`api` export in the file, following
+// `export { contract } from './other.js'` re-exports.
 const collectExportedRoutesLiterals = (
     sourceFile: ts.SourceFile,
     resolve: IdentifierResolver,
@@ -438,10 +434,6 @@ const collectExportedRoutesLiterals = (
 
             if (isContractChainCall(initializer) || (ts.isIdentifier(callee) && callee.text === 'createContract')) {
                 const routesArg = routesArgFrom(initializer);
-                const lit = routesArg ? firstObjectLiteralIn(routesArg, resolve, new Set()) : undefined;
-                if (lit) into.push(lit);
-            } else if (ts.isIdentifier(callee) && callee.text === 'createApi') {
-                const routesArg = routesArgFromCreateApi(initializer);
                 const lit = routesArg ? firstObjectLiteralIn(routesArg, resolve, new Set()) : undefined;
                 if (lit) into.push(lit);
             }

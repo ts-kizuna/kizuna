@@ -103,10 +103,10 @@ export const contract = createContract({
     });
 });
 
-describe('createDeprecationMap with createApi', () => {
+describe('createDeprecationMap with an `api` export', () => {
     const map = createDeprecationMap(fixturePath);
 
-    test('finds deprecated route inside a createApi routes object', () => {
+    test('finds deprecated route inside an `api` routes object', () => {
         expect(map.routes.has('users.deleteUser')).toBe(true);
     });
 
@@ -116,12 +116,12 @@ describe('createDeprecationMap with createApi', () => {
         expect(map.routes.has('health.check')).toBe(false);
     });
 
-    test('follows schema identifiers inside createApi routes for field deprecations', () => {
+    test('follows schema identifiers inside `api` routes for field deprecations', () => {
         // UserSchema has @deprecated email; getUser returns UserSchema
         expect(map.fields.get('users.getUser')?.has('responses.200.email')).toBe(true);
     });
 
-    test('follows schema identifiers inside createApi routes through array wrappers', () => {
+    test('follows schema identifiers inside `api` routes through array wrappers', () => {
         // listUsers returns z.array(UserSchema)
         expect(map.fields.get('users.listUsers')?.has('responses.200.users.email')).toBe(true);
     });

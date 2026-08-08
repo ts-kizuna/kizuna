@@ -72,15 +72,6 @@ export const ADAPTER_FEATURES = {
     'guards.multiIdentity': {
         summary: 'A route requiring two identities merges both contexts, and denies until both are present.',
     },
-    'guards.viaCreateApi': {
-        summary: 'Guards wired through the deprecated standalone `createApi` still behave.',
-    },
-    'middleware.perRoute': {
-        summary: 'Framework middleware declared on one route runs only for that route.',
-    },
-    'middleware.group': {
-        summary: 'Framework middleware declared on a group runs for every route in it.',
-    },
     'responses.declaredContentType': {
         summary: 'A route declaring a non-JSON content type sends its body raw under it.',
     },

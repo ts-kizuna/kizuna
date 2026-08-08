@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import { z } from 'zod';
 import { kizuna, createTags } from '@ts-kizuna/core';
-import { createApi, createServer, fastifyKizuna, type FastifyPreHandler } from './server.js';
-import { readTestBody, sessionAuthorization, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { createServer, fastifyKizuna } from './server.js';
+import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -28,8 +28,7 @@ describe('Fastify — handler context', () => {
         const contextContract = k.contract({
             routes: contextRoutes,
         });
-        const contextApi = createApi({
-            contract: contextContract,
+        const contextApi = createServer(contextContract).server.api({
             router: {
                 echo: ({ request }) => ({
                     status: 200,
@@ -54,19 +53,9 @@ describe('Fastify — handler context', () => {
     });
 });
 
-const fastifyRequireAuth: FastifyPreHandler = async (request, reply) => {
-    if (request.headers.authorization !== sessionAuthorization) {
-        await reply.status(401).send({
-            detail: 'Unauthorized',
-        });
-    }
-};
-
 testAdapterFeatures({
     name: 'fastify',
-    createApi,
     createServerApi: (contract, options) => createServer(contract).server.api(options),
-    requireAuth: fastifyRequireAuth,
     mount: async (api, { responseValidation }) => {
         const app = Fastify();
         await app.register(fastifyKizuna, {

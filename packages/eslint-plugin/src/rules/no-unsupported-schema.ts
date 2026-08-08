@@ -107,7 +107,7 @@ const schemaNodesOf = (call: TSESTree.CallExpression): TSESTree.Node[] => {
         return schema ? [schema.value] : [];
     }
 
-    if (name !== 'createContract' && name !== 'createApi' && name !== 'routes') return [];
+    if (name !== 'createContract' && name !== 'routes') return [];
 
     const nodes: TSESTree.Node[] = [];
     const visit = (node: TSESTree.Node): void => {

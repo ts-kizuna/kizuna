@@ -97,7 +97,7 @@ type IsErrorStatus<Status> = `${Status & number}` extends `4${string}` | `5${str
 /**
  * Error responses (4xx/5xx) must be RFC 9457 Problem Details — a schema assignable to the
  * envelope. Anything else resolves to `never`, surfacing as a compile error at the handler
- * return / `error()` site. Success responses pass through unchanged.
+ * return / `throwError()` site. Success responses pass through unchanged.
  */
 type ApplyErrorEnvelope<Input, Status> =
     IsErrorStatus<Status> extends true ? (Input extends ProblemDetailsEnvelope ? StripProblemEnvelope<Input> : never) : Input;
@@ -127,14 +127,6 @@ export type HandlerArgs<R extends RouteDefinition> = {
      * This function throws internally and never returns.
      */
     throwError: (response: HandlerReturn<R>) => never;
-    /**
-     * Throws a typed error response. Takes the same `{ status, body }` shape as a handler return.
-     *
-     * This function throws internally and never returns.
-     *
-     * @deprecated Use `throwError` instead.
-     */
-    error: (response: HandlerReturn<R>) => never;
 };
 
 export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = (

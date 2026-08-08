@@ -9,7 +9,7 @@ The contract is the source of truth for your API. Building one is three small st
 2. **`k.routes`** — describe each endpoint in a group: method, path, and Zod schemas.
 3. **`k.contract`** — bundle those groups (plus optional settings) into the object you share everywhere.
 
-You hand the result to [`createRouter`](/docs/building/router) on the server and [`createClient`](/docs/clients/fetch) on every client. This page covers defining it; the [Router](/docs/building/router) and [Mounting](/docs/building/mounting) pages cover implementing and serving it.
+You hand the result to [`createServer`](/docs/building/router) on the server and [`createClient`](/docs/clients/fetch) on every client. This page covers defining it; the [Router](/docs/building/router) and [Mounting](/docs/building/mounting) pages cover implementing and serving it.
 
 ## Create the factory
 
@@ -172,7 +172,7 @@ responses: {
 
 ## Bundle into a contract
 
-Assemble your route groups with `k.contract` and default-export the result. This is the object `client` and `createApi` consume.
+Assemble your route groups with `k.contract` and default-export the result. This is the object `client` and `server.api` consume.
 
 ```ts title="packages/contract/src/contract.ts"
 import { k } from './k';

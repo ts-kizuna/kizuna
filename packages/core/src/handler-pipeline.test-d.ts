@@ -110,14 +110,14 @@ test('HandlerArgs surfaces typed body when the route declares it', () => {
     expectTypeOf<HandlerArgs<GetUserRoute>['body']>().toEqualTypeOf<undefined>();
 });
 
-test('HandlerArgs error function returns never', () => {
-    type ErrorFn = HandlerArgs<GetUserRoute>['error'];
-    expectTypeOf<ErrorFn>().returns.toEqualTypeOf<never>();
+test('HandlerArgs throwError returns never', () => {
+    type ThrowErrorFn = HandlerArgs<GetUserRoute>['throwError'];
+    expectTypeOf<ThrowErrorFn>().returns.toEqualTypeOf<never>();
 });
 
-test('HandlerArgs error function accepts the same union as HandlerReturn', () => {
-    type ErrorParam = Parameters<HandlerArgs<GetUserRoute>['error']>[0];
-    expectTypeOf<ErrorParam>().toEqualTypeOf<HandlerReturn<GetUserRoute>>();
+test('HandlerArgs throwError accepts the same union as HandlerReturn', () => {
+    type ThrowErrorParam = Parameters<HandlerArgs<GetUserRoute>['throwError']>[0];
+    expectTypeOf<ThrowErrorParam>().toEqualTypeOf<HandlerReturn<GetUserRoute>>();
 });
 
 test('HandlerArgs surfaces typed path params', () => {

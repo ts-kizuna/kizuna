@@ -41,11 +41,6 @@ export const ROUTER_META: unique symbol = Symbol('ts-kizuna.router');
 export const GUARDS_META: unique symbol = Symbol('ts-kizuna.guards');
 export const SCHEMES_META: unique symbol = Symbol('ts-kizuna.schemes');
 export const REQUEST_CONTEXT_META: unique symbol = Symbol('ts-kizuna.request-context');
-/**
- * @deprecated Define auth with identities + the contract's `auth` map and pass
- * `guards` to `createApi`. See /docs/auth.
- */
-export const MIDDLEWARE_META: unique symbol = Symbol('ts-kizuna.middleware');
 
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter = ApiDefinition & { readonly [ROUTER_META]: Record<string, unknown> };
@@ -135,11 +130,33 @@ const assertNoDuplicateRoutes = (routes: Routes): void => {
     }
 };
 
-export const createApi = <const R extends Routes>(routes: R): R & ApiDefinition => {
-    assertNoDuplicateRoutes(routes);
-    const result = { ...routes } as R & Record<typeof API_META, true>;
-    result[API_META] = true;
-    return result as unknown as R & ApiDefinition;
+export interface ApiParts {
+    router: unknown;
+    guards?: unknown;
+    requestContext?: unknown;
+}
+
+/**
+ * Brand a contract's routes with the parts that serve them, for the adapter to read back when mounting.
+ */
+export const assembleApi = <const R extends Routes>(
+    contract: {
+        routes: R;
+        securitySchemes?: Record<string, SecurityScheme>;
+    },
+    parts: ApiParts
+): R & ApiWithRouter => {
+    assertNoDuplicateRoutes(contract.routes);
+    return Object.assign(
+        { ...contract.routes },
+        {
+            [API_META]: true,
+            [ROUTER_META]: parts.router,
+            [GUARDS_META]: parts.guards,
+            [SCHEMES_META]: contract.securitySchemes,
+            [REQUEST_CONTEXT_META]: parts.requestContext,
+        }
+    ) as unknown as R & ApiWithRouter;
 };
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
 export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
@@ -147,7 +164,6 @@ export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';
 export { matchRoute } from './route-matcher.js';
-export { type MiddlewareMap, resolveMiddleware } from './middleware.js';
 
 export type RouteMatcher = (method: string, path: string, routes: Routes, basePath?: string) => MatchResult;
 
@@ -597,8 +613,6 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             body: validation.parsed.body,
             headers: validation.parsed.headers,
             throwError,
-            // Deprecated alias for `throwError`; kept for backward compatibility.
-            error: throwError,
             ...handlerContext,
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),

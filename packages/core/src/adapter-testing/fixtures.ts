@@ -191,8 +191,8 @@ export const createBrokenRouter = <Context>(): Router<typeof brokenRoutes, Conte
 export const sessionToken = 'tok_ada';
 
 /**
- * The `Authorization` value the `middleware.*` features send. Every adapter's own `requireAuth` matches on this, so it
- * is written once here rather than hardcoded per adapter.
+ * The `Authorization` value the guard features send. Every adapter matches on this, so it is written once here rather
+ * than hardcoded per adapter.
  */
 export const sessionAuthorization = `Bearer ${sessionToken}`;
 
@@ -285,7 +285,7 @@ export const securedContract = securedK.contract({
 });
 
 /**
- * The guard body every adapter shares. `createGuard` is an identity function in all four, so only the wiring differs.
+ * The guard body every adapter shares. `server.guard` is an identity function in all four, so only the wiring differs.
  */
 export const requireUserGuard = ({ bearer, deny }: { bearer?: { token: string }; deny: GuardDeny }) => {
     if (bearer?.token !== sessionToken) return deny(401, 'Unauthorized');
@@ -350,7 +350,7 @@ export const createSecuredRouter = <Context>(): SecuredRouter<Context> => ({
 });
 
 /**
- * A one-route group at a distinct path, for the `createRouter` / sub-router composition tests each adapter repeated.
+ * A one-route group at a distinct path, for the sub-router composition tests each adapter repeated.
  */
 export const subUserRoutes = k.routes('api', {
     getUser: {
@@ -581,93 +581,3 @@ export const createMethodRouter = <Context>(): Router<typeof methodRoutes, Conte
         headItem: echo('HEAD'),
     };
 };
-
-/**
- * Routes for the middleware tests: one open, one behind the adapter's own `requireAuth`, plus a group.
- */
-export const middlewareRoutes = k.routes('api', {
-    openRoute: {
-        method: 'GET',
-        path: '/open',
-        responses: {
-            200: z.object({
-                message: z.string(),
-            }),
-        },
-    },
-    guardedRoute: {
-        method: 'GET',
-        path: '/guarded',
-        responses: {
-            200: z.object({
-                message: z.string(),
-            }),
-        },
-    },
-});
-
-export const middlewareContract = k.contract({
-    routes: middlewareRoutes,
-});
-
-/**
- * A nested group, so adapters can prove middleware applies to every route in a group.
- */
-export const groupedRoutes = k.routes('api', {
-    admin: {
-        dashboard: {
-            method: 'GET',
-            path: '/admin/dashboard',
-            responses: {
-                200: z.object({
-                    message: z.string(),
-                }),
-            },
-        },
-        settings: {
-            method: 'GET',
-            path: '/admin/settings',
-            responses: {
-                200: z.object({
-                    message: z.string(),
-                }),
-            },
-        },
-    },
-});
-
-export const groupedContract = k.contract({
-    routes: groupedRoutes,
-});
-
-export const createGroupedRouter = <Context>(): Router<typeof groupedRoutes, Context> => ({
-    admin: {
-        dashboard: () => ({
-            status: 200,
-            body: {
-                message: 'dashboard',
-            },
-        }),
-        settings: () => ({
-            status: 200,
-            body: {
-                message: 'settings',
-            },
-        }),
-    },
-});
-
-export const createMiddlewareRouter = <Context>(): Router<typeof middlewareRoutes, Context> => ({
-    openRoute: () => ({
-        status: 200,
-        body: {
-            message: 'open',
-        },
-    }),
-    guardedRoute: () => ({
-        status: 200,
-        body: {
-            message: 'guarded',
-        },
-    }),
-});

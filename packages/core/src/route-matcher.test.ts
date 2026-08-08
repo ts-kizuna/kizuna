@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { kizuna, createTags } from '@ts-kizuna/core';
-import { createApi } from './adapter.js';
+import { assembleApi } from './adapter.js';
 import { matchRoute } from './route-matcher.js';
 
 const { k } = kizuna({
@@ -66,7 +66,9 @@ describe('duplicate route detection', () => {
                 responses: { 200: z.string() },
             },
         });
-        expect(() => createApi(duplicateRoutes)).toThrow(/fetchUser.*conflicts with.*getUser|getUser.*conflicts with.*fetchUser/);
+        expect(() => assembleApi({ routes: duplicateRoutes }, { router: {} })).toThrow(
+            /fetchUser.*conflicts with.*getUser|getUser.*conflicts with.*fetchUser/
+        );
     });
 
     it('throws on parametric conflict (same structure, different param names)', () => {
@@ -82,7 +84,7 @@ describe('duplicate route detection', () => {
                 responses: { 200: z.string() },
             },
         });
-        expect(() => createApi(conflictingRoutes)).toThrow(/conflicts with/);
+        expect(() => assembleApi({ routes: conflictingRoutes }, { router: {} })).toThrow(/conflicts with/);
     });
 
     it('throws on duplicate across nested sub-routes with dot-notated keys in message', () => {
@@ -102,7 +104,7 @@ describe('duplicate route detection', () => {
                 },
             },
         });
-        expect(() => createApi(nestedRoutes)).toThrow(/users\.getUser|legacy\.getUser/);
+        expect(() => assembleApi({ routes: nestedRoutes }, { router: {} })).toThrow(/users\.getUser|legacy\.getUser/);
     });
 });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
-import { createApi as coreCreateApi, ROUTER_META, GUARDS_META, SCHEMES_META, type GuardDeny } from '@ts-kizuna/core/adapter';
+import { assembleApi, type GuardDeny } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildToolDefinitions, createMcpServer } from './server.js';
@@ -135,9 +135,15 @@ const router = {
                 ],
             },
         }),
-        getUser: ({ params, error }: { params: { id: string }; error: (response: { status: number; body: unknown }) => never }) => {
+        getUser: ({
+            params,
+            throwError,
+        }: {
+            params: { id: string };
+            throwError: (response: { status: number; body: unknown }) => never;
+        }) => {
             if (params.id === '999') {
-                error({
+                throwError({
                     status: 404,
                     body: {
                         message: 'User not found',
@@ -193,8 +199,8 @@ const router = {
 };
 
 const buildApi = (testRouter: Record<string, unknown> = router) =>
-    Object.assign(coreCreateApi(contract.routes), {
-        [ROUTER_META]: testRouter,
+    assembleApi(contract, {
+        router: testRouter,
     });
 
 const api = buildApi();
@@ -546,7 +552,7 @@ describe('MCP server e2e', () => {
         await close();
     });
 
-    it('returns isError when handler calls error()', async () => {
+    it('returns isError when handler calls throwError()', async () => {
         const { client, close } = await connectMcpClient();
 
         const result = await client.callTool({
@@ -695,9 +701,8 @@ describe('MCP server — guards', () => {
     });
 
     const makeSecuredApi = () => {
-        const spec = coreCreateApi(securedContract.routes);
-        return Object.assign(spec, {
-            [ROUTER_META]: {
+        return assembleApi(securedContract, {
+            router: {
                 api: {
                     publicRoute: () => ({
                         status: 200,
@@ -713,7 +718,7 @@ describe('MCP server — guards', () => {
                     }),
                 },
             },
-            [GUARDS_META]: {
+            guards: {
                 user: ({ bearer, deny }: { bearer: { token: string } | null; deny: GuardDeny }) => {
                     if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
                     return {
@@ -721,7 +726,6 @@ describe('MCP server — guards', () => {
                     };
                 },
             },
-            [SCHEMES_META]: securedContract.securitySchemes,
         }) as Parameters<typeof createMcpServer>[0];
     };
 
@@ -780,9 +784,8 @@ describe('MCP server — guards', () => {
     });
 
     it('errors clearly when a secured tool has no registered guard', async () => {
-        const spec = coreCreateApi(securedContract.routes);
-        const apiWithoutGuards = Object.assign(spec, {
-            [ROUTER_META]: {
+        const apiWithoutGuards = assembleApi(securedContract, {
+            router: {
                 api: {
                     publicRoute: () => ({
                         status: 200,

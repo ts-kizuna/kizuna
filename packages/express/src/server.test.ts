@@ -1,23 +1,11 @@
-import express, { type Request, type Response, type NextFunction } from 'express';
+import express from 'express';
 import request from 'supertest';
-import { createApi, createExpressEndpoints, createServer } from './server.js';
-import { readTestBody, sessionAuthorization, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
-
-const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-    if (req.headers.authorization !== sessionAuthorization) {
-        res.status(401).json({
-            detail: 'Unauthorized',
-        });
-        return;
-    }
-    next();
-};
+import { createExpressEndpoints, createServer } from './server.js';
+import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 testAdapterFeatures({
     name: 'express',
-    createApi,
     createServerApi: (contract, options) => createServer(contract).server.api(options),
-    requireAuth,
     mount: (api, { responseValidation }) => {
         const app = express();
         app.use(express.json());
