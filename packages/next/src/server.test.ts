@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { kizuna, createTags } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { createApi, createNextEndpoints, createServer, NextRequest, NextResponse } from './index.js';
+import { createApi, createNextEndpoints, createServer, NextRequest, NextResponse } from './server.js';
 import { readTestBody, sessionAuthorization, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const { k } = kizuna({

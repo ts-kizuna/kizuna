@@ -1,5 +1,4 @@
 import { expectTypeOf, test } from 'vitest';
-import type { Env } from 'hono';
 import type { GuardRun, RequestContextRun } from '@ts-kizuna/core/adapter';
 import {
     checkAdapterTypeFeatures,
@@ -18,31 +17,26 @@ import {
     createRequestContextResolver,
     createRouter,
     createServer,
-    type HonoHandlerContext,
+    type NextHandlerContext,
+    type NextMiddlewareHandler,
     type RouteHandler,
     type Router,
 } from './server.js';
 
-interface SessionEnv extends Env {
-    Variables: {
-        sessionId: string;
-    };
-}
-
 test('conforms to the shared adapter type catalogue', () => {
-    checkAdapterTypeFeatures('hono', {
+    checkAdapterTypeFeatures('next', {
         'surface.router': () => {
-            expectTypeOf<Router<typeof securedContract>>().toEqualTypeOf<ExpectedRouter<typeof securedContract, HonoHandlerContext>>();
-            expectTypeOf<Router<typeof inferenceRoutes>>().toEqualTypeOf<ExpectedRouter<typeof inferenceRoutes, HonoHandlerContext>>();
+            expectTypeOf<Router<typeof securedContract>>().toEqualTypeOf<ExpectedRouter<typeof securedContract, NextHandlerContext>>();
+            expectTypeOf<Router<typeof inferenceRoutes>>().toEqualTypeOf<ExpectedRouter<typeof inferenceRoutes, NextHandlerContext>>();
         },
         'surface.routeHandler': () => {
             expectTypeOf<RouteHandler<typeof inferenceRoutes.getUser>>().toEqualTypeOf<
-                ExpectedRouteHandler<typeof inferenceRoutes.getUser, HonoHandlerContext>
+                ExpectedRouteHandler<typeof inferenceRoutes.getUser, NextHandlerContext>
             >();
         },
         'surface.guardRun': () => {
             expectTypeOf(createGuard(securedContract, 'user', ({ deny }) => deny(401, 'Unauthorized'))).toEqualTypeOf<
-                GuardRun<HonoHandlerContext>
+                GuardRun<NextHandlerContext>
             >();
         },
         'surface.requestContextRun': () => {
@@ -50,7 +44,7 @@ test('conforms to the shared adapter type catalogue', () => {
                 createRequestContextResolver(requestContextContract, 'analytics', () => ({
                     sessionId: null,
                 }))
-            ).toEqualTypeOf<RequestContextRun<HonoHandlerContext>>();
+            ).toEqualTypeOf<RequestContextRun<NextHandlerContext>>();
         },
         'router.groupByName': () => {
             const { server } = createServer(inferenceGroupContract);
@@ -157,7 +151,7 @@ test('conforms to the shared adapter type catalogue', () => {
             expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<{ body: undefined }>();
         },
         'handler.context': () => {
-            expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<HonoHandlerContext>();
+            expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<NextHandlerContext>();
         },
         'guards.identityContext': () => {
             expectTypeOf<Router<typeof securedContract>['api']['whoAmI']>()
@@ -356,16 +350,12 @@ test('conforms to the shared adapter type catalogue', () => {
     });
 });
 
-test('a request context resolver reads the Hono context', () => {
-    createRequestContextResolver(requestContextContract, 'analytics', ({ c }) => ({
-        sessionId: c.req.header('x-posthog-session-id') ?? null,
+test('a request context resolver reads the Next request', () => {
+    createRequestContextResolver(requestContextContract, 'analytics', ({ request }) => ({
+        sessionId: request.headers.get('x-posthog-session-id'),
     }));
 });
 
-test('the Env generic threads through the handler context', () => {
-    expectTypeOf<HonoHandlerContext<SessionEnv>['c']['var']['sessionId']>().toEqualTypeOf<string>();
-    expectTypeOf<Router<typeof inferenceContract, SessionEnv>['getUser']>().parameter(0).toMatchTypeOf<HonoHandlerContext<SessionEnv>>();
-    expectTypeOf<RouteHandler<typeof inferenceRoutes.getUser, SessionEnv>>().toEqualTypeOf<
-        ExpectedRouteHandler<typeof inferenceRoutes.getUser, HonoHandlerContext<SessionEnv>>
-    >();
+test('NextMiddlewareHandler receives the Next request', () => {
+    expectTypeOf<NextMiddlewareHandler>().parameter(0).toMatchTypeOf<NextHandlerContext['request']>();
 });
