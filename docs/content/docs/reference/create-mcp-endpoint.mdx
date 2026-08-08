@@ -25,11 +25,11 @@ For Fastify, see [`fastifyKizunaMcp`](/docs/reference/fastify-kizuna-mcp).
 createMcpEndpoint(api: Api, app: Express, options?: McpEndpointOptions): void
 ```
 
-| Parameter | Type                 | Required | Description                                                             |
-| --------- | -------------------- | -------- | ----------------------------------------------------------------------- |
-| `api`     | `Api`                | Yes      | API created with [`createApi`](/docs/reference/create-server#serverapi) |
-| `app`     | `Express`            | Yes      | Express application instance                                            |
-| `options` | `McpEndpointOptions` | No       | Configuration options                                                   |
+| Parameter | Type                 | Required | Description                                                              |
+| --------- | -------------------- | -------- | ------------------------------------------------------------------------ |
+| `api`     | `Api`                | Yes      | API created with [`server.api`](/docs/reference/create-server#serverapi) |
+| `app`     | `Express`            | Yes      | Express application instance                                             |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                                    |
 
 Mounts the MCP protocol handler at `/mcp` by default.
 
@@ -54,11 +54,11 @@ app.listen(3000);
 createMcpEndpoint(api: Api, app: Hono, options?: McpEndpointOptions): void
 ```
 
-| Parameter | Type                 | Required | Description                                                             |
-| --------- | -------------------- | -------- | ----------------------------------------------------------------------- |
-| `api`     | `Api`                | Yes      | API created with [`createApi`](/docs/reference/create-server#serverapi) |
-| `app`     | `Hono`               | Yes      | Hono application instance                                               |
-| `options` | `McpEndpointOptions` | No       | Configuration options                                                   |
+| Parameter | Type                 | Required | Description                                                              |
+| --------- | -------------------- | -------- | ------------------------------------------------------------------------ |
+| `api`     | `Api`                | Yes      | API created with [`server.api`](/docs/reference/create-server#serverapi) |
+| `app`     | `Hono`               | Yes      | Hono application instance                                                |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                                    |
 
 Mounts the MCP protocol handler at `/mcp` by default.
 
@@ -82,10 +82,10 @@ export default app;
 createMcpEndpoint(api: Api, options?: McpEndpointOptions): { GET, POST, DELETE }
 ```
 
-| Parameter | Type                 | Required | Description                                                             |
-| --------- | -------------------- | -------- | ----------------------------------------------------------------------- |
-| `api`     | `Api`                | Yes      | API created with [`createApi`](/docs/reference/create-server#serverapi) |
-| `options` | `McpEndpointOptions` | No       | Configuration options                                                   |
+| Parameter | Type                 | Required | Description                                                              |
+| --------- | -------------------- | -------- | ------------------------------------------------------------------------ |
+| `api`     | `Api`                | Yes      | API created with [`server.api`](/docs/reference/create-server#serverapi) |
+| `options` | `McpEndpointOptions` | No       | Configuration options                                                    |
 
 Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HTTP transport requires.
 

@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import { createMiddleware as createHonoMiddleware } from 'hono/factory';
 import { z } from 'zod';
 import { kizuna, createTags } from '@ts-kizuna/core';
-import { createApi, createHonoEndpoints, createServer } from './server.js';
-import { readTestBody, sessionAuthorization, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { createHonoEndpoints, createServer } from './server.js';
+import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const { k } = kizuna({
     tags: createTags({
@@ -29,8 +28,7 @@ describe('Hono — handler context', () => {
         const contextContract = k.contract({
             routes: contextRoutes,
         });
-        const contextApi = createApi({
-            contract: contextContract,
+        const contextApi = createServer(contextContract).server.api({
             router: {
                 echo: ({ c }) => ({
                     status: 200,
@@ -49,23 +47,9 @@ describe('Hono — handler context', () => {
     });
 });
 
-const honoRequireAuth = createHonoMiddleware(async (c, next) => {
-    if (c.req.header('authorization') !== sessionAuthorization) {
-        return c.json(
-            {
-                detail: 'Unauthorized',
-            },
-            401
-        );
-    }
-    await next();
-});
-
 testAdapterFeatures({
     name: 'hono',
-    createApi,
     createServerApi: (contract, options) => createServer(contract).server.api(options),
-    requireAuth: honoRequireAuth,
     mount: (api, { responseValidation }) => {
         const app = new Hono();
         createHonoEndpoints(api, app, {

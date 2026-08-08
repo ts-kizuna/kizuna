@@ -5,7 +5,7 @@ import type { Server, AddressInfo } from 'node:net';
 import { kizuna, createTags, createIdentity } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createClient, type Client } from '@ts-kizuna/fetch';
-import { createApi, createExpressEndpoints, createGuard } from '@ts-kizuna/express';
+import { createExpressEndpoints, createServer } from '@ts-kizuna/express';
 
 const { k } = kizuna({
     tags: createTags({
@@ -56,8 +56,7 @@ describe('end-to-end: typed client → Express server', () => {
         const app = express();
         app.use(express.json());
 
-        const api = createApi({
-            contract,
+        const api = createServer(contract).server.api({
             router: {
                 createUser: ({ body }) => {
                     const id = String(users.size + 1);
@@ -175,8 +174,7 @@ describe('end-to-end: response headers', () => {
         const app = express();
         app.use(express.json());
 
-        const api = createApi({
-            contract: contractWithResponseHeaders,
+        const api = createServer(contractWithResponseHeaders).server.api({
             router: {
                 getUser: ({ params, headers, res }) => {
                     const requestId = headers['x-request-id'];
@@ -264,15 +262,16 @@ describe('end-to-end: typed client → secured Express route', () => {
         const app = express();
         app.use(express.json());
 
-        const requireUser = createGuard(securedContract, 'user', ({ bearer, deny }) => {
+        const { server: securedServer } = createServer(securedContract);
+
+        const requireUser = securedServer.guard('user', ({ bearer, deny }) => {
             if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
             return {
                 userId: '1',
             };
         });
 
-        const api = createApi({
-            contract: securedContract,
+        const api = securedServer.api({
             router: {
                 api: {
                     whoAmI: ({ auth }) => ({

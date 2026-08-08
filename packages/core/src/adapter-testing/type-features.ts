@@ -8,10 +8,10 @@ export const ADAPTER_TYPE_FEATURES = {
         summary: '`RouteHandler<R>` resolves to core’s handler for the adapter’s handler context.',
     },
     'surface.guardRun': {
-        summary: '`createGuard` returns a `GuardRun` over the adapter’s handler context.',
+        summary: '`server.guard` returns a `GuardRun` over the adapter’s handler context.',
     },
     'surface.requestContextRun': {
-        summary: '`createRequestContextResolver` returns a `RequestContextRun` over the adapter’s handler context.',
+        summary: '`server.requestContext` returns a `RequestContextRun` over the adapter’s handler context.',
     },
     'router.groupByName': {
         summary: '`server.router(name, …)` contextually types handlers that take no arguments.',
@@ -21,9 +21,6 @@ export const ADAPTER_TYPE_FEATURES = {
     },
     'router.undeclaredStatus': {
         summary: 'A status the route does not declare is refused.',
-    },
-    'router.groupByKey': {
-        summary: '`createRouter(contract, group, …)` types one group by key.',
     },
     'handler.pathParams': {
         summary: 'Path params reach the handler typed from the path.',
@@ -44,7 +41,7 @@ export const ADAPTER_TYPE_FEATURES = {
         summary: 'An identity with no context schema gates the route without adding an `auth` arg.',
     },
     'guards.credentialByKind': {
-        summary: '`createGuard` types the credential by the identity’s authentication method.',
+        summary: '`server.guard` types the credential by the identity’s authentication method.',
     },
     'guards.returnChecked': {
         summary: 'A guard’s return is checked against its identity’s context schema.',
@@ -56,7 +53,7 @@ export const ADAPTER_TYPE_FEATURES = {
         summary: 'An identity the contract does not declare is refused.',
     },
     'guards.completeMap': {
-        summary: '`createApi` requires a guard for every identity the contract declares.',
+        summary: '`server.api` requires a guard for every identity the contract declares.',
     },
     'requestContext.handlerArg': {
         summary: 'Handlers receive typed `requestContext` on every route.',
@@ -67,8 +64,8 @@ export const ADAPTER_TYPE_FEATURES = {
     'requestContext.unknownKey': {
         summary: 'A context key the contract does not declare is refused.',
     },
-    'requestContext.requiredOnCreateApi': {
-        summary: '`createApi` requires providers when the contract declares request context.',
+    'requestContext.requiredOnApi': {
+        summary: '`server.api` requires providers when the contract declares request context.',
     },
     'standalone.routeHandlerAuth': {
         summary: 'A standalone `RouteHandler` carries the route’s auth and drops into the group router.',

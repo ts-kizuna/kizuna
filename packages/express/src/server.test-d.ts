@@ -13,16 +13,11 @@ import {
     type ExpectedRouteHandler,
     type ExpectedRouter,
 } from '../../core/src/adapter-testing/type-testing.js';
-import {
-    createApi,
-    createGuard,
-    createRequestContextResolver,
-    createRouter,
-    createServer,
-    type ExpressHandlerContext,
-    type RouteHandler,
-    type Router,
-} from './server.js';
+import { createServer, type ExpressHandlerContext, type RouteHandler, type Router } from './server.js';
+
+const { server: securedServer } = createServer(securedContract);
+const { server: gateServer } = createServer(gateContract);
+const { server: requestContextServer } = createServer(requestContextContract);
 
 test('conforms to the shared adapter type catalogue', () => {
     checkAdapterTypeFeatures('express', {
@@ -36,13 +31,13 @@ test('conforms to the shared adapter type catalogue', () => {
             >();
         },
         'surface.guardRun': () => {
-            expectTypeOf(createGuard(securedContract, 'user', ({ deny }) => deny(401, 'Unauthorized'))).toEqualTypeOf<
+            expectTypeOf(securedServer.guard('user', ({ deny }) => deny(401, 'Unauthorized'))).toEqualTypeOf<
                 GuardRun<ExpressHandlerContext>
             >();
         },
         'surface.requestContextRun': () => {
             expectTypeOf(
-                createRequestContextResolver(requestContextContract, 'analytics', () => ({
+                requestContextServer.requestContext('analytics', () => ({
                     sessionId: null,
                 }))
             ).toEqualTypeOf<RequestContextRun<ExpressHandlerContext>>();
@@ -113,35 +108,6 @@ test('conforms to the shared adapter type catalogue', () => {
                 }),
             });
         },
-        'router.groupByKey': () => {
-            createRouter(securedContract, 'api', {
-                publicRoute: () => ({
-                    status: 200,
-                    body: {
-                        ok: true,
-                    },
-                }),
-                whoAmI: ({ auth }) => ({
-                    status: 200,
-                    body: {
-                        userId: auth.user.userId,
-                    },
-                }),
-                ownerOnly: () => ({
-                    status: 200,
-                    body: {
-                        ok: true,
-                    },
-                }),
-                both: ({ auth }) => ({
-                    status: 200,
-                    body: {
-                        userId: auth.user.userId,
-                        workspaceUserId: auth.member.workspaceUserId,
-                    },
-                }),
-            });
-        },
         'handler.pathParams': () => {
             expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<{ params: { id: string } }>();
         },
@@ -175,7 +141,7 @@ test('conforms to the shared adapter type catalogue', () => {
                 .toMatchTypeOf<{ auth: { user: { userId: string } } }>();
         },
         'guards.credentialByKind': () => {
-            createGuard(securedContract, 'user', ({ bearer, deny, scopes }) => {
+            securedServer.guard('user', ({ bearer, deny, scopes }) => {
                 expectTypeOf(bearer).toEqualTypeOf<{ token: string } | null>();
                 expectTypeOf(scopes).toEqualTypeOf<string[]>();
                 if (!bearer) return deny(401, 'Unauthorized');
@@ -184,7 +150,7 @@ test('conforms to the shared adapter type catalogue', () => {
                 };
             });
 
-            createGuard(securedContract, 'member', ({ apiKey, deny }) => {
+            securedServer.guard('member', ({ apiKey, deny }) => {
                 expectTypeOf(apiKey).toEqualTypeOf<{ in: 'header'; name: 'x-workspace-token'; value: string } | null>();
                 if (!apiKey) return deny(403, 'Forbidden');
                 return {
@@ -194,8 +160,7 @@ test('conforms to the shared adapter type catalogue', () => {
             });
         },
         'guards.returnChecked': () => {
-            createGuard(
-                securedContract,
+            securedServer.guard(
                 'user',
                 // @ts-expect-error the guard result must match the identity's context schema
                 ({ deny }) => {
@@ -207,12 +172,11 @@ test('conforms to the shared adapter type catalogue', () => {
             );
         },
         'guards.gateOnlyVoid': () => {
-            createGuard(gateContract, 'apiConsumer', ({ apiKey, deny }) => {
+            gateServer.guard('apiConsumer', ({ apiKey, deny }) => {
                 if (!apiKey) return deny(401, 'Unauthorized');
             });
 
-            createGuard(
-                gateContract,
+            gateServer.guard(
                 'user',
                 // @ts-expect-error a context-ful guard must return its context, not void
                 ({ deny }) => {
@@ -222,14 +186,13 @@ test('conforms to the shared adapter type catalogue', () => {
         },
         'guards.unknownIdentity': () => {
             // @ts-expect-error 'admin' is not a declared identity
-            createGuard(securedContract, 'admin', () => ({}));
+            securedServer.guard('admin', () => ({}));
         },
         'guards.completeMap': () => {
-            const requireUser = createGuard(securedContract, 'user', ({ deny }) => deny(401, 'Unauthorized'));
+            const requireUser = securedServer.guard('user', ({ deny }) => deny(401, 'Unauthorized'));
 
-            createApi({
-                contract: securedContract,
-                router: createRouter(securedContract, {
+            createServer(securedContract).server.api({
+                router: {
                     api: {
                         publicRoute: () => ({
                             status: 200,
@@ -257,7 +220,7 @@ test('conforms to the shared adapter type catalogue', () => {
                             },
                         }),
                     },
-                }),
+                },
                 // @ts-expect-error the member guard is missing
                 guards: {
                     user: requireUser,
@@ -270,8 +233,7 @@ test('conforms to the shared adapter type catalogue', () => {
             }>();
         },
         'requestContext.resolverReturn': () => {
-            createRequestContextResolver(
-                requestContextContract,
+            requestContextServer.requestContext(
                 'analytics',
                 // @ts-expect-error the resolver must return the schema's shape
                 () => ({
@@ -281,12 +243,11 @@ test('conforms to the shared adapter type catalogue', () => {
         },
         'requestContext.unknownKey': () => {
             // @ts-expect-error 'metrics' is not a declared context key
-            createRequestContextResolver(requestContextContract, 'metrics', () => ({}));
+            requestContextServer.requestContext('metrics', () => ({}));
         },
-        'requestContext.requiredOnCreateApi': () => {
+        'requestContext.requiredOnApi': () => {
             // @ts-expect-error context resolvers are required when the contract declares context
-            createApi({
-                contract: requestContextContract,
+            createServer(requestContextContract).server.api({
                 router: {
                     api: {
                         publicRoute: () => ({
@@ -310,7 +271,7 @@ test('conforms to the shared adapter type catalogue', () => {
                 };
             };
 
-            createRouter(securedContract, 'api', {
+            createServer(securedContract).server.router('api', {
                 publicRoute: () => ({
                     status: 200,
                     body: {
@@ -344,7 +305,7 @@ test('conforms to the shared adapter type catalogue', () => {
                 };
             };
 
-            createRouter(requestContextContract, 'api', {
+            createServer(requestContextContract).server.router('api', {
                 publicRoute,
             });
         },
@@ -356,7 +317,7 @@ test('Express Request is augmented with kizunaRoute', () => {
 });
 
 test('a request context resolver reads the Express request', () => {
-    createRequestContextResolver(requestContextContract, 'analytics', ({ req }) => ({
+    requestContextServer.requestContext('analytics', ({ req }) => ({
         sessionId: req.header('x-posthog-session-id') ?? null,
     }));
 });

@@ -37,13 +37,13 @@ app.listen({
 
 Register the plugin with `app.register(fastifyKizunaMcp, options)`.
 
-| Option        | Type       | Required | Description                                                             |
-| ------------- | ---------- | -------- | ----------------------------------------------------------------------- |
-| `api`         | `Api`      | Yes      | API created with [`createApi`](/docs/reference/create-server#serverapi) |
-| `path`        | `string`   | No       | Mount path (default: `'/mcp'`)                                          |
-| `name`        | `string`   | No       | Human-readable name (default: `'MCP Server'`)                           |
-| `version`     | `string`   | No       | Semantic version (default: `'1.0.0'`)                                   |
-| `routeFilter` | `Function` | No       | Predicate to filter which routes become tools                           |
+| Option        | Type       | Required | Description                                                              |
+| ------------- | ---------- | -------- | ------------------------------------------------------------------------ |
+| `api`         | `Api`      | Yes      | API created with [`server.api`](/docs/reference/create-server#serverapi) |
+| `path`        | `string`   | No       | Mount path (default: `'/mcp'`)                                           |
+| `name`        | `string`   | No       | Human-readable name (default: `'MCP Server'`)                            |
+| `version`     | `string`   | No       | Semantic version (default: `'1.0.0'`)                                    |
+| `routeFilter` | `Function` | No       | Predicate to filter which routes become tools                            |
 
 ## Secured routes
 

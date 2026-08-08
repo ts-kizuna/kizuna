@@ -313,7 +313,7 @@ const executeToolCall = async (
     }
 
     try {
-        const error = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
+        const throwError = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
             throw new ResponseError(response);
         };
 
@@ -322,7 +322,7 @@ const executeToolCall = async (
             query: validation.parsed.query,
             body: validation.parsed.body,
             headers: validation.parsed.headers,
-            error,
+            throwError,
             ...handlerContext,
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(guardOutcome.securityContext).length > 0 ? { auth: guardOutcome.securityContext } : {}),

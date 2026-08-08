@@ -52,7 +52,7 @@ const NODES: OutputNode[] = [
         file: 'router.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
-        code: `createRouter(contract, {
+        code: `server.router({
   users: {
     getUser: async ({ params, throwError }) => {
       const user = await db.users.findById(params.id);

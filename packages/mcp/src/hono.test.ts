@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import type { Server } from 'node:http';
 import { kizuna, createTags } from '@ts-kizuna/core';
-import { createApi as coreCreateApi, ROUTER_META } from '@ts-kizuna/core/adapter';
+import { assembleApi } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createMcpEndpoint } from './hono.js';
@@ -118,8 +118,8 @@ const router = {
     }),
 };
 
-const api = Object.assign(coreCreateApi(contract.routes), {
-    [ROUTER_META]: router,
+const api = assembleApi(contract, {
+    router,
 });
 
 const startServer = async (): Promise<{ port: number; server: Server }> => {

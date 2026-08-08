@@ -40,7 +40,7 @@ export interface Contract<
     securitySchemes?: Schemes;
     /**
      * The request context schemas passed to {@link kizuna}. Each key names a
-     * provider registered on `createApi`; every handler receives its value.
+     * provider registered on `server.api`; every handler receives its value.
      * Never gates a request and never appears in the OpenAPI document.
      */
     requestContext?: RequestContext;

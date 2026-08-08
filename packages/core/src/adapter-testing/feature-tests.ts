@@ -5,19 +5,15 @@ import {
     badgeBytes,
     brokenContract,
     createBrokenRouter,
-    createGroupedRouter,
     createIssueRouter,
     createMethodRouter,
-    createMiddlewareRouter,
     createResponseShapeRouter,
     createSecuredRouter,
     createSubUserRouter,
     createUserRouter,
     csvBody,
-    groupedContract,
     issueContract,
     methodContract,
-    middlewareContract,
     ownerToken,
     responseShapeContract,
     securedContract,
@@ -32,22 +28,13 @@ import { toMountedApi, type MountedApi, type Transport, type TestResponse } from
  * One adapter, described by its parts. The `never` parameters are what let a contract known only at runtime reach a
  * fully typed builder, so those casts stay here instead of in every adapter's test file.
  */
-export interface AdapterUnderTest<Api, Middleware> {
+export interface AdapterUnderTest<Api> {
     name: AdapterName;
     /**
      * @example
      * createServerApi: (contract, options) => createServer(contract).server.api(options)
      */
     createServerApi: (contract: never, options: never) => Api;
-    /**
-     * The deprecated standalone builder. Only `guards.viaCreateApi` uses it; everything else goes through
-     * `createServerApi`.
-     */
-    createApi: (options: never) => Api;
-    /**
-     * Must reject anything but `sessionAuthorization`.
-     */
-    requireAuth: Middleware;
     mount: (api: Api, options: { responseValidation?: boolean }) => Transport | Promise<Transport>;
 }
 
@@ -56,31 +43,19 @@ interface MountOptions {
     router: unknown;
     responseValidation?: boolean;
     guards?: Record<string, unknown>;
-    requireAuthOn?: string;
-    viaCreateApi?: boolean;
 }
 
-export const testAdapterFeatures = <Api, Middleware>(adapter: AdapterUnderTest<Api, Middleware>): void => {
+export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void => {
     const behaviour = ADAPTER_BEHAVIOUR[adapter.name];
 
     const mount = async (options: MountOptions): Promise<MountedApi> => {
-        const apiOptions = {
-            router: options.router,
-            guards: options.guards,
-            ...(options.requireAuthOn
-                ? {
-                      middleware: {
-                          [options.requireAuthOn]: [adapter.requireAuth],
-                      },
-                  }
-                : {}),
-        };
-        const api = options.viaCreateApi
-            ? adapter.createApi({
-                  contract: options.contract,
-                  ...apiOptions,
-              } as never)
-            : adapter.createServerApi(options.contract as never, apiOptions as never);
+        const api = adapter.createServerApi(
+            options.contract as never,
+            {
+                router: options.router,
+                guards: options.guards,
+            } as never
+        );
         const transport = await adapter.mount(api, {
             responseValidation: options.responseValidation,
         });
@@ -96,13 +71,12 @@ export const testAdapterFeatures = <Api, Middleware>(adapter: AdapterUnderTest<A
         }
     };
 
-    const usingSecured = <T>(use: (mounted: MountedApi) => Promise<T>, viaCreateApi = false) =>
+    const usingSecured = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
             {
                 contract: securedContract,
                 router: createSecuredRouter(),
                 guards: securedGuards,
-                viaCreateApi,
             },
             use
         );
@@ -561,97 +535,6 @@ export const testAdapterFeatures = <Api, Middleware>(adapter: AdapterUnderTest<A
                     workspaceUserId: '1',
                 });
             });
-        },
-
-        'guards.viaCreateApi': async () => {
-            await usingSecured(async (server) => {
-                const open = await server.request({
-                    method: 'GET',
-                    path: '/public',
-                });
-                expect(open.status).toBe(200);
-
-                const denied = await server.request({
-                    method: 'GET',
-                    path: '/who-am-i',
-                });
-                expect(denied.status).toBe(401);
-
-                const allowed = await server.request({
-                    method: 'GET',
-                    path: '/who-am-i',
-                    headers: {
-                        authorization: sessionAuthorization,
-                    },
-                });
-                expect(allowed.status).toBe(200);
-                expect(allowed.body).toEqual({
-                    userId: '1',
-                });
-            }, true);
-        },
-
-        'middleware.perRoute': async () => {
-            await using(
-                {
-                    contract: middlewareContract,
-                    router: createMiddlewareRouter(),
-                    requireAuthOn: 'guardedRoute',
-                },
-                async (withMiddleware) => {
-                    const open = await withMiddleware.request({
-                        method: 'GET',
-                        path: '/open',
-                    });
-                    expect(open.status).toBe(200);
-
-                    const denied = await withMiddleware.request({
-                        method: 'GET',
-                        path: '/guarded',
-                    });
-                    expect(denied.status).toBe(401);
-
-                    const allowed = await withMiddleware.request({
-                        method: 'GET',
-                        path: '/guarded',
-                        headers: {
-                            authorization: sessionAuthorization,
-                        },
-                    });
-                    expect(allowed.status).toBe(200);
-                    expect(allowed.body).toEqual({
-                        message: 'guarded',
-                    });
-                }
-            );
-        },
-
-        'middleware.group': async () => {
-            await using(
-                {
-                    contract: groupedContract,
-                    router: createGroupedRouter(),
-                    requireAuthOn: 'admin',
-                },
-                async (grouped) => {
-                    for (const path of ['/admin/dashboard', '/admin/settings']) {
-                        const denied = await grouped.request({
-                            method: 'GET',
-                            path,
-                        });
-                        expect(denied.status, path).toBe(401);
-
-                        const allowed = await grouped.request({
-                            method: 'GET',
-                            path,
-                            headers: {
-                                authorization: sessionAuthorization,
-                            },
-                        });
-                        expect(allowed.status, path).toBe(200);
-                    }
-                }
-            );
         },
 
         'responses.declaredContentType': async () => {

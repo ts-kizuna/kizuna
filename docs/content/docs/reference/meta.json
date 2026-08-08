@@ -6,7 +6,6 @@
         "create-tags",
         "create-identity",
         "create-server",
-        "create-middleware",
         "create-request-context",
         "problem-details-schema",
         "binary-and-file-schemas",
