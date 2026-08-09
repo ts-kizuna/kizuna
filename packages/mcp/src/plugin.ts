@@ -1,4 +1,4 @@
-import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { createMcpHandler } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { adapterContextOf, createPlugin, raw, type ApiWithRouter } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
@@ -87,24 +87,21 @@ export const mcpPlugin = (props: McpPluginProps = {}) =>
         server: (_config: void, api: unknown) => ({
             router: {
                 endpoint: async (args: HandlerArgs) => {
-                    const headers = toHeaders(args.headers);
-                    const server = createMcpServer(api as ApiWithRouter, {
-                        ...props,
-                        handlerContext: adapterContextOf(args),
-                        credentialHeaders: args.headers,
-                    });
-                    const transport = new WebStandardStreamableHTTPServerTransport({
-                        sessionIdGenerator: undefined,
-                    });
-                    await server.connect(transport);
+                    const handler = createMcpHandler(() =>
+                        createMcpServer(api as ApiWithRouter, {
+                            ...props,
+                            handlerContext: adapterContextOf(args),
+                            credentialHeaders: args.headers,
+                        })
+                    );
 
                     // Rebuilt from the inputs the pipeline already parsed, so
-                    // the transport gets a web request on every adapter.
+                    // the handler gets a web request on every adapter.
                     return raw(
-                        await transport.handleRequest(
+                        await handler.fetch(
                             new Request('http://mcp.local/', {
                                 method: 'POST',
-                                headers,
+                                headers: toHeaders(args.headers),
                                 body: JSON.stringify(args.body),
                             })
                         )
