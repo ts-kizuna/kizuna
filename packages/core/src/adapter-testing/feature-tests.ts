@@ -21,6 +21,9 @@ import {
     sessionAuthorization,
     subUserContract,
     userContract,
+    pluginContract,
+    createPluginRouter,
+    pluginConfigs,
 } from './fixtures.js';
 import { toMountedApi, type MountedApi, type Transport, type TestResponse } from './transport.js';
 
@@ -43,6 +46,7 @@ interface MountOptions {
     router: unknown;
     responseValidation?: boolean;
     guards?: Record<string, unknown>;
+    plugins?: Record<string, unknown>;
 }
 
 export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void => {
@@ -54,6 +58,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             {
                 router: options.router,
                 guards: options.guards,
+                plugins: options.plugins,
             } as never
         );
         const transport = await adapter.mount(api, {
@@ -70,6 +75,16 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             await mounted.close?.();
         }
     };
+
+    const usingPlugins = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                contract: pluginContract,
+                router: createPluginRouter(),
+                plugins: pluginConfigs,
+            },
+            use
+        );
 
     const usingSecured = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
@@ -588,6 +603,52 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     expect(response.status).toBe(500);
                 }
             );
+        },
+        'plugins.routesServed': async () => {
+            await usingPlugins(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/probe/ping',
+                });
+                expect(response.status).toBe(200);
+                expect(response.body).toEqual({
+                    pong: true,
+                });
+            });
+        },
+        'plugins.exportsReachHandlers': async () => {
+            await usingPlugins(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/which-label',
+                });
+                expect(response.status).toBe(200);
+                expect(response.body).toEqual({
+                    label: 'probed',
+                });
+            });
+        },
+        'plugins.contractWinsOverlap': async () => {
+            await usingPlugins(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/which-label/me',
+                });
+                expect(response.status).toBe(200);
+                expect(response.body).toEqual({
+                    from: 'contract',
+                });
+            });
+        },
+        'plugins.rawResponse': async () => {
+            await usingPlugins(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/probe/stream',
+                });
+                expect(response.status).toBe(200);
+                expect(response.text).toBe('not json at all');
+            });
         },
     };
 

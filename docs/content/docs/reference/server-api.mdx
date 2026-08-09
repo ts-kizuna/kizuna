@@ -29,3 +29,20 @@ export const api = server.api({
 | Next.js | [`api.mount()`](/docs/adapters/next)             |
 
 See the [Mounting guide](/docs/building/mounting) for full setup with each adapter.
+
+## plugins
+
+A [plugin](/docs/extend/create-plugin) is installed on [`Kizuna.init`](/docs/reference/kizuna-init). If it needs anything live, such as a store or a transport, pass it here under the same key:
+
+```ts title="src/lib/api.ts"
+export const api = server.api({
+    router,
+    plugins: {
+        audit: {
+            store,
+        },
+    },
+});
+```
+
+A plugin that needs nothing live, such as [`mcpPlugin`](/docs/reference/mcp-plugin), never appears here at all. `api.mount` serves every installed plugin's routes either way.

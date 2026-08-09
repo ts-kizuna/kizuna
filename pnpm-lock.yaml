@@ -331,6 +331,9 @@ importers:
       '@ts-kizuna/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@ts-kizuna/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       zod:
         specifier: 'catalog:'
         version: 4.3.6
@@ -593,24 +596,18 @@ importers:
         specifier: ^1.29.0
         version: 1.29.0(zod@4.3.6)
     devDependencies:
-      '@hono/node-server':
-        specifier: 'catalog:'
-        version: 1.19.14(hono@4.12.19)
       '@ts-kizuna/core':
         specifier: workspace:*
         version: link:../core
+      '@ts-kizuna/express':
+        specifier: workspace:*
+        version: link:../express
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.6
       express:
         specifier: 'catalog:'
         version: 5.2.1
-      fastify:
-        specifier: 'catalog:'
-        version: 5.8.5
-      hono:
-        specifier: 'catalog:'
-        version: 4.12.19
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)

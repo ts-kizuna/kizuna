@@ -1,7 +1,6 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { apiReference } from '@scalar/hono-api-reference';
-import { createMcpEndpoint } from '@ts-kizuna/mcp/hono';
 
 import { api } from './lib/api';
 import { openApiSpec } from './lib/openApi';
@@ -52,7 +51,6 @@ app.get('/', (c) => {
 });
 
 api.mount(app);
-createMcpEndpoint(api, app);
 
 const port = Number(process.env.PORT ?? 8001);
 serve(

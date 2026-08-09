@@ -22,7 +22,7 @@
         "generate-openapi",
         "generate-swift-client",
         "generate-kotlin-client",
-        "create-mcp-server",
-        "create-mcp-endpoint"
+        "mcp-plugin",
+        "create-mcp-server"
     ]
 }

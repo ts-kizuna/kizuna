@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '../error-response.js';
 import { Kizuna } from '../namespace.js';
+import { createPlugin, raw } from '../adapter.js';
 import type { Router } from '../handler-pipeline.js';
 import type { GuardDeny } from '../adapter.js';
 
@@ -579,3 +580,120 @@ export const createMethodRouter = <Context>(): Router<typeof methodRoutes, Conte
         headItem: echo('HEAD'),
     };
 };
+
+const probePlugin = createPlugin({
+    name: 'probe',
+    routes: {
+        ping: {
+            method: 'GET',
+            path: '/probe/ping',
+            responses: {
+                200: z.object({
+                    pong: z.boolean(),
+                }),
+            },
+        },
+        overlap: {
+            method: 'GET',
+            path: '/which-label/:id',
+            responses: {
+                200: z.object({
+                    from: z.string(),
+                }),
+            },
+        },
+        stream: {
+            method: 'GET',
+            path: '/probe/stream',
+            responses: {
+                200: z.object({
+                    never: z.boolean(),
+                }),
+            },
+        },
+    },
+    server: (config: { label: string }) => ({
+        router: {
+            ping: () => ({
+                status: 200 as const,
+                body: {
+                    pong: true,
+                },
+            }),
+            overlap: () => ({
+                status: 200 as const,
+                body: {
+                    from: 'plugin',
+                },
+            }),
+            stream: () =>
+                raw(
+                    new Response('not json at all', {
+                        status: 200,
+                        headers: {
+                            'Content-Type': 'text/plain',
+                        },
+                    })
+                ),
+        },
+        exports: {
+            label: () => config.label,
+        },
+    }),
+});
+
+const { k: pluginK } = Kizuna.init({
+    tags: Kizuna.tags({
+        api: 'API',
+    }),
+    plugins: {
+        probe: probePlugin,
+    },
+});
+
+export const pluginRoutes = pluginK.routes('api', {
+    whichLabel: {
+        method: 'GET',
+        path: '/which-label',
+        responses: {
+            200: z.object({
+                label: z.string(),
+            }),
+        },
+    },
+    overlapping: {
+        method: 'GET',
+        path: '/which-label/me',
+        responses: {
+            200: z.object({
+                from: z.string(),
+            }),
+        },
+    },
+});
+
+export const pluginContract = pluginK.contract({
+    routes: pluginRoutes,
+});
+
+export const pluginConfigs = {
+    probe: {
+        label: 'probed',
+    },
+};
+
+export const createPluginRouter = <Context>(): Router<typeof pluginRoutes, Context> =>
+    ({
+        whichLabel: ({ plugins }: { plugins: { probe: { label: () => string } } }) => ({
+            status: 200,
+            body: {
+                label: plugins.probe.label(),
+            },
+        }),
+        overlapping: () => ({
+            status: 200,
+            body: {
+                from: 'contract',
+            },
+        }),
+    }) as unknown as Router<typeof pluginRoutes, Context>;

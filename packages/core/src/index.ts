@@ -10,6 +10,17 @@ export {
     type AccessConstraint,
 } from './kizuna.js';
 export { type Contract } from './contract.js';
+export {
+    type KizunaPlugin,
+    type PluginRoutes,
+    type PluginServer,
+    type ContractPlugins,
+    type PluginConfigs,
+    type PluginExportValues,
+    type PluginArgs,
+    type PluginConfigOf,
+    type PluginExportsOf,
+} from './plugin.js';
 export { type ModelOptions } from './model.js';
 export { type TagOptions, type TagSet, type TagKeysOf, type NormalizeTags } from './tags.js';
 export {

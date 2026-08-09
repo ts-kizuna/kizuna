@@ -1,0 +1,93 @@
+---
+title: Plugins
+description: Add endpoints and helpers to your API, fully typed in your handlers, on any adapter.
+---
+
+A plugin adds endpoints, helpers your handlers can call, or both. It gets your contract, and everything it adds is typed.
+
+## Installing one
+
+Plugins go on `Kizuna.init`, beside the rest of your API's vocabulary:
+
+```ts title="src/lib/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { mcpPlugin } from '@ts-kizuna/mcp';
+
+export const { k } = Kizuna.init({
+    tags,
+    identities,
+    plugins: {
+        mcp: mcpPlugin({
+            name: 'My API',
+        }),
+    },
+});
+```
+
+The key you choose is the plugin's name everywhere else: handlers read it under `plugins.mcp`, and `server.api` takes its config under the same key.
+
+`api.mount` serves its routes along with yours. There is nothing extra to mount, and it is the same on Express, Fastify, Hono and Next.js.
+
+## Configuring one
+
+Anything live, a store or a transport, goes on `server.api`:
+
+```ts title="src/lib/api.ts"
+export const api = server.api({
+    router,
+    plugins: {
+        audit: {
+            store,
+        },
+    },
+});
+```
+
+A plugin that needs nothing live never appears there. `mcpPlugin` is one, which is why installing it is the whole setup.
+
+The split is not arbitrary: `Kizuna.init` reaches your client through the contract, so only pure data can go there. A database handle passed at install would end up in your browser bundle.
+
+## Using what a plugin offers
+
+A plugin can hand your handlers functions to call, under `plugins`:
+
+```ts title="src/lib/router.ts"
+updateUser: async ({ params, body, plugins }) => {
+    const user = await db.users.update(params.id, body);
+    plugins.audit.record('users.updateUser');
+
+    return {
+        status: 200,
+        body: user,
+    };
+},
+```
+
+It sits beside `auth.*` and `requestContext.*`, and for the same reason: plugin names come from other people, and one called `body` must not shadow your request body. Destructure it if you prefer the short form:
+
+```ts
+updateUser: async ({ params, body, plugins: { audit } }) => {
+```
+
+A contract with no plugins gets no `plugins` argument at all.
+
+## Plugin routes are not your routes
+
+A plugin's routes run through the same pipeline as yours, with the same validation, guards, access gates and problem details. But they never join `contract.routes`.
+
+|                           | your routes | a plugin's routes |
+| ------------------------- | ----------- | ----------------- |
+| declared with             | `k.routes`  | the plugin        |
+| served by `api.mount`     | yes         | yes               |
+| validated, guarded        | yes         | yes               |
+| in your fetch client      | yes         | **no**            |
+| in OpenAPI, Swift, Kotlin | yes         | **no**            |
+
+That is deliberate. A protocol endpoint has no business being a method on your generated Swift client, and keeping the two apart makes that structural rather than something you remember to exclude.
+
+If a plugin claims a path your contract already uses, `server.api` throws and names both.
+
+## Next
+
+- [Create a Plugin](/docs/extend/create-plugin) to write your own
+- [MCP](/docs/mcp), a plugin that turns every route into an AI-callable tool

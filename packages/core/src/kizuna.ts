@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import { tagRoutes } from './routes.js';
 import { assembleContract, type Contract } from './contract.js';
+import type { ContractPlugins } from './plugin.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { type TagSet, type TagOptions } from './tags.js';
@@ -183,13 +184,14 @@ const applyGroupAuth = (group: Routes, groupAuth: GroupAuth, path: string): void
 };
 
 /**
- * The four things `Kizuna.init` binds.
+ * What `Kizuna.init` binds.
  */
 export interface KizunaSpec {
     tags: Record<string, TagOptions>;
     codes: string;
     identities: Record<string, SecurityScheme>;
     requestContext: Record<string, RequestContextSchema>;
+    plugins: ContractPlugins;
 }
 
 /**
@@ -201,6 +203,11 @@ export type TagNamesOf<Spec extends KizunaSpec> = Extract<keyof Spec['tags'], st
  * The identity names declared on a spec, e.g. `'user' | 'member'`.
  */
 export type IdentityNamesOf<Spec extends KizunaSpec> = Extract<keyof Spec['identities'], string>;
+
+/**
+ * The plugins declared on a spec, e.g. `{ mcp: McpPlugin }`.
+ */
+export type PluginsOf<Spec extends KizunaSpec> = Spec['plugins'];
 
 /**
  * The handle `Kizuna.init` returns.
@@ -243,7 +250,8 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         Spec['codes'],
         Spec['identities'],
         A,
-        Spec['requestContext']
+        Spec['requestContext'],
+        PluginsOf<Spec>
     >;
     contract<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>>(definition: {
         routes: R;
@@ -253,7 +261,8 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         Spec['codes'],
         Spec['identities'],
         unknown,
-        Spec['requestContext']
+        Spec['requestContext'],
+        PluginsOf<Spec>
     >;
     /**
      * Emit a validation issue with a machine-readable `code`, checked against the
@@ -293,6 +302,7 @@ export const init = <
     const Codes extends string = never,
     const Identities extends Record<string, SecurityScheme> = Record<string, never>,
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
+    const Plugins extends ContractPlugins = Record<string, never>,
 >(config?: {
     identities?: Identities;
     requestContext?: RequestContext;
@@ -300,12 +310,18 @@ export const init = <
     validation?: {
         issueCodes?: readonly Codes[];
     };
+    /**
+     * Plugins to install, keyed by name. That key is what handlers read under
+     * `plugins`.
+     */
+    plugins?: Plugins;
 }): {
     k: K<{
         tags: Tags;
         codes: Codes;
         identities: Identities;
         requestContext: RequestContext;
+        plugins: Plugins;
     }>;
 } => {
     type Spec = {
@@ -313,6 +329,7 @@ export const init = <
         codes: Codes;
         identities: Identities;
         requestContext: RequestContext;
+        plugins: Plugins;
     };
 
     const tagSet: TagSet<Tags> = config?.tags ?? { __brand: 'TagSet', tags: {} as Tags };
@@ -349,6 +366,7 @@ export const init = <
             securitySchemes: config?.identities,
             requestContext: config?.requestContext,
             validation: config?.validation,
+            plugins: config?.plugins,
         });
     };
 

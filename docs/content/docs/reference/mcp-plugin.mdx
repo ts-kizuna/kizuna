@@ -1,0 +1,80 @@
+---
+title: mcpPlugin
+description: Install an MCP (Model Context Protocol) endpoint so AI assistants can call your API as tools.
+---
+
+Serve an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint as part of your API. Install it on [`Kizuna.init`](/docs/reference/kizuna-init) and `api.mount` serves it, on every adapter.
+
+<InstallTabs packageName="@ts-kizuna/mcp" />
+
+```ts
+import { mcpPlugin } from '@ts-kizuna/mcp';
+```
+
+## Parameters
+
+```ts
+mcpPlugin(props?: McpPluginProps): KizunaPlugin
+```
+
+| Parameter | Type             | Required | Description           |
+| --------- | ---------------- | -------- | --------------------- |
+| `props`   | `McpPluginProps` | No       | Configuration options |
+
+## Props
+
+| Option        | Default            | Description                                   |
+| ------------- | ------------------ | --------------------------------------------- |
+| `path`        | `'/mcp'`           | Path the endpoint is served from              |
+| `name`        | `'MCP Server'`     | Human-readable name shown to AI assistants    |
+| `version`     | `'1.0.0'`          | Semantic version string                       |
+| `routeFilter` | excludes multipart | Predicate to filter which routes become tools |
+
+Props are pure data, because they reach the contract and the contract reaches your client. The plugin needs nothing at runtime, so it never appears in `server.api`.
+
+## Example
+
+```ts title="src/lib/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { mcpPlugin } from '@ts-kizuna/mcp';
+
+export const { k } = Kizuna.init({
+    tags,
+    identities,
+    plugins: {
+        mcp: mcpPlugin({
+            name: 'My API',
+        }),
+    },
+});
+```
+
+```ts title="src/index.ts"
+api.mount(app);
+```
+
+## Next.js
+
+The endpoint is served by the catch-all route file that already serves your contract, so `path` resolves under its `basePath`:
+
+```ts title="app/api/[...ts-kizuna]/route.ts"
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
+    basePath: '/api',
+});
+```
+
+With the default `path`, the endpoint is at `/api/mcp`.
+
+## Secured routes
+
+Each tool call runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request, reading credentials from the MCP transport request's headers. A `deny(...)` becomes a tool error result. See the [MCP guide](/docs/mcp) for configuring clients to send credentials.
+
+## Not in your client
+
+The endpoint is a plugin route, so it lives outside `contract.routes`. Your fetch client, OpenAPI document and generated Swift and Kotlin clients never see it.
+
+## See also
+
+- [MCP guide](/docs/mcp)
+- [`createMcpServer`](/docs/reference/create-mcp-server) to drive the transport yourself
+- [Create a Plugin](/docs/extend/create-plugin)

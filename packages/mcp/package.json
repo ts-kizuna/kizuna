@@ -15,80 +15,27 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
-    },
-    "./express": {
-      "import": {
-        "types": "./dist/express.d.mts",
-        "default": "./dist/express.mjs"
-      },
-      "require": {
-        "types": "./dist/express.d.cts",
-        "default": "./dist/express.cjs"
-      }
-    },
-    "./next": {
-      "import": {
-        "types": "./dist/next.d.mts",
-        "default": "./dist/next.mjs"
-      },
-      "require": {
-        "types": "./dist/next.d.cts",
-        "default": "./dist/next.cjs"
-      }
-    },
-    "./hono": {
-      "import": {
-        "types": "./dist/hono.d.mts",
-        "default": "./dist/hono.mjs"
-      },
-      "require": {
-        "types": "./dist/hono.d.cts",
-        "default": "./dist/hono.cjs"
-      }
-    },
-    "./fastify": {
-      "import": {
-        "types": "./dist/fastify.d.mts",
-        "default": "./dist/fastify.mjs"
-      },
-      "require": {
-        "types": "./dist/fastify.d.cts",
-        "default": "./dist/fastify.cjs"
-      }
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsdown src/index.ts src/express.ts src/next.ts src/hono.ts src/fastify.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external @modelcontextprotocol/sdk --external express --external next --external hono --external fastify",
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external @modelcontextprotocol/sdk",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "@ts-kizuna/core": "workspace:*",
     "zod": "^4.0.0"
   },
-  "peerDependenciesMeta": {
-    "express": {
-      "optional": true
-    },
-    "hono": {
-      "optional": true
-    },
-    "fastify": {
-      "optional": true
-    }
-  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {
-    "@hono/node-server": "catalog:",
     "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/express": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",
-    "fastify": "catalog:",
-    "hono": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"

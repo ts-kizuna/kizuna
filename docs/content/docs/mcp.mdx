@@ -1,76 +1,36 @@
 ---
 title: MCP
-description: Mount an MCP endpoint on your Express, Fastify, Hono, or Next.js app so AI assistants can call your API.
+description: Install the MCP plugin so AI assistants can call your API as tools, on any adapter.
 ---
 
-`@ts-kizuna/mcp` adds a [Model Context Protocol](https://modelcontextprotocol.io) endpoint to your existing app. Each route becomes an MCP tool that AI assistants can discover and call. Works with Express, Fastify, Hono, and Next.js.
+`@ts-kizuna/mcp` adds an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint to your API. Each route becomes an MCP tool that AI assistants can discover and call.
 
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
-## Express
+## Install it
 
-```ts title="src/index.ts"
-import express from 'express';
-import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
-import { api } from './lib/api';
+MCP is a [plugin](/docs/extend/create-plugin). You install it where the rest of your API's vocabulary is declared, and `api.mount` serves it:
 
-const app = express();
-app.use(express.json());
+```ts title="src/lib/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { mcpPlugin } from '@ts-kizuna/mcp';
 
-api.mount(app);
-createMcpEndpoint(api, app);
-
-app.listen(3000);
-```
-
-`createMcpEndpoint` mounts the MCP protocol handler at `/mcp` by default. Change it with the `path` option.
-
-## Fastify
-
-```ts title="src/index.ts"
-import Fastify from 'fastify';
-import { createMcpEndpoint } from '@ts-kizuna/mcp/fastify';
-import { api } from './lib/api';
-
-const app = Fastify();
-
-await api.mount(app);
-await createMcpEndpoint(api, app);
-
-app.listen({
-    port: 3000,
+export const { k } = Kizuna.init({
+    tags,
+    identities,
+    plugins: {
+        mcp: mcpPlugin({
+            name: 'My API',
+        }),
+    },
 });
 ```
 
-Mounts at `/mcp` by default, configurable with the `path` option.
+Nothing else to mount. The endpoint answers at `/mcp` by default. On Next.js it is served by the catch-all route file that already serves your contract, so with `basePath: '/api'` it lands at `/api/mcp`.
 
-## Hono
+## It is not in your client
 
-```ts title="src/index.ts"
-import { Hono } from 'hono';
-import { createMcpEndpoint } from '@ts-kizuna/mcp/hono';
-import { api } from './lib/api';
-
-const app = new Hono();
-
-api.mount(app);
-createMcpEndpoint(api, app);
-
-export default app;
-```
-
-Same as Express — mounts at `/mcp` by default, configurable with the `path` option.
-
-## Next.js
-
-```ts title="app/mcp/route.ts"
-import { createMcpEndpoint } from '@ts-kizuna/mcp/next';
-import { api } from '../../lib/api';
-
-export const { GET, POST, DELETE } = createMcpEndpoint(api);
-```
-
-Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HTTP transport requires.
+The MCP endpoint is a plugin route, so it lives outside `contract.routes`. Your fetch client, OpenAPI document and generated Swift and Kotlin clients never see it, which is what you want: it is a protocol endpoint, not part of your API's surface.
 
 ## How it works
 
@@ -83,18 +43,11 @@ Each route becomes an MCP tool:
 
 Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-urlencoded'` are excluded by default since MCP tools receive JSON.
 
-## Framework context
-
-Handlers called via MCP receive the same framework context as regular HTTP handlers. The MCP endpoint passes its incoming request through automatically:
-
-- **Express** — handlers receive `req` and `res`
-- **Fastify** — handlers receive `request` and `reply`
-- **Hono** — handlers receive `c` (Hono Context)
-- **Next.js** — handlers receive `request`
+Handlers receive the same framework context they do over HTTP, passed through from the transport request, so a handler reading `req` or `c` keeps working when it is called as a tool.
 
 ## Auth
 
-Secured tools authenticate via the headers of the MCP transport request. When an assistant calls one, the endpoint runs the [guards](/docs/auth) registered on `server.api`, exactly like the HTTP pipeline: each identity's credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context as usual. Nothing extra to wire — mounting a secured API gives you a secured MCP endpoint.
+Secured tools authenticate via the headers of the MCP transport request. When an assistant calls one, the endpoint runs the [guards](/docs/auth) registered on `server.api`, exactly like the HTTP pipeline: each identity's credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context as usual. Installing the plugin on a secured API gives you a secured MCP endpoint.
 
 Configure the MCP client to send the credential as a header on the connection. For example, with Claude Code:
 
@@ -104,7 +57,7 @@ claude mcp add --transport http my-api http://localhost:3000/mcp --header "Autho
 
 For an `apiKey` identity, send the header the identity names (e.g. `x-workspace-token`) instead.
 
-When a guard denies the call — or an access gate fails — the tool call returns an error result (`isError: true`) carrying the status and detail, so the assistant sees exactly why it was refused:
+When a guard denies the call, or an access gate fails, the tool call returns an error result (`isError: true`) carrying the status and detail, so the assistant sees exactly why it was refused:
 
 ```json
 {
@@ -121,14 +74,12 @@ Public routes (`false` in the auth map) run without guards, credentials or not.
 
 | Option        | Default                                | Description                                   |
 | ------------- | -------------------------------------- | --------------------------------------------- |
+| `path`        | `'/mcp'`                               | Path the endpoint is served from              |
 | `name`        | `'MCP Server'`                         | Human-readable name shown to AI assistants    |
 | `version`     | `'1.0.0'`                              | Semantic version string                       |
 | `routeFilter` | excludes multipart and form-urlencoded | Predicate to filter which routes become tools |
-| `path`        | `'/mcp'`                               | Mount path (Express, Fastify, and Hono)       |
 
 ## Connecting clients
-
-After mounting the endpoint, connect your AI tools to it.
 
 ### Claude Code
 
@@ -194,7 +145,7 @@ Responses with status >= 400 set `isError: true` on the MCP result so the AI kno
 
 ## Standalone server
 
-If you don't want to mount on an existing app, [`createMcpServer`](/docs/reference/create-mcp-server) returns a raw `McpServer` you can connect to any transport (stdio, SSE, etc.).
+If you want to drive the transport yourself, for stdio or SSE, [`createMcpServer`](/docs/reference/create-mcp-server) returns a raw `McpServer`:
 
 ```ts title="src/index.ts"
 import { createMcpServer } from '@ts-kizuna/mcp';
@@ -211,5 +162,6 @@ await server.connect(new StdioServerTransport());
 
 ## Reference
 
-- [`createMcpEndpoint`](/docs/reference/create-mcp-endpoint)
+- [`mcpPlugin`](/docs/reference/mcp-plugin)
 - [`createMcpServer`](/docs/reference/create-mcp-server)
+- [Create a Plugin](/docs/extend/create-plugin) to write your own

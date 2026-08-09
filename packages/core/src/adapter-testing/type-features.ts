@@ -73,6 +73,12 @@ export const ADAPTER_TYPE_FEATURES = {
     'standalone.routeHandlerContext': {
         summary: 'A standalone `RouteHandler` carries the contract’s request context.',
     },
+    'plugins.exportsTyped': {
+        summary: 'A handler’s `plugins` carries each installed plugin’s exports, typed and keyed by install name.',
+    },
+    'plugins.absentWhenUninstalled': {
+        summary: 'A contract with no plugins gives handlers no `plugins` key at all.',
+    },
 } as const satisfies Record<string, AdapterFeatureMeta>;
 
 export type AdapterTypeFeature = keyof typeof ADAPTER_TYPE_FEATURES;

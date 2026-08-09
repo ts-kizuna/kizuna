@@ -84,6 +84,18 @@ export const ADAPTER_FEATURES = {
     'responses.validation': {
         summary: 'With `responseValidation` on, a body the contract disallows fails as a 500.',
     },
+    'plugins.routesServed': {
+        summary: 'A plugin route is served by `api.mount`, in the same pipeline as the contract’s own.',
+    },
+    'plugins.exportsReachHandlers': {
+        summary: 'What a plugin exports reaches every handler under `plugins`.',
+    },
+    'plugins.contractWinsOverlap': {
+        summary: 'A contract route wins a path a plugin route also matches, such as a static path against the plugin’s param.',
+    },
+    'plugins.rawResponse': {
+        summary: 'A plugin route answering with `raw` sends its response untouched by validation or rendering.',
+    },
 } as const satisfies Record<string, AdapterFeatureMeta>;
 
 export type AdapterFeature = keyof typeof ADAPTER_FEATURES;
