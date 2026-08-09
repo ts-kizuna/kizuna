@@ -14,13 +14,13 @@ import { generateOpenApi } from '@ts-kizuna/openapi';
 ## Parameters
 
 ```ts
-generateOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer
+generateOpenApi(contract: Contract, options?: GenerateOpenApiOptions): OpenApiRenderer
 ```
 
-| Parameter  | Type                     | Description                                                   |
-| ---------- | ------------------------ | ------------------------------------------------------------- |
-| `contract` | `Contract`               | The contract from [`k.contract`](/docs/reference/kizuna-init) |
-| `options`  | `GenerateOpenApiOptions` | OpenAPI generation options                                    |
+| Parameter  | Type                     | Description                                                                                                                                      |
+| ---------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `contract` | `Contract`               | The contract from [`k.contract`](/docs/reference/kizuna-init)                                                                                    |
+| `options`  | `GenerateOpenApiOptions` | OpenAPI generation options. Omit them and the options an installed [`openApiDocsPlugin`](/docs/reference/openapi-docs-plugin) was given are used |
 
 ## Options
 

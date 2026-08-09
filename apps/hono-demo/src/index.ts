@@ -1,28 +1,9 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
-import { apiReference } from '@scalar/hono-api-reference';
 
 import { api } from './lib/api';
-import { openApiSpec } from './lib/openApi';
 
 const app = new Hono();
-
-app.get('/openapi.json', (c) => {
-    return c.json(openApiSpec('json'));
-});
-
-app.get('/openapi.yaml', (c) => {
-    return c.text(openApiSpec('yaml') as string, 200, {
-        'content-type': 'text/yaml; charset=utf-8',
-    });
-});
-
-app.get(
-    '/docs',
-    apiReference({
-        url: '/openapi.json',
-    })
-);
 
 app.get('/', (c) => {
     return c.html(`<!doctype html>

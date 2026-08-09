@@ -1,6 +1,6 @@
 ---
 title: OpenAPI
-description: Generate an OpenAPI 3.1.0 document from your contract and serve it with Scalar.
+description: Generate an OpenAPI 3.1.0 document from your contract, and serve it with a reference UI.
 ---
 
 `@ts-kizuna/openapi` generates an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from your contract.
@@ -25,6 +25,78 @@ const spec = generateOpenApi(contract, {
 spec('json'); // OpenApiDocument object
 spec('yaml'); // YAML string
 ```
+
+## Serving it
+
+`openApiDocsPlugin` serves the document and an API reference UI for it. Install it and there is nothing else to wire: it generates the document from your contract, and `api.mount` serves its routes on any adapter.
+
+```ts title="src/lib/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { openApiDocsPlugin } from '@ts-kizuna/openapi';
+
+export const { k } = Kizuna.init({
+    tags,
+    plugins: {
+        openApiDocs: openApiDocsPlugin({
+            info: {
+                title: 'My API',
+                version: '1.0.0',
+            },
+        }),
+    },
+});
+```
+
+That gives you three routes:
+
+| Path            | What                                    |
+| --------------- | --------------------------------------- |
+| `/docs`         | the API reference UI, Scalar by default |
+| `/openapi.json` | the document                            |
+| `/openapi.yaml` | the same document as YAML               |
+
+Every path is configurable, and `false` turns any of them off: `path: false` serves the document with no UI, `yamlPath: false` serves JSON only. They are [plugin routes](/docs/plugins), so they stay out of your fetch client and out of the document itself.
+
+The routes are public. Gate them with your framework's own middleware if that is not what you want.
+
+### The options are declared once
+
+With the plugin installed, `generateOpenApi(contract)` reads its options off the contract. A build step that writes the document to disk cannot drift from the one your server serves:
+
+```ts title="scripts/generate-openapi.ts"
+const spec = generateOpenApi(contract);
+
+writeFileSync('openapi.yaml', spec('yaml'));
+```
+
+Pass options explicitly and they win, which is what you want without the plugin installed.
+
+### Serving it yourself
+
+The plugin is the batteries-included path, not the only one:
+
+```ts title="src/index.ts"
+const spec = generateOpenApi(contract);
+
+app.get('/openapi.yaml', (_req, res) => {
+    res.type('text/yaml; charset=utf-8').send(spec('yaml'));
+});
+```
+
+Leave `yamlPath` off when you do, or two handlers claim the path and whichever registered first wins. Kizuna cannot catch that one for you: it sees collisions between the contract and a plugin, but a route you register on the app yourself is invisible to it.
+
+Mixing is the useful case: `docsPath: false` lets the plugin serve the document while you render your own UI.
+
+### Swagger instead of Scalar
+
+```ts
+openApiDocsPlugin({
+    info,
+    provider: 'swagger',
+});
+```
+
+Point `cdnUrl` at a self-hosted copy for air-gapped deployments or a strict CSP.
 
 ## Deprecation
 
@@ -89,66 +161,6 @@ paths:
 
 Routes marked `false` in the auth map get no `security` entry — they document as public, because they are. A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity also emits no `security` (OpenAPI can't describe its credential), but its routes carry an `x-kizuna-guarded` extension, so protected-out-of-band stays distinct from public.
 
-## Serving with Scalar (Express)
-
-```ts title="src/index.ts"
-import express from 'express';
-import { apiReference } from '@scalar/express-api-reference';
-import { generateOpenApi } from '@ts-kizuna/openapi';
-import { api } from './lib/server';
-import { contract } from '@shared/contract';
-
-const app = express();
-app.use(express.json());
-
-const spec = generateOpenApi(contract, {
-    info: {
-        title: 'My API',
-        version: '1.0.0',
-    },
-});
-
-app.get('/openapi.json', (_req, res) => {
-    res.json(spec('json'));
-});
-
-app.use(
-    '/reference',
-    apiReference({
-        url: '/openapi.json',
-    })
-);
-
-api.mount(app);
-app.listen(3000);
-```
-
-## Serving with Scalar (Next.js)
-
-```ts title="src/app/reference/route.ts"
-import { ApiReference } from '@scalar/nextjs-api-reference';
-import { generateOpenApi } from '@ts-kizuna/openapi';
-import { contract } from '@shared/contract';
-
-const spec = generateOpenApi(contract, {
-    info: {
-        title: 'My API',
-        version: '1.0.0',
-    },
-    servers: [
-        {
-            url: '/api',
-        },
-    ],
-});
-
-export const GET = ApiReference({
-    spec: {
-        content: spec('json'),
-    },
-});
-```
-
 ## Writing the spec to disk
 
 ```ts title="scripts/generate-openapi.ts"
@@ -179,6 +191,7 @@ If a route already declares a `400` response, the automatic validation error is 
 ## Reference
 
 - [`generateOpenApi`](/docs/reference/generate-openapi)
+- [`openApiDocsPlugin`](/docs/reference/openapi-docs-plugin)
 
 ## Breaking changes
 

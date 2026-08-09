@@ -8,10 +8,10 @@
     "server": "kizuna deprecations ../shared/src/contract.ts && tsx watch src/index.ts",
     "server:once": "kizuna deprecations ../shared/src/contract.ts && tsx src/index.ts",
     "client": "tsx src/scripts/run-client.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "openapi": "tsx scripts/generate-openapi.ts"
   },
   "dependencies": {
-    "@scalar/fastify-api-reference": "^1.57.5",
     "@ts-kizuna-demo/shared": "workspace:*",
     "@ts-kizuna/core": "workspace:*",
     "@ts-kizuna/fastify": "workspace:*",

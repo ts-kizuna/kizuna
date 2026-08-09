@@ -8,14 +8,14 @@
     "server": "kizuna deprecations ../shared/src/contract.ts && tsx watch src/index.ts",
     "server:once": "kizuna deprecations ../shared/src/contract.ts && tsx src/index.ts",
     "client": "tsx src/scripts/run-client.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "openapi": "tsx scripts/generate-openapi.ts"
   },
   "dependencies": {
     "@hono/node-server": "catalog:",
-    "@scalar/hono-api-reference": "^0.10.19",
     "@ts-kizuna-demo/shared": "workspace:*",
-    "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/hono": "workspace:*",
     "@ts-kizuna/mcp": "workspace:*",
     "@ts-kizuna/openapi": "workspace:*",

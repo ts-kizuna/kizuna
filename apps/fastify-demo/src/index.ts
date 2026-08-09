@@ -1,25 +1,8 @@
 import Fastify from 'fastify';
-import fastifyApiReference from '@scalar/fastify-api-reference';
 
 import { api } from './lib/api';
-import { openApiSpec } from './lib/openApi';
 
 const app = Fastify();
-
-app.get('/openapi.json', async (_request, reply) => {
-    reply.send(openApiSpec('json'));
-});
-
-app.get('/openapi.yaml', async (_request, reply) => {
-    reply.header('content-type', 'text/yaml; charset=utf-8').send(openApiSpec('yaml'));
-});
-
-app.register(fastifyApiReference, {
-    routePrefix: '/docs',
-    configuration: {
-        url: '/openapi.json',
-    },
-});
 
 app.get('/', async (_request, reply) => {
     reply.header('content-type', 'text/html; charset=utf-8').send(`<!doctype html>

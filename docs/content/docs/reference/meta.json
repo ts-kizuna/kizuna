@@ -20,6 +20,7 @@
         "binary-and-file-schemas",
         "is-validation-error",
         "generate-openapi",
+        "openapi-docs-plugin",
         "generate-swift-client",
         "generate-kotlin-client",
         "mcp-plugin",

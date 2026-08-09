@@ -1,26 +1,9 @@
 import express from 'express';
-import { apiReference } from '@scalar/express-api-reference';
 
 import { api } from './lib/api';
-import { openApiSpec } from './lib/openApi';
 
 const app = express();
 app.use(express.json());
-
-app.get('/openapi.json', (_req, res) => {
-    res.json(openApiSpec('json'));
-});
-
-app.get('/openapi.yaml', (_req, res) => {
-    res.type('text/yaml; charset=utf-8').send(openApiSpec('yaml'));
-});
-
-app.use(
-    '/docs',
-    apiReference({
-        url: '/openapi.json',
-    })
-);
 
 app.get('/', (_req, res) => {
     res.type('html').send(`<!doctype html>
