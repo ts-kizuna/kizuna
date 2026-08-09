@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import * as url from 'node:url';
 import ts from 'typescript';
-import { collectExportedSchemaDocs, patchDeclarationDocs } from './deprecation-parser.js';
+import { collectExportedSchemaDocs, patchDeclarationDocs } from './jsdoc-parser.js';
 
 const packageDir = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..');
 const tempDirs: string[] = [];

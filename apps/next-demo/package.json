@@ -3,9 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "kizuna deprecations ../shared/src/contract.ts && next dev -p 3030",
-    "build": "kizuna deprecations ../shared/src/contract.ts && next build",
-    "start": "kizuna deprecations ../shared/src/contract.ts && next start -p 3030",
+    "dev": "kizuna jsdoc ../shared/src/contract.ts && next dev -p 3030",
+    "build": "kizuna jsdoc ../shared/src/contract.ts && next build",
+    "start": "kizuna jsdoc ../shared/src/contract.ts && next start -p 3030",
     "typecheck": "tsc --noEmit",
     "openapi": "tsx scripts/generate-openapi.ts"
   },

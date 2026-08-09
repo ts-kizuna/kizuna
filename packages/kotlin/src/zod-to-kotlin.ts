@@ -8,6 +8,8 @@ import {
     readDiscriminatorStringLiteral,
     readMetaDescription,
     readMetaId,
+    jsDocText,
+    type JsDocEntry,
     readObjectShape,
     unwrapOptionalWrappers,
     toPascalCase,
@@ -163,10 +165,10 @@ const objectFields = (
     schema: z.core.$ZodType,
     registry: TypeRegistry,
     hint: string,
-    deprecatedPaths?: ReadonlyMap<string, string>,
+    fieldJsDoc?: ReadonlyMap<string, JsDocEntry>,
     pathPrefix?: string,
-    deprecationSchemas?: ReadonlyMap<string, Map<string, string>>,
-    schemaDeprecations?: ReadonlyMap<string, string>
+    schemaJsDoc?: ReadonlyMap<string, Map<string, JsDocEntry>>,
+    schemaFieldJsDoc?: ReadonlyMap<string, JsDocEntry>
 ): KotlinField[] => {
     const shape = readObjectShape(schema) ?? {};
     const fields: KotlinField[] = [];
@@ -174,7 +176,8 @@ const objectFields = (
     for (const [key, value] of Object.entries(shape)) {
         const childHint = `${hint}${toPascalCase(key)}`;
         const fieldPath = pathPrefix ? `${pathPrefix}.${key}` : key;
-        const result = mapType(value, registry, childHint, deprecatedPaths, fieldPath, deprecationSchemas);
+        const entry = fieldJsDoc?.get(fieldPath) ?? schemaFieldJsDoc?.get(key);
+        const result = mapType(value, registry, childHint, fieldJsDoc, fieldPath, schemaJsDoc);
         const kotlinName = propertyName(key, registry.camelCaseProperties);
         const previousWireName = seen.get(kotlinName);
         if (previousWireName !== undefined && previousWireName !== key) {
@@ -188,10 +191,10 @@ const objectFields = (
             wireName: key,
             type: result.expression,
             optional: result.optional,
-            description: readMetaDescription(value),
+            description: jsDocText(entry) ?? readMetaDescription(value),
             isFile: result.isFile,
-            deprecated: deprecatedPaths?.has(fieldPath) === true || schemaDeprecations?.has(key) === true,
-            deprecationMessage: deprecatedPaths?.get(fieldPath) || schemaDeprecations?.get(key) || undefined,
+            deprecated: entry?.deprecated !== undefined,
+            deprecationMessage: entry?.deprecated || undefined,
         });
     }
     return fields;
@@ -199,13 +202,33 @@ const objectFields = (
 
 const stringify = (value: string): string => JSON.stringify(value);
 
+/**
+ * Whether a field path names a whole route member (`body`, `query`, a response
+ * status) rather than a field inside one. JSDoc on a member describes the type
+ * generated for it; JSDoc on a field describes that property, and repeating it
+ * on the property's inline type would just say the same thing twice.
+ */
+const isRouteMemberPath = (path: string): boolean =>
+    path === 'body' || path === 'query' || path === 'headers' || path === 'pathParams' || /^responses\.[^.]+$/.test(path);
+
+/**
+ * A generated type's doc comment. JSDoc on the route member the type came from
+ * wins over the schema's own `.meta({ description })`.
+ */
+const typeDescription = (
+    schema: z.core.$ZodType,
+    fieldJsDoc: ReadonlyMap<string, JsDocEntry> | undefined,
+    pathPrefix: string | undefined
+): string | undefined =>
+    (pathPrefix && isRouteMemberPath(pathPrefix) ? jsDocText(fieldJsDoc?.get(pathPrefix)) : undefined) ?? readMetaDescription(schema);
+
 export const mapType = (
     schema: z.core.$ZodType,
     registry: TypeRegistry,
     hint: string,
-    deprecatedPaths?: ReadonlyMap<string, string>,
+    fieldJsDoc?: ReadonlyMap<string, JsDocEntry>,
     pathPrefix?: string,
-    deprecationSchemas?: ReadonlyMap<string, Map<string, string>>
+    schemaJsDoc?: ReadonlyMap<string, Map<string, JsDocEntry>>
 ): MapResult => {
     if (isFileSchema(schema)) {
         return {
@@ -228,14 +251,14 @@ export const mapType = (
                 name: enumName,
                 discriminator: discriminated.discriminator,
                 variants: [],
-                description: readMetaDescription(schema),
+                description: typeDescription(schema, fieldJsDoc, pathPrefix),
             });
             const variants: KotlinSealedClass['variants'] = [];
             for (const option of discriminated.options) {
                 const variantId = readMetaId(option);
                 const literal = readDiscriminatorStringLiteral(option, discriminated.discriminator);
                 const variantHint = variantId ?? `${enumName}${toPascalCase(literal ?? 'Variant')}`;
-                const variantResult = mapType(option, registry, variantHint, undefined, undefined, deprecationSchemas);
+                const variantResult = mapType(option, registry, variantHint, undefined, undefined, schemaJsDoc);
                 if (literal !== undefined) {
                     variants.push({
                         caseName: sanitizeCaseName(literal),
@@ -266,7 +289,7 @@ export const mapType = (
                 name: enumName,
                 discriminator: discriminated.discriminator,
                 variants,
-                description: readMetaDescription(schema),
+                description: typeDescription(schema, fieldJsDoc, pathPrefix),
             });
         }
         return {
@@ -282,14 +305,14 @@ export const mapType = (
                 kind: 'data-class',
                 name: id,
                 fields: [],
-                description: readMetaDescription(schema),
+                description: typeDescription(schema, fieldJsDoc, pathPrefix),
             });
-            const fields = objectFields(schema, registry, id, deprecatedPaths, pathPrefix, deprecationSchemas, deprecationSchemas?.get(id));
+            const fields = objectFields(schema, registry, id, fieldJsDoc, pathPrefix, schemaJsDoc, schemaJsDoc?.get(id));
             registry.replace({
                 kind: 'data-class',
                 name: id,
                 fields,
-                description: readMetaDescription(schema),
+                description: typeDescription(schema, fieldJsDoc, pathPrefix),
             });
         }
         return {
@@ -300,7 +323,7 @@ export const mapType = (
 
     const { inner, optional } = unwrapOptionalWrappers(schema);
     if (optional) {
-        const innerResult = mapType(inner, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+        const innerResult = mapType(inner, registry, hint, fieldJsDoc, pathPrefix, schemaJsDoc);
         return {
             expression: innerResult.expression.endsWith('?') ? innerResult.expression : `${innerResult.expression}?`,
             optional: true,
@@ -318,9 +341,9 @@ export const mapType = (
         case 'pipe': {
             const outType = def.out ? readDefType(def.out) : undefined;
             if (def.out && outType !== 'transform') {
-                return mapType(def.out, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+                return mapType(def.out, registry, hint, fieldJsDoc, pathPrefix, schemaJsDoc);
             }
-            if (def.in) return mapType(def.in, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+            if (def.in) return mapType(def.in, registry, hint, fieldJsDoc, pathPrefix, schemaJsDoc);
             registry.warnJsonElement(hint, 'pipe schema missing resolvable type');
             return {
                 expression: 'JsonElement',
@@ -363,7 +386,7 @@ export const mapType = (
                     optional: false,
                 };
             }
-            const elementResult = mapType(element, registry, `${hint}Item`, deprecatedPaths, pathPrefix, deprecationSchemas);
+            const elementResult = mapType(element, registry, `${hint}Item`, fieldJsDoc, pathPrefix, schemaJsDoc);
             return {
                 expression: `List<${elementResult.expression.replace(/\?$/, '')}>`,
                 optional: false,
@@ -376,14 +399,14 @@ export const mapType = (
                     kind: 'data-class',
                     name: className,
                     fields: [],
-                    description: readMetaDescription(schema),
+                    description: typeDescription(schema, fieldJsDoc, pathPrefix),
                 });
-                const fields = objectFields(schema, registry, className, deprecatedPaths, pathPrefix, deprecationSchemas);
+                const fields = objectFields(schema, registry, className, fieldJsDoc, pathPrefix, schemaJsDoc);
                 registry.replace({
                     kind: 'data-class',
                     name: className,
                     fields,
-                    description: readMetaDescription(schema),
+                    description: typeDescription(schema, fieldJsDoc, pathPrefix),
                 });
             }
             return {
@@ -400,7 +423,7 @@ export const mapType = (
                     kind: 'enum-class',
                     name: enumName,
                     cases,
-                    description: readMetaDescription(schema),
+                    description: typeDescription(schema, fieldJsDoc, pathPrefix),
                     unknownCase: registry.unknownEnumCase,
                 });
             }
@@ -448,7 +471,7 @@ export const mapType = (
                 };
             }
             const resolved = options
-                .map((option) => mapType(option, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas))
+                .map((option) => mapType(option, registry, hint, fieldJsDoc, pathPrefix, schemaJsDoc))
                 .filter((result): result is MapResult => result !== undefined && result.expression !== 'JsonElement');
             if (resolved.length === 0) {
                 registry.warnJsonElement(hint, 'non-discriminated union');
@@ -518,11 +541,11 @@ export const collectObjectFields = (
     schema: z.core.$ZodType,
     registry: TypeRegistry,
     hint: string,
-    deprecatedPaths?: ReadonlyMap<string, string>,
+    fieldJsDoc?: ReadonlyMap<string, JsDocEntry>,
     pathPrefix?: string,
-    deprecationSchemas?: ReadonlyMap<string, Map<string, string>>
+    schemaJsDoc?: ReadonlyMap<string, Map<string, JsDocEntry>>
 ): KotlinField[] => {
-    return objectFields(schema, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+    return objectFields(schema, registry, hint, fieldJsDoc, pathPrefix, schemaJsDoc);
 };
 
 export const objectFieldCount = (schema: z.core.$ZodType): number => {

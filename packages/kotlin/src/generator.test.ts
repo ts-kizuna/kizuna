@@ -4,9 +4,9 @@ import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
-import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
+import { writeKizunaJsDoc } from '../../cli/src/jsdoc-parser.js';
 import { generateKotlinClient } from './generator.js';
-import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
+import { contract as deprecatedContract } from '../../cli/src/contract.fixture.js';
 
 const k = new Kizuna();
 
@@ -685,7 +685,7 @@ describe('Kotlin generator — owned type nesting', () => {
 describe('Kotlin generator — @Deprecated', () => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-kotlin-'));
     const previousCwd = process.cwd();
-    const fixturePath = path.resolve(import.meta.dirname, '../../cli/src/deprecation.fixture.ts');
+    const fixturePath = path.resolve(import.meta.dirname, '../../cli/src/contract.fixture.ts');
 
     beforeAll(() => {
         process.chdir(workDir);
@@ -697,7 +697,7 @@ describe('Kotlin generator — @Deprecated', () => {
 
     const generate = (routes: Contract['routes']): string => {
         const contract = { routes } as Contract;
-        writeKizunaDeprecations([{ contract, contractPath: fixturePath }], path.join(workDir, '.kizuna'));
+        writeKizunaJsDoc([{ contract, contractPath: fixturePath }], path.join(workDir, '.kizuna'));
         return generateKotlinClient(contract, baseConfig);
     };
 
@@ -728,6 +728,22 @@ describe('Kotlin generator — @Deprecated', () => {
         const output = generate({ getUserByIdV2: deprecatedContract.routes.getUserByIdV2 });
         expect(output).toContain('@Deprecated("use email_address instead")');
         expect(output).toContain('val email: String');
+    });
+
+    it('documents a method from the route JSDoc', () => {
+        const output = generate({ newRoute: deprecatedContract.routes.newRoute });
+        expect(output).toContain('Creates a user from the submitted name.');
+    });
+
+    it('documents a response type from JSDoc on its status key', () => {
+        const output = generate({ newRoute: deprecatedContract.routes.newRoute });
+        expect(output).toContain('/** The user was created. */');
+    });
+
+    it('documents a field from its JSDoc, alongside the deprecation annotation', () => {
+        const output = generate({ newRoute: deprecatedContract.routes.newRoute });
+        expect(output).toContain('The display name.');
+        expect(output).toContain('@Deprecated("use fullName instead")');
     });
 });
 

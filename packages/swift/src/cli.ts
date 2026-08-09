@@ -2,7 +2,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { writeKizunaDeprecations, loadContract } from '@ts-kizuna/cli';
+import { writeKizunaJsDoc, loadContract } from '@ts-kizuna/cli';
 import { generateSwiftClient } from './generator.js';
 
 const usage = `Usage: ts-kizuna-swift generate --contract <path> --output <path> --namespace-name <name>
@@ -66,7 +66,7 @@ const main = async (): Promise<void> => {
     const contractPath = resolve(process.cwd(), pathPart!);
     const contract =
         (await loadContract(contractPath, exportName)) ?? die(`No \`${exportName}\` (or default) export found at ${contractPath}`);
-    writeKizunaDeprecations([{ contract, contractPath }], resolve(process.cwd(), '.kizuna'));
+    writeKizunaJsDoc([{ contract, contractPath }], resolve(process.cwd(), '.kizuna'));
     const swiftSource = generateSwiftClient(contract, {
         namespaceName,
         camelCaseProperties: values['camel-case'],

@@ -2,21 +2,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ts from 'typescript';
 import { AUTHORING_NAMES, CONTRACT_EXPORT_NAMES } from '@ts-kizuna/core/authoring-names';
-import {
-    type DeprecationMap,
-    type SerializedDeprecationMap,
-    serializeDeprecationMap,
-    contractFingerprint,
-} from '@ts-kizuna/core/generator';
+import { type JsDocEntry, type JsDocMap, type SerializedJsDocMap, serializeJsDocMap, contractFingerprint } from '@ts-kizuna/core/generator';
+import { readJsDocBlock, readJsDocEntry } from './jsdoc-block.js';
 import type { Contract } from '@ts-kizuna/core';
 
-const SCHEMA_KEYS: ReadonlySet<string> = new Set(['body', 'query', 'headers']);
-
-const readDeprecatedMessage = (node: ts.Node): string | undefined => {
-    const tag = ts.getJSDocTags(node).find((candidate) => candidate.tagName.text === 'deprecated');
-    if (!tag) return undefined;
-    return ts.getTextOfJSDocComment(tag.comment) ?? '';
-};
+const SCHEMA_KEYS: ReadonlySet<string> = new Set(['pathParams', 'body', 'query', 'headers']);
 
 const propertyName = (node: ts.PropertyName): string | undefined => {
     if (ts.isIdentifier(node)) return node.text;
@@ -238,30 +228,28 @@ export const walkSchemaFields = (
     }
 };
 
-export const collectFieldDeprecations = (
+export const collectFieldJsDoc = (
+    schemaNode: ts.Node,
+    prefix: string,
+    into: Map<string, JsDocEntry>,
+    resolve: IdentifierResolver
+): void => {
+    walkSchemaFields(schemaNode, prefix, resolve, (fieldPath, property) => {
+        const entry = readJsDocEntry(property);
+        if (entry !== undefined) into.set(fieldPath, entry);
+    });
+};
+
+/**
+ * Collects the verbatim JSDoc block on each field, for re-injecting into emitted
+ * `.d.ts` files where the comment has to survive as written.
+ */
+export const collectFieldJsDocBlocks = (
     schemaNode: ts.Node,
     prefix: string,
     into: Map<string, string>,
     resolve: IdentifierResolver
 ): void => {
-    walkSchemaFields(schemaNode, prefix, resolve, (fieldPath, property) => {
-        const message = readDeprecatedMessage(property);
-        if (message !== undefined) into.set(fieldPath, message);
-    });
-};
-
-/**
- * Returns the verbatim leading JSDoc block (`/** … *\/`) on a node, or undefined
- * when it has none.
- */
-const readJsDocBlock = (node: ts.Node): string | undefined => {
-    const sourceFile = node.getSourceFile();
-    const ranges = ts.getLeadingCommentRanges(sourceFile.text, node.getFullStart()) ?? [];
-    const jsDoc = ranges.filter((range) => sourceFile.text.slice(range.pos, range.pos + 3) === '/**').at(-1);
-    return jsDoc ? sourceFile.text.slice(jsDoc.pos, jsDoc.end) : undefined;
-};
-
-export const collectFieldDocs = (schemaNode: ts.Node, prefix: string, into: Map<string, string>, resolve: IdentifierResolver): void => {
     walkSchemaFields(schemaNode, prefix, resolve, (fieldPath, property) => {
         const block = readJsDocBlock(property);
         if (block !== undefined) into.set(fieldPath, block);
@@ -287,17 +275,17 @@ const routePropertyName = (prop: ts.ObjectLiteralElementLike): string | undefine
 const routePropertyInitializer = (prop: ts.PropertyAssignment | ts.ShorthandPropertyAssignment): ts.Expression =>
     ts.isPropertyAssignment(prop) ? prop.initializer : prop.name;
 
-const buildMapFromRoutesLiteral = (routesLiteral: ts.ObjectLiteralExpression, resolve: IdentifierResolver, prefix = ''): DeprecationMap => {
-    const routes = new Map<string, string>();
-    const fields = new Map<string, Map<string, string>>();
+const buildMapFromRoutesLiteral = (routesLiteral: ts.ObjectLiteralExpression, resolve: IdentifierResolver, prefix = ''): JsDocMap => {
+    const routes = new Map<string, JsDocEntry>();
+    const fields = new Map<string, Map<string, JsDocEntry>>();
     for (const routeProperty of routesLiteral.properties) {
         if (!ts.isPropertyAssignment(routeProperty) && !ts.isShorthandPropertyAssignment(routeProperty)) continue;
         const routeName = routePropertyName(routeProperty);
         if (routeName === undefined) continue;
         const fullKey = prefix === '' ? routeName : `${prefix}.${routeName}`;
 
-        const routeMessage = readDeprecatedMessage(routeProperty);
-        if (routeMessage !== undefined) routes.set(fullKey, routeMessage);
+        const routeEntry = readJsDocEntry(routeProperty);
+        if (routeEntry !== undefined) routes.set(fullKey, routeEntry);
 
         const initializer = routePropertyInitializer(routeProperty);
         const resolvedLiteral = ts.isObjectLiteralExpression(initializer)
@@ -313,13 +301,13 @@ const buildMapFromRoutesLiteral = (routesLiteral: ts.ObjectLiteralExpression, re
             continue;
         }
 
-        const deprecated = new Map<string, string>();
+        const fieldEntries = new Map<string, JsDocEntry>();
         for (const subProperty of resolvedLiteral.properties) {
             if (!ts.isPropertyAssignment(subProperty)) continue;
             const subKey = propertyName(subProperty.name);
             if (subKey === undefined) continue;
             if (SCHEMA_KEYS.has(subKey)) {
-                collectFieldDeprecations(subProperty.initializer, subKey, deprecated, resolve);
+                collectFieldJsDoc(subProperty.initializer, subKey, fieldEntries, resolve);
                 continue;
             }
             if (subKey === 'responses' && ts.isObjectLiteralExpression(subProperty.initializer)) {
@@ -327,11 +315,14 @@ const buildMapFromRoutesLiteral = (routesLiteral: ts.ObjectLiteralExpression, re
                     if (!ts.isPropertyAssignment(responseEntry)) continue;
                     const status = propertyName(responseEntry.name);
                     if (status === undefined) continue;
-                    collectFieldDeprecations(responseEntry.initializer, `responses.${status}`, deprecated, resolve);
+                    // JSDoc on the status key itself documents the response, not a field inside it.
+                    const statusEntry = readJsDocEntry(responseEntry);
+                    if (statusEntry !== undefined) fieldEntries.set(`responses.${status}`, statusEntry);
+                    collectFieldJsDoc(responseEntry.initializer, `responses.${status}`, fieldEntries, resolve);
                 }
             }
         }
-        if (deprecated.size > 0) fields.set(fullKey, deprecated);
+        if (fieldEntries.size > 0) fields.set(fullKey, fieldEntries);
     }
     return {
         routes,
@@ -455,27 +446,27 @@ const findAllRouteObjectLiterals = (sourceFile: ts.SourceFile, resolve: Identifi
     return lit ? [lit] : [];
 };
 
-const parseFromSource = (contractPath: string): DeprecationMap => {
+const parseFromSource = (contractPath: string): JsDocMap => {
     const source = fs.readFileSync(contractPath, 'utf8');
     const sourceFile = ts.createSourceFile(contractPath, source, ts.ScriptTarget.Latest, true);
     const { resolve, cache } = makeResolverWithCache(contractPath);
     const routeLiterals = findAllRouteObjectLiterals(sourceFile, resolve);
-    const routes = new Map<string, string>();
-    const fields = new Map<string, Map<string, string>>();
+    const routes = new Map<string, JsDocEntry>();
+    const fields = new Map<string, Map<string, JsDocEntry>>();
     for (const literal of routeLiterals) {
         const partial = buildMapFromRoutesLiteral(literal, resolve);
         for (const [key, value] of partial.routes) routes.set(key, value);
         for (const [key, value] of partial.fields) fields.set(key, value);
     }
 
-    const schemas = new Map<string, Map<string, string>>();
+    const schemas = new Map<string, Map<string, JsDocEntry>>();
     for (const fileScope of cache.values()) {
         for (const expr of fileScope.values()) {
             const id = readAstMetaId(expr);
             if (!id) continue;
-            const fieldDeprecations = new Map<string, string>();
-            collectFieldDeprecations(expr, '', fieldDeprecations, resolve);
-            if (fieldDeprecations.size > 0) schemas.set(id, fieldDeprecations);
+            const schemaFields = new Map<string, JsDocEntry>();
+            collectFieldJsDoc(expr, '', schemaFields, resolve);
+            if (schemaFields.size > 0) schemas.set(id, schemaFields);
         }
     }
 
@@ -486,9 +477,10 @@ export { collectExportedSchemaDocs } from './schema-exports.js';
 export { patchDeclarationDocs, type PatchResult } from './dts-jsdoc.js';
 
 /**
- * Parses a contract's `@deprecated` JSDoc tags into a {@link DeprecationMap}.
+ * Parses a contract's JSDoc — descriptions, `@summary`, `@example`, and
+ * `@deprecated` — into a {@link JsDocMap}.
  */
-export const createDeprecationMap = (contractPath: string): DeprecationMap => parseFromSource(contractPath);
+export const createJsDocMap = (contractPath: string): JsDocMap => parseFromSource(contractPath);
 
 export interface ContractSource {
     contract: Contract;
@@ -496,16 +488,16 @@ export interface ContractSource {
 }
 
 /**
- * Parses each contract's `@deprecated` tags and writes them to
- * `<outDir>/deprecations.json`, keyed by contract fingerprint. Generators read
- * the entry matching the contract they generate. Returns the written path.
+ * Parses each contract's JSDoc and writes it to `<outDir>/jsdoc.json`, keyed by
+ * contract fingerprint. Generators read the entry matching the contract they
+ * generate. Returns the written path.
  */
-export const writeKizunaDeprecations = (contracts: ContractSource[], outDir: string): string => {
-    const entries: Record<string, SerializedDeprecationMap> = {};
+export const writeKizunaJsDoc = (contracts: ContractSource[], outDir: string): string => {
+    const entries: Record<string, SerializedJsDocMap> = {};
     for (const { contract, contractPath } of contracts) {
-        entries[contractFingerprint(contract)] = serializeDeprecationMap(createDeprecationMap(contractPath));
+        entries[contractFingerprint(contract)] = serializeJsDocMap(createJsDocMap(contractPath));
     }
-    const outputPath = path.join(outDir, 'deprecations.json');
+    const outputPath = path.join(outDir, 'jsdoc.json');
     fs.mkdirSync(outDir, { recursive: true });
     fs.writeFileSync(outputPath, JSON.stringify(entries, null, 2), 'utf8');
     return outputPath;

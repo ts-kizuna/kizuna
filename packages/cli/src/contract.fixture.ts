@@ -102,14 +102,25 @@ const routes = k.routes('api', {
             }),
         },
     },
+    /**
+     * @description Creates a user from the submitted name.
+     * @example
+     * {
+     *     fullName: 'Ada Lovelace',
+     * }
+     */
     newRoute: {
         method: 'POST',
         path: '/new',
         body: z.object({
             /**
-             * @deprecated
+             * @description The display name.
+             * @deprecated use fullName instead
              */
             name: z.string(),
+            /**
+             * @example Ada Lovelace
+             */
             fullName: z.string(),
         }),
         query: z.object({
@@ -117,9 +128,16 @@ const routes = k.routes('api', {
              * @deprecated
              */
             page: z.number().optional(),
+            /**
+             * @example eyJpZCI6IjQyIn0
+             * @example eyJpZCI6Ijk5In0
+             */
             cursor: z.string().optional(),
         }),
         responses: {
+            /**
+             * @description The user was created.
+             */
             200: z.object({
                 ok: z.boolean(),
             }),
@@ -148,6 +166,11 @@ const routes = k.routes('api', {
             200: ExtendedUserSchema,
         },
     },
+    /**
+     * @summary List users, one page at a time.
+     * @description Pages are cursor-based, so a page boundary is stable while
+     * users are being created.
+     */
     listUsersPaginated: {
         method: 'GET',
         path: '/users/paginated',
@@ -158,6 +181,12 @@ const routes = k.routes('api', {
     getUserByIdV2: {
         method: 'GET',
         path: '/users/v2/:id',
+        pathParams: z.object({
+            /**
+             * @description The user id, as returned by listUsers.
+             */
+            id: z.string(),
+        }),
         responses: {
             200: z.object({
                 id: z.string(),

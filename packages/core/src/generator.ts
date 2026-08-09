@@ -1,23 +1,27 @@
 import {
     contractFingerprint,
-    serializeDeprecationMap,
-    deserializeDeprecationMap,
-    type DeprecationMap,
-    type SerializedDeprecationMap,
-} from './deprecation.js';
-import { loadDeprecations } from './load-deprecations.js';
+    serializeJsDocMap,
+    deserializeJsDocMap,
+    jsDocText,
+    type JsDocEntry,
+    type JsDocMap,
+    type SerializedJsDocMap,
+} from './jsdoc.js';
+import { loadJsDoc } from './load-jsdoc.js';
 import { flattenRoutes } from './handler-pipeline.js';
 import { parsePath } from './path-params.js';
 import type { Routes, RouteDefinition } from './types.js';
 import type { Contract } from './contract.js';
 
 export {
-    loadDeprecations,
+    loadJsDoc,
     contractFingerprint,
-    serializeDeprecationMap,
-    deserializeDeprecationMap,
-    type DeprecationMap,
-    type SerializedDeprecationMap,
+    serializeJsDocMap,
+    deserializeJsDocMap,
+    jsDocText,
+    type JsDocEntry,
+    type JsDocMap,
+    type SerializedJsDocMap,
 };
 export type { Routes, RouteDefinition };
 export { parsePath };
@@ -67,6 +71,12 @@ export interface GeneratorRouteContext {
     route: RouteDefinition;
     routeTags: string[];
     /**
+     * The JSDoc written above this route in the routes source: summary,
+     * description, examples, and `@deprecated`. `undefined` when the route has no
+     * doc comment.
+     */
+    jsDoc: JsDocEntry | undefined;
+    /**
      * Whether this route is marked `@deprecated` in the routes source.
      */
     deprecated: boolean;
@@ -75,17 +85,17 @@ export interface GeneratorRouteContext {
      */
     deprecationMessage: string | undefined;
     /**
-     * Field-path → deprecation message for body/query/headers/responses fields
-     * on this route. `undefined` when the route has no deprecated fields.
+     * Field-path → JSDoc for pathParams/body/query/headers/responses fields on
+     * this route. `undefined` when no field on the route is documented.
      */
-    fieldDeprecations: Map<string, string> | undefined;
+    fieldJsDoc: Map<string, JsDocEntry> | undefined;
 }
 
 /**
  * Factory for building type-safe routes generators.
  *
- * Centralises routes walking and deprecation resolution so generator authors
- * only need to implement `processRoute` and `finalize`.
+ * Centralises routes walking and JSDoc resolution so generator authors only need
+ * to implement `processRoute` and `finalize`.
  *
  * ```ts
  * const generateRouteList = createGenerator(() => {
@@ -115,16 +125,17 @@ export const createGenerator =
     ): ((contract: Contract, options: Options) => Output) =>
     (contract, options) => {
         const { processRoute, finalize } = factory(options, contract);
-        const deprecation = loadDeprecations(contractFingerprint(contract));
+        const jsDocMap = loadJsDoc(contractFingerprint(contract));
         for (const { routeKey, route, routeTags } of flattenRoutes(contract.routes)) {
-            const rawMessage = deprecation?.routes.get(routeKey);
+            const jsDoc = jsDocMap?.routes.get(routeKey);
             processRoute({
                 routeKey,
                 route,
                 routeTags,
-                deprecated: rawMessage !== undefined,
-                deprecationMessage: rawMessage || undefined,
-                fieldDeprecations: deprecation?.fields.get(routeKey),
+                jsDoc,
+                deprecated: jsDoc?.deprecated !== undefined,
+                deprecationMessage: jsDoc?.deprecated || undefined,
+                fieldJsDoc: jsDocMap?.fields.get(routeKey),
             });
         }
         return finalize();

@@ -16,7 +16,8 @@ import {
     guardDeny,
     isGuardDenial,
 } from '@ts-kizuna/core/adapter';
-import type { Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
+import { contractFingerprint, loadJsDoc, type JsDocEntry, type JsDocMap } from '@ts-kizuna/core/generator';
+import type { Contract, Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
 import { deriveToolNames } from './tool-name.js';
 import { buildToolInputSchema, type ToolInputSchema } from './schema.js';
 
@@ -92,12 +93,18 @@ const buildToolAnnotations = (route: RouteDefinition): Annotations => {
     }
 };
 
-const buildToolDescription = (route: RouteDefinition): string => {
+const buildToolDescription = (route: RouteDefinition, jsDoc: JsDocEntry | undefined): string => {
     const parts: string[] = [];
-    if (route.summary) parts.push(route.summary);
-    if (route.description) parts.push(route.description);
+    const summary = jsDoc?.summary ?? route.summary;
+    const description = jsDoc?.description ?? route.description;
+    if (summary) parts.push(summary);
+    if (description) parts.push(description);
     if (parts.length === 0) parts.push(`${route.method} ${route.path}`);
+    if (jsDoc?.deprecated !== undefined) parts.push(`\nDeprecated${jsDoc.deprecated ? `: ${jsDoc.deprecated}` : '.'}`);
     parts.push(`\nHTTP: ${route.method} ${route.path}`);
+    for (const example of jsDoc?.examples ?? []) {
+        parts.push(`\nExample input:\n${typeof example === 'string' ? example : JSON.stringify(example, null, 2)}`);
+    }
     return parts.join('\n');
 };
 
@@ -109,7 +116,7 @@ export interface ToolDefinition {
     routeKey: string;
 }
 
-export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions): ToolDefinition[] => {
+export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions, jsDocMap?: JsDocMap): ToolDefinition[] => {
     const filter = options?.routeFilter ?? defaultRouteFilter;
     const flatRoutes = flattenRoutes(routes).filter(({ route, routeKey }: { route: RouteDefinition; routeKey: string }) =>
         filter(route, routeKey)
@@ -121,8 +128,8 @@ export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions)
         const name = names.get(routeKey)!;
         definitions.push({
             name,
-            description: buildToolDescription(route),
-            inputSchema: buildToolInputSchema(route),
+            description: buildToolDescription(route, jsDocMap?.routes.get(routeKey)),
+            inputSchema: buildToolInputSchema(route, jsDocMap?.fields.get(routeKey)),
             route,
             routeKey,
         });
@@ -411,7 +418,10 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
         version: options?.version ?? '1.0.0',
     });
 
-    const definitions = buildToolDefinitions(api.routes, options);
+    // The same `.kizuna/jsdoc.json` the generators read, so an assistant sees the
+    // descriptions and examples the contract's JSDoc documents.
+    const jsDocMap = loadJsDoc(contractFingerprint({ routes: api.routes } as Contract));
+    const definitions = buildToolDefinitions(api.routes, options, jsDocMap);
 
     for (const definition of definitions) {
         server.registerTool(

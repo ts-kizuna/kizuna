@@ -3,7 +3,8 @@ import { stringify as stringifyYaml } from 'yaml';
 import {
     createGenerator,
     contractFingerprint,
-    loadDeprecations,
+    loadJsDoc,
+    jsDocText,
     isFileSchema,
     isBinarySchema,
     isVoidSchema,
@@ -17,6 +18,7 @@ import {
     resolveResponseBody,
     resolveResponseHeaders,
     resolveResponseContentType,
+    type JsDocEntry,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
 import { getStatusText } from '@ts-kizuna/core';
@@ -46,9 +48,15 @@ export interface OpenApiParameter {
     schema: Record<string, unknown>;
 }
 
+export interface OpenApiMediaType {
+    schema: Record<string, unknown>;
+    example?: unknown;
+    examples?: Record<string, { value: unknown }>;
+}
+
 export interface OpenApiResponseObject {
     description: string;
-    content?: Record<string, { schema: Record<string, unknown> }>;
+    content?: Record<string, OpenApiMediaType>;
 }
 
 export interface OpenApiExternalDocs {
@@ -78,7 +86,7 @@ export interface OpenApiOperation {
     parameters?: OpenApiParameter[];
     requestBody?: {
         required?: boolean;
-        content: Record<string, { schema: Record<string, unknown> }>;
+        content: Record<string, OpenApiMediaType>;
     };
     responses: Record<string, OpenApiResponseObject>;
 }
@@ -242,14 +250,28 @@ const buildComponentSchemas = (): Record<string, unknown> | undefined => {
 
 const COMPONENT_REF_PREFIX = '#/components/schemas/';
 
-const applyDeprecatedToSchema = (
+/**
+ * Writes a field's JSDoc onto a JSON Schema node. `description` never overwrites
+ * one already set from `.meta()` unless the JSDoc has its own, in which case the
+ * JSDoc wins: it is the text the author reads on hover, so the two should not
+ * disagree.
+ */
+const writeJsDocToSchema = (schema: Record<string, unknown>, entry: JsDocEntry): void => {
+    const description = jsDocText(entry);
+    if (description !== undefined) schema.description = description;
+    if (entry.examples) schema.examples = entry.examples;
+    if (entry.deprecated !== undefined) schema.deprecated = true;
+};
+
+const applyJsDocToSchema = (
     schema: Record<string, unknown> | undefined,
     pathRest: string[],
+    entry: JsDocEntry,
     components: Record<string, Record<string, unknown>> | undefined
 ): void => {
     if (!schema) return;
     if (pathRest.length === 0) {
-        schema.deprecated = true;
+        writeJsDocToSchema(schema, entry);
         return;
     }
     if (typeof schema.$ref === 'string') {
@@ -258,7 +280,7 @@ const applyDeprecatedToSchema = (
         if (!ref.startsWith(COMPONENT_REF_PREFIX)) return;
         const id = ref.slice(COMPONENT_REF_PREFIX.length);
         const target = components[id];
-        applyDeprecatedToSchema(target, pathRest, components);
+        applyJsDocToSchema(target, pathRest, entry, components);
         return;
     }
     const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
@@ -266,12 +288,35 @@ const applyDeprecatedToSchema = (
     const head = pathRest[0];
     const rest = pathRest.slice(1);
     if (head === undefined) return;
-    applyDeprecatedToSchema(properties[head], rest, components);
+    applyJsDocToSchema(properties[head], rest, entry, components);
 };
 
-const applyDeprecatedToOperation = (
+/**
+ * `example` for a single value, an `examples` map for several — both render, and
+ * the singular form is what most authors expect to see for one example.
+ */
+const toMediaTypeExamples = (examples: unknown[] | undefined): Partial<OpenApiMediaType> => {
+    if (!examples || examples.length === 0) return {};
+    if (examples.length === 1) {
+        return {
+            example: examples[0],
+        };
+    }
+    return {
+        examples: Object.fromEntries(examples.map((value, index) => [`example${index + 1}`, { value }])),
+    };
+};
+
+const PARAMETER_LOCATIONS: Record<string, OpenApiParameter['in']> = {
+    pathParams: 'path',
+    query: 'query',
+    headers: 'header',
+};
+
+const applyJsDocToOperation = (
     operation: OpenApiOperation,
     path: string,
+    entry: JsDocEntry,
     components: Record<string, Record<string, unknown>> | undefined
 ): void => {
     const segments = path.split('.');
@@ -280,16 +325,22 @@ const applyDeprecatedToOperation = (
     if (head === 'body') {
         const content = operation.requestBody?.content;
         if (!content) return;
-        for (const entry of Object.values(content)) {
-            applyDeprecatedToSchema(entry.schema, rest, components);
+        for (const contentEntry of Object.values(content)) {
+            applyJsDocToSchema(contentEntry.schema, rest, entry, components);
         }
         return;
     }
-    if (head === 'query' || head === 'headers') {
+    if (head !== undefined && head in PARAMETER_LOCATIONS) {
         if (rest.length !== 1) return;
-        const direction = head === 'query' ? 'query' : 'header';
-        const target = operation.parameters?.find((parameter) => parameter.in === direction && parameter.name === rest[0]);
-        if (target) target.schema.deprecated = true;
+        const location = PARAMETER_LOCATIONS[head];
+        const target = operation.parameters?.find((parameter) => parameter.in === location && parameter.name === rest[0]);
+        if (!target) return;
+        // A parameter carries its own description; only the examples and the
+        // deprecated flag belong on its schema.
+        const description = jsDocText(entry);
+        if (description !== undefined) target.description = description;
+        if (entry.examples) target.schema.examples = entry.examples;
+        if (entry.deprecated !== undefined) target.schema.deprecated = true;
         return;
     }
     if (head === 'responses') {
@@ -297,9 +348,19 @@ const applyDeprecatedToOperation = (
         if (status === undefined) return;
         const responseRest = rest.slice(1);
         const response = operation.responses[status];
-        const responseContent = response?.content?.['application/json'] ?? response?.content?.['application/problem+json'];
-        if (!responseContent) return;
-        applyDeprecatedToSchema(responseContent.schema, responseRest, components);
+        if (!response) return;
+        const responseContent = response.content?.['application/json'] ?? response.content?.['application/problem+json'];
+        if (responseRest.length > 0) {
+            if (responseContent) applyJsDocToSchema(responseContent.schema, responseRest, entry, components);
+            return;
+        }
+        // JSDoc on the status key documents the response itself: its description
+        // is the Response Object's, not the schema's, and a description beside a
+        // `$ref` would be noise. Examples belong on the media type.
+        const description = jsDocText(entry);
+        if (description !== undefined) response.description = description;
+        if (responseContent) Object.assign(responseContent, toMediaTypeExamples(entry.examples));
+        if (entry.deprecated !== undefined && responseContent) responseContent.schema.deprecated = true;
     }
 };
 
@@ -318,17 +379,17 @@ type GeneratorContext = GenerateOpenApiOptions & {
 
 const openApiGenerator = createGenerator((options: GeneratorContext, contract: Contract) => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
-    const pendingFieldDeprecations: Array<{ operation: OpenApiOperation; fieldDeprecations: Map<string, string> }> = [];
-    const schemaDeprecations = loadDeprecations(contractFingerprint(contract))?.schemas;
+    const pendingFieldJsDoc: Array<{ operation: OpenApiOperation; fieldJsDoc: Map<string, JsDocEntry> }> = [];
+    const schemaJsDoc = loadJsDoc(contractFingerprint(contract))?.schemas;
 
     return {
-        processRoute({ routeKey, route, routeTags, deprecated, fieldDeprecations }) {
+        processRoute({ routeKey, route, routeTags, deprecated, jsDoc, fieldJsDoc }) {
             const openApiPath = convertPath(route.path);
             const method = route.method.toLowerCase();
 
             let operation: OpenApiOperation = {
-                summary: route.summary,
-                description: route.description,
+                summary: jsDoc?.summary ?? route.summary,
+                description: jsDoc?.description ?? route.description,
                 responses: {},
             };
 
@@ -403,6 +464,8 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                     content: {
                         [contentType]: {
                             schema: toJsonSchema(route.body, 'input'),
+                            // A route's own `@example` documents the request it accepts.
+                            ...toMediaTypeExamples(jsDoc?.examples),
                         },
                     },
                 };
@@ -495,10 +558,10 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                 operation = options.operationMapper(operation, route, routeKey);
             }
 
-            if (fieldDeprecations && fieldDeprecations.size > 0) {
-                pendingFieldDeprecations.push({
+            if (fieldJsDoc && fieldJsDoc.size > 0) {
+                pendingFieldJsDoc.push({
                     operation,
-                    fieldDeprecations,
+                    fieldJsDoc,
                 });
             }
 
@@ -527,18 +590,18 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
             }
 
             const componentSchemasForLookup = componentSchemas as Record<string, Record<string, unknown>> | undefined;
-            for (const { operation, fieldDeprecations: deprecatedPaths } of pendingFieldDeprecations) {
-                for (const fieldPath of deprecatedPaths.keys()) {
-                    applyDeprecatedToOperation(operation, fieldPath, componentSchemasForLookup);
+            for (const { operation, fieldJsDoc: fieldPaths } of pendingFieldJsDoc) {
+                for (const [fieldPath, entry] of fieldPaths) {
+                    applyJsDocToOperation(operation, fieldPath, entry, componentSchemasForLookup);
                 }
             }
 
-            if (schemaDeprecations && componentSchemasForLookup) {
-                for (const [metaId, fields] of schemaDeprecations) {
+            if (schemaJsDoc && componentSchemasForLookup) {
+                for (const [metaId, fields] of schemaJsDoc) {
                     const component = componentSchemasForLookup[metaId];
                     if (!component) continue;
-                    for (const fieldPath of fields.keys()) {
-                        applyDeprecatedToSchema(component, fieldPath.split('.'), componentSchemasForLookup);
+                    for (const [fieldPath, entry] of fields) {
+                        applyJsDocToSchema(component, fieldPath.split('.'), entry, componentSchemasForLookup);
                     }
                 }
             }

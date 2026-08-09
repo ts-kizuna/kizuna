@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import { makeResolverWithCache } from './deprecation-parser.js';
+import { makeResolverWithCache } from './jsdoc-parser.js';
 
 export interface DeprecationLintWarning {
     file: string;

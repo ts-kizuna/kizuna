@@ -50,18 +50,19 @@ const list = generateRouteList(contract, {
 
 Each `processRoute` call receives:
 
-| Property             | Type                               | Description                                                             |
-| -------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
-| `routeKey`           | `string`                           | Dot-separated key path, e.g. `users.getUser`                            |
-| `route`              | `RouteDefinition`                  | The full route definition                                               |
-| `routeTags`          | `string[]`                         | OpenAPI tags inherited from the sub-routes                              |
-| `deprecated`         | `boolean`                          | `true` if the route is marked `/** @deprecated */`                      |
-| `deprecationMessage` | `string \| undefined`              | The text after `@deprecated`, if any                                    |
-| `fieldDeprecations`  | `Map<string, string> \| undefined` | Field-path → deprecation message for body/query/headers/response fields |
+| Property             | Type                                   | Description                                                           |
+| -------------------- | -------------------------------------- | --------------------------------------------------------------------- |
+| `routeKey`           | `string`                               | Dot-separated key path, e.g. `users.getUser`                          |
+| `route`              | `RouteDefinition`                      | The full route definition                                             |
+| `routeTags`          | `string[]`                             | OpenAPI tags inherited from the sub-routes                            |
+| `jsDoc`              | `JsDocEntry \| undefined`              | The route's JSDoc: `summary`, `description`, `examples`, `deprecated` |
+| `deprecated`         | `boolean`                              | `true` if the route is marked `/** @deprecated */`                    |
+| `deprecationMessage` | `string \| undefined`                  | The text after `@deprecated`, if any                                  |
+| `fieldJsDoc`         | `Map<string, JsDocEntry> \| undefined` | Field-path → JSDoc for pathParams/body/query/headers/response fields  |
 
-## Deprecation
+## Documentation
 
-Deprecation data resolves automatically. When `.kizuna/deprecations.json` exists — produced by `kizuna deprecations` (see [Deprecations](/docs/deprecations)) — each `processRoute` call gets `deprecated`, `deprecationMessage`, and `fieldDeprecations` filled in for the matching route. Without that file, `deprecated` is always `false` and `fieldDeprecations` is always `undefined`.
+JSDoc resolves automatically. When `.kizuna/jsdoc.json` exists, produced by `kizuna jsdoc` (see [JSDoc](/docs/jsdoc)), each `processRoute` call gets `jsDoc`, `deprecated`, `deprecationMessage`, and `fieldJsDoc` filled in for the matching route. Without that file, `deprecated` is always `false` and `jsDoc`/`fieldJsDoc` are always `undefined`, so a generator should fall back to the route's own `summary`/`description` and to `.meta({ description })`.
 
 ## Publishing
 

@@ -225,6 +225,24 @@ suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.Us
 }
 ```
 
+## Documentation
+
+A `@description` tag on a route or a field becomes KDoc in the generated code. Field documentation lands on the data class as `@property`, which is where Kotlin puts documentation for a constructor parameter:
+
+```kotlin
+/**
+ * Create a user.
+ *
+ * @property email Where account notices are sent.
+ */
+@Serializable
+data class CreateUserBody(
+    val email: String
+)
+```
+
+See [JSDoc](/docs/jsdoc) for the full tag list.
+
 ## Tip: automate with a script
 
 You can add a script to your `package.json` to regenerate the client whenever the contract changes:

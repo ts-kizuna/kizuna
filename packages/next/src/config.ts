@@ -2,14 +2,14 @@ import path from 'node:path';
 import type { NextConfig } from 'next';
 
 /**
- * Wrap your Next.js config so the `.kizuna/` deprecation data is bundled into
+ * Wrap your Next.js config so the `.kizuna/` JSDoc data is bundled into
  * serverless functions (Vercel and similar). It merges into
  * `outputFileTracingIncludes`, preserving anything you already set there, so it
  * composes with other config wrappers.
  *
  * `.kizuna/` is expected at the tracing root: your project root by default, or
  * `outputFileTracingRoot` when set. In a monorepo, set `outputFileTracingRoot`
- * to the repo root (where you run `kizuna deprecations`) and the include glob is
+ * to the repo root (where you run `kizuna jsdoc`) and the include glob is
  * derived from it.
  *
  * ```ts

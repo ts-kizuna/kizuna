@@ -97,9 +97,9 @@ spec('json'); // OpenApiDocument object
 spec('yaml'); // YAML string
 ```
 
-## Deprecation
+## Documentation
 
-Routes and fields marked `/** @deprecated */` get `deprecated: true` in the generated spec — no extra options here. `generateOpenApi(contract)` reads them straight off the contract, once you've added the one-time build step. See [Deprecations](/docs/deprecations) for setup.
+JSDoc tags on a route or a field (`@summary`, `@description`, `@example`, `@deprecated`) become `summary`, `description`, `examples`, and `deprecated: true` in the generated spec, with no extra options here. `generateOpenApi(contract)` reads it straight off the contract, once you've added the one-time build step. See [JSDoc](/docs/jsdoc) for setup.
 
 ## Options
 

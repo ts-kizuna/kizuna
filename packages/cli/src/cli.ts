@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { writeKizunaDeprecations, collectExportedSchemaDocs, patchDeclarationDocs, type ContractSource } from './deprecation-parser.js';
+import { writeKizunaJsDoc, collectExportedSchemaDocs, patchDeclarationDocs, type ContractSource } from './jsdoc-parser.js';
 import { loadContract } from './load-contract.js';
 import { lintDeprecations } from './lint-deprecations.js';
 
-const usage = `Usage: kizuna deprecations <contract.ts...> [--output <dir>] [--export <name>] [--dts <dir>]
+const usage = `Usage: kizuna jsdoc <contract.ts...> [--output <dir>] [--export <name>] [--dts <dir>]
 
-Writes deprecations.json into .kizuna, keyed per contract. Generators read it at
-generate time and apply the deprecations.
+Writes jsdoc.json into .kizuna, keyed per contract. Generators read it at generate
+time and apply the descriptions, examples, and deprecations it holds.
 
 A contract path may be suffixed with the export to read: src/workspace.ts:workspaceContract.
 
@@ -26,7 +26,7 @@ const die = (message: string, code = 1): never => {
 
 const main = async (): Promise<void> => {
     const argv = process.argv.slice(2);
-    if (argv[0] !== 'deprecations') die(usage, argv[0] ? 1 : 0);
+    if (argv[0] !== 'jsdoc') die(usage, argv[0] ? 1 : 0);
 
     const { values, positionals } = parseArgs({
         args: argv.slice(1),
@@ -67,7 +67,7 @@ const main = async (): Promise<void> => {
         }
     }
 
-    const written = writeKizunaDeprecations(contracts, outDir);
+    const written = writeKizunaJsDoc(contracts, outDir);
     process.stderr.write(`Wrote ${written}\n`);
 
     if (values.dts !== undefined) {

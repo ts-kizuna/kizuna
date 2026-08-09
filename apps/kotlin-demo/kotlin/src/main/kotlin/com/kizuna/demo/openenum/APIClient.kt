@@ -20,7 +20,16 @@ interface KizunaQueryValue {
 
 object OpenEnumAPI {
 
-    /** A user in the system */
+    /**
+     * A user in the system
+     * 
+     * @property id Unique user identifier
+     * @property name Display name
+     * @property email Email address
+     * @property email_address Email address
+     * @property last_name Family name on the wire as `last_name`, exercises snake_case fidelity through the generators.
+     * @property avatar Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another.
+     */
     @Serializable
     data class User(
         val id: String,
@@ -101,6 +110,12 @@ object OpenEnumAPI {
         }
     }
 
+    /**
+     * @property name Display name
+     * @property email Email address
+     * @property last_name Family name. Snake_case wire key, kept verbatim by both clients.
+     * @property phone Phone number in E.164-ish form. Demonstrates a custom-coded validation issue.
+     */
     @Serializable
     data class CreateUserInput(
         val name: String,

@@ -69,7 +69,7 @@
     "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/adapter.ts src/generator.ts src/schemas.ts src/authoring-names.ts src/load-deprecations.ts --format esm,cjs --dts --clean",
+    "build": "tsdown src/index.ts src/adapter.ts src/generator.ts src/schemas.ts src/authoring-names.ts src/load-jsdoc.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

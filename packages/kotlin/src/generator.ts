@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import {
-    loadDeprecations,
+    loadJsDoc,
     contractFingerprint,
     createGenerator,
     parsePath,
@@ -17,6 +17,7 @@ import {
     isSuccessStatus,
     mergeHeaderFields,
     type RouteDefinition,
+    type JsDocEntry,
 } from '@ts-kizuna/core/generator';
 import type { Contract } from '@ts-kizuna/core';
 import { KotlinWriter, stringLiteral } from './emit.js';
@@ -126,10 +127,11 @@ const buildRouteMethod = (
     routeKey: string,
     route: RouteDefinition,
     registry: TypeRegistry,
+    jsDoc: JsDocEntry | undefined,
     deprecated: boolean,
     deprecationMessage: string | undefined,
-    fieldPaths: Map<string, string> | undefined,
-    deprecationSchemas: Map<string, Map<string, string>> | undefined,
+    fieldPaths: Map<string, JsDocEntry> | undefined,
+    schemaJsDoc: Map<string, Map<string, JsDocEntry>> | undefined,
     methodNameOverride?: string
 ): RouteMethod => {
     const fullJoinedName = routeKey.includes('.')
@@ -143,15 +145,15 @@ const buildRouteMethod = (
     const pathParams = parsePath(route.path).paramNames;
 
     const declaredPathParams: KotlinField[] = route.pathParams
-        ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`, fieldPaths, 'pathParams', deprecationSchemas)
+        ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`, fieldPaths, 'pathParams', schemaJsDoc)
         : [];
 
     const queryFields: KotlinField[] = route.query
-        ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`, fieldPaths, 'query', deprecationSchemas)
+        ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`, fieldPaths, 'query', schemaJsDoc)
         : [];
 
     const headerFields: KotlinField[] = route.headers
-        ? collectObjectFields(route.headers as z.ZodType, registry, `${baseHint}Headers`, fieldPaths, 'headers', deprecationSchemas)
+        ? collectObjectFields(route.headers as z.ZodType, registry, `${baseHint}Headers`, fieldPaths, 'headers', schemaJsDoc)
         : [];
 
     const bodyDefType =
@@ -164,7 +166,7 @@ const buildRouteMethod = (
         const isUnion = isDiscriminatedUnionSchema(route.body as z.ZodType);
 
         if (isUnion) {
-            const result = mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
+            const result = mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', schemaJsDoc);
             bodyDescriptor = {
                 kind: 'union',
                 structName: result.expression,
@@ -172,8 +174,8 @@ const buildRouteMethod = (
                 multipartFields: [],
             };
         } else if (isMultipart) {
-            mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
-            const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
+            mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', schemaJsDoc);
+            const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', schemaJsDoc);
             const multipartFields = objectShapeKeys(route.body as z.ZodType, registry.camelCaseProperties);
             bodyDescriptor = {
                 kind: 'multipart',
@@ -192,7 +194,7 @@ const buildRouteMethod = (
                 };
             } else {
                 const useStruct = !isObject || fieldCount > BODY_FLATTEN_MAX_FIELDS;
-                const result = mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
+                const result = mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', schemaJsDoc);
                 const structName = result.expression;
 
                 if (useStruct) {
@@ -203,14 +205,7 @@ const buildRouteMethod = (
                         multipartFields: [],
                     };
                 } else {
-                    const flattened = collectObjectFields(
-                        route.body as z.ZodType,
-                        registry,
-                        bodyHint,
-                        fieldPaths,
-                        'body',
-                        deprecationSchemas
-                    );
+                    const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', schemaJsDoc);
                     bodyDescriptor = {
                         kind: 'json-flat',
                         structName,
@@ -229,7 +224,7 @@ const buildRouteMethod = (
         const status = Number(statusKey);
         const responseHint = `${baseHint}Response${status === 200 ? '' : status}`;
         const bodySchema = resolveResponseBody(responseValue);
-        const result = mapType(bodySchema as z.ZodType, registry, responseHint, fieldPaths, `responses.${statusKey}`, deprecationSchemas);
+        const result = mapType(bodySchema as z.ZodType, registry, responseHint, fieldPaths, `responses.${statusKey}`, schemaJsDoc);
         const typeExpression = result.expression;
         if (isSuccessStatus(status)) {
             const headersSchema = resolveResponseHeaders(responseValue);
@@ -240,7 +235,7 @@ const buildRouteMethod = (
                       `${baseHint}ResponseHeaders`,
                       fieldPaths,
                       'responseHeaders',
-                      deprecationSchemas
+                      schemaJsDoc
                   )
                 : [];
             successResponses.push({
@@ -287,8 +282,8 @@ const buildRouteMethod = (
     return {
         name: methodName,
         operationName: baseHint,
-        summary: route.summary,
-        description: route.description,
+        summary: jsDoc?.summary ?? route.summary,
+        description: jsDoc?.description ?? route.description,
         deprecated,
         deprecationMessage,
         pathParams,
@@ -311,10 +306,10 @@ const buildRouteMethod = (
 const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, contract: Contract) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
-    const deprecationSchemas = loadDeprecations(contractFingerprint(contract))?.schemas;
+    const schemaJsDoc = loadJsDoc(contractFingerprint(contract))?.schemas;
 
     return {
-        processRoute({ routeKey, route, deprecated, deprecationMessage, fieldDeprecations }) {
+        processRoute({ routeKey, route, jsDoc, deprecated, deprecationMessage, fieldJsDoc }) {
             const dotIndex = routeKey.indexOf('.');
             if (dotIndex !== -1) {
                 const groupKey = routeKey.slice(0, dotIndex);
@@ -330,24 +325,17 @@ const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: Typ
                         routeKey,
                         route,
                         options.registry,
+                        jsDoc,
                         deprecated,
                         deprecationMessage,
-                        fieldDeprecations,
-                        deprecationSchemas,
+                        fieldJsDoc,
+                        schemaJsDoc,
                         leafName
                     )
                 );
             } else {
                 flatMethods.push(
-                    buildRouteMethod(
-                        routeKey,
-                        route,
-                        options.registry,
-                        deprecated,
-                        deprecationMessage,
-                        fieldDeprecations,
-                        deprecationSchemas
-                    )
+                    buildRouteMethod(routeKey, route, options.registry, jsDoc, deprecated, deprecationMessage, fieldJsDoc, schemaJsDoc)
                 );
             }
         },
@@ -752,6 +740,24 @@ const emitSealedClass = (
     });
 };
 
+/**
+ * A data class's KDoc: its own description plus one `@property` line per
+ * documented field. Kotlin has no doc comment for a constructor parameter, so
+ * `@property` is where a field's documentation belongs.
+ */
+const dataClassDoc = (type: KotlinType): string | undefined => {
+    const lines: string[] = [];
+    if (type.description) lines.push(type.description);
+    if (type.kind === 'data-class') {
+        const documented = type.fields.filter((field) => field.description);
+        if (documented.length > 0 && lines.length > 0) lines.push('');
+        for (const field of documented) {
+            lines.push(`@property ${field.name} ${field.description!.replace(/\s*\n\s*/g, ' ')}`);
+        }
+    }
+    return lines.length > 0 ? lines.join('\n') : undefined;
+};
+
 const emitType = (
     writer: KotlinWriter,
     type: KotlinType,
@@ -761,7 +767,7 @@ const emitType = (
     registry?: TypeRegistry
 ): void => {
     writer.blank();
-    writer.docComment(type.description);
+    writer.docComment(dataClassDoc(type));
     if (type.kind === 'data-class') {
         emitDataClass(writer, type, ownedTypeMap, ownedTypeLookup, registryName);
     } else if (type.kind === 'enum-class') {

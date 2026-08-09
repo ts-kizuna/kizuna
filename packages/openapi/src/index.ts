@@ -1,9 +1,4 @@
-export {
-    type DeprecationMap,
-    type SerializedDeprecationMap,
-    serializeDeprecationMap,
-    deserializeDeprecationMap,
-} from '@ts-kizuna/core/generator';
+export { type JsDocEntry, type JsDocMap, type SerializedJsDocMap, serializeJsDocMap, deserializeJsDocMap } from '@ts-kizuna/core/generator';
 export {
     generateOpenApi,
     type GenerateOpenApiOptions,

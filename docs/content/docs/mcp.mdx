@@ -37,11 +37,13 @@ The MCP endpoint is a plugin route, so it lives outside `contract.routes`. Your 
 Each route becomes an MCP tool:
 
 - **Tool name** — the dotted route key from the routes (e.g. `users.getUser`)
-- **Tool description** — from the route's `summary` and `description`, falling back to `METHOD /path`
-- **Tool input** — structured as `{ params, query, body }` matching the route's schemas
+- **Tool description** — from the route's `@summary`/`@description` tags, or its `summary` and `description`, falling back to `METHOD /path`
+- **Tool input** — structured as `{ params, query, body }` matching the route's schemas, with each field described by its `@description`
 - **Tool execution** — invokes the corresponding handler directly and returns `{ status, body }`
 
 Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-urlencoded'` are excluded by default since MCP tools receive JSON.
+
+An assistant works from what your tools say about themselves, so the tags you write in the contract are what make the tools usable: `@description` on routes and fields, plus `@example` values it can copy. It needs the one-time build step in [JSDoc](/docs/jsdoc); without it the tools fall back to `summary`/`description` and `.meta({ description })`.
 
 Handlers receive the same framework context they do over HTTP, passed through from the transport request, so a handler reading `req` or `c` keeps working when it is called as a tool.
 

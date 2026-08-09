@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ts from 'typescript';
-import { buildFileScope, collectFieldDocs, makeResolverWithCache, resolveImportPath } from './deprecation-parser.js';
+import { buildFileScope, collectFieldJsDocBlocks, makeResolverWithCache, resolveImportPath } from './jsdoc-parser.js';
 
 /**
  * Maps every exported schema reachable from `entryPath` to the verbatim JSDoc
@@ -22,7 +22,7 @@ export const collectExportedSchemaDocs = (entryPath: string): Map<string, Map<st
 
     const record = (name: string, expression: ts.Expression): void => {
         const fields = new Map<string, string>();
-        collectFieldDocs(expression, '', fields, resolve);
+        collectFieldJsDocBlocks(expression, '', fields, resolve);
         if (fields.size > 0) result.set(name, fields);
     };
 

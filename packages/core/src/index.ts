@@ -79,4 +79,4 @@ export {
     type BrandedHandlerContext,
 } from './handler-pipeline.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
-export { type DeprecationMap, type SerializedDeprecationMap } from './deprecation.js';
+export { type JsDocEntry, type JsDocMap, type SerializedJsDocMap } from './jsdoc.js';

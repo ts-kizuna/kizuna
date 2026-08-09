@@ -1,7 +1,7 @@
 import type { Kizuna, K } from './kizuna.js';
 
 /**
- * Member names the CLI's deprecation parser and the ESLint plugin match on in
+ * Member names the CLI's JSDoc parser and the ESLint plugin match on in
  * source text. Asserted against the real surface so a rename fails to compile
  * here rather than silently matching nothing.
  */
@@ -18,6 +18,6 @@ export const AUTHORING_NAMES = {
 };
 
 /**
- * Export names the deprecation parser treats as a contract entry point.
+ * Export names the JSDoc parser treats as a contract entry point.
  */
 export const CONTRACT_EXPORT_NAMES = ['contract', 'api'] as const;

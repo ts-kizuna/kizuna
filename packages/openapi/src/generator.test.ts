@@ -6,9 +6,9 @@ import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
 import { contractFingerprint } from '@ts-kizuna/core/generator';
-import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
+import { writeKizunaJsDoc } from '../../cli/src/jsdoc-parser.js';
 import { generateOpenApi, renderOpenApi, type GenerateOpenApiOptions } from './generator.js';
-import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
+import { contract as deprecatedContract } from '../../cli/src/contract.fixture.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -1194,12 +1194,12 @@ describe('deprecation on a component reached via the schemas map', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-openapi-ref-'));
         fs.mkdirSync(path.join(dir, '.kizuna'), { recursive: true });
         fs.writeFileSync(
-            path.join(dir, '.kizuna', 'deprecations.json'),
+            path.join(dir, '.kizuna', 'jsdoc.json'),
             JSON.stringify({
                 [contractFingerprint(contractWithRef)]: {
                     routes: {},
                     fields: {},
-                    schemas: { User: { email: 'use `email_address`' } },
+                    schemas: { User: { email: { deprecated: 'use `email_address`' } } },
                 },
             })
         );
@@ -1221,8 +1221,8 @@ describe('deprecation from .kizuna', () => {
     const previousCwd = process.cwd();
 
     beforeAll(() => {
-        writeKizunaDeprecations(
-            [{ contract: deprecatedContract, contractPath: path.resolve(import.meta.dirname, '../../cli/src/deprecation.fixture.ts') }],
+        writeKizunaJsDoc(
+            [{ contract: deprecatedContract, contractPath: path.resolve(import.meta.dirname, '../../cli/src/contract.fixture.ts') }],
             path.join(workDir, '.kizuna')
         );
         process.chdir(workDir);
@@ -1242,6 +1242,58 @@ describe('deprecation from .kizuna', () => {
     it('marks a deprecated route operation', () => {
         const spec = generateJson(deprecatedContract, baseConfig);
         expect(spec.paths['/users/by-id/{id}']?.get?.deprecated).toBe(true);
+    });
+
+    it('describes an operation from the route JSDoc', () => {
+        const spec = generateJson(deprecatedContract, baseConfig);
+        expect(spec.paths['/new']?.post?.description).toBe('Creates a user from the submitted name.');
+    });
+
+    it('splits a summary paragraph off the route description', () => {
+        const spec = generateJson(deprecatedContract, baseConfig);
+        const operation = spec.paths['/users/paginated']?.get;
+        expect(operation?.summary).toBe('List users, one page at a time.');
+        expect(operation?.description).toContain('Pages are cursor-based');
+    });
+
+    it('emits a route @example as the request body example', () => {
+        const spec = generateJson(deprecatedContract, baseConfig);
+        expect(spec.paths['/new']?.post?.requestBody?.content?.['application/json']?.example).toEqual({
+            fullName: 'Ada Lovelace',
+        });
+    });
+
+    it('describes a body field and keeps its deprecation', () => {
+        const spec = generateJson(deprecatedContract, baseConfig);
+        const properties = (spec.paths['/new']?.post?.requestBody?.content?.['application/json']?.schema?.['properties'] ?? {}) as Record<
+            string,
+            Record<string, unknown>
+        >;
+        expect(properties['name']?.description).toBe('The display name.');
+        expect(properties['name']?.deprecated).toBe(true);
+        expect(properties['fullName']?.examples).toEqual(['Ada Lovelace']);
+    });
+
+    it('emits several @example tags on a query parameter', () => {
+        const spec = generateJson(deprecatedContract, baseConfig);
+        const cursor = spec.paths['/new']?.post?.parameters?.find((parameter) => parameter.name === 'cursor');
+        expect(cursor?.schema['examples']).toEqual(['eyJpZCI6IjQyIn0', 'eyJpZCI6Ijk5In0']);
+    });
+
+    it('describes a path parameter', () => {
+        const spec = generateJson(deprecatedContract, baseConfig);
+        const parameter = spec.paths['/users/v2/{id}']?.get?.parameters?.find((candidate) => candidate.in === 'path');
+        expect(parameter?.description).toBe('The user id, as returned by listUsers.');
+    });
+
+    it('uses JSDoc on a status key as the response description', () => {
+        const spec = generateJson(deprecatedContract, baseConfig);
+        expect(spec.paths['/new']?.post?.responses['200']?.description).toBe('The user was created.');
+    });
+
+    it('does not repeat the response description on its schema', () => {
+        const spec = generateJson(deprecatedContract, baseConfig);
+        expect(spec.paths['/new']?.post?.responses['200']?.content?.['application/json']?.schema?.['description']).toBeUndefined();
     });
 });
 
@@ -1294,11 +1346,11 @@ describe('error response media type (RFC 9457)', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-openapi-err-'));
         fs.mkdirSync(path.join(dir, '.kizuna'), { recursive: true });
         fs.writeFileSync(
-            path.join(dir, '.kizuna', 'deprecations.json'),
+            path.join(dir, '.kizuna', 'jsdoc.json'),
             JSON.stringify({
                 [contractFingerprint(contractWithErrors)]: {
                     routes: {},
-                    fields: { getUser: { 'responses.404.detail': '' } },
+                    fields: { getUser: { 'responses.404.detail': { deprecated: '' } } },
                 },
             })
         );

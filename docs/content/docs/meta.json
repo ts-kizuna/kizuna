@@ -8,7 +8,7 @@
         "adapters",
         "clients",
         "openapi",
-        "deprecations",
+        "jsdoc",
         "plugins",
         "mcp",
         "eslint",

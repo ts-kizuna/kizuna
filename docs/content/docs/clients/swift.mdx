@@ -123,6 +123,21 @@ public func deleteUser(_ params: APIClient.DeleteUser.Params) async throws(APICl
 }
 ```
 
+## Documentation
+
+A `@description` tag on a route or a field becomes a `///` doc comment in the generated code, so the description you wrote once in the contract is what Xcode shows on hover:
+
+```swift
+/// Create a user.
+///
+/// The email must be unique; a duplicate is rejected with 409.
+public func createUser(_ body: APIClient.CreateUser.Body) async throws(APIClient.CreateUser.Failure) -> APIClient.CreateUser.Result {
+    // ...
+}
+```
+
+See [JSDoc](/docs/jsdoc) for the full tag list.
+
 ## Tip: automate with a script
 
 You can add a script to your `package.json` to regenerate the client whenever the contract changes:

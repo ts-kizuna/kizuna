@@ -1,0 +1,202 @@
+---
+title: JSDoc
+description: Write documentation where you already write it, and have it reach your IDE, OpenAPI, MCP, Swift, and Kotlin.
+---
+
+Document a route or a field with JSDoc tags and every surface picks them up: your editor on hover, `description` in the OpenAPI spec, the tool description an AI assistant reads over MCP, and doc comments in the generated Swift and Kotlin clients.
+
+```ts title="src/contract.ts"
+export const usersRoutes = k.routes('users', {
+    /**
+     * @summary Create a user.
+     * @description The email must be unique; a duplicate is rejected with 409.
+     * @example
+     * {
+     *     email: 'ada@example.com',
+     * }
+     */
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        body: z.object({
+            /**
+             * @description Where account notices are sent.
+             * @example ada@example.com
+             */
+            email: z.string(),
+            /**
+             * @deprecated use `fullName`
+             */
+            name: z.string().optional(),
+        }),
+        responses: {
+            /**
+             * @description The user was created.
+             */
+            201: UserSchema,
+        },
+    },
+});
+```
+
+Only tagged content is read. Untagged prose above the tags stays what it already is: a note to whoever is reading the code, free to say things your API consumers have no business seeing. What ships is what you tagged.
+
+Zod's `.meta({ description })` still works and still fills in where no tag exists. The difference is that JSDoc shows up on hover in your editor, so the documentation and the code stay in the same place your team already reads.
+
+## What each tag does
+
+| Tag            | Where it goes                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `@description` | `description` on the operation, schema, or parameter. Swift `///` and Kotlin KDoc comments. The MCP tool description.    |
+| `@summary`     | `summary` on the OpenAPI operation, and the first line of the MCP tool description.                                      |
+| `@example`     | `example` on the request body, `examples` on a schema or parameter, an example input in the MCP tool description.        |
+| `@deprecated`  | `deprecated: true` in OpenAPI, `@available(*, deprecated)` in Swift, `@Deprecated` in Kotlin, strikethrough in your IDE. |
+
+Write an `@example` plainly and it stays a string, so `@example Alice Johnson` needs no quoting. A body that reads as a JSON or JavaScript literal becomes that value instead, which is how you document a number, a boolean, or a whole object:
+
+```ts
+/** @example 42 */ // the number 42
+/** @example '42' */ // the string "42"
+/** @example { id: 'usr_1', active: true } */
+```
+
+Repeat the tag for several examples.
+
+Routes, `pathParams`, `query`, `headers`, `body` fields, response fields, and the response status keys themselves are all documentable.
+
+## Setup
+
+The `kizuna` CLI ships in `@ts-kizuna/cli`, a build-time dev dependency:
+
+<InstallTabs packageName="@ts-kizuna/cli" dev />
+
+Generate the JSDoc data into `.kizuna/jsdoc.json`:
+
+```bash
+kizuna jsdoc src/contract.ts
+```
+
+`generateOpenApi(contract)` reads it:
+
+```ts
+const spec = generateOpenApi(contract);
+```
+
+Prepend it to your existing dev and build scripts, for example with Next.js:
+
+```json title="package.json"
+{
+    "scripts": {
+        "dev": "kizuna jsdoc src/contract.ts && next dev",
+        "build": "kizuna jsdoc src/contract.ts && next build"
+    }
+}
+```
+
+Gitignore the output:
+
+```text title=".gitignore"
+.kizuna/
+```
+
+A `predev`/`prebuild` lifecycle hook works too if you prefer.
+
+Generators read `.kizuna/jsdoc.json` from the working directory. Without it they fall back to `.meta({ description })` and the route's own `summary`/`description`, so nothing breaks; the tags simply do not reach them.
+
+## Multiple contracts
+
+Pass each contract. They are merged into one `jsdoc.json`; each generator applies only the entries whose routes exist in the contract it is generating.
+
+```bash
+kizuna jsdoc src/app.ts src/workspace.ts src/admin.ts
+```
+
+## Published packages
+
+When you publish your contract or schemas as a package, the JSDoc you wrote on Zod fields is lost: declaration emit serializes the inferred `z.ZodObject<{...}>`, whose properties carry no comments. Consumers in other repos using `z.infer<typeof Schema>` get no field docs and no strikethrough.
+
+Pass `--dts <dir>` to re-inject each field's full JSDoc block, descriptions, `@example`, `@deprecated`, all of it, back into the emitted `.d.ts` after your build.
+
+Whether you need this depends on what consumers resolve: if they read your built `.d.ts`, run `--dts`; if they read your `.ts` source directly, the JSDoc is already there and you can skip it.
+
+```json title="package.json"
+{
+    "scripts": {
+        "build": "tsdown src/index.ts --dts && kizuna jsdoc src/index.ts --dts dist"
+    }
+}
+```
+
+## Deployment
+
+When your app starts, `generateOpenApi` reads the `.kizuna/` folder from wherever the app runs. Your build's `kizuna jsdoc` step created it, it just has to still be there at runtime.
+
+On most hosts it already is: a VM, a single container, `next start`, or Railway/Render (Nixpacks) all run from the same files the build produced, so `.kizuna/` comes along with no extra work.
+
+### Docker (multi-stage)
+
+If your Dockerfile builds in one stage and then copies the result into a smaller final image, `.kizuna/` gets left behind, just like `dist/` would. Copy it across too:
+
+```dockerfile
+COPY --from=builder /app/.kizuna ./.kizuna
+```
+
+### Turborepo
+
+If you cache builds with Turborepo, add `.kizuna/**` to the build task's `outputs`, otherwise a cached build leaves it out:
+
+```json title="turbo.json"
+{
+    "tasks": {
+        "build": {
+            "outputs": ["dist/**", ".kizuna/**"]
+        }
+    }
+}
+```
+
+### Vercel and serverless
+
+Vercel functions and Next's `output: 'standalone'` bundle only the files the tracer sees, not your whole project, and the tracer can't see a `process.cwd()` read. Wrap your config with `withKizuna` to trace `.kizuna/` in:
+
+```ts title="next.config.ts"
+import type { NextConfig } from 'next';
+import { withKizuna } from '@ts-kizuna/next/config';
+
+const nextConfig: NextConfig = {
+    // your config
+};
+
+export default withKizuna(nextConfig);
+```
+
+It merges into `outputFileTracingIncludes`, so it composes with any other config wrapper. Run `kizuna jsdoc` from the same directory as `next build` so `.kizuna/` sits at the project root.
+
+<Callout type="info">
+    The route that serves the OpenAPI spec must run on the Node runtime, not Edge: the Edge runtime has no filesystem to read `.kizuna/`
+    from.
+</Callout>
+
+### Next.js monorepos
+
+`.kizuna/` lands wherever you run `kizuna jsdoc`. If you run it from the repo root instead of the app, set `outputFileTracingRoot` to that root and `withKizuna` derives the include path from it, no extra arguments:
+
+```ts title="next.config.ts"
+import path from 'node:path';
+import type { NextConfig } from 'next';
+import { withKizuna } from '@ts-kizuna/next/config';
+
+const nextConfig: NextConfig = {
+    outputFileTracingRoot: path.join(import.meta.dirname, '../..'),
+};
+
+export default withKizuna(nextConfig);
+```
+
+## Swift and Kotlin
+
+The Swift and Kotlin CLIs read the contract source directly, so they need no separate step.
+
+```bash
+ts-kizuna-swift generate --contract src/contract.ts --output APIClient.swift --namespace-name API
+```

@@ -8,40 +8,42 @@ export const UserSchema = Kizuna.model({
     title: 'User',
     description: 'A user in the system',
     schema: z.object({
-        id: z.string().meta({
-            description: 'Unique user identifier',
-            example: 'usr_abc123',
-        }),
-        name: z.string().meta({
-            description: 'Display name',
-            example: 'Alice Johnson',
-        }),
         /**
+         * @description Unique user identifier
+         * @example usr_abc123
+         */
+        id: z.string(),
+        /**
+         * @description Display name
+         * @example Alice Johnson
+         */
+        name: z.string(),
+        /**
+         * @description Email address
+         * @example alice@example.com
          * @deprecated use `email_address` instead.
          */
-        email: z.email().meta({
-            description: 'Email address',
-            example: 'alice@example.com',
-        }),
-        email_address: z.email().optional().meta({
-            description: 'Email address',
-            example: 'alice@example.com',
-        }),
-        last_name: z.string().optional().meta({
-            description: 'Family name on the wire as `last_name`, exercises snake_case fidelity through the generators.',
-            example: 'Hopper',
-        }),
+        email: z.email(),
+        /**
+         * @description Email address
+         * @example alice@example.com
+         */
+        email_address: z.email().optional(),
+        /**
+         * @description Family name on the wire as `last_name`, exercises snake_case fidelity through the generators.
+         * @example Hopper
+         */
+        last_name: z.string().optional(),
+        /**
+         * @description Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another.
+         */
         avatar: z
             .object({
                 id: z.string(),
                 url: z.string(),
             })
             .nullable()
-            .optional()
-            .meta({
-                description:
-                    'Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another.',
-            }),
+            .optional(),
         avatars: z
             .array(
                 z.object({
@@ -56,18 +58,21 @@ export const UserSchema = Kizuna.model({
 export const CreateUserSchema = Kizuna.model({
     title: 'CreateUserInput',
     schema: z.object({
-        name: z.string().min(1).meta({
-            description: 'Display name',
-            example: 'Alice Johnson',
-        }),
-        email: z.email().meta({
-            description: 'Email address',
-            example: 'alice@example.com',
-        }),
-        last_name: z.string().optional().meta({
-            description: 'Family name. Snake_case wire key, kept verbatim by both clients.',
-            example: 'Hopper',
-        }),
+        /**
+         * @description Display name
+         * @example Alice Johnson
+         */
+        name: z.string().min(1),
+        /**
+         * @description Email address
+         * @example alice@example.com
+         */
+        email: z.email(),
+        /**
+         * @description Family name. Snake_case wire key, kept verbatim by both clients.
+         * @example Hopper
+         */
+        last_name: z.string().optional(),
         /**
          * Optional phone number, validated with a custom-coded issue.
          *
@@ -75,6 +80,9 @@ export const CreateUserSchema = Kizuna.model({
          * the code against the `issueCodes` declared on `new Kizuna()`. The client
          * suggests it in autocomplete when reading `errors[].code` on the `400`
          * response.
+         *
+         * @description Phone number in E.164-ish form. Demonstrates a custom-coded validation issue.
+         * @example +15551234567
          */
         phone: z
             .string()
@@ -86,10 +94,6 @@ export const CreateUserSchema = Kizuna.model({
                     message: 'Phone number must be 7–15 digits, optionally prefixed with +.',
                     input: value,
                 });
-            })
-            .meta({
-                description: 'Phone number in E.164-ish form. Demonstrates a custom-coded validation issue.',
-                example: '+15551234567',
             }),
     }),
 });
@@ -273,6 +277,9 @@ export const usersRoutes = k.routes('users', {
         },
         summary: 'Get a year of user activity, exercising two typed path params (a string id and a coerced int year)',
     },
+    /**
+     * @summary Create a user
+     */
     createUser: {
         method: 'POST',
         path: '/users',
@@ -281,7 +288,6 @@ export const usersRoutes = k.routes('users', {
             201: UserSchema,
             400: ProblemDetailsSchema,
         },
-        summary: 'Create a user',
     },
     /**
      * @deprecated
@@ -457,26 +463,26 @@ export const notificationsRoutes = k.routes('notifications', {
         method: 'GET',
         path: '/events',
         query: z.object({
-            since: z.date().optional().meta({
-                description: 'Lower bound for occurredAt — wire format is ISO-8601',
-            }),
+            /**
+             * @description Lower bound for occurredAt — wire format is ISO-8601
+             */
+            since: z.date().optional(),
             kind: EventKind.optional(),
-            ids: z.array(z.string()).optional().meta({
-                description: 'Filter by id; repeated query param',
-            }),
+            /**
+             * @description Filter by id; repeated query param
+             */
+            ids: z.array(z.string()).optional(),
+            /**
+             * @description Arbitrary label — exercises z.string().transform()
+             */
             label: z
                 .string()
                 .transform((value) => value.trim())
-                .optional()
-                .meta({
-                    description: 'Arbitrary label — exercises z.string().transform()',
-                }),
-            tagIds: z
-                .union([z.array(z.string()), z.string().transform((id) => [id])])
-                .optional()
-                .meta({
-                    description: 'One or many tag IDs — exercises non-discriminated union codegen',
-                }),
+                .optional(),
+            /**
+             * @description One or many tag IDs — exercises non-discriminated union codegen
+             */
+            tagIds: z.union([z.array(z.string()), z.string().transform((id) => [id])]).optional(),
         }),
         responses: {
             200: z.object({
@@ -501,13 +507,12 @@ export const notificationsRoutes = k.routes('notifications', {
             interval: z.int(),
         }),
         responses: {
-            200: z
-                .object({
-                    status: z.string(),
-                })
-                .meta({
-                    description: 'Validation result',
-                }),
+            /**
+             * @description Validation result
+             */
+            200: z.object({
+                status: z.string(),
+            }),
             400: ProblemDetailsSchema,
             401: z.void(),
         },

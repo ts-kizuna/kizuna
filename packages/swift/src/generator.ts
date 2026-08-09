@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import {
-    loadDeprecations,
+    loadJsDoc,
     contractFingerprint,
     createGenerator,
     isVoidSchema,
@@ -23,6 +23,7 @@ import {
     mergeHeaderFields,
     type Routes,
     type RouteDefinition,
+    type JsDocEntry,
 } from '@ts-kizuna/core/generator';
 import type { Contract } from '@ts-kizuna/core';
 import { SwiftWriter, stringLiteral } from './emit.js';
@@ -129,10 +130,11 @@ const buildRouteMethod = (
     routeKey: string,
     route: RouteDefinition,
     registry: TypeRegistry,
+    jsDoc: JsDocEntry | undefined,
     deprecated: boolean,
     deprecationMessage: string | undefined,
-    fieldPaths: Map<string, string> | undefined,
-    deprecationSchemas: Map<string, Map<string, string>> | undefined,
+    fieldPaths: Map<string, JsDocEntry> | undefined,
+    schemaJsDoc: Map<string, Map<string, JsDocEntry>> | undefined,
     methodNameOverride?: string
 ): RouteMethod => {
     const fullJoinedName = routeKey.includes('.')
@@ -146,15 +148,15 @@ const buildRouteMethod = (
     const pathParams = parsePath(route.path).paramNames;
 
     const declaredPathParams: SwiftField[] = route.pathParams
-        ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`, fieldPaths, 'pathParams', deprecationSchemas)
+        ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`, fieldPaths, 'pathParams', schemaJsDoc)
         : [];
 
     const queryFields: SwiftField[] = route.query
-        ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`, fieldPaths, 'query', deprecationSchemas)
+        ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`, fieldPaths, 'query', schemaJsDoc)
         : [];
 
     const headerFields: SwiftField[] = route.headers
-        ? collectObjectFields(route.headers as z.ZodType, registry, `${baseHint}Headers`, fieldPaths, 'headers', deprecationSchemas)
+        ? collectObjectFields(route.headers as z.ZodType, registry, `${baseHint}Headers`, fieldPaths, 'headers', schemaJsDoc)
         : [];
 
     let bodyDescriptor: BodyDescriptor | undefined;
@@ -164,7 +166,7 @@ const buildRouteMethod = (
         const isUnion = isDiscriminatedUnionSchema(route.body as z.ZodType);
 
         if (isUnion) {
-            const result = mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
+            const result = mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', schemaJsDoc);
             bodyDescriptor = {
                 kind: 'union',
                 structName: result.expression,
@@ -173,8 +175,8 @@ const buildRouteMethod = (
             };
         } else if (isMultipart) {
             // Always emit the struct for type clarity, but call sites use flat params (file fields → MultipartFile)
-            mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
-            const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
+            mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', schemaJsDoc);
+            const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', schemaJsDoc);
             const multipartFields = objectShapeKeys(route.body as z.ZodType, registry.camelCaseProperties);
             bodyDescriptor = {
                 kind: 'multipart',
@@ -192,7 +194,7 @@ const buildRouteMethod = (
                     multipartFields: [],
                 };
             } else {
-                const result = mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
+                const result = mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', schemaJsDoc);
                 const structName = result.expression;
 
                 if (!isObject) {
@@ -207,14 +209,7 @@ const buildRouteMethod = (
                 } else {
                     // Object body of any field count: exposed as a labeled tuple, rebuilt into the
                     // Codable Input internally. Tuples handle any arity, so there is no flatten cap.
-                    const flattened = collectObjectFields(
-                        route.body as z.ZodType,
-                        registry,
-                        bodyHint,
-                        fieldPaths,
-                        'body',
-                        deprecationSchemas
-                    );
+                    const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', schemaJsDoc);
                     bodyDescriptor = {
                         kind: 'json-flat',
                         structName,
@@ -236,7 +231,7 @@ const buildRouteMethod = (
         const responseContentType = resolveResponseContentType(responseValue);
         const isBinary = isBinarySchema(bodySchema as z.core.$ZodType);
         const isRaw = isBinary || (responseContentType !== undefined && !isJsonMediaType(responseContentType));
-        const result = mapType(bodySchema as z.ZodType, registry, responseHint, fieldPaths, `responses.${statusKey}`, deprecationSchemas);
+        const result = mapType(bodySchema as z.ZodType, registry, responseHint, fieldPaths, `responses.${statusKey}`, schemaJsDoc);
         const typeExpression = result.expression;
         if (isSuccessStatus(status)) {
             const headersSchema = resolveResponseHeaders(responseValue);
@@ -247,7 +242,7 @@ const buildRouteMethod = (
                       `${baseHint}ResponseHeaders`,
                       fieldPaths,
                       'responseHeaders',
-                      deprecationSchemas
+                      schemaJsDoc
                   )
                 : [];
             successResponses.push({
@@ -300,8 +295,8 @@ const buildRouteMethod = (
     return {
         name: methodName,
         operationName: baseHint,
-        summary: route.summary,
-        description: route.description,
+        summary: jsDoc?.summary ?? route.summary,
+        description: jsDoc?.description ?? route.description,
         deprecated,
         deprecationMessage,
         pathParams,
@@ -324,10 +319,10 @@ const buildRouteMethod = (
 const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }, contract: Contract) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
-    const deprecationSchemas = loadDeprecations(contractFingerprint(contract))?.schemas;
+    const schemaJsDoc = loadJsDoc(contractFingerprint(contract))?.schemas;
 
     return {
-        processRoute({ routeKey, route, deprecated, deprecationMessage, fieldDeprecations }) {
+        processRoute({ routeKey, route, jsDoc, deprecated, deprecationMessage, fieldJsDoc }) {
             const dotIndex = routeKey.indexOf('.');
             if (dotIndex !== -1) {
                 const groupKey = routeKey.slice(0, dotIndex);
@@ -343,24 +338,17 @@ const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeR
                         routeKey,
                         route,
                         options.registry,
+                        jsDoc,
                         deprecated,
                         deprecationMessage,
-                        fieldDeprecations,
-                        deprecationSchemas,
+                        fieldJsDoc,
+                        schemaJsDoc,
                         leafName
                     )
                 );
             } else {
                 flatMethods.push(
-                    buildRouteMethod(
-                        routeKey,
-                        route,
-                        options.registry,
-                        deprecated,
-                        deprecationMessage,
-                        fieldDeprecations,
-                        deprecationSchemas
-                    )
+                    buildRouteMethod(routeKey, route, options.registry, jsDoc, deprecated, deprecationMessage, fieldJsDoc, schemaJsDoc)
                 );
             }
         },

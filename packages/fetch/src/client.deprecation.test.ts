@@ -4,7 +4,7 @@ import * as url from 'node:url';
 import ts from 'typescript';
 
 const fixtureDir = path.dirname(url.fileURLToPath(import.meta.url));
-const fixturePath = path.resolve(fixtureDir, '../../cli/src/deprecation.fixture.ts');
+const fixturePath = path.resolve(fixtureDir, '../../cli/src/contract.fixture.ts');
 
 const program = ts.createProgram({
     rootNames: [fixturePath],
