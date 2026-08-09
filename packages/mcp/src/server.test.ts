@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { assembleApi, type GuardDeny } from '@ts-kizuna/core/adapter';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Client } from '@modelcontextprotocol/client';
+import { InMemoryTransport } from '@modelcontextprotocol/client';
 import { buildToolDefinitions, createMcpServer } from './server.js';
 
 const { k } = Kizuna.init({

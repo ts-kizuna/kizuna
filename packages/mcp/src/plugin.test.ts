@@ -4,8 +4,8 @@ import express from 'express';
 import type { Server } from 'node:http';
 import { Kizuna } from '@ts-kizuna/core';
 import { KizunaServer } from '@ts-kizuna/express';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client } from '@modelcontextprotocol/client';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { mcpPlugin } from './plugin.js';
 
 const { k } = Kizuna.init({
