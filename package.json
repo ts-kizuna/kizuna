@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:types": "vitest --typecheck.only",
     "test:exports": "pnpm -r --filter \"./packages/*\" exec attw --pack . --profile node16 --ignore-rules false-export-default && pnpm -r --filter \"./packages/*\" exec publint --strict",
+    "generate:openapi": "pnpm -r --filter \"@ts-kizuna-demo/express\" --filter \"@ts-kizuna-demo/hono\" --filter \"@ts-kizuna-demo/fastify\" --filter \"@ts-kizuna-demo/next\" openapi",
     "generate:swift": "pnpm --filter @ts-kizuna-demo/swift generate",
     "test:swift": "pnpm --filter @ts-kizuna-demo/swift test",
     "swift:build": "pnpm --filter @ts-kizuna-demo/swift build",

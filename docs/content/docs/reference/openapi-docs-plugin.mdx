@@ -1,0 +1,88 @@
+---
+title: openApiDocsPlugin
+description: Serve your OpenAPI document and an API reference UI for it, on any adapter.
+---
+
+Serve a reference UI for the OpenAPI document generated from your contract, and the document itself if you want it public. Install it on [`Kizuna.init`](/docs/reference/kizuna-init) and `api.mount` serves the routes.
+
+<InstallTabs packageName="@ts-kizuna/openapi" />
+
+```ts
+import { openApiDocsPlugin } from '@ts-kizuna/openapi';
+```
+
+## Parameters
+
+```ts
+openApiDocsPlugin(props: OpenApiDocsPluginProps): KizunaPlugin
+```
+
+| Parameter | Type                     | Required | Description                                                                                    |
+| --------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------------- |
+| `props`   | `OpenApiDocsPluginProps` | Yes      | Everything [`generateOpenApi`](/docs/reference/generate-openapi) takes, plus the options below |
+
+## Props
+
+`OpenApiDocsPluginProps` extends `GenerateOpenApiOptions`, so `info`, `servers`, `setOperationId` and the rest work exactly as they do on `generateOpenApi`. On top of those:
+
+| Option          | Default            | Description                                                  |
+| --------------- | ------------------ | ------------------------------------------------------------ |
+| `docsPath`      | `'/docs'`          | The reference UI. A path moves it, `false` turns it off      |
+| `jsonPath`      | off                | The document. `true` uses `/openapi.json`, or give a path    |
+| `yamlPath`      | off                | The document as YAML. `true` uses `/openapi.yaml`, or a path |
+| `provider`      | `'scalar'`         | Which reference UI to render, `'scalar'` or `'swagger'`      |
+| `cdnUrl`        | the provider's CDN | Where to load the UI's assets from                           |
+| `pageTitle`     | the document title | The page's `<title>`                                         |
+| `configuration` | —                  | Extra config merged into the UI's initializer                |
+
+Props are pure data, and the plugin builds the document from the contract at serve time, so it needs nothing from `server.api`.
+
+They are also the options [`generateOpenApi`](/docs/reference/generate-openapi) uses when you call it without any, so a build step and the served document cannot disagree.
+
+The three path props read their own defaults: `docsPath` takes `false` because the UI is on, `jsonPath` and `yamlPath` take `true` because the document is not.
+
+## Example
+
+```ts title="src/lib/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { openApiDocsPlugin } from '@ts-kizuna/openapi';
+
+export const { k } = Kizuna.init({
+    tags,
+    plugins: {
+        openApiDocs: openApiDocsPlugin({
+            info: {
+                title: 'My API',
+                version: '1.0.0',
+            },
+            setOperationId: true,
+        }),
+    },
+});
+```
+
+```ts title="src/index.ts"
+api.mount(app);
+```
+
+## Not in your client
+
+Its routes are plugin routes, so they live outside `contract.routes`. Your fetch client and generated Swift and Kotlin clients never see them, and neither does the document itself.
+
+## Public by default
+
+Nothing guards these routes. Gate them with your framework's own middleware if your document should not be public.
+
+## Air-gapped and strict CSP
+
+`cdnUrl` points the page at a self-hosted copy of the UI's assets. For `'scalar'` it is the script URL; for `'swagger'` it is the directory holding `swagger-ui.css` and `swagger-ui-bundle.js`.
+
+## Serving it yourself
+
+[`generateOpenApi`](/docs/reference/generate-openapi) is unchanged and exported, so you can skip the plugin and serve the document from your own route. Mixing works too: `docsPath: false` lets the plugin serve the document while you render your own UI, and leaving `jsonPath` unset keeps the plugin off a path you serve yourself.
+
+## See also
+
+- [OpenAPI guide](/docs/openapi)
+- [`generateOpenApi`](/docs/reference/generate-openapi) to write the document to disk instead
+- [Plugins](/docs/plugins)

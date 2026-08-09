@@ -119,9 +119,6 @@ importers:
 
   apps/express-demo:
     dependencies:
-      '@scalar/express-api-reference':
-        specifier: ^0.9.11
-        version: 0.9.11
       '@ts-kizuna-demo/shared':
         specifier: workspace:*
         version: link:../shared
@@ -165,9 +162,6 @@ importers:
 
   apps/fastify-demo:
     dependencies:
-      '@scalar/fastify-api-reference':
-        specifier: ^1.57.5
-        version: 1.57.5
       '@ts-kizuna-demo/shared':
         specifier: workspace:*
         version: link:../shared
@@ -214,9 +208,6 @@ importers:
       '@hono/node-server':
         specifier: 'catalog:'
         version: 1.19.14(hono@4.12.19)
-      '@scalar/hono-api-reference':
-        specifier: ^0.10.19
-        version: 0.10.19(hono@4.12.19)
       '@ts-kizuna-demo/shared':
         specifier: workspace:*
         version: link:../shared
@@ -322,6 +313,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.14)
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -334,6 +328,9 @@ importers:
       '@ts-kizuna/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
+      '@ts-kizuna/openapi':
+        specifier: workspace:*
+        version: link:../../packages/openapi
       zod:
         specifier: 'catalog:'
         version: 4.3.6
@@ -648,6 +645,15 @@ importers:
       '@ts-kizuna/core':
         specifier: workspace:*
         version: link:../core
+      '@ts-kizuna/express':
+        specifier: workspace:*
+        version: link:../express
+      '@types/express':
+        specifier: 'catalog:'
+        version: 5.0.6
+      express:
+        specifier: 'catalog:'
+        version: 5.2.1
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)
@@ -2278,38 +2284,12 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@scalar/client-side-rendering@0.1.12':
-    resolution: {integrity: sha512-prwHK4ozTU268BHZ/5OstoKB23JSidDuvddAOp0bVz9c29ZxsyzzxPtPcVgF7X16LiZnS1OzY030FoDCM+iC9Q==}
-    engines: {node: '>=22'}
-
   '@scalar/client-side-rendering@0.1.4':
     resolution: {integrity: sha512-xriPrHrKs/FNQbMJTPWiP7bIualAobbJlzrDM5Tl+7nSgKMUUgpR60IcOphCsJ+iFcdOU/VTmjufBcOaVigDPg==}
     engines: {node: '>=22'}
 
-  '@scalar/express-api-reference@0.9.11':
-    resolution: {integrity: sha512-ZYOppmOxaNYNeN00/QmVbJd4QbLJu5rkJHsVr7eSWxCHbeNVpkY4kV136d70tGtGP5k5eM1Duqtd6jVeSk9TzA==}
-    engines: {node: '>=22'}
-
-  '@scalar/fastify-api-reference@1.57.5':
-    resolution: {integrity: sha512-GtkU5lT3hX5ID+IQa1DXfMk2pdhNVdEBpjNrkJ4PHtaTqRTMMTjvv86jWoAc0IZ3q/9Gnbbe852j8Lrnxa2HwQ==}
-    engines: {node: '>=22'}
-
   '@scalar/helpers@0.5.3':
     resolution: {integrity: sha512-PgQmhuV0oRoHtaqH0OhyCcSY9t35qm8ThNeuUMEAKeN+hW1ijBnJiUADpxaIfXPbLrpN9sjyYza0A16WFbLttg==}
-    engines: {node: '>=22'}
-
-  '@scalar/helpers@0.8.0':
-    resolution: {integrity: sha512-gmOC6VravNB9VDl6wnt/GOj4K/hn48tj5bpW4AM4MhH8Ubil6uu7g1DSoKHwltu8Ks79KEtR6JmOrROi9R7jaQ==}
-    engines: {node: '>=22'}
-
-  '@scalar/hono-api-reference@0.10.19':
-    resolution: {integrity: sha512-6EfwN/lfPvePzAxe9UE8fr/ZuAAqS6ttUwQu9JTgk2Xl/clicaVVSOc0gyGt+8GLXdysoNinjZ74we8xqNWyCA==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      hono: ^4.12.5
-
-  '@scalar/json-magic@0.12.14':
-    resolution: {integrity: sha512-dWrCy3ew1r7OQ1pu2r4ZjiKEVy0yVd66kXdmsl41bteOG2F2I2IBlPjmPV6p8ckjImQHxtNBIntFaQfNrdBhJg==}
     engines: {node: '>=22'}
 
   '@scalar/nextjs-api-reference@0.10.11':
@@ -2319,33 +2299,9 @@ packages:
       next: ^15.0.0 || ^16.0.0
       react: ^19.0.0
 
-  '@scalar/openapi-parser@0.28.5':
-    resolution: {integrity: sha512-W8uS5p4dR5Ri4Zqra6c/KaL54R5qkLJAwXCm/QTYvzsLw/NT4N6NdbqHQLHpJeLMG9c0dkA70S/KZKkFZgDRTg==}
-    engines: {node: '>=22'}
-
-  '@scalar/openapi-types@0.9.0':
-    resolution: {integrity: sha512-XGuYegItO8iJbEy5hHxS04vyxoFIuERy3D/twt1hGPya6KJljg9iO0geZ/X5vjDKmSKYAuMNkGqYO5Jjp4NLUA==}
-    engines: {node: '>=22'}
-
-  '@scalar/openapi-upgrader@0.2.8':
-    resolution: {integrity: sha512-/SDb3+SIFuScKwrNRTFd7bklGDkayo81cHZlajXfUaT22Oc4VUlOUvyMXBLPa0miOfZTExYTM1I0BWW7Nujugw==}
-    engines: {node: '>=22'}
-
-  '@scalar/schemas@0.3.2':
-    resolution: {integrity: sha512-iadXBgJ02XUU5C5s6/xh/PmGLzUPd7X8upXIvPWBXDcQ4FHACNgkG8PPZ/beYM8UPDDkTUPM3ygEs0G6jKwGjQ==}
-    engines: {node: '>=22'}
-
-  '@scalar/types@0.12.2':
-    resolution: {integrity: sha512-EzLkubCb7xioiTm9eYnmn/032akaq4kkrrdclgV2uezwtniR8ErQICjhMl2AjBWL6nstHiFZ9RnPZm2Z2/KM0Q==}
-    engines: {node: '>=22'}
-
   '@scalar/types@0.9.3':
     resolution: {integrity: sha512-/cEFjVa8PxRIDyhcWKh7McT8pm5O0kbafzd1jvpVq69sgIIq0gJ0P1sCcPye6qJ2k478PK7VmpK9FxZcr6D4Kw==}
     engines: {node: '>=22'}
-
-  '@scalar/validation@0.6.0':
-    resolution: {integrity: sha512-tpmmG+/xRE2Kn9RpflU3AIyZv08v10+E1ZrJCx7z6+/91zHVxy0M73kC1LT4/8PbYNt85ywyC8+n+D99JdMcGA==}
-    engines: {node: '>=20'}
 
   '@shikijs/core@3.23.0':
     resolution: {integrity: sha512-NSWQz0riNb67xthdm5br6lAkvpDJRTgB36fxlo37ZzM2yq0PQFFzbd8psqC2XMPgCzo1fW6cVi18+ArJ44wqgA==}
@@ -3475,9 +3431,6 @@ packages:
   fast-wrap-ansi@0.2.0:
     resolution: {integrity: sha512-rLV8JHxTyhVmFYhBJuMujcrHqOT2cnO5Zxj37qROj23CP39GXubJRBUFF0z8KFK77Uc0SukZUf7JZhsVEQ6n8w==}
 
-  fastify-plugin@4.5.1:
-    resolution: {integrity: sha512-stRHYGeuqpEZTL1Ef0Ovr2ltazUT9g844X5z/zEBFLG8RYlpDiOCIG+ATvYEp+/zmc7sN29mcIMp8gvYplYPIQ==}
-
   fastify-plugin@5.1.0:
     resolution: {integrity: sha512-FAIDA8eovSt5qcDgcBvDuX/v0Cjz0ohGhENZ/wpc3y+oZCY2afZ9Baqql3g/lC+OHRnciQol4ww7tuthOb9idw==}
 
@@ -3990,10 +3943,6 @@ packages:
   leven@3.1.0:
     resolution: {integrity: sha512-qsda+H8jTaUaN/x5vzW2rzc+8Rw4TAQ/4KjB46IwK5VH+IlVeeeje/EoZRpiXvIqjFgK84QffqPztGI3VBLG1A==}
     engines: {node: '>=6'}
-
-  leven@4.1.0:
-    resolution: {integrity: sha512-KZ9W9nWDT7rF7Dazg8xyLHGLrmpgq2nVNFUckhqdW3szVP6YhCpp/RAnpmVExA9JvrMynjwSLVrEj3AepHR6ew==}
-    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
@@ -6833,42 +6782,11 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.60.2':
     optional: true
 
-  '@scalar/client-side-rendering@0.1.12':
-    dependencies:
-      '@scalar/schemas': 0.3.2
-      '@scalar/types': 0.12.2
-      '@scalar/validation': 0.6.0
-
   '@scalar/client-side-rendering@0.1.4':
     dependencies:
       '@scalar/types': 0.9.3
 
-  '@scalar/express-api-reference@0.9.11':
-    dependencies:
-      '@scalar/client-side-rendering': 0.1.4
-
-  '@scalar/fastify-api-reference@1.57.5':
-    dependencies:
-      '@scalar/client-side-rendering': 0.1.12
-      '@scalar/openapi-parser': 0.28.5
-      '@scalar/openapi-types': 0.9.0
-      fastify-plugin: 4.5.1
-      github-slugger: 2.0.0
-
   '@scalar/helpers@0.5.3': {}
-
-  '@scalar/helpers@0.8.0': {}
-
-  '@scalar/hono-api-reference@0.10.19(hono@4.12.19)':
-    dependencies:
-      '@scalar/client-side-rendering': 0.1.12
-      hono: 4.12.19
-
-  '@scalar/json-magic@0.12.14':
-    dependencies:
-      '@scalar/helpers': 0.8.0
-      pathe: 2.0.3
-      yaml: 2.8.4
 
   '@scalar/nextjs-api-reference@0.10.11(next@16.2.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)':
     dependencies:
@@ -6876,45 +6794,12 @@ snapshots:
       next: 16.2.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react: 19.2.5
 
-  '@scalar/openapi-parser@0.28.5':
-    dependencies:
-      '@scalar/helpers': 0.8.0
-      '@scalar/json-magic': 0.12.14
-      '@scalar/openapi-types': 0.9.0
-      '@scalar/openapi-upgrader': 0.2.8
-      ajv: 8.20.0
-      ajv-draft-04: 1.0.0(ajv@8.20.0)
-      ajv-formats: 3.0.1(ajv@8.20.0)
-      jsonpointer: 5.0.1
-      leven: 4.1.0
-      yaml: 2.8.4
-
-  '@scalar/openapi-types@0.9.0': {}
-
-  '@scalar/openapi-upgrader@0.2.8':
-    dependencies:
-      '@scalar/openapi-types': 0.9.0
-
-  '@scalar/schemas@0.3.2':
-    dependencies:
-      '@scalar/helpers': 0.8.0
-      '@scalar/validation': 0.6.0
-
-  '@scalar/types@0.12.2':
-    dependencies:
-      '@scalar/helpers': 0.8.0
-      nanoid: 5.1.9
-      type-fest: 5.6.0
-      zod: 4.3.6
-
   '@scalar/types@0.9.3':
     dependencies:
       '@scalar/helpers': 0.5.3
       nanoid: 5.1.9
       type-fest: 5.6.0
       zod: 4.3.6
-
-  '@scalar/validation@0.6.0': {}
 
   '@shikijs/core@3.23.0':
     dependencies:
@@ -8143,8 +8028,6 @@ snapshots:
     dependencies:
       fast-string-width: 3.0.2
 
-  fastify-plugin@4.5.1: {}
-
   fastify-plugin@5.1.0: {}
 
   fastify@5.8.5:
@@ -8719,8 +8602,6 @@ snapshots:
       json-buffer: 3.0.1
 
   leven@3.1.0: {}
-
-  leven@4.1.0: {}
 
   levn@0.4.1:
     dependencies:

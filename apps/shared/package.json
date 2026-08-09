@@ -19,6 +19,7 @@
   "dependencies": {
     "@ts-kizuna/core": "workspace:*",
     "@ts-kizuna/mcp": "workspace:*",
+    "@ts-kizuna/openapi": "workspace:*",
     "zod": "catalog:"
   }
 }

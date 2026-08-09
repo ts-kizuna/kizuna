@@ -62,6 +62,7 @@ export const ROUTER_META: unique symbol = Symbol('ts-kizuna.router');
 export const GUARDS_META: unique symbol = Symbol('ts-kizuna.guards');
 export const SCHEMES_META: unique symbol = Symbol('ts-kizuna.schemes');
 export const REQUEST_CONTEXT_META: unique symbol = Symbol('ts-kizuna.request-context');
+const CONTRACT_META: unique symbol = Symbol.for('ts-kizuna.contract');
 
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
@@ -138,6 +139,11 @@ export type RequestContextRun<HandlerContext = unknown> = (
 ) => Promise<unknown> | unknown;
 
 /**
+ * The contract the api was assembled from, for plugins needing more than the routes.
+ */
+export const contractOf = <C = unknown>(api: unknown): C => (api as Record<symbol, unknown>)[CONTRACT_META] as C;
+
+/**
  * What kizuna puts in handler args. Must agree with the spread in `runPipeline`.
  */
 export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'throwError', 'auth', 'requestContext', 'plugins'] as const;
@@ -203,6 +209,7 @@ export const assembleApi = <const R extends Routes>(
         [SCHEMES_META]: contract.securitySchemes,
         [REQUEST_CONTEXT_META]: parts.requestContext,
         [PLUGIN_ROUTES_META_KEY]: pluginRoutes,
+        [CONTRACT_META]: contract,
     } as Record<string | symbol, unknown>;
 
     // Resolved after the api exists, because a plugin's server half receives it.

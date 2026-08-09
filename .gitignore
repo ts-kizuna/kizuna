@@ -17,3 +17,7 @@ DerivedData/
 
 # kizuna generated output
 .kizuna/
+
+# generated openapi files
+apps/*/openapi.json
+apps/*/openapi.yaml

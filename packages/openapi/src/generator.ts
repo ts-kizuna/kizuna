@@ -652,8 +652,27 @@ const tagsFromContract = (contract: Contract): OpenApiTag[] => {
  * app.get('/openapi.yaml', (_req, res) => res.send(spec('yaml')));
  * ```
  */
-export function generateOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer {
-    const renderer = openApiGenerator(contract, { ...options, tagLookup: buildTagLookup(contract) });
+/**
+ * Where `openApiDocsPlugin` stamps the options it was given.
+ */
+export const OPENAPI_OPTIONS: unique symbol = Symbol.for('ts-kizuna.openapi-options') as symbol as typeof OPENAPI_OPTIONS;
+
+/**
+ * So a build step does not restate the options and drift from what is served.
+ */
+const optionsFromInstalledPlugin = (contract: Contract): GenerateOpenApiOptions => {
+    for (const plugin of Object.values(contract.plugins ?? {})) {
+        const installed = (plugin as unknown as Record<symbol, GenerateOpenApiOptions | undefined>)[OPENAPI_OPTIONS];
+        if (installed) return installed;
+    }
+    throw new Error(
+        'generateOpenApi needs options. Pass them, or install `openApiDocsPlugin` on `Kizuna.init` and they will be read from the contract.'
+    );
+};
+
+export function generateOpenApi(contract: Contract, options?: GenerateOpenApiOptions): OpenApiRenderer {
+    const resolved = options ?? optionsFromInstalledPlugin(contract);
+    const renderer = openApiGenerator(contract, { ...resolved, tagLookup: buildTagLookup(contract) });
     const tags = tagsFromContract(contract);
     if (tags.length > 0) {
         const originalJson = renderer('json') as OpenApiDocument;

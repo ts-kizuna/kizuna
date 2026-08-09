@@ -6,13 +6,14 @@
     "dev": "kizuna deprecations ../shared/src/contract.ts && next dev -p 3030",
     "build": "kizuna deprecations ../shared/src/contract.ts && next build",
     "start": "kizuna deprecations ../shared/src/contract.ts && next start -p 3030",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "openapi": "tsx scripts/generate-openapi.ts"
   },
   "dependencies": {
     "@scalar/nextjs-api-reference": "^0.10.11",
     "@ts-kizuna-demo/shared": "workspace:*",
-    "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/next": "workspace:*",
     "@ts-kizuna/openapi": "workspace:*",
     "next": "catalog:",
@@ -25,6 +26,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:"
   }
 }
