@@ -155,7 +155,7 @@ export const adapterContextOf = (args: Record<string, unknown>): Record<string, 
     Object.fromEntries(Object.entries(args).filter(([key]) => !(HANDLER_ARG_KEYS as readonly string[]).includes(key)));
 
 /**
- * Request context resolvers keyed by the name they were declared under on `Kizuna.init`.
+ * Request context resolvers keyed by the name they were declared under on `new Kizuna()`.
  */
 export type RequestContextMap<HandlerContext = unknown> = Record<string, RequestContextRun<HandlerContext>>;
 

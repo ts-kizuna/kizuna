@@ -90,7 +90,7 @@ type UnionToIntersection<Union> = (Union extends unknown ? (distributed: Union) 
 
 /**
  * Every header input the contract's request context declares, flattened. Set
- * once on `createClient` under `requestContext` and sent with every request.
+ * once on `new KizunaClient()` under `requestContext` and sent with every request.
  */
 type ContextHeaderInputs<Declarations> = string extends keyof Declarations
     ? {}
@@ -229,37 +229,7 @@ const buildClientTree = (router: Routes, config: ClientConfig): Record<string, u
     return result;
 };
 
-/**
- * Create a typed fetch client from a contract. Each route becomes a method that
- * validates its arguments and returns the typed response. The contract's custom
- * issue codes are carried through to `errors[].code` on `400` responses.
- *
- * When the contract declares a request context with header bindings, pass their
- * values under `requestContext`; the client sends them with every request.
- *
- * @example
- * export const apiClient = createClient(contract, {
- *     baseUrl: 'https://api.example.com',
- * });
- *
- * const { status, body } = await apiClient.orders.pay({
- *     params: {
- *         id: '1',
- *     },
- * });
- */
-export function createClient<
-    T extends Routes,
-    Codes extends string = never,
-    Schemes extends Record<string, SecurityScheme> = Record<string, never>,
-    RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
->(
-    contract: Contract<T, Record<string, TagOptions>, Codes, Schemes, unknown, RequestContext>,
-    config: ClientConfig &
-        ({} extends ContextHeaderInputs<RequestContext>
-            ? { requestContext?: ContextHeaderInputs<RequestContext> }
-            : { requestContext: ContextHeaderInputs<RequestContext> })
-): Client<T, Codes> {
+function buildClient(contract: Contract, config: ClientConfig): unknown {
     const contextHeaders = (config as { requestContext?: Record<string, string | undefined> }).requestContext;
     const resolvedConfig: ClientConfig = contextHeaders
         ? {
@@ -271,5 +241,41 @@ export function createClient<
           }
         : config;
 
-    return buildClientTree(contract.routes, resolvedConfig) as Client<T, Codes>;
+    return buildClientTree(contract.routes, resolvedConfig);
 }
+
+/**
+ * A typed fetch client built from a contract. Each route becomes a method that
+ * validates its arguments and returns the typed response. The contract's custom
+ * issue codes are carried through to `errors[].code` on `400` responses.
+ *
+ * When the contract declares a request context with header bindings, pass their
+ * values under `requestContext`; the client sends them with every request.
+ *
+ * @example
+ * export const apiClient = new KizunaClient(contract, {
+ *     baseUrl: 'https://api.example.com',
+ * });
+ *
+ * const { status, body } = await apiClient.orders.pay({
+ *     params: {
+ *         id: '1',
+ *     },
+ * });
+ */
+export interface KizunaClientConstructor {
+    new <
+        T extends Routes,
+        Codes extends string = never,
+        Schemes extends Record<string, SecurityScheme> = Record<string, never>,
+        RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
+    >(
+        contract: Contract<T, Record<string, TagOptions>, Codes, Schemes, unknown, RequestContext>,
+        config: ClientConfig &
+            ({} extends ContextHeaderInputs<RequestContext>
+                ? { requestContext?: ContextHeaderInputs<RequestContext> }
+                : { requestContext: ContextHeaderInputs<RequestContext> })
+    ): Client<T, Codes>;
+}
+
+export const KizunaClient = buildClient as unknown as KizunaClientConstructor;

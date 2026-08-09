@@ -1,0 +1,25 @@
+---
+title: new KizunaServer()
+description: Bind a contract to a server handle for defining guards, request context, and the router.
+---
+
+`new KizunaServer(contract)` is a `server` handle bound to your contract. It is the server-side counterpart to `k`: define guards, request context, and the router without passing the contract again.
+
+<AdapterTabs functionName="KizunaServer" />
+
+## Parameters
+
+```ts
+new KizunaServer(contract: Contract): Server
+```
+
+| Parameter  | Type       | Description                                                  |
+| ---------- | ---------- | ------------------------------------------------------------ |
+| `contract` | `Contract` | The contract from [`k.contract`](/docs/reference/k-contract) |
+
+```ts title="src/lib/server.ts"
+import { KizunaServer } from '@ts-kizuna/express';
+import { contract } from './contract';
+
+export const server = new KizunaServer(contract);
+```

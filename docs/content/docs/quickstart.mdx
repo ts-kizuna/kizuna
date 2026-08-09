@@ -31,15 +31,15 @@ Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
 ## 1. Define the routes
 
-Bind your API surface once with `Kizuna.init` and export `k` — then group your routes with `k.routes`. Keep each piece in its own file (a package both your server and client import).
+Bind your API surface once with `new Kizuna()` and export `k` — then group your routes with `k.routes`. Keep each piece in its own file (a package both your server and client import).
 
 ```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 
-export const { k } = Kizuna.init();
+export const k = new Kizuna();
 ```
 
-`Kizuna.init` takes optional tags, identities, request contexts and validation settings — see [`Kizuna.init`](/docs/reference/kizuna-init) for the full options.
+`new Kizuna()` takes optional tags, identities, request contexts and validation settings — see [`new Kizuna()`](/docs/reference/kizuna) for the full options.
 
 Because this setup declares no tags, `k.routes` is called with just the route map. Once you declare tags, pass the tag name first — `k.routes('users', { ... })` — and TypeScript checks it against the tags you declared. See [Contract](/docs/building/contract) for the tagged form.
 
@@ -96,7 +96,7 @@ export const usersRoutes = k.routes({
 
 ## 2. Bundle them into a contract
 
-The contract is the one object you hand to both the server and the client. `k.contract` assembles your route groups; it carries the tags and any [custom validation codes](/docs/reference/k-issue) you configured on `Kizuna.init`. Give it its own file — `contract.ts`.
+The contract is the one object you hand to both the server and the client. `k.contract` assembles your route groups; it carries the tags and any [custom validation codes](/docs/reference/k-issue) you configured on `new Kizuna()`. Give it its own file — `contract.ts`.
 
 ```ts title="contract.ts"
 import { k } from './k';
@@ -111,7 +111,7 @@ export const contract = k.contract({
 
 ## 3. Implement the server
 
-Pick an adapter, here Express. `KizunaServer.init` binds the contract to a `server` handle, `server.router` supplies the handlers, `server.api` produces the API object, and the mount attaches it to your app.
+Pick an adapter, here Express. `new KizunaServer()` binds the contract to a `server` handle, `server.router` supplies the handlers, `server.api` produces the API object, and the mount attaches it to your app.
 
 <InstallTabs packageName="@ts-kizuna/express" />
 
@@ -121,7 +121,7 @@ Pick an adapter, here Express. `KizunaServer.init` binds the contract to a `serv
 import { KizunaServer } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 
-export const { server } = KizunaServer.init(contract);
+export const server = new KizunaServer(contract);
 ```
 
 ```ts title="src/lib/router.ts"
@@ -209,10 +209,10 @@ The client is built from the same contract, so every route, input, and response 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
 ```ts title="src/lib/api-client.ts"
-import { createClient } from '@ts-kizuna/fetch';
+import { KizunaClient } from '@ts-kizuna/fetch';
 import { contract } from '@shared/contract';
 
-export const apiClient = createClient(contract, {
+export const apiClient = new KizunaClient(contract, {
     baseUrl: 'http://localhost:3000',
 });
 ```

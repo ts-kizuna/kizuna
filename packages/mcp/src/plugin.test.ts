@@ -8,7 +8,7 @@ import { Client } from '@modelcontextprotocol/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { mcpPlugin } from './plugin.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
@@ -37,7 +37,7 @@ const contract = k.contract({
     routes,
 });
 
-const { server } = KizunaServer.init(contract);
+const server = new KizunaServer(contract);
 
 const api = server.api({
     router: {

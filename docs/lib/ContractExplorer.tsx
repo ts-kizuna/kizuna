@@ -129,7 +129,7 @@ Content-Type: application/problem+json
         file: 'api-client.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
-        code: `const client = createClient(contract, {
+        code: `const client = new KizunaClient(contract, {
   baseUrl: 'http://localhost:3000',
 });
 
@@ -218,7 +218,7 @@ deleteUser: { ... }
     },
 ];
 
-const CONTRACT_CODE = `export const { k } = Kizuna.init();
+const CONTRACT_CODE = `export const k = new Kizuna();
 
 const UserSchema = Kizuna.model({
   title: 'User',

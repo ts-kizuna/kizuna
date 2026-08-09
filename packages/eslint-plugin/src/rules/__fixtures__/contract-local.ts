@@ -1,7 +1,7 @@
 import { Kizuna } from '@ts-kizuna/core';
 import { z } from 'zod';
 
-const { k } = Kizuna.init();
+const k = new Kizuna();
 
 const LocalQuery = z.object({
     page: z.coerce.number(),

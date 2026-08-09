@@ -3,11 +3,11 @@ title: Kizuna.requestContext
 description: Provide request-scoped values — analytics ids, loggers, tenants — to every handler, typed.
 ---
 
-Not everything that runs before a handler is auth. Analytics ids, request loggers, tenant lookups — values every handler wants, gating nothing. Declare them with `Kizuna.requestContext`, register them on `Kizuna.init`, resolve each with the adapter's `server.requestContext`, and every handler receives them typed under `requestContext`, keyed by their name.
+Not everything that runs before a handler is auth. Analytics ids, request loggers, tenant lookups — values every handler wants, gating nothing. Declare them with `Kizuna.requestContext`, register them on `new Kizuna()`, resolve each with the adapter's `server.requestContext`, and every handler receives them typed under `requestContext`, keyed by their name.
 
 <AdapterTabs functionName="KizunaServer" />
 
-A declaration can bind to request `headers`. Those headers stay off the routes and out of the OpenAPI document, but the clients type them: the fetch client takes them on `createClient`, and the generated Swift and Kotlin clients take them in their initializers — so a caller sets them once, and the resolver reads them validated.
+A declaration can bind to request `headers`. Those headers stay off the routes and out of the OpenAPI document, but the clients type them: the fetch client takes them on `new KizunaClient()`, and the generated Swift and Kotlin clients take them in their initializers — so a caller sets them once, and the resolver reads them validated.
 
 ```ts title="packages/contract/src/request-contexts.ts"
 import { z } from 'zod';
@@ -26,7 +26,7 @@ export const analytics = Kizuna.requestContext({
 ```ts title="packages/contract/src/k.ts"
 import { analytics } from './request-contexts';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     requestContext: {
         analytics,
     },
@@ -62,7 +62,7 @@ listUsers: ({ query, requestContext }) => {
 The fetch client takes the declared headers under `requestContext` and sends them with every request — required when a header is, optional otherwise:
 
 ```ts
-const apiClient = createClient(contract, {
+const apiClient = new KizunaClient(contract, {
     baseUrl: 'https://api.example.com',
     requestContext: {
         'x-posthog-session-id': sessionId,

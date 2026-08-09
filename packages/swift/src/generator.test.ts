@@ -8,7 +8,7 @@ import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateSwiftClient } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
@@ -1434,7 +1434,7 @@ describe('Swift generator — request context', () => {
         }),
     });
 
-    const { k: ctxK } = Kizuna.init({
+    const ctxK = new Kizuna({
         requestContext: {
             analytics,
         },

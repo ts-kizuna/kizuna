@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { createClient } from '../../fetch/src/client.js';
+import { KizunaClient } from '../../fetch/src/client.js';
 
 const Paginated = <T extends z.ZodType>(itemSchema: T) =>
     z.object({
@@ -43,7 +43,7 @@ export const tags = Kizuna.tags({
     },
 });
 
-const { k } = Kizuna.init({ tags });
+const k = new Kizuna({ tags });
 
 const healthRoutes = k.routes('health', {
     check: {
@@ -194,6 +194,6 @@ export const api = k.contract({
     },
 });
 
-export const client = createClient(contract, {
+export const client = new KizunaClient(contract, {
     baseUrl: 'http://localhost:3000',
 });

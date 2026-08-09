@@ -50,12 +50,7 @@ kizuna deprecations src/contract.ts
 `generateOpenApi(contract)` reads it:
 
 ```ts
-const spec = generateOpenApi(contract, {
-    info: {
-        title: 'My API',
-        version: '1.0.0',
-    },
-});
+const spec = generateOpenApi(contract);
 ```
 
 Prepend it to your existing dev and build scripts — for example, with Next.js:

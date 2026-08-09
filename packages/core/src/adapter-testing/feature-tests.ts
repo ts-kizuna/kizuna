@@ -35,7 +35,7 @@ export interface AdapterUnderTest<Api> {
     name: AdapterName;
     /**
      * @example
-     * initServerApi: (contract, options) => KizunaServer.init(contract).server.api(options)
+     * initServerApi: (contract, options) => new KizunaServer(contract).api(options)
      */
     initServerApi: (contract: never, options: never) => Api;
     mount: (api: Api, options: { responseValidation?: boolean }) => Transport | Promise<Transport>;

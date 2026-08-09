@@ -6,7 +6,7 @@ import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/client';
 import { buildToolDefinitions, createMcpServer } from './server.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
@@ -661,7 +661,7 @@ describe('MCP server — guards', () => {
         }),
     });
 
-    const { k: securedK } = Kizuna.init({
+    const securedK = new Kizuna({
         identities: {
             user,
         },

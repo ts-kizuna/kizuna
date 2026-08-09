@@ -5,15 +5,15 @@ description: Define your routes and bundle them into a contract — the source o
 
 The contract is the source of truth for your API. Building one is three small steps:
 
-1. **`Kizuna.init`** — bind your surface once and destructure `k`.
+1. **`new Kizuna()`** — bind your surface once and export `k`.
 2. **`k.routes`** — describe each endpoint in a group: method, path, and Zod schemas.
 3. **`k.contract`** — bundle those groups (plus optional settings) into the object you share everywhere.
 
-You hand the result to [`createServer`](/docs/building/router) on the server and [`createClient`](/docs/clients/fetch) on every client. This page covers defining it; the [Router](/docs/building/router) and [Mounting](/docs/building/mounting) pages cover implementing and serving it.
+You hand the result to [`createServer`](/docs/building/router) on the server and [`new KizunaClient()`](/docs/clients/fetch) on every client. This page covers defining it; the [Router](/docs/building/router) and [Mounting](/docs/building/mounting) pages cover implementing and serving it.
 
 ## Create the factory
 
-Call `Kizuna.init` once — usually in a `k.ts` file — and export `k`. Pass a tag set so route groups have a tag to sit under; the keys become the allowed group names. Then import `k` wherever you define routes.
+Construct it once — usually in a `k.ts` file — and export `k`. Pass a tag set so route groups have a tag to sit under; the keys become the allowed group names. Then import `k` wherever you define routes.
 
 ```ts title="packages/contract/src/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
@@ -22,7 +22,7 @@ const tags = Kizuna.tags({
     users: 'Users',
 });
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     tags,
 });
 ```
@@ -185,7 +185,7 @@ export const contract = k.contract({
 });
 ```
 
-API-wide settings — tags and [`validation.issueCodes`](/docs/reference/k-issue) for custom validation codes — are configured on `Kizuna.init` and carried onto every contract `k.contract` produces, so you set them once.
+API-wide settings — tags and [`validation.issueCodes`](/docs/reference/k-issue) for custom validation codes — are configured on `new Kizuna()` and carried onto every contract `k.contract` produces, so you set them once.
 
 Non-JSON responses — set `contentType` to send the body as-is instead of JSON. Responses default to `application/json` (errors to `application/problem+json`); declare a non-JSON body as `z.string()`:
 
@@ -215,7 +215,7 @@ That's everything you need to define an API. The rest of this page is optional �
 
 ## Auth
 
-Auth is part of the contract too: you declare identities with [`Kizuna.identity`](/docs/reference/kizuna-identity), register them on `Kizuna.init`, and give `k.contract` an `auth` map saying which routes require which identity. That one declaration drives runtime enforcement, typed handler context, the OpenAPI spec's security, and client-side access checks. The [Auth guide](/docs/auth) walks the whole pipeline.
+Auth is part of the contract too: you declare identities with [`Kizuna.identity`](/docs/reference/kizuna-identity), register them on `new Kizuna()`, and give `k.contract` an `auth` map saying which routes require which identity. That one declaration drives runtime enforcement, typed handler context, the OpenAPI spec's security, and client-side access checks. The [Auth guide](/docs/auth) walks the whole pipeline.
 
 ## Going further
 
@@ -243,7 +243,7 @@ export const UserSchema = Kizuna.model({
 
 ### Splitting routes across files
 
-Large contracts split into groups. Declare the tags once with [`Kizuna.tags`](/docs/reference/kizuna-tags), pass them to `Kizuna.init`, then define each group with `k.routes` in its own file:
+Large contracts split into groups. Declare the tags once with [`Kizuna.tags`](/docs/reference/kizuna-tags), pass them to `new Kizuna()`, then define each group with `k.routes` in its own file:
 
 ```ts title="contract/tags.ts"
 import { Kizuna } from '@ts-kizuna/core';
@@ -261,7 +261,7 @@ export const tags = Kizuna.tags({
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     tags,
 });
 ```
@@ -359,7 +359,7 @@ function UserCard({ user }: { user: User }) {
 
 ## Reference
 
-- [`Kizuna.init`](/docs/reference/kizuna-init)
+- [`new Kizuna()`](/docs/reference/kizuna)
 - [`Kizuna.model`](/docs/reference/kizuna-model)
 - [`Kizuna.tags`](/docs/reference/kizuna-tags)
 

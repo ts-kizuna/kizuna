@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createAdapter, type AdapterRequest, type AdapterResult, type RequestContextMap, type GuardMap } from './adapter.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
 const user = Kizuna.identity.bearer({
     context: z.object({
@@ -9,7 +9,7 @@ const user = Kizuna.identity.bearer({
     }),
 });
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     identities: {
         user,
     },

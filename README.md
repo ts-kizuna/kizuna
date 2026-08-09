@@ -86,7 +86,7 @@ export const contract = k.contract({
 // server.ts
 import { contract } from './contract';
 
-export const { server } = KizunaServer.init(contract);
+export const server = new KizunaServer(contract);
 ```
 
 ```ts
@@ -152,7 +152,7 @@ app.listen(3000);
 
 ```ts
 // client.ts
-const client = createClient(contract, {
+const client = new KizunaClient(contract, {
     baseUrl: 'http://localhost:3000',
 });
 

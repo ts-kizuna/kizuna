@@ -7,7 +7,7 @@ The handlers are your server's implementation of the contract, one function per 
 
 ## `server.router`
 
-`server.router(router)` types the handler tree against the contract, one function per route, grouped to mirror the contract. The `server` handle comes from `KizunaServer.init(contract)`.
+`server.router(router)` types the handler tree against the contract, one function per route, grouped to mirror the contract. The `server` handle comes from `new KizunaServer(contract)`.
 
 Each group lives in its own file, typed against its group in the contract with the [`Router`](#routehandler-and-router-types) type so inputs and responses stay inferred:
 
@@ -229,7 +229,7 @@ Each issue includes a `code` that tells you _why_ the field failed — not just 
 | `not_multiple_of`       | Failed `multipleOf()`                     |
 | `custom`                | `.refine()` or `.superRefine()` check     |
 
-User-defined checks (`.refine()`) report as `custom` by default. To emit a **typed** code instead — like `invalid_phone_number` above — declare it in `validation.issueCodes` on [`Kizuna.init`](/docs/reference/kizuna-init) and raise it with [`k.issue`](/docs/reference/k-issue). It then shows up in `errors[].code` as a typed literal on both the server and the generated client, not a bare `string`.
+User-defined checks (`.refine()`) report as `custom` by default. To emit a **typed** code instead — like `invalid_phone_number` above — declare it in `validation.issueCodes` on [`new Kizuna()`](/docs/reference/kizuna) and raise it with [`k.issue`](/docs/reference/k-issue). It then shows up in `errors[].code` as a typed literal on both the server and the generated client, not a bare `string`.
 
 The `message` and `path` fields come directly from your Zod schemas. If you use custom messages (e.g. `z.string().min(1, "Name is required")`), those are what the client receives.
 

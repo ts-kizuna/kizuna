@@ -1,5 +1,4 @@
-import type { Kizuna } from './namespace.js';
-import type { K } from './kizuna.js';
+import type { Kizuna, K } from './kizuna.js';
 
 /**
  * Member names the CLI's deprecation parser and the ESLint plugin match on in

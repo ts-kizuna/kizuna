@@ -23,7 +23,7 @@ export interface Contract<
      */
     routes: Routes_;
     /**
-     * The plugins passed to `Kizuna.init`. Their routes are served by
+     * The plugins passed to `new Kizuna()`. Their routes are served by
      * `api.mount` but stay outside `routes`, so the client and the generators
      * do not see them.
      */
@@ -40,13 +40,13 @@ export interface Contract<
      */
     tags?: TagSet<Tags>;
     /**
-     * The identities passed to `Kizuna.init`. Routes reference them by name in
+     * The identities passed to `new Kizuna()`. Routes reference them by name in
      * their `security` field; the OpenAPI generator emits them under
      * `components.securitySchemes`.
      */
     securitySchemes?: Schemes;
     /**
-     * The request context schemas passed to `Kizuna.init`. Each key names a
+     * The request context schemas passed to `new Kizuna()`. Each key names a
      * provider registered on `server.api`; every handler receives its value.
      * Never gates a request and never appears in the OpenAPI document.
      */

@@ -27,7 +27,7 @@ export interface CodedIssue<Input> {
 
 /**
  * A validation issue whose `code` is checked against the issue codes declared on
- * `Kizuna.init`, plus Zod's built-ins. This is what `k.issue` accepts.
+ * `new Kizuna()`, plus Zod's built-ins. This is what `k.issue` accepts.
  */
 export interface RegisteredIssue<Codes extends string, Input> {
     /**

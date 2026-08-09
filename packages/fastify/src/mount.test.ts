@@ -5,7 +5,7 @@ import { userContract, createUserRouter } from '../../core/src/adapter-testing/f
 
 describe('api.mount and api.plugin', () => {
     it('mount(app) serves routes', async () => {
-        const { server } = KizunaServer.init(userContract);
+        const server = new KizunaServer(userContract);
         const api = server.api({ router: createUserRouter() as never });
         const app = Fastify();
         await api.mount(app);
@@ -14,7 +14,7 @@ describe('api.mount and api.plugin', () => {
     });
 
     it('app.register(api.plugin) serves routes', async () => {
-        const { server } = KizunaServer.init(userContract);
+        const server = new KizunaServer(userContract);
         const api = server.api({ router: createUserRouter() as never });
         const app = Fastify();
         await app.register(api.plugin, {});

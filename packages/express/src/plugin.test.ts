@@ -34,7 +34,7 @@ const probePlugin = createPlugin({
     }),
 });
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
@@ -60,7 +60,7 @@ const contract = k.contract({
 });
 
 const serve = () => {
-    const { server } = KizunaServer.init(contract);
+    const server = new KizunaServer(contract);
     const api = server.api({
         router: {
             indexUser: ({ params, plugins }) => ({
@@ -129,7 +129,7 @@ describe('plugin lane', () => {
             }),
         });
 
-        const { k: collidingK } = Kizuna.init({
+        const collidingK = new Kizuna({
             tags: Kizuna.tags({
                 api: 'API',
             }),
@@ -141,7 +141,7 @@ describe('plugin lane', () => {
             routes,
         });
 
-        const { server } = KizunaServer.init(colliding);
+        const server = new KizunaServer(colliding);
         expect(() =>
             server.api({
                 router: {

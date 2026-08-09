@@ -3,7 +3,7 @@ title: k.contract
 description: Assemble route groups into the Contract your server, clients, and generators all read.
 ---
 
-`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/create-client), [server](/docs/reference/server-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `Kizuna.init`.
+`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/kizuna-client), [server](/docs/reference/server-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `new Kizuna()`.
 
 ```ts
 // contract.ts
@@ -24,7 +24,7 @@ The declared `issueCodes` widen `errors[].code` on `400` responses to `Validatio
 
 ## The auth map
 
-The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `Kizuna.init`. It is **exhaustive over groups** — every key in `routes` must appear, and public takes an explicit `false`, so a new group can't ship unsecured by omission. For the full walkthrough, see the [Auth guide](/docs/auth).
+The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `new Kizuna()`. It is **exhaustive over groups** — every key in `routes` must appear, and public takes an explicit `false`, so a new group can't ship unsecured by omission. For the full walkthrough, see the [Auth guide](/docs/auth).
 
 ```ts
 export const contract = k.contract({

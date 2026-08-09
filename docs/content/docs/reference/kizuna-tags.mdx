@@ -3,7 +3,7 @@ title: Kizuna.tags
 description: Declare the set of tags used to group routes across nested route trees and the OpenAPI spec.
 ---
 
-Declare the set of tags used to group routes across nested route trees and the OpenAPI spec. Pass the result to [`Kizuna.init`](/docs/reference/kizuna-init) so `k.routes` completes the group tag.
+Declare the set of tags used to group routes across nested route trees and the OpenAPI spec. Pass the result to [`new Kizuna()`](/docs/reference/kizuna) so `k.routes` completes the group tag.
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -27,7 +27,7 @@ Each entry is keyed by an id you choose; routes reference tags by these keys. A 
 
 ## Returns
 
-A `TagSet`. Pass it to [`Kizuna.init`](/docs/reference/kizuna-init) so `k.routes` completes the group tag and route-level `tags`. `k.contract` carries the set onto the contract — so the generated OpenAPI document lists each tag with its title and description without you passing it again.
+A `TagSet`. Pass it to [`new Kizuna()`](/docs/reference/kizuna) so `k.routes` completes the group tag and route-level `tags`. `k.contract` carries the set onto the contract — so the generated OpenAPI document lists each tag with its title and description without you passing it again.
 
 ## Example
 
@@ -49,7 +49,7 @@ export const tags = Kizuna.tags({
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     tags,
 });
 ```

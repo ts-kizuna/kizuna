@@ -5,14 +5,14 @@ import { KizunaServer } from '@ts-kizuna/express';
 import express from 'express';
 import request from 'supertest';
 import { generateOpenApi } from './generator.js';
-import { openApiDocsPlugin } from './plugin.js';
+import { openApiPlugin } from './plugin.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
     plugins: {
-        openApiDocs: openApiDocsPlugin({
+        openApiDocs: openApiPlugin({
             info: {
                 title: 'Demo API',
                 version: '1.0.0',
@@ -36,7 +36,7 @@ const contract = k.contract({
 });
 
 const serve = () => {
-    const { server } = KizunaServer.init(contract);
+    const server = new KizunaServer(contract);
     const api = server.api({
         router: {
             getUser: ({ params }) => ({
@@ -52,7 +52,7 @@ const serve = () => {
     return app;
 };
 
-describe('openApiDocsPlugin', () => {
+describe('openApiPlugin', () => {
     it('serves the reference UI with the document embedded', async () => {
         const response = await request(serve()).get('/docs');
 
@@ -81,12 +81,12 @@ describe('openApiDocsPlugin', () => {
     });
 
     it('hands its options to generateOpenApi, so a build step cannot drift from what is served', async () => {
-        const { k: servedK } = Kizuna.init({
+        const servedK = new Kizuna({
             tags: Kizuna.tags({
                 api: 'API',
             }),
             plugins: {
-                openApiDocs: openApiDocsPlugin({
+                openApiDocs: openApiPlugin({
                     info: {
                         title: 'No drift',
                         version: '2.0.0',
@@ -110,8 +110,8 @@ describe('openApiDocsPlugin', () => {
         });
 
         const app = express();
-        KizunaServer.init(servedContract)
-            .server.api({
+        new KizunaServer(servedContract)
+            .api({
                 router: {
                     ping: () => ({
                         status: 200,
@@ -130,7 +130,7 @@ describe('openApiDocsPlugin', () => {
     });
 
     it('says what to do when there are no options and no plugin', () => {
-        const { k: bareK } = Kizuna.init({
+        const bareK = new Kizuna({
             tags: Kizuna.tags({
                 api: 'API',
             }),
@@ -149,16 +149,16 @@ describe('openApiDocsPlugin', () => {
             }),
         });
 
-        expect(() => generateOpenApi(bare)).toThrow(/install `openApiDocsPlugin`/);
+        expect(() => generateOpenApi(bare)).toThrow(/Install `openApiPlugin`/);
     });
 
     it('serves the document without a UI when the page is turned off', async () => {
-        const { k: specOnlyK } = Kizuna.init({
+        const specOnlyK = new Kizuna({
             tags: Kizuna.tags({
                 api: 'API',
             }),
             plugins: {
-                openApiDocs: openApiDocsPlugin({
+                openApiDocs: openApiPlugin({
                     info: {
                         title: 'Spec only',
                         version: '1.0.0',
@@ -183,8 +183,8 @@ describe('openApiDocsPlugin', () => {
         });
 
         const app = express();
-        KizunaServer.init(specOnly)
-            .server.api({
+        new KizunaServer(specOnly)
+            .api({
                 router: {
                     ping: () => ({
                         status: 200,
@@ -201,12 +201,12 @@ describe('openApiDocsPlugin', () => {
     });
 
     it('takes a custom path as well as true', async () => {
-        const { k: customK } = Kizuna.init({
+        const customK = new Kizuna({
             tags: Kizuna.tags({
                 api: 'API',
             }),
             plugins: {
-                openApiDocs: openApiDocsPlugin({
+                openApiDocs: openApiPlugin({
                     info: {
                         title: 'Custom',
                         version: '1.0.0',
@@ -231,8 +231,8 @@ describe('openApiDocsPlugin', () => {
         });
 
         const app = express();
-        KizunaServer.init(custom)
-            .server.api({
+        new KizunaServer(custom)
+            .api({
                 router: {
                     ping: () => ({
                         status: 200,
@@ -251,12 +251,12 @@ describe('openApiDocsPlugin', () => {
     });
 
     it('serves the document at the paths it is given', async () => {
-        const { k: jsonOnlyK } = Kizuna.init({
+        const jsonOnlyK = new Kizuna({
             tags: Kizuna.tags({
                 api: 'API',
             }),
             plugins: {
-                openApiDocs: openApiDocsPlugin({
+                openApiDocs: openApiPlugin({
                     info: {
                         title: 'Both',
                         version: '1.0.0',
@@ -280,7 +280,7 @@ describe('openApiDocsPlugin', () => {
             }),
         });
 
-        const { server } = KizunaServer.init(jsonOnly);
+        const server = new KizunaServer(jsonOnly);
         const app = express();
         server
             .api({

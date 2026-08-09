@@ -174,7 +174,7 @@ describe('loadDeprecations', () => {
     test('returns undefined for a contract not in the file', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-'));
         writeKizunaDeprecations([{ contract, contractPath: fixturePath }], dir);
-        const { k } = Kizuna.init({
+        const k = new Kizuna({
             tags: Kizuna.tags({
                 ping: 'Ping',
             }),

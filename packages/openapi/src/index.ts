@@ -16,5 +16,5 @@ export {
     type OpenApiServer,
     type OpenApiVersion,
 } from './generator.js';
-export { openApiDocsPlugin, type OpenApiDocsPluginProps } from './plugin.js';
+export { openApiPlugin, type OpenApiPluginProps } from './plugin.js';
 export { renderDocsHtml, type DocsProvider, type DocsHtmlOptions } from './docs-html.js';

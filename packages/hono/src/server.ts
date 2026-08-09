@@ -285,26 +285,7 @@ export interface Server<
     ): HonoApi<R>;
 }
 
-/**
- * Bind a contract to a server handle: the server-side counterpart to `kizuna`'s
- * `k`.
- *
- * @example
- * const { server } = KizunaServer.init(contract);
- *
- * const requireUser = server.guard('user', ({ bearer, deny }) => {
- *     const session = bearer && sessions.get(bearer.token);
- *     return session ? { userId: session.userId } : deny(401, 'Unauthorized');
- * });
- *
- * export const api = server.api({
- *     router,
- *     guards: {
- *         user: requireUser,
- *     },
- * });
- */
-const init = <
+const createServerSurface = <
     const R extends Routes,
     Schemes extends Record<string, SecurityScheme>,
     Auth,
@@ -313,7 +294,7 @@ const init = <
     E extends Env = Env,
 >(
     contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>
-): { server: Server<R, Schemes, Auth, RequestContext, Plugins, E> } => {
+): Server<R, Schemes, Auth, RequestContext, Plugins, E> => {
     const server = {
         plugins: new Proxy(
             {},
@@ -332,10 +313,43 @@ const init = <
             });
         },
     };
-    return { server: server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, E> };
+    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, E>;
 };
 
 /**
- * Bind a contract to a server handle. The serving counterpart to `Kizuna.init`.
+ * Bind a contract to a server handle: the serving counterpart to `Kizuna`. Keep
+ * the instance and use `server.guard` to define guards, `server.router` to bind
+ * typed handlers, and `server.api` to assemble them.
+ *
+ * @example
+ * const server = new KizunaServer(contract);
+ *
+ * const requireUser = server.guard('user', ({ bearer, deny }) => {
+ *     const session = bearer && sessions.get(bearer.token);
+ *     return session ? { userId: session.userId } : deny(401, 'Unauthorized');
+ * });
+ *
+ * export const api = server.api({
+ *     router,
+ *     guards: {
+ *         user: requireUser,
+ *     },
+ * });
  */
-export const KizunaServer = { init };
+export class KizunaServer<
+    const R extends Routes,
+    Schemes extends Record<string, SecurityScheme>,
+    Auth,
+    RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
+    E extends Env = Env,
+> implements Server<R, Schemes, Auth, RequestContext, Plugins, E> {
+    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, E>['guard'];
+    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, E>['requestContext'];
+    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, E>['router'];
+    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, E>['api'];
+
+    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>) {
+        Object.assign(this, createServerSurface(contract));
+    }
+}

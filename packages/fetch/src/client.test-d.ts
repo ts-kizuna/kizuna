@@ -1,9 +1,9 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type ValidationError } from '@ts-kizuna/core';
-import { createClient } from './client.js';
+import { KizunaClient } from './client.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
@@ -207,7 +207,7 @@ const voidBodyContract = k.contract({
     routes: voidBodyContractRoutes,
 });
 
-const voidBodyClient = createClient(voidBodyContract, {
+const voidBodyClient = new KizunaClient(voidBodyContract, {
     baseUrl: 'http://localhost:3000',
 });
 
@@ -267,11 +267,11 @@ const nestedContract = k.contract({
     routes: nestedContractRoutes,
 });
 
-const nestedClient = createClient(nestedContract, {
+const nestedClient = new KizunaClient(nestedContract, {
     baseUrl: 'http://localhost:3000',
 });
 
-const client = createClient(contract, {
+const client = new KizunaClient(contract, {
     baseUrl: 'http://localhost:3000',
 });
 
@@ -607,7 +607,7 @@ const pathParamsContract = k.contract({
     routes: pathParamsContractRoutes,
 });
 
-const pathParamsClient = createClient(pathParamsContract, {
+const pathParamsClient = new KizunaClient(pathParamsContract, {
     baseUrl: 'http://localhost:3000',
 });
 
@@ -665,7 +665,7 @@ const tenantContext = Kizuna.requestContext({
     }),
 });
 
-const { k: optionalCtxK } = Kizuna.init({
+const optionalCtxK = new Kizuna({
     requestContext: {
         analytics: analyticsContext,
     },
@@ -687,7 +687,7 @@ const optionalCtxContract = optionalCtxK.contract({
     },
 });
 
-const { k: requiredCtxK } = Kizuna.init({
+const requiredCtxK = new Kizuna({
     requestContext: {
         analytics: analyticsContext,
         tenant: tenantContext,
@@ -711,16 +711,16 @@ const requiredCtxContract = requiredCtxK.contract({
 });
 
 test('requestContext config is optional when every declared header is optional', () => {
-    createClient(optionalCtxContract, {
+    new KizunaClient(optionalCtxContract, {
         baseUrl: 'https://api.example.com',
     });
-    createClient(optionalCtxContract, {
+    new KizunaClient(optionalCtxContract, {
         baseUrl: 'https://api.example.com',
         requestContext: {
             'x-session-id': 's1',
         },
     });
-    createClient(optionalCtxContract, {
+    new KizunaClient(optionalCtxContract, {
         baseUrl: 'https://api.example.com',
         requestContext: {
             // @ts-expect-error unknown context header
@@ -730,7 +730,7 @@ test('requestContext config is optional when every declared header is optional',
 });
 
 test('requestContext config is required when a declared header is required', () => {
-    createClient(requiredCtxContract, {
+    new KizunaClient(requiredCtxContract, {
         baseUrl: 'https://api.example.com',
         requestContext: {
             'x-tenant': 't1',
@@ -738,10 +738,10 @@ test('requestContext config is required when a declared header is required', () 
         },
     });
     // @ts-expect-error requestContext is required: x-tenant must be sent
-    createClient(requiredCtxContract, {
+    new KizunaClient(requiredCtxContract, {
         baseUrl: 'https://api.example.com',
     });
-    createClient(requiredCtxContract, {
+    new KizunaClient(requiredCtxContract, {
         baseUrl: 'https://api.example.com',
         // @ts-expect-error x-tenant is required
         requestContext: {
@@ -778,7 +778,7 @@ const activityRoutes = k.routes('api', {
     },
 });
 
-const activityClient = createClient(
+const activityClient = new KizunaClient(
     k.contract({
         routes: activityRoutes,
     }),

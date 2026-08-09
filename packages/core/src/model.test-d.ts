@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
 test('Kizuna.model preserves object schema type', () => {
     const User = Kizuna.model({

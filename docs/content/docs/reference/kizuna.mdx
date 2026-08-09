@@ -1,9 +1,9 @@
 ---
-title: Kizuna.init
-description: Bind one API surface — its tags, identities, request contexts, and validation codes — and get back `k`.
+title: new Kizuna()
+description: Bind one API surface — its tags, identities, request contexts, and validation codes — and keep it as `k`.
 ---
 
-`Kizuna.init` binds one API surface. Destructure `k` from it, then use `k.routes` to define route groups and `k.contract` to assemble them. Set it up once and import `k` wherever you define routes.
+`new Kizuna()` binds one API surface. Keep the instance as `k`, then use `k.routes` to define route groups and `k.contract` to assemble them. Construct it once and import `k` wherever you define routes.
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -14,12 +14,12 @@ import { Kizuna } from '@ts-kizuna/core';
 ## Parameters
 
 ```ts
-Kizuna.init(config?: {
+new Kizuna(config?: {
     identities?: Record<string, Identity>;
     requestContext?: Record<string, RequestContext>;
     tags?: TagSet;
     validation?: { issueCodes?: readonly string[] };
-}): { k: K }
+}): K
 ```
 
 | Field                   | Type                             | Description                                                                                                                                                     |
@@ -31,7 +31,7 @@ Kizuna.init(config?: {
 
 ## Returns
 
-`{ k }`, the factory for this API:
+The instance — keep it as `k`, the authoring surface for this API:
 
 | Method       | Signature                        | Description                                                |
 | ------------ | -------------------------------- | ---------------------------------------------------------- |
@@ -49,7 +49,7 @@ import { tags } from './tags';
 import { user, member } from './identities';
 import { analytics } from './request-contexts';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     identities: {
         user,
         member,
@@ -82,7 +82,7 @@ export const analytics = Kizuna.requestContext(
 ```ts title="k.ts"
 import { analytics } from './request-contexts';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     requestContext: {
         analytics,
     },

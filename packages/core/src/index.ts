@@ -1,6 +1,7 @@
-export { Kizuna } from './namespace.js';
 export {
+    Kizuna,
     type K,
+    type KizunaConfig,
     type KizunaSpec,
     type TagNamesOf,
     type IdentityNamesOf,
