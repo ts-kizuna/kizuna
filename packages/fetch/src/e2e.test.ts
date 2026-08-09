@@ -4,10 +4,10 @@ import { z } from 'zod';
 import type { Server, AddressInfo } from 'node:net';
 import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { createClient, type Client } from '@ts-kizuna/fetch';
+import { KizunaClient, type Client } from '@ts-kizuna/fetch';
 import { KizunaServer } from '@ts-kizuna/express';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
@@ -56,7 +56,7 @@ describe('end-to-end: typed client → Express server', () => {
         const app = express();
         app.use(express.json());
 
-        const api = KizunaServer.init(contract).server.api({
+        const api = new KizunaServer(contract).api({
             router: {
                 createUser: ({ body }) => {
                     const id = String(users.size + 1);
@@ -96,7 +96,7 @@ describe('end-to-end: typed client → Express server', () => {
         });
 
         const address = server.address() as AddressInfo;
-        client = createClient(contract, {
+        client = new KizunaClient(contract, {
             baseUrl: `http://localhost:${address.port}`,
         });
     });
@@ -174,7 +174,7 @@ describe('end-to-end: response headers', () => {
         const app = express();
         app.use(express.json());
 
-        const api = KizunaServer.init(contractWithResponseHeaders).server.api({
+        const api = new KizunaServer(contractWithResponseHeaders).api({
             router: {
                 getUser: ({ params, headers, res }) => {
                     const requestId = headers['x-request-id'];
@@ -197,7 +197,7 @@ describe('end-to-end: response headers', () => {
         });
 
         const address = server.address() as AddressInfo;
-        client = createClient(contractWithResponseHeaders, {
+        client = new KizunaClient(contractWithResponseHeaders, {
             baseUrl: `http://localhost:${address.port}`,
         });
     });
@@ -226,7 +226,7 @@ const userIdentity = Kizuna.identity.bearer({
     }),
 });
 
-const { k: securedK } = Kizuna.init({
+const securedK = new Kizuna({
     identities: {
         user: userIdentity,
     },
@@ -262,7 +262,7 @@ describe('end-to-end: typed client → secured Express route', () => {
         const app = express();
         app.use(express.json());
 
-        const { server: securedServer } = KizunaServer.init(securedContract);
+        const securedServer = new KizunaServer(securedContract);
 
         const requireUser = securedServer.guard('user', ({ bearer, deny }) => {
             if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
@@ -301,7 +301,7 @@ describe('end-to-end: typed client → secured Express route', () => {
     });
 
     it('round-trips with the credential in baseHeaders', async () => {
-        const client = createClient(securedContract, {
+        const client = new KizunaClient(securedContract, {
             baseUrl,
             baseHeaders: {
                 authorization: 'Bearer tok_ada',
@@ -315,7 +315,7 @@ describe('end-to-end: typed client → secured Express route', () => {
     });
 
     it('surfaces the typed 401 without a credential', async () => {
-        const client = createClient(securedContract, {
+        const client = new KizunaClient(securedContract, {
             baseUrl,
         });
         const response = await client.api.whoAmI();

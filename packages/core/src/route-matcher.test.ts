@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { assembleApi } from './adapter.js';
 import { matchRoute } from './route-matcher.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),

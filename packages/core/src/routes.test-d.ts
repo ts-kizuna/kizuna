@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { tagRoutes } from './routes.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
 const routes = tagRoutes({
     getUser: {

@@ -7,16 +7,16 @@ import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
 import { contractFingerprint } from '@ts-kizuna/core/generator';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
-import { generateOpenApi, type GenerateOpenApiOptions } from './generator.js';
+import { generateOpenApi, renderOpenApi, type GenerateOpenApiOptions } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
 });
 
-const generateJson = (contract: Contract, options: GenerateOpenApiOptions) => generateOpenApi(contract, options)('json');
+const generateJson = (contract: Contract, options: GenerateOpenApiOptions) => renderOpenApi(contract, options)('json');
 
 expect.extend({
     toBeAValidOpenAPIDefinition,
@@ -367,7 +367,7 @@ describe('operation metadata passthrough', () => {
     });
 
     it('merges route-level tags with the group tag', () => {
-        const { k } = Kizuna.init({
+        const k = new Kizuna({
             tags: Kizuna.tags({
                 users: {
                     title: 'Users',
@@ -943,7 +943,7 @@ describe('response headers', () => {
 
 describe('contract-level tag grouping', () => {
     it('applies the group tag to all routes in that group', () => {
-        const { k } = Kizuna.init({
+        const k = new Kizuna({
             tags: Kizuna.tags({
                 users: {
                     title: 'Users',
@@ -976,7 +976,7 @@ describe('contract-level tag grouping', () => {
     });
 
     it('accumulates tags from nested tagged groups', () => {
-        const { k } = Kizuna.init({
+        const k = new Kizuna({
             tags: Kizuna.tags({
                 users: {
                     title: 'Users',
@@ -1006,7 +1006,7 @@ describe('contract-level tag grouping', () => {
     });
 
     it('collects tag descriptions into the document tags', () => {
-        const { k } = Kizuna.init({
+        const k = new Kizuna({
             tags: Kizuna.tags({
                 users: {
                     title: 'Users',
@@ -1036,7 +1036,7 @@ describe('contract-level tag grouping', () => {
     });
 
     it('an untagged sub-group inside a tagged group inherits the outer tag', () => {
-        const { k } = Kizuna.init({
+        const k = new Kizuna({
             tags: Kizuna.tags({
                 users: {
                     title: 'Users',
@@ -1404,7 +1404,7 @@ describe('security from the contract', () => {
     });
 
     const makeSecuredContract = () => {
-        const { k: securedK } = Kizuna.init({
+        const securedK = new Kizuna({
             identities: {
                 user,
                 member,
@@ -1527,7 +1527,7 @@ describe('security from the contract', () => {
     });
 
     it('emits security resolved through a nested cascade', () => {
-        const { k: nestedK } = Kizuna.init({
+        const nestedK = new Kizuna({
             identities: {
                 user,
             },
@@ -1608,7 +1608,7 @@ describe('shared scheme names', () => {
                 userId: z.string(),
             }),
         });
-        const { k: sharedK } = Kizuna.init({
+        const sharedK = new Kizuna({
             identities: {
                 admin,
                 viewer,
@@ -1679,7 +1679,7 @@ describe('custom identities (no OpenAPI scheme)', () => {
     });
 
     const makeContract = () => {
-        const { k: customK } = Kizuna.init({
+        const customK = new Kizuna({
             identities: {
                 user,
                 inviteToken,

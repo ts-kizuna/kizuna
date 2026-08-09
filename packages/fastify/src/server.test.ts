@@ -5,7 +5,7 @@ import { Kizuna } from '@ts-kizuna/core';
 import { KizunaServer } from './server.js';
 import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
@@ -28,7 +28,7 @@ describe('Fastify — handler context', () => {
         const contextContract = k.contract({
             routes: contextRoutes,
         });
-        const contextApi = KizunaServer.init(contextContract).server.api({
+        const contextApi = new KizunaServer(contextContract).api({
             router: {
                 echo: ({ request }) => ({
                     status: 200,
@@ -53,7 +53,7 @@ describe('Fastify — handler context', () => {
 
 testAdapterFeatures({
     name: 'fastify',
-    initServerApi: (contract, options) => KizunaServer.init(contract).server.api(options),
+    initServerApi: (contract, options) => new KizunaServer(contract).api(options),
     mount: async (api, { responseValidation }) => {
         const app = Fastify();
         await api.mount(app, {

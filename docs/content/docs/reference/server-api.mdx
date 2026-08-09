@@ -32,7 +32,7 @@ See the [Mounting guide](/docs/building/mounting) for full setup with each adapt
 
 ## plugins
 
-A [plugin](/docs/extend/create-plugin) is installed on [`Kizuna.init`](/docs/reference/kizuna-init). If it needs anything live, such as a store or a transport, pass it here under the same key:
+A [plugin](/docs/extend/create-plugin) is installed on [`new Kizuna()`](/docs/reference/kizuna). If it needs anything live, such as a store or a transport, pass it here under the same key:
 
 ```ts title="src/lib/api.ts"
 export const api = server.api({

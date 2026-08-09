@@ -59,7 +59,7 @@ const toHeaders = (headers: HandlerArgs['headers']): Headers => {
  *
  * @example
  * ```ts
- * export const { k } = Kizuna.init({
+ * export const k = new Kizuna({
  *     tags,
  *     identities,
  *     plugins: {

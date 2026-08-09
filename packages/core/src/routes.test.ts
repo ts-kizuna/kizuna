@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ROUTES_TAG, type Routes } from './types.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         users: {
             title: 'Users',

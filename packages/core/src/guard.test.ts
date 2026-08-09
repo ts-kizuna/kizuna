@@ -10,7 +10,7 @@ import {
     type GuardMap,
 } from './adapter.js';
 import type { RouteDefinition } from './types.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
 const user = Kizuna.identity.bearer({
     context: z.object({
@@ -29,7 +29,7 @@ const member = Kizuna.identity.apiKey({
     }),
 });
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     identities: {
         user,
         member,
@@ -531,7 +531,7 @@ describe('guard params and array gates', () => {
         }),
     });
 
-    const { k: permK } = Kizuna.init({
+    const permK = new Kizuna({
         identities: {
             member: workspaceMember,
         },
@@ -615,7 +615,7 @@ describe('custom identity guard', () => {
         }),
     });
 
-    const { k: inviteK } = Kizuna.init({
+    const inviteK = new Kizuna({
         identities: {
             inviteToken,
         },

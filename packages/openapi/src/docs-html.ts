@@ -98,7 +98,7 @@ const swaggerPage = (title: string, cdnUrl: string, configuration: Record<string
 
 /**
  * Render a self-contained page that loads an API reference UI over your OpenAPI
- * document. `openApiDocsPlugin` calls this, so reach for it directly only when
+ * document. `openApiPlugin` calls this, so reach for it directly only when
  * kizuna has no adapter for your framework.
  *
  * @example

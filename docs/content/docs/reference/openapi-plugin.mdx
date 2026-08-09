@@ -1,29 +1,29 @@
 ---
-title: openApiDocsPlugin
+title: openApiPlugin
 description: Serve your OpenAPI document and an API reference UI for it, on any adapter.
 ---
 
-Serve a reference UI for the OpenAPI document generated from your contract, and the document itself if you want it public. Install it on [`Kizuna.init`](/docs/reference/kizuna-init) and `api.mount` serves the routes.
+Serve a reference UI for the OpenAPI document generated from your contract, and the document itself if you want it public. Install it on [`new Kizuna()`](/docs/reference/kizuna) and `api.mount` serves the routes.
 
 <InstallTabs packageName="@ts-kizuna/openapi" />
 
 ```ts
-import { openApiDocsPlugin } from '@ts-kizuna/openapi';
+import { openApiPlugin } from '@ts-kizuna/openapi';
 ```
 
 ## Parameters
 
 ```ts
-openApiDocsPlugin(props: OpenApiDocsPluginProps): KizunaPlugin
+openApiPlugin(props: OpenApiPluginProps): KizunaPlugin
 ```
 
-| Parameter | Type                     | Required | Description                                                                                    |
-| --------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------------- |
-| `props`   | `OpenApiDocsPluginProps` | Yes      | Everything [`generateOpenApi`](/docs/reference/generate-openapi) takes, plus the options below |
+| Parameter | Type                 | Required | Description                                                                                    |
+| --------- | -------------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `props`   | `OpenApiPluginProps` | Yes      | Everything [`generateOpenApi`](/docs/reference/generate-openapi) takes, plus the options below |
 
 ## Props
 
-`OpenApiDocsPluginProps` extends `GenerateOpenApiOptions`, so `info`, `servers`, `setOperationId` and the rest work exactly as they do on `generateOpenApi`. On top of those:
+`OpenApiPluginProps` extends `GenerateOpenApiOptions`, so `info`, `servers`, `setOperationId` and the rest work exactly as they do on `generateOpenApi`. On top of those:
 
 | Option          | Default            | Description                                                  |
 | --------------- | ------------------ | ------------------------------------------------------------ |
@@ -45,12 +45,12 @@ The three path props read their own defaults: `docsPath` takes `false` because t
 
 ```ts title="src/lib/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
-import { openApiDocsPlugin } from '@ts-kizuna/openapi';
+import { openApiPlugin } from '@ts-kizuna/openapi';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     tags,
     plugins: {
-        openApiDocs: openApiDocsPlugin({
+        openApiDocs: openApiPlugin({
             info: {
                 title: 'My API',
                 version: '1.0.0',

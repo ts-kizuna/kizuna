@@ -44,10 +44,10 @@ ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and keeps the public API
 [tRPC](https://trpc.io) is a great choice for a pure TypeScript stack, and you don't give up the RPC-like client by choosing ts-kizuna. You still call your endpoints like functions and get fully typed results back:
 
 ```ts title="src/api-client.ts"
-import { createClient } from '@ts-kizuna/fetch';
+import { KizunaClient } from '@ts-kizuna/fetch';
 import { contract } from '@shared/contract';
 
-const client = createClient(contract, {
+const client = new KizunaClient(contract, {
     baseUrl: 'https://api.example.com',
 });
 

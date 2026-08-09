@@ -8,7 +8,7 @@ import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateKotlinClient } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
-const { k } = Kizuna.init();
+const k = new Kizuna();
 
 const baseConfig = {
     namespaceName: 'TestAPI',
@@ -1472,7 +1472,7 @@ describe('Kotlin generator — request context', () => {
         }),
     });
 
-    const { k: ctxK } = Kizuna.init({
+    const ctxK = new Kizuna({
         requestContext: {
             analytics,
         },

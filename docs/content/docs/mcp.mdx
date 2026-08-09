@@ -15,7 +15,7 @@ MCP is a [plugin](/docs/extend/create-plugin). You install it where the rest of 
 import { Kizuna } from '@ts-kizuna/core';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     tags,
     identities,
     plugins: {

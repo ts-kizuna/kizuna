@@ -3,17 +3,17 @@ title: Fetch
 description: A fully typed HTTP client for consuming ts-kizuna routes in the browser or on the server.
 ---
 
-`@ts-kizuna/fetch` provides `createClient` — a typed wrapper around the native `fetch` API.
+`@ts-kizuna/fetch` provides `new KizunaClient()` — a typed wrapper around the native `fetch` API.
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
-## `createClient`
+## `new KizunaClient()`
 
 ```ts title="src/lib/api-client.ts"
-import { createClient } from '@ts-kizuna/fetch';
+import { KizunaClient } from '@ts-kizuna/fetch';
 import { contract } from '@shared/contract';
 
-export const apiClient = createClient(contract, {
+export const apiClient = new KizunaClient(contract, {
     baseUrl: 'http://localhost:3000',
 });
 ```
@@ -112,7 +112,7 @@ Routes without a `headers` schema accept an optional `headers?: Record<string, s
 When the contract secures routes with [identities](/docs/auth), send the credential in `baseHeaders` — the server's guards read it and return the typed `401`/`403` when it's missing or insufficient:
 
 ```ts
-const apiClient = createClient(contract, {
+const apiClient = new KizunaClient(contract, {
     baseUrl: 'https://api.example.com',
     baseHeaders: {
         Authorization: `Bearer ${token}`,
@@ -195,5 +195,5 @@ If a route does not declare a `400`, you don't need this — `result.status === 
 
 ## Reference
 
-- [`createClient`](/docs/reference/create-client)
+- [`new KizunaClient()`](/docs/reference/kizuna-client)
 - [`isValidationError`](/docs/reference/is-validation-error)

@@ -14,15 +14,16 @@ import { generateOpenApi } from '@ts-kizuna/openapi';
 ## Parameters
 
 ```ts
-generateOpenApi(contract: Contract, options?: GenerateOpenApiOptions): OpenApiRenderer
+generateOpenApi(contract: Contract): OpenApiRenderer
 ```
 
-| Parameter  | Type                     | Description                                                                                                                                      |
-| ---------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `contract` | `Contract`               | The contract from [`k.contract`](/docs/reference/kizuna-init)                                                                                    |
-| `options`  | `GenerateOpenApiOptions` | OpenAPI generation options. Omit them and the options an installed [`openApiDocsPlugin`](/docs/reference/openapi-docs-plugin) was given are used |
+| Parameter  | Type       | Description                                                  |
+| ---------- | ---------- | ------------------------------------------------------------ |
+| `contract` | `Contract` | The contract from [`k.contract`](/docs/reference/k-contract) |
 
 ## Options
+
+Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin) in `k.ts`, and `generateOpenApi` reads them off the contract. There is nowhere else to put them, so a build step cannot write a document that differs from the one your server serves.
 
 | Option            | Type                                  | Default   | Description                                                                             |
 | ----------------- | ------------------------------------- | --------- | --------------------------------------------------------------------------------------- |
@@ -46,25 +47,35 @@ renderer('yaml'); // YAML string
 
 ## Example
 
+```ts title="src/lib/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { openApiPlugin } from '@ts-kizuna/openapi';
+
+export const k = new Kizuna({
+    plugins: {
+        openApiDocs: openApiPlugin({
+            info: {
+                title: 'My API',
+                version: '1.0.0',
+            },
+            servers: [
+                {
+                    url: 'https://api.example.com',
+                    description: 'Production',
+                },
+            ],
+            setOperationId: true,
+        }),
+    },
+});
+```
+
 ```ts
 import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from './contract';
 
-const spec = generateOpenApi(contract, {
-    info: {
-        title: 'My API',
-        version: '1.0.0',
-    },
-    servers: [
-        {
-            url: 'https://api.example.com',
-            description: 'Production',
-        },
-    ],
-    setOperationId: true,
-});
+const spec = generateOpenApi(contract);
 
-// Serve as a JSON endpoint
 app.get('/openapi.json', (_req, res) => {
     res.json(spec('json'));
 });
@@ -72,7 +83,7 @@ app.get('/openapi.json', (_req, res) => {
 
 ## Security emission
 
-Security is generated from the contract, not configured on the generator. Every [identity](/docs/reference/kizuna-identity) registered on [`Kizuna.init`](/docs/reference/kizuna-init) is emitted under `components.securitySchemes`, and every route the [`auth` map](/docs/reference/k-contract#the-auth-map) secures references those names in its `security` — with OAuth scopes where the map declares them. Public routes (`false`) get none.
+Security is generated from the contract, not configured on the generator. Every [identity](/docs/reference/kizuna-identity) registered on [`new Kizuna()`](/docs/reference/kizuna) is emitted under `components.securitySchemes`, and every route the [`auth` map](/docs/reference/k-contract#the-auth-map) secures references those names in its `security` — with OAuth scopes where the map declares them. Public routes (`false`) get none.
 
 With the `user` (bearer) and `member` (API key) identities and `workspace: 'member'` in the auth map, the document contains:
 

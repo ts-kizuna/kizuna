@@ -13,7 +13,7 @@ description: Mount a ts-kizuna API on a Hono application.
 
 The standard setup:
 
-- `KizunaServer.init` binds the contract to a `server` handle
+- `new KizunaServer()` binds the contract to a `server` handle
 - `server.router` binds typed implementations to the contract
 - `server.api` combines the router and guards into an API object
 - `api.mount(app)` mounts the API on a Hono app
@@ -22,7 +22,7 @@ The standard setup:
 import { KizunaServer } from '@ts-kizuna/hono';
 import { contract } from '@shared/contract';
 
-export const { server } = KizunaServer.init(contract);
+export const server = new KizunaServer(contract);
 ```
 
 ```ts title="src/lib/router.ts"
@@ -191,7 +191,7 @@ const router: Router<typeof contract> = { ... };
 
 ## Reference
 
-- [`KizunaServer.init`](/docs/reference/kizuna-server-init)
+- [`new KizunaServer()`](/docs/reference/kizuna-server)
 - [`server.router`](/docs/reference/server-router)
 - [`server.api`](/docs/reference/server-api)
 - [`server.guard`](/docs/reference/server-guard)

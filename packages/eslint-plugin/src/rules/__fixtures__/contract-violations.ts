@@ -1,7 +1,7 @@
 import { Kizuna } from '@ts-kizuna/core';
 import { CoercedQuery, DeprecatedLinkSchema, DuplicateDeprecatedSchema, NestedCoerced } from './shared-schemas.js';
 
-const { k } = Kizuna.init();
+const k = new Kizuna();
 
 export const routes = k.routes({
     a: {

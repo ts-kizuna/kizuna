@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ProblemDetailsSchema } from './schemas.js';
 import { createAdapter, renderJsonResult, ResponseValidationError, type AdapterRequest, type AdapterResult } from './adapter.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),

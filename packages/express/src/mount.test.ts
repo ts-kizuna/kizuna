@@ -6,7 +6,7 @@ import { userContract, createUserRouter } from '../../core/src/adapter-testing/f
 
 describe('api.mount', () => {
     it('serves routes', async () => {
-        const { server } = KizunaServer.init(userContract);
+        const server = new KizunaServer(userContract);
         const api = server.api({ router: createUserRouter() as never });
         const app = express();
         app.use(express.json());

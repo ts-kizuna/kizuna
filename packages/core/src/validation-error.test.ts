@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isValidationError } from './validation-error.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
 describe('isValidationError', () => {
     it('returns true for a valid validation error body', () => {

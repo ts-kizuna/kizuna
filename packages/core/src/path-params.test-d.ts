@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import type { ExtractPathParams, HasPathParams, PathParamName } from './path-params.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
 test('PathParamName matches what parsePath finds at runtime', () => {
     expectTypeOf<PathParamName<'/users/:id'>>().toEqualTypeOf<'id'>();

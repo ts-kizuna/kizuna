@@ -2,9 +2,9 @@ import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { ProblemDetailsSchema } from './error-response.js';
 import type { RouteHandler, HandlerArgs, HandlerReturn, Router } from './handler-pipeline.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),

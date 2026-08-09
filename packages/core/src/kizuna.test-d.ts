@@ -9,7 +9,7 @@ import type {
     BrandedHandlerContext,
 } from './handler-pipeline.js';
 import type { RouteDefinition } from './types.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 import { type CredentialOf } from './identity.js';
 
 const user = Kizuna.identity.bearer({
@@ -29,7 +29,7 @@ const member = Kizuna.identity.apiKey({
     }),
 });
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     identities: {
         user,
         member,
@@ -108,7 +108,7 @@ test('a route entry inherits the * default identities', () => {
 });
 
 test('an auth-less contract degrades to plain handlers', () => {
-    const { k: plainK } = Kizuna.init();
+    const plainK = new Kizuna();
     const items = plainK.routes({
         listItems: {
             method: 'GET',
@@ -377,7 +377,7 @@ const inviteToken = Kizuna.identity.custom({
     }),
 });
 
-const { k: inviteK } = Kizuna.init({
+const inviteK = new Kizuna({
     identities: {
         inviteToken,
     },

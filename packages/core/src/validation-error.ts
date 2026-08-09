@@ -23,7 +23,7 @@ export const BUILTIN_VALIDATION_ISSUE_CODES = [
 
 /**
  * One of Zod's built-in issue codes, with no escape hatch for arbitrary strings.
- * `k.issue` accepts this union plus the codes declared on `Kizuna.init`.
+ * `k.issue` accepts this union plus the codes declared on `new Kizuna()`.
  */
 export type BuiltinIssueCode = (typeof BUILTIN_VALIDATION_ISSUE_CODES)[number];
 

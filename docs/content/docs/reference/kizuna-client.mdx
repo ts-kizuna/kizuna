@@ -1,6 +1,6 @@
 ---
-title: createClient
-description: Create a fully typed HTTP client from a ts-kizuna contract using the native fetch API.
+title: new KizunaClient()
+description: Build a fully typed HTTP client from a ts-kizuna contract using the native fetch API.
 ---
 
 Create a fully typed HTTP client from a contract. The returned client mirrors the route structure — each route becomes a function that accepts typed arguments and returns a typed response.
@@ -8,19 +8,19 @@ Create a fully typed HTTP client from a contract. The returned client mirrors th
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
 ```ts
-import { createClient } from '@ts-kizuna/fetch';
+import { KizunaClient } from '@ts-kizuna/fetch';
 ```
 
 ## Parameters
 
 ```ts
-createClient(contract: Contract, config: ClientConfig): Client
+new KizunaClient(contract: Contract, config: ClientConfig): Client
 ```
 
-| Parameter  | Type           | Description                                                   |
-| ---------- | -------------- | ------------------------------------------------------------- |
-| `contract` | `Contract`     | The contract from [`k.contract`](/docs/reference/kizuna-init) |
-| `config`   | `ClientConfig` | Client configuration                                          |
+| Parameter  | Type           | Description                                                  |
+| ---------- | -------------- | ------------------------------------------------------------ |
+| `contract` | `Contract`     | The contract from [`k.contract`](/docs/reference/k-contract) |
+| `config`   | `ClientConfig` | Client configuration                                         |
 
 ## `ClientConfig`
 
@@ -35,7 +35,7 @@ createClient(contract: Contract, config: ClientConfig): Client
 
 ## Returns
 
-`createClient` returns the `Client`, mirroring the contract's route groups. Each route becomes a function accepting `{ params?, query?, body?, headers?, fetchOptions? }` and returning a `Promise` resolving to `{ status, body, headers }`.
+`new KizunaClient()` returns the `Client`, mirroring the contract's route groups. Each route becomes a function accepting `{ params?, query?, body?, headers?, fetchOptions? }` and returning a `Promise` resolving to `{ status, body, headers }`.
 
 `params` is typed from the route's `pathParams` schema output when one is declared (matching the server-side handler), otherwise from the `:param` placeholders in the path.
 
@@ -46,10 +46,10 @@ The response is a discriminated union over the route's declared status codes. Na
 When the contract secures routes with [identities](/docs/auth), send the credential in `baseHeaders`:
 
 ```ts
-import { createClient } from '@ts-kizuna/fetch';
+import { KizunaClient } from '@ts-kizuna/fetch';
 import { contract } from './contract';
 
-const apiClient = createClient(contract, {
+const apiClient = new KizunaClient(contract, {
     baseUrl: 'http://localhost:3000',
     baseHeaders: {
         Authorization: `Bearer ${token}`,

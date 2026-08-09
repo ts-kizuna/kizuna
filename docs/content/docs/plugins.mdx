@@ -7,13 +7,13 @@ A plugin adds endpoints, helpers your handlers can call, or both. It gets your c
 
 ## Installing one
 
-Plugins go on `Kizuna.init`, beside the rest of your API's vocabulary:
+Plugins go on `new Kizuna()`, beside the rest of your API's vocabulary:
 
 ```ts title="src/lib/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     tags,
     identities,
     plugins: {
@@ -45,7 +45,7 @@ export const api = server.api({
 
 A plugin that needs nothing live never appears there. `mcpPlugin` is one, which is why installing it is the whole setup.
 
-The split is not arbitrary: `Kizuna.init` reaches your client through the contract, so only pure data can go there. A database handle passed at install would end up in your browser bundle.
+The split is not arbitrary: `new Kizuna()` reaches your client through the contract, so only pure data can go there. A database handle passed at install would end up in your browser bundle.
 
 ## Using what a plugin offers
 

@@ -7,37 +7,18 @@ description: Generate an OpenAPI 3.1.0 document from your contract, and serve it
 
 <InstallTabs packageName="@ts-kizuna/openapi" />
 
-## `generateOpenApi`
+## `openApiPlugin`
 
-`generateOpenApi` returns a renderer — call it with `'json'` for the document object or `'yaml'` for a YAML string.
-
-```ts
-import { generateOpenApi } from '@ts-kizuna/openapi';
-import { contract } from '@shared/contract';
-
-const spec = generateOpenApi(contract, {
-    info: {
-        title: 'My API',
-        version: '1.0.0',
-    },
-});
-
-spec('json'); // OpenApiDocument object
-spec('yaml'); // YAML string
-```
-
-## Serving it
-
-`openApiDocsPlugin` serves the document and an API reference UI for it. Install it and there is nothing else to wire: it generates the document from your contract, and `api.mount` serves its routes on any adapter.
+`openApiPlugin` serves the document and an API reference UI for it. Install it and there is nothing else to wire: it generates the document from your contract, and `api.mount` serves its routes on any adapter.
 
 ```ts title="src/lib/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
-import { openApiDocsPlugin } from '@ts-kizuna/openapi';
+import { openApiPlugin } from '@ts-kizuna/openapi';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     tags,
     plugins: {
-        openApiDocs: openApiDocsPlugin({
+        openApiDocs: openApiPlugin({
             info: {
                 title: 'My API',
                 version: '1.0.0',
@@ -59,17 +40,21 @@ Every path is configurable, and `false` turns any of them off: `path: false` ser
 
 The routes are public. Gate them with your framework's own middleware if that is not what you want.
 
-### The options are declared once
-
-With the plugin installed, `generateOpenApi(contract)` reads its options off the contract. A build step that writes the document to disk cannot drift from the one your server serves:
+### Writing it to disk
 
 ```ts title="scripts/generate-openapi.ts"
+import { writeFileSync } from 'fs';
+import { generateOpenApi } from '@ts-kizuna/openapi';
+import { contract } from '../src/contract';
+
 const spec = generateOpenApi(contract);
 
 writeFileSync('openapi.yaml', spec('yaml'));
 ```
 
-Pass options explicitly and they win, which is what you want without the plugin installed.
+```sh
+tsx scripts/generate-openapi.ts
+```
 
 ### Serving it yourself
 
@@ -90,7 +75,7 @@ Mixing is the useful case: `docsPath: false` lets the plugin serve the document 
 ### Swagger instead of Scalar
 
 ```ts
-openApiDocsPlugin({
+openApiPlugin({
     info,
     provider: 'swagger',
 });
@@ -98,14 +83,30 @@ openApiDocsPlugin({
 
 Point `cdnUrl` at a self-hosted copy for air-gapped deployments or a strict CSP.
 
+## `generateOpenApi`
+
+`generateOpenApi` returns a renderer. Call it with `'json'` for the document object or `'yaml'` for a YAML string. Everything it needs, `info` included, comes off the contract: you declare it once on [`openApiPlugin`](#openapiplugin) in `k.ts`, and nothing here can disagree with it.
+
+```ts
+import { generateOpenApi } from '@ts-kizuna/openapi';
+import { contract } from '@shared/contract';
+
+const spec = generateOpenApi(contract);
+
+spec('json'); // OpenApiDocument object
+spec('yaml'); // YAML string
+```
+
 ## Deprecation
 
 Routes and fields marked `/** @deprecated */` get `deprecated: true` in the generated spec — no extra options here. `generateOpenApi(contract)` reads them straight off the contract, once you've added the one-time build step. See [Deprecations](/docs/deprecations) for setup.
 
 ## Options
 
-```ts
-generateOpenApi(contract, {
+They go on `openApiPlugin` in `k.ts`, and `generateOpenApi` reads them from there.
+
+```ts title="src/lib/k.ts"
+openApiPlugin({
     info: {
         title: 'My API',
         version: '1.0.0',
@@ -135,7 +136,7 @@ generateOpenApi(contract, {
 
 ## Security
 
-Security comes from the contract, not from generator options. The [identities](/docs/auth) you register on `Kizuna.init` are emitted as `components.securitySchemes`, and the contract's auth map becomes each operation's `security` — with oauth2 scopes included. There is nothing to declare here, and the spec can never disagree with what the server actually enforces.
+Security comes from the contract, not from generator options. The [identities](/docs/auth) you register on `new Kizuna()` are emitted as `components.securitySchemes`, and the contract's auth map becomes each operation's `security` — with oauth2 scopes included. There is nothing to declare here, and the spec can never disagree with what the server actually enforces.
 
 ```ts
 export const user = Kizuna.identity.bearer({
@@ -161,27 +162,6 @@ paths:
 
 Routes marked `false` in the auth map get no `security` entry — they document as public, because they are. A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity also emits no `security` (OpenAPI can't describe its credential), but its routes carry an `x-kizuna-guarded` extension, so protected-out-of-band stays distinct from public.
 
-## Writing the spec to disk
-
-```ts title="scripts/generate-openapi.ts"
-import { writeFileSync } from 'fs';
-import { generateOpenApi } from '@ts-kizuna/openapi';
-import { contract } from '../src/contract';
-
-const spec = generateOpenApi(contract, {
-    info: {
-        title: 'My API',
-        version: '1.0.0',
-    },
-});
-
-writeFileSync('openapi.yaml', spec('yaml'));
-```
-
-```sh
-tsx scripts/generate-openapi.ts
-```
-
 ## Validation errors
 
 Routes with a `body` or `query` schema automatically include a `400` validation error response in the generated spec. This matches the error kizuna returns when request data fails schema validation.
@@ -191,7 +171,7 @@ If a route already declares a `400` response, the automatic validation error is 
 ## Reference
 
 - [`generateOpenApi`](/docs/reference/generate-openapi)
-- [`openApiDocsPlugin`](/docs/reference/openapi-docs-plugin)
+- [`openApiPlugin`](/docs/reference/openapi-plugin)
 
 ## Breaking changes
 

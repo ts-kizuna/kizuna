@@ -16,9 +16,9 @@ import {
 } from '../../core/src/adapter-testing/type-testing.js';
 import { KizunaServer, type ExpressHandlerContext, type RouteHandler, type Router } from './server.js';
 
-const { server: securedServer } = KizunaServer.init(securedContract);
-const { server: gateServer } = KizunaServer.init(gateContract);
-const { server: requestContextServer } = KizunaServer.init(requestContextContract);
+const securedServer = new KizunaServer(securedContract);
+const gateServer = new KizunaServer(gateContract);
+const requestContextServer = new KizunaServer(requestContextContract);
 
 test('conforms to the shared adapter type catalogue', () => {
     checkAdapterTypeFeatures('express', {
@@ -44,7 +44,7 @@ test('conforms to the shared adapter type catalogue', () => {
             ).toEqualTypeOf<RequestContextRun<ExpressHandlerContext>>();
         },
         'router.groupByName': () => {
-            const { server } = KizunaServer.init(inferenceGroupContract);
+            const server = new KizunaServer(inferenceGroupContract);
 
             const users = server.router('users', {
                 getUser: async () => ({
@@ -71,7 +71,7 @@ test('conforms to the shared adapter type catalogue', () => {
             });
         },
         'router.bareRouteGroup': () => {
-            const { server } = KizunaServer.init(inferenceGroupContract);
+            const server = new KizunaServer(inferenceGroupContract);
 
             server.router(inferenceRoutes, {
                 getUser: () => ({
@@ -92,7 +92,7 @@ test('conforms to the shared adapter type catalogue', () => {
             });
         },
         'router.undeclaredStatus': () => {
-            const { server } = KizunaServer.init(inferenceGroupContract);
+            const server = new KizunaServer(inferenceGroupContract);
 
             server.router('users', {
                 getUser: () => ({
@@ -192,7 +192,7 @@ test('conforms to the shared adapter type catalogue', () => {
         'guards.completeMap': () => {
             const requireUser = securedServer.guard('user', ({ deny }) => deny(401, 'Unauthorized'));
 
-            KizunaServer.init(securedContract).server.api({
+            new KizunaServer(securedContract).api({
                 router: {
                     api: {
                         publicRoute: () => ({
@@ -228,7 +228,7 @@ test('conforms to the shared adapter type catalogue', () => {
                 },
             });
             // @ts-expect-error guards is required when the contract declares identities
-            KizunaServer.init(securedContract).server.api({
+            new KizunaServer(securedContract).api({
                 router: {
                     api: {
                         publicRoute: () => ({
@@ -280,7 +280,7 @@ test('conforms to the shared adapter type catalogue', () => {
         },
         'requestContext.requiredOnApi': () => {
             // @ts-expect-error context resolvers are required when the contract declares context
-            KizunaServer.init(requestContextContract).server.api({
+            new KizunaServer(requestContextContract).api({
                 router: {
                     api: {
                         publicRoute: () => ({
@@ -304,7 +304,7 @@ test('conforms to the shared adapter type catalogue', () => {
                 };
             };
 
-            KizunaServer.init(securedContract).server.router('api', {
+            new KizunaServer(securedContract).router('api', {
                 publicRoute: () => ({
                     status: 200,
                     body: {
@@ -346,7 +346,7 @@ test('conforms to the shared adapter type catalogue', () => {
                 };
             };
 
-            KizunaServer.init(requestContextContract).server.router('api', {
+            new KizunaServer(requestContextContract).router('api', {
                 publicRoute,
             });
         },

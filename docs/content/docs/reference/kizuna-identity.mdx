@@ -119,14 +119,14 @@ Reach for `custom` only when the credential is truly inexpressible. A token belo
 
 ## Registering identities
 
-Pass identities to [`Kizuna.init`](/docs/reference/kizuna-init) under `identities`. Their keys become the names everything else uses — auth map values, guard registrations, and handler context keys:
+Pass identities to [`new Kizuna()`](/docs/reference/kizuna) under `identities`. Their keys become the names everything else uses — auth map values, guard registrations, and handler context keys:
 
 ```ts title="src/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 import { user, member } from './identities';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     identities: {
         user,
         member,

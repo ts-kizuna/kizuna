@@ -5,7 +5,7 @@ import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { KizunaServer, NextRequest, NextResponse } from './server.js';
 import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
@@ -51,7 +51,7 @@ interface User {
 }
 const users = new Map<string, User>();
 
-const api = KizunaServer.init(contract).server.api({
+const api = new KizunaServer(contract).api({
     router: {
         getUser: ({ params }) => {
             const user = users.get(params.id);
@@ -133,7 +133,7 @@ describe('Next.js handler', () => {
         const throwingContract = k.contract({
             routes: throwingRoutes,
         });
-        const throwingApi = KizunaServer.init(throwingContract).server.api({
+        const throwingApi = new KizunaServer(throwingContract).api({
             router: {
                 boom: () => {
                     throw new Error('handler exploded');
@@ -194,7 +194,7 @@ describe('Next.js handler — alternate content types', () => {
     const uploadContract = k.contract({
         routes: uploadRoutes,
     });
-    const uploadApi = KizunaServer.init(uploadContract).server.api({
+    const uploadApi = new KizunaServer(uploadContract).api({
         router: {
             uploadAvatar: async ({ body }) => {
                 const contents = await body.file.text();
@@ -280,7 +280,7 @@ describe('Next.js handler — requestMiddleware', () => {
     it('runs requestMiddleware before the handler with the matched route', async () => {
         const routesSeen: Array<{ path: string; method: string }> = [];
 
-        const middlewareApi = KizunaServer.init(middlewareContract).server.api({
+        const middlewareApi = new KizunaServer(middlewareContract).api({
             router: {
                 getResource: ({ params, request }) => ({
                     status: 200,
@@ -318,7 +318,7 @@ describe('Next.js handler — requestMiddleware', () => {
     it('short-circuits when middleware returns a Response', async () => {
         let handlerCalled = false;
 
-        const middlewareApi = KizunaServer.init(middlewareContract).server.api({
+        const middlewareApi = new KizunaServer(middlewareContract).api({
             router: {
                 getResource: ({ params }) => {
                     handlerCalled = true;
@@ -357,7 +357,7 @@ describe('Next.js handler — requestMiddleware', () => {
     it('runs middleware functions in order and stops at the first Response', async () => {
         const order: number[] = [];
 
-        const middlewareApi = KizunaServer.init(middlewareContract).server.api({
+        const middlewareApi = new KizunaServer(middlewareContract).api({
             router: {
                 getResource: ({ params }) => ({
                     status: 200,
@@ -393,7 +393,7 @@ describe('Next.js handler — requestMiddleware', () => {
     it('skips middleware for unmatched routes and returns 404', async () => {
         let middlewareCalled = false;
 
-        const middlewareApi = KizunaServer.init(middlewareContract).server.api({
+        const middlewareApi = new KizunaServer(middlewareContract).api({
             router: {
                 getResource: ({ params }) => ({
                     status: 200,
@@ -422,7 +422,7 @@ describe('Next.js handler — requestMiddleware', () => {
 
 testAdapterFeatures({
     name: 'next',
-    initServerApi: (contract, options) => KizunaServer.init(contract).server.api(options),
+    initServerApi: (contract, options) => new KizunaServer(contract).api(options),
     mount: (api, { responseValidation }) => {
         const handlers = api.mount({
             basePath: '/api',

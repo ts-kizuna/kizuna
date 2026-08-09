@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
 import { isSecurityScheme, type ContextOf } from './security-scheme.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
 const context = z.object({
     userId: z.string(),

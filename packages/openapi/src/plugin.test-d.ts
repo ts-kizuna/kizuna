@@ -1,5 +1,5 @@
 import { test } from 'vitest';
-import { openApiDocsPlugin } from './plugin.js';
+import { openApiPlugin } from './plugin.js';
 
 const info = {
     title: 'T',
@@ -7,39 +7,39 @@ const info = {
 };
 
 test('each path prop offers only the values that do something', () => {
-    openApiDocsPlugin({
+    openApiPlugin({
         info,
         docsPath: false,
         jsonPath: true,
         yamlPath: true,
     });
 
-    openApiDocsPlugin({
+    openApiPlugin({
         info,
         docsPath: '/reference',
         jsonPath: '/spec.json',
         yamlPath: '/spec.yaml',
     });
 
-    openApiDocsPlugin({
+    openApiPlugin({
         info,
         // @ts-expect-error the reference UI is on by default, so `true` says nothing
         docsPath: true,
     });
 
-    openApiDocsPlugin({
+    openApiPlugin({
         info,
         // @ts-expect-error the document is off by default, so `false` says nothing
         jsonPath: false,
     });
 
-    openApiDocsPlugin({
+    openApiPlugin({
         info,
         // @ts-expect-error the same for YAML
         yamlPath: false,
     });
 
-    openApiDocsPlugin({
+    openApiPlugin({
         info,
         // @ts-expect-error a path has to start with a slash
         docsPath: 'reference',

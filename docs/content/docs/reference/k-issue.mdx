@@ -5,7 +5,7 @@ description: Emit a validation issue with a machine-readable code, checked again
 
 Emit a single Zod validation issue carrying a custom machine-readable `code`. The code is surfaced verbatim in the `errors[].code` field of kizuna's [`ValidationErrorSchema`](/docs/reference/is-validation-error).
 
-The code is checked against the `issueCodes` you declared on `Kizuna.init`, so a typo is a compile error rather than a silently accepted string.
+The code is checked against the `issueCodes` you declared on `new Kizuna()`, so a typo is a compile error rather than a silently accepted string.
 
 ## Why it exists
 
@@ -75,14 +75,14 @@ A request whose body fails this refinement returns `400` with the custom code in
 
 By default `errors[].code` is typed as [`ValidationIssueCode`](/docs/reference/is-validation-error) — the built-in Zod codes are suggested in autocomplete and any custom string is accepted, but your `invalid_phone_number` is not _suggested_ (it lives only inside the refinement callback, where TypeScript can't see it).
 
-To make the client suggest your custom codes, declare them on `Kizuna.init`'s `validation.issueCodes` for that API and pass the contract to [`createClient`](/docs/reference/create-client):
+To make the client suggest your custom codes, declare them on `new Kizuna()`'s `validation.issueCodes` for that API and pass the contract to [`new KizunaClient()`](/docs/reference/kizuna-client):
 
 ```ts
 // k.ts
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     tags,
     validation: {
         issueCodes: ['invalid_phone_number'],
@@ -92,10 +92,10 @@ export const { k } = Kizuna.init({
 
 ```ts
 // api-client.ts
-import { createClient } from '@ts-kizuna/fetch';
+import { KizunaClient } from '@ts-kizuna/fetch';
 import { contract } from './contract';
 
-export const apiClient = createClient(contract, {
+export const apiClient = new KizunaClient(contract, {
     baseUrl: 'http://localhost:3000',
 });
 ```
@@ -113,6 +113,6 @@ if (result.status === 400 && isValidationError(result.body)) {
 }
 ```
 
-Each API has its own `Kizuna.init` call, so codes stay scoped per API rather than leaking across them.
+Each API has its own `new Kizuna()` call, so codes stay scoped per API rather than leaking across them.
 
 See [`isValidationError`](/docs/reference/is-validation-error) for how clients consume these codes.

@@ -32,7 +32,7 @@ export interface PluginServer<R extends PluginRoutes, Exports, HandlerContext> {
 /**
  * A plugin declares routes and serves them, and never touches the app.
  *
- * `HandlerContext` comes from `KizunaServer.init` rather than being chosen
+ * `HandlerContext` comes from `new KizunaServer()` rather than being chosen
  * here. Left open, the plugin runs on every adapter; narrowed, it compiles only
  * on the adapters that match.
  */
@@ -77,7 +77,7 @@ export const createPlugin = <const R extends PluginRoutes, Config = void, Export
 ): KizunaPlugin<R, Config, Exports, HandlerContext> => plugin;
 
 /**
- * Plugins keyed by the name they were installed under on `Kizuna.init`. That
+ * Plugins keyed by the name they were installed under on `new Kizuna()`. That
  * key is what `plugins.*` in handler args resolves against.
  */
 export type ContractPlugins = Record<string, KizunaPlugin<PluginRoutes, never, unknown, never>>;

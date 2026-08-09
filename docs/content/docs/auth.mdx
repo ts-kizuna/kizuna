@@ -21,7 +21,7 @@ import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 import { user } from './identities';
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     identities: {
         user,
     },
@@ -234,10 +234,10 @@ A `custom` identity has no scheme to emit, so its routes carry an `x-kizuna-guar
 
 ### Client
 
-The [`createClient`](/docs/reference/create-client) client sends the credential in `baseHeaders`; the server's guards enforce the contract's auth and return the typed `401`/`403`:
+The [`new KizunaClient()`](/docs/reference/kizuna-client) client sends the credential in `baseHeaders`; the server's guards enforce the contract's auth and return the typed `401`/`403`:
 
 ```ts
-const apiClient = createClient(contract, {
+const apiClient = new KizunaClient(contract, {
     baseUrl,
     baseHeaders: {
         Authorization: `Bearer ${token}`,
@@ -252,7 +252,7 @@ const apiClient = createClient(contract, {
 ## Reference
 
 - [`Kizuna.identity`](/docs/reference/kizuna-identity)
-- [`Kizuna.init`](/docs/reference/k-contract#the-auth-map) — the auth map's value forms
+- [`k.contract`](/docs/reference/k-contract#the-auth-map) — the auth map's value forms
 - [`server.guard`](/docs/reference/server-guard)
 - [`server.api`](/docs/reference/server-api)
-- [`createClient`](/docs/reference/create-client)
+- [`new KizunaClient()`](/docs/reference/kizuna-client)

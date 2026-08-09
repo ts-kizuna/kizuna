@@ -16,9 +16,9 @@ ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneer
 
 ## Routes
 
-### `initContract` -> `Kizuna.init` + `k.routes`
+### `initContract` -> `new Kizuna()` + `k.routes`
 
-`initContract` does not exist in ts-kizuna. Bind your surface with `Kizuna.init` once, then define groups with `k.routes`.
+`initContract` does not exist in ts-kizuna. Bind your surface with `new Kizuna()` once, then define groups with `k.routes`.
 
 ```ts
 // ts-rest
@@ -35,7 +35,7 @@ const tags = Kizuna.tags({
     users: 'Users',
 });
 
-export const { k } = Kizuna.init({
+export const k = new Kizuna({
     tags,
 });
 
@@ -128,8 +128,8 @@ const client = initClient(contract, {
 
 ```ts
 // ts-kizuna
-import { createClient } from '@ts-kizuna/fetch';
-const client = createClient(contract, {
+import { KizunaClient } from '@ts-kizuna/fetch';
+const client = new KizunaClient(contract, {
     baseUrl: '...',
 });
 ```
@@ -151,7 +151,7 @@ const router = s.router(contract, { ... });
 // ts-kizuna
 import { KizunaServer } from '@ts-kizuna/express';
 
-const { server } = KizunaServer.init(contract);
+const server = new KizunaServer(contract);
 
 const router = server.router({ ... });
 

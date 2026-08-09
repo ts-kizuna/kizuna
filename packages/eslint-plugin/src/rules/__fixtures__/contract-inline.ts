@@ -1,7 +1,7 @@
 import { Kizuna } from '@ts-kizuna/core';
 import { z } from 'zod';
 
-const { k } = Kizuna.init();
+const k = new Kizuna();
 
 export const routes = k.routes({
     a: {

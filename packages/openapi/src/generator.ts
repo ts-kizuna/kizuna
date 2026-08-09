@@ -634,26 +634,7 @@ const tagsFromContract = (contract: Contract): OpenApiTag[] => {
 };
 
 /**
- * Generate an OpenAPI 3.1.0 document from a routes.
- *
- * Returns a renderer — call it with `'json'` for the document object or `'yaml'` for a YAML string.
- *
- * See {@link GenerateOpenApiOptions} for all options.
- *
- * ```ts
- * import { routes } from './routes';
- *
- * const spec = openapi(routes, {
- *     info: { title: 'My API', version: '1.0.0' },
- *     setOperationId: true,
- * });
- *
- * app.get('/openapi.json', (_req, res) => res.json(spec('json')));
- * app.get('/openapi.yaml', (_req, res) => res.send(spec('yaml')));
- * ```
- */
-/**
- * Where `openApiDocsPlugin` stamps the options it was given.
+ * Where `openApiPlugin` stamps the options it was given.
  */
 export const OPENAPI_OPTIONS: unique symbol = Symbol.for('ts-kizuna.openapi-options') as symbol as typeof OPENAPI_OPTIONS;
 
@@ -666,13 +647,15 @@ const optionsFromInstalledPlugin = (contract: Contract): GenerateOpenApiOptions 
         if (installed) return installed;
     }
     throw new Error(
-        'generateOpenApi needs options. Pass them, or install `openApiDocsPlugin` on `Kizuna.init` and they will be read from the contract.'
+        "generateOpenApi reads its options from the contract. Install `openApiPlugin` on `new Kizuna()` with the API's `info`."
     );
 };
 
-export function generateOpenApi(contract: Contract, options?: GenerateOpenApiOptions): OpenApiRenderer {
-    const resolved = options ?? optionsFromInstalledPlugin(contract);
-    const renderer = openApiGenerator(contract, { ...resolved, tagLookup: buildTagLookup(contract) });
+/**
+ * Render from options held directly, for `openApiPlugin`.
+ */
+export function renderOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer {
+    const renderer = openApiGenerator(contract, { ...options, tagLookup: buildTagLookup(contract) });
     const tags = tagsFromContract(contract);
     if (tags.length > 0) {
         const originalJson = renderer('json') as OpenApiDocument;
@@ -684,4 +667,13 @@ export function generateOpenApi(contract: Contract, options?: GenerateOpenApiOpt
         }
     }
     return renderer;
+}
+
+/**
+ * Generate an OpenAPI 3.1.0 document from a contract. Returns a renderer: call
+ * it with `'json'` or `'yaml'`. Options come from the `openApiPlugin` installed
+ * on the contract.
+ */
+export function generateOpenApi(contract: Contract): OpenApiRenderer {
+    return renderOpenApi(contract, optionsFromInstalledPlugin(contract));
 }

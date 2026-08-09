@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { readMetaId, readMetaDescription } from './generator.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
 describe('Kizuna.model', () => {
     it('sets the meta id from title', () => {

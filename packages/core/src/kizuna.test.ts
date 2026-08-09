@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { RouteDefinition, Routes } from './types.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
 const user = Kizuna.identity.bearer({
     context: z.object({
@@ -31,7 +31,7 @@ const routeDefinition = (path: `/${string}`) => ({
 });
 
 const makeRoutes = () => {
-    const { k } = Kizuna.init({
+    const k = new Kizuna({
         identities: {
             user,
             member,
@@ -53,7 +53,7 @@ const makeRoutes = () => {
 const routeOf = (routes: Routes, key: string): RouteDefinition => routes[key] as RouteDefinition;
 
 const makeNestedRoutes = () => {
-    const { k } = Kizuna.init({
+    const k = new Kizuna({
         identities: {
             user,
             member,
@@ -238,7 +238,7 @@ describe('k.contract auth resolution', () => {
     });
 
     it('leaves routes untouched when no auth map is passed', () => {
-        const { k } = Kizuna.init();
+        const k = new Kizuna();
         const routes = k.routes({
             listItems: routeDefinition('/items'),
         });

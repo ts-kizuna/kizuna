@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '../error-response.js';
-import { Kizuna } from '../namespace.js';
+import { Kizuna } from '../kizuna.js';
 import { createPlugin, raw } from '../adapter.js';
 import type { Router } from '../handler-pipeline.js';
 import type { GuardDeny } from '../adapter.js';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
@@ -215,7 +215,7 @@ export const memberIdentity = Kizuna.identity.apiKey({
 export const ownerToken = 'wst_owner';
 export const adminToken = 'wst_admin';
 
-const { k: securedK } = Kizuna.init({
+const securedK = new Kizuna({
     identities: {
         user: userIdentity,
         member: memberIdentity,
@@ -642,7 +642,7 @@ const probePlugin = createPlugin({
     }),
 });
 
-const { k: pluginK } = Kizuna.init({
+const pluginK = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),

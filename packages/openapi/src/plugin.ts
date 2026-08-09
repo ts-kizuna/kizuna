@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import type { Contract } from '@ts-kizuna/core';
 import { contractOf, createPlugin, raw } from '@ts-kizuna/core/adapter';
-import { generateOpenApi, OPENAPI_OPTIONS, type GenerateOpenApiOptions } from './generator.js';
+import { renderOpenApi, OPENAPI_OPTIONS, type GenerateOpenApiOptions } from './generator.js';
 import { renderDocsHtml, type DocsProvider } from './docs-html.js';
 
-export interface OpenApiDocsPluginProps extends GenerateOpenApiOptions {
+export interface OpenApiPluginProps extends GenerateOpenApiOptions {
     /**
      * Where the reference UI is served, or `false` to serve none.
      *
@@ -75,10 +75,10 @@ const sent = (body: string, contentType: string): Response =>
  *
  * @example
  * ```ts
- * export const { k } = Kizuna.init({
+ * export const k = new Kizuna({
  *     tags,
  *     plugins: {
- *         openApiDocs: openApiDocsPlugin({
+ *         openApiDocs: openApiPlugin({
  *             info: {
  *                 title: 'My API',
  *                 version: '1.0.0',
@@ -88,7 +88,7 @@ const sent = (body: string, contentType: string): Response =>
  * });
  * ```
  */
-export const openApiDocsPlugin = (props: OpenApiDocsPluginProps) => {
+export const openApiPlugin = (props: OpenApiPluginProps) => {
     const resolve = (value: `/${string}` | boolean | undefined, fallback: `/${string}`, onByDefault: boolean): `/${string}` | undefined => {
         if (value === true) return fallback;
         if (value === false) return undefined;
@@ -140,7 +140,7 @@ export const openApiDocsPlugin = (props: OpenApiDocsPluginProps) => {
                   }),
         },
         server: (_config: void, api: unknown) => {
-            const spec = generateOpenApi(contractOf<Contract>(api), props);
+            const spec = renderOpenApi(contractOf<Contract>(api), props);
 
             return {
                 router: {

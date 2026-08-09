@@ -4,7 +4,7 @@ import { applyCoercion, coercionPlanFor, resolveCoercionPlans } from './coercion
 import { tagRoutes } from './routes.js';
 import { readDef } from './zod-internals.js';
 import type { RouteDefinition } from './types.js';
-import { Kizuna } from './namespace.js';
+import { Kizuna } from './kizuna.js';
 
 describe('coercion plans', () => {
     it('is null when no field can be coerced', () => {

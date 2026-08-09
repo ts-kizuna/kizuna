@@ -72,7 +72,7 @@ export const CreateUserSchema = Kizuna.model({
          * Optional phone number, validated with a custom-coded issue.
          *
          * On failure it emits `invalid_phone_number` via `k.issue`, which checks
-         * the code against the `issueCodes` declared on `Kizuna.init`. The client
+         * the code against the `issueCodes` declared on `new Kizuna()`. The client
          * suggests it in autocomplete when reading `errors[].code` on the `400`
          * response.
          */

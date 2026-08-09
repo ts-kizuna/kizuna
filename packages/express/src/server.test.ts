@@ -5,7 +5,7 @@ import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testin
 
 testAdapterFeatures({
     name: 'express',
-    initServerApi: (contract, options) => KizunaServer.init(contract).server.api(options),
+    initServerApi: (contract, options) => new KizunaServer(contract).api(options),
     mount: (api, { responseValidation }) => {
         const app = express();
         app.use(express.json());

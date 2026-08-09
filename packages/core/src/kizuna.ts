@@ -4,7 +4,10 @@ import { assembleContract, type Contract } from './contract.js';
 import type { ContractPlugins } from './plugin.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
-import { type TagSet, type TagOptions } from './tags.js';
+import { createTags, type TagSet, type TagOptions } from './tags.js';
+import { createIdentity } from './identity.js';
+import { createRequestContext } from './request-context.js';
+import { createModel } from './model.js';
 import type { Routes, RouteDefinition, SecurityRequirement, AccessGate, AuthoredRoutes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
@@ -184,7 +187,7 @@ const applyGroupAuth = (group: Routes, groupAuth: GroupAuth, path: string): void
 };
 
 /**
- * What `Kizuna.init` binds.
+ * What a {@link Kizuna} instance binds.
  */
 export interface KizunaSpec {
     tags: Record<string, TagOptions>;
@@ -210,7 +213,7 @@ export type IdentityNamesOf<Spec extends KizunaSpec> = Extract<keyof Spec['ident
 export type PluginsOf<Spec extends KizunaSpec> = Spec['plugins'];
 
 /**
- * The handle `Kizuna.init` returns.
+ * The authoring surface a {@link Kizuna} instance exposes.
  */
 export interface K<Spec extends KizunaSpec = KizunaSpec> {
     /**
@@ -282,28 +285,33 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
 }
 
 /**
- * Bind one API surface: its tags, identities, request contexts and custom
- * validation issue codes. Destructure `k`, then use `k.routes` to define route
- * groups, `k.auth` to type the auth map, and `k.contract` to assemble them.
- *
- * @example
- * export const { k } = Kizuna.init({
- *     identities: {
- *         user,
- *     },
- *     tags,
- *     validation: {
- *         issueCodes: ['invalid_phone_number'],
- *     },
- * });
+ * The spec a {@link Kizuna} instance's type parameters assemble into.
  */
-export const init = <
-    const Tags extends Record<string, TagOptions> = Record<string, never>,
-    const Codes extends string = never,
-    const Identities extends Record<string, SecurityScheme> = Record<string, never>,
-    const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
-    const Plugins extends ContractPlugins = Record<string, never>,
->(config?: {
+type SpecOf<
+    Tags extends Record<string, TagOptions>,
+    Codes extends string,
+    Identities extends Record<string, SecurityScheme>,
+    RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
+> = {
+    tags: Tags;
+    codes: Codes;
+    identities: Identities;
+    requestContext: RequestContext;
+    plugins: Plugins;
+};
+
+/**
+ * The tags, identities, request contexts, plugins and custom validation issue
+ * codes one API surface is bound to.
+ */
+export interface KizunaConfig<
+    Tags extends Record<string, TagOptions> = Record<string, never>,
+    Codes extends string = never,
+    Identities extends Record<string, SecurityScheme> = Record<string, never>,
+    RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
+    Plugins extends ContractPlugins = Record<string, never>,
+> {
     identities?: Identities;
     requestContext?: RequestContext;
     tags?: TagSet<Tags>;
@@ -315,22 +323,18 @@ export const init = <
      * `plugins`.
      */
     plugins?: Plugins;
-}): {
-    k: K<{
-        tags: Tags;
-        codes: Codes;
-        identities: Identities;
-        requestContext: RequestContext;
-        plugins: Plugins;
-    }>;
-} => {
-    type Spec = {
-        tags: Tags;
-        codes: Codes;
-        identities: Identities;
-        requestContext: RequestContext;
-        plugins: Plugins;
-    };
+}
+
+const createSurface = <
+    Tags extends Record<string, TagOptions>,
+    Codes extends string,
+    Identities extends Record<string, SecurityScheme>,
+    RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
+>(
+    config?: KizunaConfig<Tags, Codes, Identities, RequestContext, Plugins>
+): K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>> => {
+    type Spec = SpecOf<Tags, Codes, Identities, RequestContext, Plugins>;
 
     const tagSet: TagSet<Tags> = config?.tags ?? { __brand: 'TagSet', tags: {} as Tags };
 
@@ -377,5 +381,46 @@ export const init = <
         issue: addCodedIssue,
     };
 
-    return { k };
+    return k;
 };
+
+/**
+ * Bind one API surface: its tags, identities, request contexts and custom
+ * validation issue codes. Keep the instance and use `k.routes` to define route
+ * groups, `k.auth` to type the auth map, and `k.contract` to assemble them.
+ *
+ * The authoring helpers that need no binding stay static: `Kizuna.tags`,
+ * `Kizuna.identity`, `Kizuna.requestContext` and `Kizuna.model`.
+ *
+ * @example
+ * export const k = new Kizuna({
+ *     identities: {
+ *         user,
+ *     },
+ *     tags,
+ *     validation: {
+ *         issueCodes: ['invalid_phone_number'],
+ *     },
+ * });
+ */
+export class Kizuna<
+    const Tags extends Record<string, TagOptions> = Record<string, never>,
+    const Codes extends string = never,
+    const Identities extends Record<string, SecurityScheme> = Record<string, never>,
+    const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
+    const Plugins extends ContractPlugins = Record<string, never>,
+> implements K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>> {
+    static readonly tags = createTags;
+    static readonly identity = createIdentity;
+    static readonly requestContext = createRequestContext;
+    static readonly model = createModel;
+
+    declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['routes'];
+    declare readonly auth: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['auth'];
+    declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['contract'];
+    declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['issue'];
+
+    constructor(config?: KizunaConfig<Tags, Codes, Identities, RequestContext, Plugins>) {
+        Object.assign(this, createSurface<Tags, Codes, Identities, RequestContext, Plugins>(config));
+    }
+}

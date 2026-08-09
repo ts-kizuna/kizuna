@@ -30,7 +30,7 @@ Then create a catch-all route at `src/app/api/[...ts-kizuna]/route.ts`. The adap
 import { KizunaServer } from '@ts-kizuna/next';
 import { contract } from '@shared/contract';
 
-export const { server } = KizunaServer.init(contract);
+export const server = new KizunaServer(contract);
 ```
 
 ```ts title="src/lib/router.ts"
@@ -231,7 +231,7 @@ uploadAvatar: async ({ body }) => {
 
 ## Reference
 
-- [`KizunaServer.init`](/docs/reference/kizuna-server-init)
+- [`new KizunaServer()`](/docs/reference/kizuna-server)
 - [`server.router`](/docs/reference/server-router)
 - [`server.api`](/docs/reference/server-api)
 - [`server.guard`](/docs/reference/server-guard)

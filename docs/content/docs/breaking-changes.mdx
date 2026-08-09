@@ -13,12 +13,7 @@ Create a script that prints your OpenAPI spec as YAML to stdout — this is the 
 import { generateOpenApi } from '@ts-kizuna/openapi';
 import { contract } from '../src/contract';
 
-const spec = generateOpenApi(contract, {
-    info: {
-        title: 'My API',
-        version: '1.0.0',
-    },
-});
+const spec = generateOpenApi(contract);
 
 console.log(spec('yaml'));
 ```

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { createPlugin } from '@ts-kizuna/core/adapter';
 
-const { k } = Kizuna.init({
+const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
@@ -71,7 +71,7 @@ export const memberIdentity = Kizuna.identity.apiKey({
     }),
 });
 
-const { k: securedK } = Kizuna.init({
+const securedK = new Kizuna({
     identities: {
         user: userIdentity,
         member: memberIdentity,
@@ -144,7 +144,7 @@ export const apiConsumerIdentity = Kizuna.identity.apiKey({
     in: 'header',
 });
 
-const { k: gateK } = Kizuna.init({
+const gateK = new Kizuna({
     identities: {
         user: userIdentity,
         apiConsumer: apiConsumerIdentity,
@@ -200,7 +200,7 @@ export const analyticsContext = Kizuna.requestContext(
     })
 );
 
-const { k: requestContextK } = Kizuna.init({
+const requestContextK = new Kizuna({
     identities: {
         user: userIdentity,
     },
@@ -258,7 +258,7 @@ const typedProbePlugin = createPlugin({
     }),
 });
 
-const { k: pluginTypeK } = Kizuna.init({
+const pluginTypeK = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
