@@ -35,7 +35,6 @@ describe.each([
         expect(await messageIdsFor('contract-violations.ts', parserOptions)).toEqual([
             'coerceReference',
             'jsdocTagReference',
-            'duplicateDeprecatedReference',
             'coerceReference',
         ]);
     });
@@ -53,6 +52,6 @@ describe.each([
     });
 
     it('uses the direct variant on Kizuna.model fields', async () => {
-        expect(await messageIdsFor('contract-model.ts', parserOptions)).toEqual(['coerce', 'jsdocTag', 'duplicateDeprecated']);
+        expect(await messageIdsFor('contract-model.ts', parserOptions)).toEqual(['coerce', 'jsdocTag']);
     });
 });

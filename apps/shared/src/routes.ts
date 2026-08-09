@@ -156,33 +156,42 @@ export const EventRecord = Kizuna.model({
 });
 
 export const healthRoutes = k.routes('health', {
+    /**
+     * @summary Health check — exercises nested sub-client routing
+     */
     check: {
         method: 'GET',
         path: '/health',
         responses: {
             200: z.object({ ok: z.boolean() }),
         },
-        summary: 'Health check — exercises nested sub-client routing',
     },
+    /**
+     * @summary Version — exercises second method in a sub-client group
+     */
     version: {
         method: 'GET',
         path: '/health/version',
         responses: {
             200: z.object({ version: z.string() }),
         },
-        summary: 'Version — exercises second method in a sub-client group',
     },
+    /**
+     * @summary Health history — exercises array return type qualification
+     */
     history: {
         method: 'GET',
         path: '/health/history',
         responses: {
             200: z.array(z.object({ ok: z.boolean(), checkedAt: z.iso.datetime() })),
         },
-        summary: 'Health history — exercises array return type qualification',
     },
 });
 
 export const usersRoutes = k.routes('users', {
+    /**
+     * @summary List users with pagination
+     */
     listUsers: {
         method: 'GET',
         path: '/users',
@@ -193,8 +202,10 @@ export const usersRoutes = k.routes('users', {
                 total: z.number(),
             }),
         },
-        summary: 'List users with pagination',
     },
+    /**
+     * @summary Export users as CSV — exercises a non-JSON (text/csv) raw response body
+     */
     exportUsers: {
         method: 'GET',
         path: '/users/export',
@@ -204,8 +215,10 @@ export const usersRoutes = k.routes('users', {
                 contentType: 'text/csv',
             },
         },
-        summary: 'Export users as CSV — exercises a non-JSON (text/csv) raw response body',
     },
+    /**
+     * @summary Download a user badge — exercises a binary (BinarySchema) response body
+     */
     userBadge: {
         method: 'GET',
         path: '/users/:id/badge',
@@ -216,8 +229,10 @@ export const usersRoutes = k.routes('users', {
             },
             404: ProblemDetailsSchema,
         },
-        summary: 'Download a user badge — exercises a binary (BinarySchema) response body',
     },
+    /**
+     * @summary A user's most recent login or logout — inline union variants nest under the User model in native clients
+     */
     lastSessionEvent: {
         method: 'GET',
         path: '/users/:id/last-session-event',
@@ -225,8 +240,10 @@ export const usersRoutes = k.routes('users', {
             200: UserSessionEvent,
             404: ProblemDetailsSchema,
         },
-        summary: "A user's most recent login or logout — inline union variants nest under the User model in native clients",
     },
+    /**
+     * @summary Search users — required coerced limit and cursor
+     */
     searchUsers: {
         method: 'GET',
         path: '/users/search',
@@ -241,8 +258,10 @@ export const usersRoutes = k.routes('users', {
                 nextCursor: z.number().nullable(),
             }),
         },
-        summary: 'Search users — required coerced limit and cursor',
     },
+    /**
+     * @summary Get a user by id
+     */
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -258,8 +277,10 @@ export const usersRoutes = k.routes('users', {
             },
             404: ProblemDetailsSchema,
         },
-        summary: 'Get a user by id',
     },
+    /**
+     * @summary Get a year of user activity, exercising two typed path params (a string id and a coerced int year)
+     */
     userActivity: {
         method: 'GET',
         path: '/users/:id/activity/:year',
@@ -275,7 +296,6 @@ export const usersRoutes = k.routes('users', {
             }),
             404: ProblemDetailsSchema,
         },
-        summary: 'Get a year of user activity, exercising two typed path params (a string id and a coerced int year)',
     },
     /**
      * @summary Create a user
@@ -290,6 +310,7 @@ export const usersRoutes = k.routes('users', {
         },
     },
     /**
+     * @summary Delete a user
      * @deprecated
      */
     deleteUser: {
@@ -301,8 +322,10 @@ export const usersRoutes = k.routes('users', {
             }),
             404: ProblemDetailsSchema,
         },
-        summary: 'Delete a user',
     },
+    /**
+     * @summary Archive a user — first call returns 201, subsequent calls 200
+     */
     archiveUser: {
         method: 'POST',
         path: '/users/:id/archive',
@@ -316,8 +339,10 @@ export const usersRoutes = k.routes('users', {
                 userId: z.string(),
             }),
         },
-        summary: 'Archive a user — first call returns 201, subsequent calls 200',
     },
+    /**
+     * @summary Upload an avatar image
+     */
     uploadAvatar: {
         method: 'POST',
         path: '/avatar',
@@ -332,8 +357,10 @@ export const usersRoutes = k.routes('users', {
                 userId: z.string(),
             }),
         },
-        summary: 'Upload an avatar image',
     },
+    /**
+     * @summary Ping a user — exercises z.void() body and response
+     */
     pingUser: {
         method: 'POST',
         path: '/users/:id/ping',
@@ -341,8 +368,10 @@ export const usersRoutes = k.routes('users', {
         responses: {
             204: z.void(),
         },
-        summary: 'Ping a user — exercises z.void() body and response',
     },
+    /**
+     * @summary List work items — a z.void() arm in a multi-status success union, and enum values invalid as Swift identifiers
+     */
     getMyWork: {
         method: 'GET',
         path: '/work',
@@ -353,9 +382,10 @@ export const usersRoutes = k.routes('users', {
             }),
             204: z.void(),
         },
-        summary:
-            'List work items — exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers',
     },
+    /**
+     * @summary Check user existence — exercises HEAD body stripping
+     */
     checkUser: {
         method: 'HEAD',
         path: '/users/:id/check',
@@ -365,8 +395,10 @@ export const usersRoutes = k.routes('users', {
             }),
             404: ProblemDetailsSchema,
         },
-        summary: 'Check user existence — exercises HEAD body stripping',
     },
+    /**
+     * @summary Describe allowed operations — exercises OPTIONS routing
+     */
     describeUsers: {
         method: 'OPTIONS',
         path: '/users/describe',
@@ -375,11 +407,13 @@ export const usersRoutes = k.routes('users', {
                 allow: z.string(),
             }),
         },
-        summary: 'Describe allowed operations — exercises OPTIONS routing',
     },
 });
 
 const workspaceMembers = k.routes('members', {
+    /**
+     * @summary List workspace members
+     */
     listMembers: {
         method: 'GET',
         path: '/workspace/members',
@@ -388,8 +422,10 @@ const workspaceMembers = k.routes('members', {
                 members: z.array(UserSchema),
             }),
         },
-        summary: 'List workspace members',
     },
+    /**
+     * @summary Invite a member to the workspace
+     */
     inviteMember: {
         method: 'POST',
         path: '/workspace/members',
@@ -400,11 +436,13 @@ const workspaceMembers = k.routes('members', {
             201: UserSchema,
             409: ProblemDetailsSchema,
         },
-        summary: 'Invite a member to the workspace',
     },
 });
 
 const workspaceInfo = k.routes('workspace', {
+    /**
+     * @summary Get workspace info
+     */
     getWorkspace: {
         method: 'GET',
         path: '/workspace',
@@ -414,8 +452,10 @@ const workspaceInfo = k.routes('workspace', {
                 name: z.string(),
             }),
         },
-        summary: 'Get workspace info',
     },
+    /**
+     * @summary Delete the workspace — owner-only via the auth map
+     */
     deleteWorkspace: {
         method: 'DELETE',
         path: '/workspace',
@@ -424,8 +464,10 @@ const workspaceInfo = k.routes('workspace', {
                 ok: z.boolean(),
             }),
         },
-        summary: 'Delete the workspace — owner-only via the auth map',
     },
+    /**
+     * @summary Transfer ownership — owner-only via the auth map
+     */
     transfer: {
         method: 'POST',
         path: '/workspace/transfer',
@@ -437,7 +479,6 @@ const workspaceInfo = k.routes('workspace', {
                 ok: z.boolean(),
             }),
         },
-        summary: 'Transfer ownership — owner-only via the auth map',
     },
 });
 
@@ -447,6 +488,9 @@ export const workspaceRoutes = {
 };
 
 export const notificationsRoutes = k.routes('notifications', {
+    /**
+     * @summary Send a notification (discriminated by channel)
+     */
     sendNotification: {
         method: 'POST',
         path: '/notifications',
@@ -457,8 +501,10 @@ export const notificationsRoutes = k.routes('notifications', {
                 accepted: z.boolean(),
             }),
         },
-        summary: 'Send a notification (discriminated by channel)',
     },
+    /**
+     * @summary List events — exercises Date / enum / array query params
+     */
     listEvents: {
         method: 'GET',
         path: '/events',
@@ -497,8 +543,10 @@ export const notificationsRoutes = k.routes('notifications', {
                 }),
             }),
         },
-        summary: 'List events — exercises Date / enum / array query params',
     },
+    /**
+     * @summary Validate contract — exercises generator bug coverage
+     */
     validateConfig: {
         method: 'POST',
         path: '/contract/validate',
@@ -516,8 +564,10 @@ export const notificationsRoutes = k.routes('notifications', {
             400: ProblemDetailsSchema,
             401: z.void(),
         },
-        summary: 'Validate contract — exercises generator bug coverage',
     },
+    /**
+     * @summary Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen
+     */
     webhook: {
         method: 'POST',
         path: '/webhook',
@@ -527,11 +577,13 @@ export const notificationsRoutes = k.routes('notifications', {
                 received: z.boolean(),
             }),
         },
-        summary: 'Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen',
     },
 });
 
 export const inviteRoutes = k.routes('invites', {
+    /**
+     * @summary Resolve an invite by its capability-URL token, guarded by a custom path-token identity
+     */
     getInvite: {
         method: 'GET',
         path: '/invites/:token',
@@ -542,8 +594,10 @@ export const inviteRoutes = k.routes('invites', {
             }),
             404: ProblemDetailsSchema,
         },
-        summary: 'Resolve an invite by its capability-URL token, guarded by a custom path-token identity',
     },
+    /**
+     * @summary Accept an invite via the capability URL
+     */
     acceptInvite: {
         method: 'POST',
         path: '/invites/:token/accept',
@@ -556,7 +610,6 @@ export const inviteRoutes = k.routes('invites', {
             }),
             404: ProblemDetailsSchema,
         },
-        summary: 'Accept an invite via the capability URL',
     },
 });
 

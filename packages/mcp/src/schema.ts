@@ -27,9 +27,8 @@ const WRAPPER_KEYS: Record<string, 'element' | 'innerType'> = {
 };
 
 /**
- * Rebuilds `schema` with one def property replaced, carrying over the metadata
- * registered on the original — a clone is a new instance, and the registry is
- * keyed by instance.
+ * Rebuilds `schema` with one def property replaced, re-registering the metadata
+ * from the original: the registry is keyed by instance, and a clone is a new one.
  */
 const cloneWith = (schema: z.ZodType, changes: Record<string, unknown>): z.ZodType => {
     const clone = schema.clone({ ...(readDef(schema) as Record<string, unknown>), ...changes } as never) as z.ZodType;
@@ -46,9 +45,8 @@ const describe = (schema: z.ZodType, entry: JsDocEntry | undefined): z.ZodType =
 
 /**
  * Returns `schema` with each documented field carrying its JSDoc as a Zod
- * description, so the JSON Schema an assistant reads says what the field is for.
- * Schemas are cloned, never mutated: the contract's own schemas keep serving
- * requests untouched.
+ * description, so it reaches the JSON Schema an assistant reads. Clones, never
+ * mutates: the contract's own schemas are left untouched.
  */
 export const withFieldJsDoc = (schema: z.ZodType, fieldJsDoc: ReadonlyMap<string, JsDocEntry>, prefix: string): z.ZodType => {
     const wrapperKey = WRAPPER_KEYS[readDefType(schema) ?? ''];

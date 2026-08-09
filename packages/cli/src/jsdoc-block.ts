@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import type { JsDocTag } from '@ts-kizuna/core/authoring-names';
 import type { JsDocEntry } from '@ts-kizuna/core/generator';
 
 /**
@@ -124,17 +125,20 @@ export const parseExampleValue = (body: string): unknown => {
 
 /**
  * Parses a JSDoc block into a {@link JsDocEntry}, reading only the tags kizuna
- * defines. Prose above the tags is the author's note to whoever reads the code;
- * what ships to the spec, the clients, and the MCP tools is what they tagged
- * deliberately. Returns undefined for a block with none of those tags.
+ * defines. Untagged prose is ignored. Returns undefined for a block with none
+ * of those tags.
  */
 export const parseJsDoc = (block: string): JsDocEntry | undefined => {
     const tags = splitTags(stripDelimiters(block));
 
-    const summary = tags.find((tag) => tag.name === 'summary')?.body;
-    const description = tags.find((tag) => tag.name === 'description')?.body;
-    const deprecated = tags.find((tag) => tag.name === 'deprecated')?.body;
-    const examples = tags.filter((tag) => tag.name === 'example').map((tag) => parseExampleValue(tag.body));
+    // Typed against the shared tag list, so a tag read here but not declared there
+    // fails to compile.
+    const bodyOf = (name: JsDocTag): string | undefined => tags.find((tag) => tag.name === name)?.body;
+
+    const summary = bodyOf('summary');
+    const description = bodyOf('description');
+    const deprecated = bodyOf('deprecated');
+    const examples = tags.filter((tag) => tag.name === ('example' satisfies JsDocTag)).map((tag) => parseExampleValue(tag.body));
 
     const entry: JsDocEntry = {};
     if (summary) entry.summary = summary;

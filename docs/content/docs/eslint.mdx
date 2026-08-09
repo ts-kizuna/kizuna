@@ -47,6 +47,83 @@ query: z.object({
 }),
 ```
 
+## `valid-jsdoc-tags`
+
+Contract JSDoc carries exactly four tags: `@description`, `@summary`, `@example`, and `@deprecated` ([see JSDoc](/docs/jsdoc)). Anything else is ignored, so the code reads as documented while the text reaches neither the spec, the MCP tools, nor the generated clients. This rule turns that silence into an error.
+
+### Any other tag
+
+A tag outside the four is flagged, whether it is a typo or a real JSDoc tag:
+
+```ts
+// flagged, and `eslint --fix` renames it
+/**
+ * @descriptionn Create a user.
+ */
+
+// flagged: @param is a real tag, but nothing reads it on a route
+/**
+ * @description Create a user.
+ * @param body the user to create
+ */
+
+// good
+/**
+ * @description Create a user.
+ */
+```
+
+`--fix` renames a typo to the tag it is closest to. Other tags have no rename to apply, so you decide what to do with them.
+
+Prose is left alone. A note above the tags is for whoever reads the code and reaches nothing kizuna generates.
+
+### Repeated tags
+
+kizuna keeps the **first** `@description`, `@summary`, or `@deprecated` and silently drops the rest, so a second one is documentation you think you wrote:
+
+```ts
+// flagged: the second line never reaches a client
+/**
+ * @description Create a user.
+ * @description Emails are unique.
+ */
+
+// good
+/**
+ * @description Create a user. Emails are unique.
+ */
+```
+
+`@example` is the exception: the parser collects every one, so repeat it to document several values.
+
+### Empty tags
+
+A tag with no text after it documents nothing while reading as done. A bare `@deprecated` is fine, since deprecation needs no message:
+
+```ts
+// flagged
+/**
+ * @description
+ */
+```
+
+### Overlong `@summary`
+
+`@summary` becomes the OpenAPI operation summary, which renders in list views and gets truncated. Past 120 characters the rule asks you to move the detail to `@description`. Set your own limit:
+
+```js title="eslint.config.js"
+export default [
+    kizuna.configs.recommended,
+    {
+        rules: {
+            '@ts-kizuna/valid-jsdoc-tags': ['error', { maxSummaryLength: 80 }],
+        },
+    },
+];
+```
+
+The rule reads each file's own comments, so a schema imported from another module is checked where it is written rather than where it is used.
+
 ## `no-unsupported-schema`
 
 Flags `body`, `query`, `pathParams`, `headers`, and response schemas in your routes — plus `Kizuna.model` schemas, inline or imported — that use something ts-kizuna can't support. It follows imports, so the error lands on the offending field when it's local, or on the reference when the schema comes from another file.
@@ -80,23 +157,6 @@ kizuna serializes the text after `@deprecated` verbatim and surfaces it to every
 // good
 /**
  * @deprecated Use `createUser` instead.
- */
-```
-
-### Duplicate `@deprecated`
-
-kizuna serializes only the **first** `@deprecated` message — any later one is silently dropped and never reaches a client. Collapse them into one:
-
-```ts
-// flagged — clients never see the second line
-/**
- * @deprecated Use `createUser` instead.
- * @deprecated Numeric ids are no longer accepted.
- */
-
-// good
-/**
- * @deprecated Use `createUser` instead. Numeric ids are no longer accepted.
  */
 ```
 

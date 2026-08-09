@@ -8,12 +8,8 @@ Document a route or a field with JSDoc tags and every surface picks them up: you
 ```ts title="src/contract.ts"
 export const usersRoutes = k.routes('users', {
     /**
-     * @summary Create a user.
+     * @summary Create a user
      * @description The email must be unique; a duplicate is rejected with 409.
-     * @example
-     * {
-     *     email: 'ada@example.com',
-     * }
      */
     createUser: {
         method: 'POST',
@@ -39,9 +35,9 @@ export const usersRoutes = k.routes('users', {
 });
 ```
 
-Only tagged content is read. Untagged prose above the tags stays what it already is: a note to whoever is reading the code, free to say things your API consumers have no business seeing. What ships is what you tagged.
+Only tagged content is read. Untagged prose stays a note to whoever reads the code and reaches nothing kizuna generates.
 
-Zod's `.meta({ description })` still works and still fills in where no tag exists. The difference is that JSDoc shows up on hover in your editor, so the documentation and the code stay in the same place your team already reads.
+Zod's `.meta({ description })` still works and fills in where no tag exists. What it cannot do is show on hover in your editor, which is where you read your contract.
 
 ## What each tag does
 
@@ -63,6 +59,13 @@ Write an `@example` plainly and it stays a string, so `@example Alice Johnson` n
 Repeat the tag for several examples.
 
 Routes, `pathParams`, `query`, `headers`, `body` fields, response fields, and the response status keys themselves are all documentable.
+
+`@description`, `@summary`, and `@deprecated` are read once per member: a second one is dropped. Only `@example` repeats.
+
+<Callout type="info">
+    A tag outside these four is ignored, so a typo like `@descriptionn` costs you the documentation with nothing to show for it. The [ESLint
+    plugin](/docs/eslint#valid-jsdoc-tags) makes that an error and autofixes it.
+</Callout>
 
 ## Setup
 

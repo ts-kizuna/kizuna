@@ -13,10 +13,10 @@ const JSDOC_INLINE_TAG = /\{@[a-zA-Z][\w-]*/;
 
 /**
  * The ways a kizuna schema can be illegal: `coerce` (uses `z.coerce`), `jsdoc-tag`
- * (a `@deprecated` message with an inline tag), `duplicate-deprecated` (a field with
- * more than one `@deprecated` tag).
+ * (a `@deprecated` message with an inline tag). Tag spelling and repetition are
+ * `valid-jsdoc-tags`' concern, not this walker's.
  */
-export type SchemaIssue = 'coerce' | 'jsdoc-tag' | 'duplicate-deprecated';
+export type SchemaIssue = 'coerce' | 'jsdoc-tag';
 
 /**
  * An issue and the exact node that carries it — the `z.coerce` access or the offending
@@ -48,7 +48,6 @@ export const collectSchemaIssues = (root: ts.Node, resolve: SchemaResolver): Sch
 
     const checkFieldJsDoc = (property: ts.Node, viaReference: boolean): void => {
         const deprecatedTags = ts.getJSDocTags(property).filter((tag) => tag.tagName.text === 'deprecated');
-        if (deprecatedTags.length > 1) add('duplicate-deprecated', property, viaReference);
         for (const tag of deprecatedTags) {
             if (JSDOC_INLINE_TAG.test(ts.getTextOfJSDocComment(tag.comment) ?? '')) add('jsdoc-tag', property, viaReference);
         }

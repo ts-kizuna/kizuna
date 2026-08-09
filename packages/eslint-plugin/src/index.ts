@@ -2,6 +2,7 @@ import type { ESLint, Linter, Rule } from 'eslint';
 import parser from '@typescript-eslint/parser';
 import packageJson from '../package.json';
 import { noUnsupportedSchema } from './rules/no-unsupported-schema.js';
+import { validJsDocTags } from './rules/valid-jsdoc-tags.js';
 
 const plugin: ESLint.Plugin = {
     meta: {
@@ -11,6 +12,7 @@ const plugin: ESLint.Plugin = {
     },
     rules: {
         'no-unsupported-schema': noUnsupportedSchema as unknown as Rule.RuleModule,
+        'valid-jsdoc-tags': validJsDocTags as unknown as Rule.RuleModule,
     },
 };
 
@@ -37,6 +39,7 @@ const recommended: Linter.Config = {
     },
     rules: {
         '@ts-kizuna/no-unsupported-schema': 'error',
+        '@ts-kizuna/valid-jsdoc-tags': 'error',
     },
 };
 
