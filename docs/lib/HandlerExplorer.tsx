@@ -199,6 +199,37 @@ const FEATURES: Feature[] = [
 };`,
     },
     {
+        id: 'plugins',
+        file: 'users.router.ts',
+        token: 'plugins',
+        type: `plugins: {
+    jobs: {
+        queue: (
+            job: 'users.indexUser',
+            input: { userId: string },
+        ) => Promise<void>;
+    };
+}`,
+        note: `Whatever your plugins offer, keyed by name. Type plugins. and autocomplete lists them.`,
+        code: `export const users: Router<typeof contract.routes.users> = {
+    updateUser: async ({ params, body, plugins }) => {
+        const user = await db.user.update({
+            where: {
+                id: params.userId,
+            },
+            data: body,
+        });
+        await plugins.jobs.queue('users.indexUser', {
+            userId: user.id,
+        });
+        return {
+            status: 200,
+            body: user,
+        };
+    },
+};`,
+    },
+    {
         id: 'throwError',
         file: 'users.router.ts',
         token: 'throwError',

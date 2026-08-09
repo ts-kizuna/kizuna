@@ -1,8 +1,8 @@
-import type { z } from 'zod';
 import type { Routes } from './types.js';
 import type { TagSet, TagOptions } from './tags.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
+import type { ContractPlugins } from './plugin.js';
 
 /**
  * A kizuna API definition: its routes plus tags, identities, and validation
@@ -16,11 +16,18 @@ export interface Contract<
     Schemes extends Record<string, SecurityScheme> = Record<string, SecurityScheme>,
     Auth = unknown,
     RequestContext extends Record<string, RequestContextSchema> = Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins = ContractPlugins,
 > {
     /**
      * The API's route groups.
      */
     routes: Routes_;
+    /**
+     * The plugins passed to `Kizuna.init`. Their routes are served by
+     * `api.mount` but stay outside `routes`, so the client and the generators
+     * do not see them.
+     */
+    plugins?: Plugins;
     /**
      * The `auth` map passed to `k.contract`, keyed by route group. Carried on the
      * contract so the adapters can resolve each route's required identities and
@@ -33,13 +40,13 @@ export interface Contract<
      */
     tags?: TagSet<Tags>;
     /**
-     * The identities passed to {@link kizuna}. Routes reference them by name in
+     * The identities passed to `Kizuna.init`. Routes reference them by name in
      * their `security` field; the OpenAPI generator emits them under
      * `components.securitySchemes`.
      */
     securitySchemes?: Schemes;
     /**
-     * The request context schemas passed to {@link kizuna}. Each key names a
+     * The request context schemas passed to `Kizuna.init`. Each key names a
      * provider registered on `server.api`; every handler receives its value.
      * Never gates a request and never appears in the OpenAPI document.
      */
@@ -58,7 +65,7 @@ export interface Contract<
 /**
  * Internal helper that builds a {@link Contract} from routes, tags, identities,
  * and issue codes. Called by `k.contract`. Not part of the public surface;
- * author contracts through `kizuna`.
+ * author contracts through `k`.
  */
 export function assembleContract<
     const Tags extends Record<string, TagOptions> = Record<string, never>,
@@ -70,6 +77,7 @@ export function assembleContract<
     >,
     const Auth = unknown,
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
+    const Plugins extends ContractPlugins = Record<string, never>,
 >(config: {
     routes: R;
     auth?: Auth;
@@ -79,9 +87,11 @@ export function assembleContract<
     validation?: {
         issueCodes?: readonly Codes[];
     };
-}): Contract<R, Tags, Codes, Schemes, Auth, RequestContext> {
+    plugins?: Plugins;
+}): Contract<R, Tags, Codes, Schemes, Auth, RequestContext, Plugins> {
     return {
         routes: config.routes,
+        plugins: config.plugins,
         auth: config.auth,
         tags: config.tags,
         securitySchemes: config.securitySchemes,

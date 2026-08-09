@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction, Router as ExpressRouter } from 'express';
 import { Router as createExpressRouter } from 'express';
+import { Readable } from 'node:stream';
 import {
     type AdapterRequest,
     type RouteDefinition,
@@ -19,6 +20,12 @@ import {
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
+    pluginRoutesOf,
+    pluginExportsOf,
+    type PluginConfigs,
+    type PluginArgs,
+    type ContractPlugins,
+    pluginRouterOf,
     assembleApi,
     createAdapter,
     renderJsonResult,
@@ -64,8 +71,8 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, Expres
  * identity's context in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C> =
-    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext>
-        ? HandlersFromAuth<R, ExpressHandlerContext & RequestContextValues<RequestContext>, Schemes, Auth>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins>
+        ? HandlersFromAuth<R, ExpressHandlerContext & RequestContextValues<RequestContext> & PluginArgs<Plugins>, Schemes, Auth>
         : C extends Routes
           ? CoreRouter<C, ExpressHandlerContext>
           : never;
@@ -155,6 +162,21 @@ interface ExpressResponseContext {
     formatError?: ErrorFormatter<Request>;
 }
 
+/**
+ * Write a web `Response` to a node response. Plugins answer in web terms to stay
+ * adapter-agnostic, so the translation belongs here.
+ */
+const writeWebResponse = async (response: unknown, res: Response): Promise<void> => {
+    if (!(response instanceof globalThis.Response)) return;
+    res.status(response.status);
+    response.headers.forEach((value, name) => res.setHeader(name, value));
+    if (!response.body) {
+        res.end();
+        return;
+    }
+    Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
+};
+
 const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressResponseContext>({
     buildHandlerContext: (adapterRequest, { res }) => ({
         req: adapterRequest.request,
@@ -166,6 +188,7 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
             return;
         }
         if (result.kind === 'raw-response') {
+            void writeWebResponse(result.response, res);
             return;
         }
         if (res.headersSent) return;
@@ -196,51 +219,60 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
  * api.mount(app);
  */
 function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOptions): ExpressRouter {
-    const resolvedRouter = api[ROUTER_META] as CoreRouter<Routes, ExpressHandlerContext>;
     const guards = api[GUARDS_META] as GuardMap<ExpressHandlerContext> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<ExpressHandlerContext> | undefined;
 
+    const pluginExports = pluginExportsOf(api);
+
     const expressRouter = createExpressRouter();
-    for (const { routeKey, route } of adapter.eachRoute(api.routes, resolvedRouter)) {
-        const method = route.method.toLowerCase() as 'get' | 'head' | 'post' | 'put' | 'patch' | 'delete' | 'options';
-        expressRouter[method](
-            route.path,
-            (req: Request, _res: Response, next: NextFunction) => {
-                req.kizunaRoute = route;
-                next();
-            },
-            async (req: Request, res: Response, next: NextFunction) => {
-                const adapterRequest: AdapterRequest<Request> = {
-                    request: req,
-                    method: req.method,
-                    resolution: {
-                        kind: 'pre-resolved',
-                        routeKey,
-                        route,
-                        params: req.params as Record<string, string>,
-                    },
-                    query: req.query,
-                    headers: req.headers,
-                    readBody: () => req.body,
-                };
-                await adapter.handle({
-                    routes: api.routes,
-                    router: resolvedRouter,
-                    request: adapterRequest,
-                    responseContext: {
-                        res,
-                        next,
-                        formatError: options?.formatError,
-                    },
-                    guards,
-                    schemes,
-                    requestContext,
-                    responseValidation: options?.responseValidation,
-                });
-            }
-        );
-    }
+
+    const mountLane = (routes: Routes, router: CoreRouter<Routes, ExpressHandlerContext>): void => {
+        for (const { routeKey, route } of adapter.eachRoute(routes, router)) {
+            const method = route.method.toLowerCase() as 'get' | 'head' | 'post' | 'put' | 'patch' | 'delete' | 'options';
+            expressRouter[method](
+                route.path,
+                (req: Request, _res: Response, next: NextFunction) => {
+                    req.kizunaRoute = route;
+                    next();
+                },
+                async (req: Request, res: Response, next: NextFunction) => {
+                    const adapterRequest: AdapterRequest<Request> = {
+                        request: req,
+                        method: req.method,
+                        resolution: {
+                            kind: 'pre-resolved',
+                            routeKey,
+                            route,
+                            params: req.params as Record<string, string>,
+                        },
+                        query: req.query,
+                        headers: req.headers,
+                        readBody: () => req.body,
+                    };
+                    await adapter.handle({
+                        routes,
+                        router,
+                        request: adapterRequest,
+                        responseContext: {
+                            res,
+                            next,
+                            formatError: options?.formatError,
+                        },
+                        guards,
+                        schemes,
+                        requestContext,
+                        pluginExports,
+                        responseValidation: options?.responseValidation,
+                    });
+                }
+            );
+        }
+    };
+
+    mountLane(api.routes, api[ROUTER_META] as CoreRouter<Routes, ExpressHandlerContext>);
+    mountLane(pluginRoutesOf(api), pluginRouterOf(api) as CoreRouter<Routes, ExpressHandlerContext>);
+
     app.use(expressRouter);
 
     return expressRouter;
@@ -251,13 +283,15 @@ type ServerContract<
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext>;
+    Plugins extends ContractPlugins,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins>;
 
 export interface Server<
     R extends Routes,
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
 > {
     /**
      * Define a guard for one of the contract's identities. It runs before the
@@ -282,18 +316,21 @@ export interface Server<
      * Bind typed handlers to the contract or one of its route groups.
      */
     router: {
-        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext>>, string> | Routes>(
+        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>, string> | Routes>(
             group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes>;
-        (router: Router<ServerContract<R, Schemes, Auth, RequestContext>>): Router<ServerContract<R, Schemes, Auth, RequestContext>>;
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes>;
+        (
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>;
     };
     /**
      * Assemble the router and guards into the api object.
      */
     api(
         options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>;
+            plugins?: PluginConfigs<Plugins>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
@@ -325,10 +362,18 @@ const init = <
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
 >(
-    contract: ServerContract<R, Schemes, Auth, RequestContext>
-): { server: Server<R, Schemes, Auth, RequestContext> } => {
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>
+): { server: Server<R, Schemes, Auth, RequestContext, Plugins> } => {
     const server = {
+        plugins: new Proxy(
+            {},
+            {
+                get: (_target, pluginKey: string) => (config: unknown) =>
+                    (contract.plugins as ContractPlugins | undefined)?.[pluginKey]?.server(config as never, undefined),
+            }
+        ),
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
@@ -339,7 +384,7 @@ const init = <
             });
         },
     };
-    return { server: server as unknown as Server<R, Schemes, Auth, RequestContext> };
+    return { server: server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins> };
 };
 
 /**

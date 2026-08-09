@@ -19,6 +19,12 @@ import {
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
+    pluginRoutesOf,
+    pluginExportsOf,
+    type PluginConfigs,
+    type PluginArgs,
+    type ContractPlugins,
+    pluginRouterOf,
     assembleApi,
     createAdapter,
     renderJsonResult,
@@ -63,8 +69,8 @@ export type RouteHandler<R extends RouteDefinition, E extends Env = Env> = CoreR
  * in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C, E extends Env = Env> =
-    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext>
-        ? HandlersFromAuth<R, HonoHandlerContext<E> & RequestContextValues<RequestContext>, Schemes, Auth>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins>
+        ? HandlersFromAuth<R, HonoHandlerContext<E> & RequestContextValues<RequestContext> & PluginArgs<Plugins>, Schemes, Auth>
         : C extends Routes
           ? CoreRouter<C, HonoHandlerContext<E>>
           : never;
@@ -165,50 +171,57 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
  * api.mount(app);
  */
 function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, options?: HonoOptions): void {
-    const resolvedRouter = api[ROUTER_META] as CoreRouter<Routes, HonoHandlerContext<E>>;
     const guards = api[GUARDS_META] as GuardMap<HonoHandlerContext<Env>> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<HonoHandlerContext<Env>> | undefined;
 
-    for (const { routeKey, route } of honoAdapter.eachRoute(api.routes, resolvedRouter as CoreRouter<Routes, HonoHandlerContext<Env>>)) {
-        const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
-        const kizunaHandler = async (c: Context<E>) => {
-            const url = new URL(c.req.url);
+    const pluginExports = pluginExportsOf(api);
 
-            const adapterRequest: AdapterRequest<Request> = {
-                request: c.req.raw,
-                method: c.req.method,
-                resolution: {
-                    kind: 'pre-resolved',
-                    routeKey,
-                    route,
-                    params: c.req.param() as Record<string, string>,
-                },
-                query: Object.fromEntries(url.searchParams),
-                headers: headersToObject(c.req.raw.headers),
-                readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),
+    const mountLane = (lane: Routes, resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>): void => {
+        for (const { routeKey, route } of honoAdapter.eachRoute(lane, resolvedRouter)) {
+            const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
+            const kizunaHandler = async (c: Context<E>) => {
+                const url = new URL(c.req.url);
+
+                const adapterRequest: AdapterRequest<Request> = {
+                    request: c.req.raw,
+                    method: c.req.method,
+                    resolution: {
+                        kind: 'pre-resolved',
+                        routeKey,
+                        route,
+                        params: c.req.param() as Record<string, string>,
+                    },
+                    query: Object.fromEntries(url.searchParams),
+                    headers: headersToObject(c.req.raw.headers),
+                    readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),
+                };
+
+                return honoAdapter.handle({
+                    routes: lane,
+                    router: resolvedRouter,
+                    request: adapterRequest,
+                    responseContext: {
+                        c: c as unknown as Context<Env>,
+                        formatError: options?.formatError,
+                    },
+                    guards,
+                    schemes,
+                    requestContext,
+                    pluginExports,
+                    responseValidation: options?.responseValidation,
+                });
             };
+            (app.on as (method: string, path: string, ...handlers: MiddlewareHandler[]) => void)(
+                method,
+                route.path,
+                kizunaHandler as MiddlewareHandler
+            );
+        }
+    };
 
-            return honoAdapter.handle({
-                routes: api.routes,
-                router: resolvedRouter as CoreRouter<Routes, HonoHandlerContext<Env>>,
-                request: adapterRequest,
-                responseContext: {
-                    c: c as unknown as Context<Env>,
-                    formatError: options?.formatError,
-                },
-                guards,
-                schemes,
-                requestContext,
-                responseValidation: options?.responseValidation,
-            });
-        };
-        (app.on as (method: string, path: string, ...handlers: MiddlewareHandler[]) => void)(
-            method,
-            route.path,
-            kizunaHandler as MiddlewareHandler
-        );
-    }
+    mountLane(api.routes, api[ROUTER_META] as CoreRouter<Routes, HonoHandlerContext<Env>>);
+    mountLane(pluginRoutesOf(api), pluginRouterOf(api) as CoreRouter<Routes, HonoHandlerContext<Env>>);
 }
 
 type ServerContract<
@@ -216,13 +229,15 @@ type ServerContract<
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext>;
+    Plugins extends ContractPlugins,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins>;
 
 export interface Server<
     R extends Routes,
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
     E extends Env = Env,
 > {
     /**
@@ -248,18 +263,21 @@ export interface Server<
      * Bind typed handlers to the contract or one of its route groups.
      */
     router: {
-        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext>, E>, string> | Routes>(
+        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>, string> | Routes>(
             group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes, E>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes, E>;
-        (router: Router<ServerContract<R, Schemes, Auth, RequestContext>, E>): Router<ServerContract<R, Schemes, Auth, RequestContext>, E>;
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes, E>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes, E>;
+        (
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>;
     };
     /**
      * Assemble the router and guards into the api object.
      */
     api(
         options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext>, E>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>;
+            plugins?: PluginConfigs<Plugins>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes, E>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
@@ -291,11 +309,19 @@ const init = <
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
     E extends Env = Env,
 >(
-    contract: ServerContract<R, Schemes, Auth, RequestContext>
-): { server: Server<R, Schemes, Auth, RequestContext, E> } => {
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>
+): { server: Server<R, Schemes, Auth, RequestContext, Plugins, E> } => {
     const server = {
+        plugins: new Proxy(
+            {},
+            {
+                get: (_target, pluginKey: string) => (config: unknown) =>
+                    (contract.plugins as ContractPlugins | undefined)?.[pluginKey]?.server(config as never, undefined),
+            }
+        ),
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
@@ -306,7 +332,7 @@ const init = <
             });
         },
     };
-    return { server: server as unknown as Server<R, Schemes, Auth, RequestContext, E> };
+    return { server: server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, E> };
 };
 
 /**

@@ -8,6 +8,7 @@ import {
     inferenceContract,
     inferenceGroupContract,
     inferenceRoutes,
+    pluginTypeContract,
     requestContextContract,
     securedContract,
     type ExpectedRouteHandler,
@@ -325,6 +326,14 @@ test('conforms to the shared adapter type catalogue', () => {
                     },
                 }),
             });
+        },
+        'plugins.exportsTyped': () => {
+            expectTypeOf<Router<typeof pluginTypeContract>['whichLabel']>().parameter(0).toMatchTypeOf<{
+                plugins: { probe: { label: () => string } };
+            }>();
+        },
+        'plugins.absentWhenUninstalled': () => {
+            expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).not.toHaveProperty('plugins');
         },
         'standalone.routeHandlerContext': () => {
             const publicRoute: RouteHandler<typeof requestContextContract.routes.api.publicRoute> = ({ requestContext }) => {

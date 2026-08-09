@@ -1,0 +1,100 @@
+---
+title: Create a Plugin
+description: Write a plugin once and it runs on every adapter, because it never touches your framework.
+---
+
+A plugin declares routes and hands back handlers. The adapter mounts them exactly as it mounts yours, so a plugin needs no `express`, `hono`, `fastify` or `next` import anywhere in it.
+
+```ts
+import { createPlugin } from '@ts-kizuna/core/adapter';
+```
+
+## The shape
+
+```ts title="@ts-kizuna/audit/src/index.ts"
+import { createPlugin } from '@ts-kizuna/core/adapter';
+import { z } from 'zod';
+
+export interface AuditPluginProps {
+    path?: `/${string}`;
+}
+
+export const auditPlugin = (props: AuditPluginProps = {}) =>
+    createPlugin({
+        name: 'audit',
+
+        routes: {
+            recent: {
+                method: 'GET',
+                path: props.path ?? '/audit/recent',
+                responses: {
+                    200: z.array(EntrySchema),
+                },
+            },
+        },
+
+        server: (config: { store: AuditStore }) => ({
+            router: {
+                recent: async () => ({
+                    status: 200 as const,
+                    body: await config.store.recent(),
+                }),
+            },
+            exports: {
+                record: (routeKey: string) => config.store.write(routeKey),
+            },
+        }),
+    });
+```
+
+Two keys, and each says where its contents land.
+
+| key      | lands                                        |
+| -------- | -------------------------------------------- |
+| `routes` | in the contract, so it must be pure data     |
+| `server` | on the server, where everything live belongs |
+
+Inside `server`:
+
+| key       | what it is                                               |
+| --------- | -------------------------------------------------------- |
+| `router`  | handlers for the plugin's own routes, typed against them |
+| `exports` | what every handler reaches at `plugins.<name>`           |
+
+`server` receives the api as a second argument, for plugins that read the contract's routes. MCP uses it to build its tool list; most plugins ignore it.
+
+## Props versus config
+
+Curry the plugin so callers can shape what it declares. Props reach the contract, so keep them pure:
+
+```ts
+plugins: {
+    audit: auditPlugin({ path: '/internal/audit' }),
+}
+```
+
+Anything live is `config`, passed on `server.api` under the same key. A plugin whose config is `void` never appears there at all. See [Plugins](/docs/plugins) for the caller's side.
+
+## Answering with something that is not JSON
+
+A plugin route can return `raw` when its wire format is not a JSON body, which is how MCP serves JSON-RPC over server-sent events:
+
+```ts
+import { raw } from '@ts-kizuna/core/adapter';
+
+endpoint: async ({ body, headers }) => raw(await transport.handleRequest(request)),
+```
+
+Kizuna skips validation and rendering, and each adapter writes the response out in its own terms. Ordinary route handlers cannot reach `raw`.
+
+## Staying adapter-agnostic
+
+A plugin's handlers receive the same arguments yours do: `params`, `query`, `body`, `headers`, plus the adapter's own context. Build from the parsed inputs and the plugin runs everywhere.
+
+If a plugin genuinely needs framework specifics, narrow its `HandlerContext` and it will compile only on the adapters that match.
+
+## Reference
+
+- [Plugins](/docs/plugins) for installing and using one
+- [`mcpPlugin`](/docs/reference/mcp-plugin) for a worked example
+- [Create an Adapter](/docs/extend/create-adapter) if the runtime itself is missing

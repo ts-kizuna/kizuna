@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginAsync } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
+import { Readable } from 'node:stream';
 import {
     type AdapterRequest,
     type RouteDefinition,
@@ -19,6 +20,12 @@ import {
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
+    pluginRoutesOf,
+    pluginExportsOf,
+    type PluginConfigs,
+    type PluginArgs,
+    type ContractPlugins,
+    pluginRouterOf,
     assembleApi,
     createAdapter,
     renderJsonResult,
@@ -67,8 +74,8 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, Fastif
  * identity's context in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C> =
-    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext>
-        ? HandlersFromAuth<R, FastifyHandlerContext & RequestContextValues<RequestContext>, Schemes, Auth>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins>
+        ? HandlersFromAuth<R, FastifyHandlerContext & RequestContextValues<RequestContext> & PluginArgs<Plugins>, Schemes, Auth>
         : C extends Routes
           ? CoreRouter<C, FastifyHandlerContext>
           : never;
@@ -153,6 +160,22 @@ interface FastifyResponseContext {
     formatError?: ErrorFormatter<FastifyRequest>;
 }
 
+/**
+ * Write a web `Response` to a Fastify reply. Plugins answer in web terms to stay
+ * adapter-agnostic, so the translation belongs here.
+ */
+const writeWebResponse = async (response: unknown, reply: FastifyReply): Promise<void> => {
+    if (!(response instanceof globalThis.Response)) return;
+    reply.hijack();
+    reply.raw.statusCode = response.status;
+    response.headers.forEach((value, name) => reply.raw.setHeader(name, value));
+    if (!response.body) {
+        reply.raw.end();
+        return;
+    }
+    Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]).pipe(reply.raw);
+};
+
 const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, FastifyResponseContext>({
     buildHandlerContext: (adapterRequest, { reply }) => ({
         request: adapterRequest.request,
@@ -163,6 +186,7 @@ const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
             throw result.error;
         }
         if (result.kind === 'raw-response') {
+            void writeWebResponse(result.response, reply);
             return;
         }
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, reply.request);
@@ -198,56 +222,63 @@ export interface KizunaPluginOptions extends FastifyOptions {
 const fastifyKizuna = fastifyPlugin(
     async (app: FastifyInstance, options: KizunaPluginOptions) => {
         const { api } = options;
-        const resolvedRouter = api[ROUTER_META] as CoreRouter<Routes, FastifyHandlerContext>;
         const guards = api[GUARDS_META] as GuardMap<FastifyHandlerContext> | undefined;
         const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
         const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<FastifyHandlerContext> | undefined;
 
-        // Fastify's auto-exposed HEAD collides with a declared one, but it skips paths that already have HEAD.
-        const declaredRoutes = [...adapter.eachRoute(api.routes, resolvedRouter)].sort(
-            (left, right) => Number(right.route.method === 'HEAD') - Number(left.route.method === 'HEAD')
-        );
+        const pluginExports = pluginExportsOf(api);
 
-        for (const { routeKey, route } of declaredRoutes) {
-            app.route({
-                method: route.method,
-                url: route.path,
-                preHandler: [
-                    async (request: FastifyRequest) => {
-                        request.kizunaRoute = route;
+        const mountLane = (lane: Routes, resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>): void => {
+            // Fastify's auto-exposed HEAD collides with a declared one, but it skips paths that already have HEAD.
+            const declaredRoutes = [...adapter.eachRoute(lane, resolvedRouter)].sort(
+                (left, right) => Number(right.route.method === 'HEAD') - Number(left.route.method === 'HEAD')
+            );
+
+            for (const { routeKey, route } of declaredRoutes) {
+                app.route({
+                    method: route.method,
+                    url: route.path,
+                    preHandler: [
+                        async (request: FastifyRequest) => {
+                            request.kizunaRoute = route;
+                        },
+                    ],
+                    handler: async (request: FastifyRequest, reply: FastifyReply) => {
+                        const adapterRequest: AdapterRequest<FastifyRequest> = {
+                            request,
+                            method: request.method,
+                            resolution: {
+                                kind: 'pre-resolved',
+                                routeKey,
+                                route,
+                                params: (request.params ?? {}) as Record<string, string>,
+                            },
+                            query: (request.query ?? {}) as Record<string, string>,
+                            headers: request.headers,
+                            readBody: () => request.body,
+                        };
+
+                        await adapter.handle({
+                            routes: lane,
+                            router: resolvedRouter,
+                            request: adapterRequest,
+                            responseContext: {
+                                reply,
+                                formatError: options?.formatError,
+                            },
+                            guards,
+                            schemes,
+                            requestContext,
+                            pluginExports,
+                            responseValidation: options?.responseValidation,
+                        });
                     },
-                ],
-                handler: async (request: FastifyRequest, reply: FastifyReply) => {
-                    const adapterRequest: AdapterRequest<FastifyRequest> = {
-                        request,
-                        method: request.method,
-                        resolution: {
-                            kind: 'pre-resolved',
-                            routeKey,
-                            route,
-                            params: (request.params ?? {}) as Record<string, string>,
-                        },
-                        query: (request.query ?? {}) as Record<string, string>,
-                        headers: request.headers,
-                        readBody: () => request.body,
-                    };
+                });
+            }
+        };
 
-                    await adapter.handle({
-                        routes: api.routes,
-                        router: resolvedRouter,
-                        request: adapterRequest,
-                        responseContext: {
-                            reply,
-                            formatError: options?.formatError,
-                        },
-                        guards,
-                        schemes,
-                        requestContext,
-                        responseValidation: options?.responseValidation,
-                    });
-                },
-            });
-        }
+        mountLane(api.routes, api[ROUTER_META] as CoreRouter<Routes, FastifyHandlerContext>);
+        mountLane(pluginRoutesOf(api), pluginRouterOf(api) as CoreRouter<Routes, FastifyHandlerContext>);
     },
     {
         name: '@ts-kizuna/fastify',
@@ -259,13 +290,15 @@ type ServerContract<
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext>;
+    Plugins extends ContractPlugins,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins>;
 
 export interface Server<
     R extends Routes,
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
 > {
     /**
      * Define a guard for one of the contract's identities. It runs before the
@@ -290,18 +323,21 @@ export interface Server<
      * Bind typed handlers to the contract or one of its route groups.
      */
     router: {
-        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext>>, string> | Routes>(
+        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>, string> | Routes>(
             group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes>;
-        (router: Router<ServerContract<R, Schemes, Auth, RequestContext>>): Router<ServerContract<R, Schemes, Auth, RequestContext>>;
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes>;
+        (
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>;
     };
     /**
      * Assemble the router and guards into the api object.
      */
     api(
         options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>;
+            plugins?: PluginConfigs<Plugins>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
@@ -333,10 +369,18 @@ const init = <
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
 >(
-    contract: ServerContract<R, Schemes, Auth, RequestContext>
-): { server: Server<R, Schemes, Auth, RequestContext> } => {
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>
+): { server: Server<R, Schemes, Auth, RequestContext, Plugins> } => {
     const server = {
+        plugins: new Proxy(
+            {},
+            {
+                get: (_target, pluginKey: string) => (config: unknown) =>
+                    (contract.plugins as ContractPlugins | undefined)?.[pluginKey]?.server(config as never, undefined),
+            }
+        ),
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
@@ -356,7 +400,7 @@ const init = <
             });
         },
     };
-    return { server: server as unknown as Server<R, Schemes, Auth, RequestContext> };
+    return { server: server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins> };
 };
 
 /**

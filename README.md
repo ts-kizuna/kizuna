@@ -27,6 +27,7 @@ Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, pow
 - **Built-in coercion** — query, path, and header params are coerced to their declared types (`z.number()`, `z.boolean()`, `z.date()`, `z.bigint()`) — no manual parsing or `z.coerce` needed
 - **OpenAPI generation** — from the same contract, no annotations needed
 - **Native client generation** — typed API clients for Swift (iOS/macOS) and Kotlin (Android/JVM)
+- **Plugins** — extend your API with features built on the contract you already wrote, and get them fully typed in your handlers
 - **MCP server generation** — expose your API as MCP tools so AI assistants can call your endpoints
 - **Deprecation support** — mark endpoints and fields as deprecated with a JSDoc `@deprecated` tag — IDEs show strikethroughs, OpenAPI, Swift, and Kotlin pick it up automatically
 

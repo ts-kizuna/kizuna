@@ -1,4 +1,4 @@
 {
     "title": "Extend",
-    "pages": ["create-adapter", "create-generator", "create-ts-client"]
+    "pages": ["create-plugin", "create-adapter", "create-generator", "create-ts-client"]
 }

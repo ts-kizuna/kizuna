@@ -9,6 +9,7 @@
         "clients",
         "openapi",
         "deprecations",
+        "plugins",
         "mcp",
         "eslint",
         "breaking-changes",

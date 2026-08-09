@@ -193,10 +193,10 @@ try {
         icon: icons.bot,
         label: 'MCP server',
         desc: 'Routes become tools for AI agents',
-        file: 'app.ts',
+        file: 'k.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
-        code: `createMcpEndpoint(api, app);
+        code: `plugins: { mcp: mcpPlugin() }
 
 // each route → a typed MCP tool:
 // GET → read-only · DELETE → destructive

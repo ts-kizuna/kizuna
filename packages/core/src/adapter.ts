@@ -19,9 +19,29 @@ import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
+import { isRawResponse, type RawResponse } from './raw-response.js';
+import { pluginRouteTree, resolvePluginServers, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from './plugin.js';
 import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
 
 export type { RouteDefinition, Routes, Method } from './types.js';
+export { raw, isRawResponse, type RawResponse } from './raw-response.js';
+export {
+    createPlugin,
+    pluginRouteTree,
+    pluginRoutesOf,
+    pluginRouterOf,
+    pluginExportsOf,
+    type KizunaPlugin,
+    type PluginRoutes,
+    type PluginServer,
+    type PluginRouter,
+    type PluginConfigs,
+    type ContractPlugins,
+    type PluginExportValues,
+    type PluginArgs,
+    type PluginConfigOf,
+    type PluginExportsOf,
+} from './plugin.js';
 
 export class ResponseValidationError extends Error {
     readonly routeKey: string;
@@ -118,13 +138,24 @@ export type RequestContextRun<HandlerContext = unknown> = (
 ) => Promise<unknown> | unknown;
 
 /**
- * Request context resolvers keyed by the name they were declared under on `kizuna`.
+ * What kizuna puts in handler args. Must agree with the spread in `runPipeline`.
+ */
+export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'throwError', 'auth', 'requestContext', 'plugins'] as const;
+
+/**
+ * The adapter's own context, with kizuna's arguments removed.
+ */
+export const adapterContextOf = (args: Record<string, unknown>): Record<string, unknown> =>
+    Object.fromEntries(Object.entries(args).filter(([key]) => !(HANDLER_ARG_KEYS as readonly string[]).includes(key)));
+
+/**
+ * Request context resolvers keyed by the name they were declared under on `Kizuna.init`.
  */
 export type RequestContextMap<HandlerContext = unknown> = Record<string, RequestContextRun<HandlerContext>>;
 
-const assertNoDuplicateRoutes = (routes: Routes): void => {
+const assertNoDuplicateRoutes = (routes: Routes, pluginRoutes: Routes = {}): void => {
     const seen = new Map<string, { routeKey: string; path: string }>();
-    for (const { routeKey, route } of flattenRoutes(routes)) {
+    for (const { routeKey, route } of [...flattenRoutes(routes), ...flattenRoutes(pluginRoutes)]) {
         const { segments } = parsePath(route.path);
         const normalizedPath = segments.map((segment) => (segment.kind === 'param' ? ':*' : segment.value)).join('');
         const key = `${route.method}:${normalizedPath}`;
@@ -142,6 +173,10 @@ export interface ApiParts {
     router: unknown;
     guards?: unknown;
     requestContext?: unknown;
+    /**
+     * Each plugin's config, keyed by install name.
+     */
+    plugins?: Record<string, unknown>;
 }
 
 /**
@@ -151,21 +186,29 @@ export const assembleApi = <const R extends Routes>(
     contract: {
         routes: R;
         securitySchemes?: Record<string, SecurityScheme>;
+        plugins?: ContractPlugins;
     },
     parts: ApiParts
 ): ApiWithRouter<R> => {
-    assertNoDuplicateRoutes(contract.routes);
-    for (const { route } of flattenRoutes(contract.routes)) {
+    const pluginRoutes = pluginRouteTree(contract.plugins);
+    assertNoDuplicateRoutes(contract.routes, pluginRoutes);
+    for (const { route } of [...flattenRoutes(contract.routes), ...flattenRoutes(pluginRoutes)]) {
         resolveCoercionPlans(route);
     }
-    return {
+    const api = {
         routes: contract.routes,
         [API_META]: true,
         [ROUTER_META]: parts.router,
         [GUARDS_META]: parts.guards,
         [SCHEMES_META]: contract.securitySchemes,
         [REQUEST_CONTEXT_META]: parts.requestContext,
-    } as ApiWithRouter<R>;
+        [PLUGIN_ROUTES_META_KEY]: pluginRoutes,
+    } as Record<string | symbol, unknown>;
+
+    // Resolved after the api exists, because a plugin's server half receives it.
+    api[PLUGIN_SERVERS_META_KEY] = resolvePluginServers(contract.plugins, parts.plugins, api);
+
+    return api as unknown as ApiWithRouter<R>;
 };
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
 export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
@@ -301,6 +344,10 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
      * it to that scheme's guard.
      */
     schemes?: Record<string, SecurityScheme>;
+    /**
+     * What each plugin exports, reaching handlers under `plugins`.
+     */
+    pluginExports?: Record<string, unknown>;
     /**
      * Request context resolvers keyed by name. Each runs on every route before
      * the guards; its value lands in the handler args under `requestContext`, keyed by its name.
@@ -508,6 +555,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     guards: GuardMap<HandlerContext> | undefined,
     schemes: Record<string, SecurityScheme> | undefined,
     contextResolvers: RequestContextMap<HandlerContext> | undefined,
+    pluginExports: Record<string, unknown> | undefined,
     basePath: string | undefined,
     responseValidation: boolean | undefined
 ): Promise<AdapterResult> => {
@@ -630,7 +678,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             throw new ResponseError(response);
         };
         const handlerResult = await (
-            handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: Record<string, string> }>
+            handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: Record<string, string> } | RawResponse>
         )({
             params: validation.parsed.params,
             query: validation.parsed.query,
@@ -640,7 +688,14 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             ...handlerContext,
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
+            ...(pluginExports && Object.keys(pluginExports).length > 0 ? { plugins: pluginExports } : {}),
         });
+        if (isRawResponse(handlerResult)) {
+            return {
+                kind: 'raw-response',
+                response: handlerResult.response,
+            };
+        }
         if (responseValidation) {
             const responseSpec = route.responses[handlerResult.status];
             if (responseSpec !== undefined) {
@@ -710,7 +765,18 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
 export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, ResponseContext = Record<string, never>>(
     definition: AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, ResponseContext>
 ): Adapter<NativeRequest, NativeResponse, HandlerContext, ResponseContext> => ({
-    handle: async ({ routes, router, request, responseContext, guards, schemes, requestContext, basePath, responseValidation }) => {
+    handle: async ({
+        routes,
+        router,
+        request,
+        responseContext,
+        guards,
+        schemes,
+        requestContext,
+        pluginExports,
+        basePath,
+        responseValidation,
+    }) => {
         const result = await runPipeline(
             request,
             routes,
@@ -720,6 +786,7 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
             guards,
             schemes,
             requestContext,
+            pluginExports,
             basePath,
             responseValidation
         );

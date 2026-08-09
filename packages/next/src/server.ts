@@ -24,6 +24,12 @@ import {
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
+    pluginRoutesOf,
+    pluginExportsOf,
+    type PluginConfigs,
+    type PluginArgs,
+    type ContractPlugins,
+    pluginRouterOf,
 } from '@ts-kizuna/core/adapter';
 import type { z } from 'zod';
 import type {
@@ -55,8 +61,8 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, NextHa
  * in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C> =
-    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext>
-        ? HandlersFromAuth<R, NextHandlerContext & RequestContextValues<RequestContext>, Schemes, Auth>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins>
+        ? HandlersFromAuth<R, NextHandlerContext & RequestContextValues<RequestContext> & PluginArgs<Plugins>, Schemes, Auth>
         : C extends Routes
           ? CoreRouter<C, NextHandlerContext>
           : never;
@@ -156,7 +162,8 @@ export const handleNextRequest = async <T extends Routes>(
     options?: NextHandlerOptions,
     guards?: GuardMap<NextHandlerContext>,
     schemes?: Record<string, SecurityScheme>,
-    requestContext?: RequestContextMap<NextHandlerContext>
+    requestContext?: RequestContextMap<NextHandlerContext>,
+    pluginExports?: Record<string, unknown>
 ): Promise<NextResponse> => {
     const url = new URL(request.url);
 
@@ -253,6 +260,7 @@ export const handleNextRequest = async <T extends Routes>(
         guards,
         schemes,
         requestContext,
+        pluginExports,
         basePath: options?.basePath,
         responseValidation: options?.responseValidation,
     });
@@ -299,21 +307,48 @@ function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions): HttpHa
     const guards = api[GUARDS_META] as GuardMap<NextHandlerContext> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<NextHandlerContext> | undefined;
-    const handler = (request: NextRequest) =>
-        handleNextRequest(
+    const handlerOptions = {
+        basePath: options?.basePath,
+        onError: options?.onError ?? api[_ON_ERROR],
+        requestMiddleware: options?.requestMiddleware,
+        responseValidation: options?.responseValidation,
+    };
+    const pluginExports = pluginExportsOf(api);
+    const pluginRoutes = pluginRoutesOf(api);
+    const pluginRouter = pluginRouterOf(api) as CoreRouter<Routes, NextHandlerContext>;
+
+    const hasPluginRoutes = Object.keys(pluginRoutes).length > 0;
+
+    const handler = async (request: NextRequest) => {
+        if (hasPluginRoutes) {
+            const pathname = new URL(request.url).pathname;
+            const claimedByContract = matchRoute(request.method, pathname, api.routes, options?.basePath).kind === 'matched';
+
+            if (!claimedByContract && matchRoute(request.method, pathname, pluginRoutes, options?.basePath).kind === 'matched') {
+                return handleNextRequest(
+                    request,
+                    pluginRoutes,
+                    pluginRouter,
+                    handlerOptions,
+                    guards,
+                    schemes,
+                    requestContext,
+                    pluginExports
+                );
+            }
+        }
+
+        return handleNextRequest(
             request,
             api.routes,
             api[ROUTER_META] as CoreRouter<Routes, NextHandlerContext>,
-            {
-                basePath: options?.basePath,
-                onError: options?.onError ?? api[_ON_ERROR],
-                requestMiddleware: options?.requestMiddleware,
-                responseValidation: options?.responseValidation,
-            },
+            handlerOptions,
             guards,
             schemes,
-            requestContext
+            requestContext,
+            pluginExports
         );
+    };
     return {
         GET: handler,
         HEAD: handler,
@@ -330,7 +365,8 @@ type ServerContract<
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext>;
+    Plugins extends ContractPlugins,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins>;
 
 /**
  * The handlers for a group named on the contract, or for a bare route group.
@@ -346,6 +382,7 @@ export interface Server<
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
 > {
     /**
      * Define a guard for one of the contract's identities. It runs before the
@@ -370,18 +407,21 @@ export interface Server<
      * Bind typed handlers to the contract or one of its route groups.
      */
     router: {
-        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext>>, string> | Routes>(
+        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>, string> | Routes>(
             group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext>, GroupOrRoutes>;
-        (router: Router<ServerContract<R, Schemes, Auth, RequestContext>>): Router<ServerContract<R, Schemes, Auth, RequestContext>>;
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes>;
+        (
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>;
     };
     /**
      * Assemble the router and guards into the api object.
      */
     api(
         options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>;
+            plugins?: PluginConfigs<Plugins>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) & {
                 onError?: NextHandlerOptions['onError'];
             } & (string extends keyof RequestContext
@@ -414,10 +454,18 @@ const init = <
     Schemes extends Record<string, SecurityScheme>,
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
 >(
-    contract: ServerContract<R, Schemes, Auth, RequestContext>
-): { server: Server<R, Schemes, Auth, RequestContext> } => {
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>
+): { server: Server<R, Schemes, Auth, RequestContext, Plugins> } => {
     const server = {
+        plugins: new Proxy(
+            {},
+            {
+                get: (_target, pluginKey: string) => (config: unknown) =>
+                    (contract.plugins as ContractPlugins | undefined)?.[pluginKey]?.server(config as never, undefined),
+            }
+        ),
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
@@ -429,7 +477,7 @@ const init = <
                 },
             }),
     };
-    return { server: server as unknown as Server<R, Schemes, Auth, RequestContext> };
+    return { server: server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins> };
 };
 
 /**
