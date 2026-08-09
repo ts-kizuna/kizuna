@@ -1,0 +1,93 @@
+---
+title: mcp
+description: Serve an MCP endpoint from api.mount by declaring it as a plugin on server.api.
+---
+
+Serve a [Model Context Protocol](https://modelcontextprotocol.io) endpoint as part of your API. Declare it on [`server.api`](/docs/reference/server-api) and `api.mount` brings it up with the contract's routes.
+
+<InstallTabs packageName="@ts-kizuna/mcp" />
+
+<AdapterTabs
+    functionName="mcp"
+    showInstall={false}
+    adapters={[
+        { label: 'Express', package: '@ts-kizuna/mcp/express' },
+        { label: 'Hono', package: '@ts-kizuna/mcp/hono' },
+        { label: 'Fastify', package: '@ts-kizuna/mcp/fastify' },
+        { label: 'Next.js', package: '@ts-kizuna/mcp/next' },
+    ]}
+/>
+
+## Parameters
+
+```ts
+mcp(options?: McpPluginOptions): KizunaPlugin<App>
+```
+
+| Parameter | Type               | Required | Description           |
+| --------- | ------------------ | -------- | --------------------- |
+| `options` | `McpPluginOptions` | No       | Configuration options |
+
+## Options
+
+| Option        | Default            | Description                                   |
+| ------------- | ------------------ | --------------------------------------------- |
+| `path`        | `'/mcp'`           | Path the endpoint is served from              |
+| `name`        | `'MCP Server'`     | Human-readable name shown to AI assistants    |
+| `version`     | `'1.0.0'`          | Semantic version string                       |
+| `routeFilter` | excludes multipart | Predicate to filter which routes become tools |
+
+## Returns
+
+A `KizunaPlugin` typed to your adapter's app. Pass it to `server.api` in `plugins`.
+
+## Example
+
+```ts title="src/lib/api.ts"
+import { mcpPlugin } from '@ts-kizuna/mcp/express';
+import { server } from './server';
+import { router } from './router';
+
+export const api = server.api({
+    router,
+    plugins: [mcpPlugin()],
+});
+```
+
+```ts title="src/index.ts"
+api.mount(app);
+```
+
+## Next.js
+
+The endpoint is served by the catch-all route file that already serves your contract, so `path` resolves under that file's `basePath`:
+
+```ts title="app/api/[...ts-kizuna]/route.ts"
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
+    basePath: '/api',
+});
+```
+
+With the default `path`, the endpoint is at `/api/mcp`. Set `path` to move it, and it still resolves under `basePath`:
+
+```ts title="src/lib/api.ts"
+export const api = server.api({
+    router,
+    plugins: [
+        mcpPlugin({
+            path: '/tools',
+        }),
+    ],
+});
+```
+
+That serves the endpoint at `/api/tools`. The path stays under `basePath`, because the catch-all route file is what receives the request: a `path` of `/tools` cannot put the endpoint at the site root. To serve it somewhere else entirely, change where the catch-all lives and pass its new `basePath` to `mount`.
+
+## Secured routes
+
+Each tool call runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request, reading credentials from the MCP transport request's headers. A `deny(...)` becomes a tool error result. See the [MCP guide](/docs/mcp) for configuring clients to send credentials.
+
+## See also
+
+- [`createMcpServer`](/docs/reference/create-mcp-server) to drive the transport yourself
+- [Create a Plugin](/docs/extend/create-plugin) to write your own

@@ -5,7 +5,7 @@ description: Create a raw MCP server from a ts-kizuna API for use with any trans
 
 Create a raw [MCP](https://modelcontextprotocol.io) server from a ts-kizuna API. Use this when you want full control over the transport — for example, stdio for CLI tools or SSE for custom setups.
 
-For mounting to an adapter, use [`createMcpEndpoint`](/docs/reference/create-mcp-endpoint) instead.
+For serving it from your app, use [`mcpPlugin`](/docs/reference/mcp-plugin) instead.
 
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
@@ -38,7 +38,7 @@ createMcpServer(api: Api, options?: McpServerOptions): McpServer
 
 Each call to a secured tool runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request: the identity's credential is extracted from `credentialHeaders`, the guard resolves it to context (passed to the handler under the identity's name), access gates are checked, and a `deny(...)` becomes a tool error result.
 
-The adapter endpoints ([`createMcpEndpoint`](/docs/reference/create-mcp-endpoint)) populate `credentialHeaders` automatically from the incoming request. When you drive the transport yourself, pass the headers along — for stdio there is no HTTP request, so supply whatever credential headers the environment provides:
+The [`mcpPlugin`](/docs/reference/mcp-plugin) endpoint populates `credentialHeaders` automatically from the incoming request. When you drive the transport yourself, pass the headers along — for stdio there is no HTTP request, so supply whatever credential headers the environment provides:
 
 ```ts
 const server = createMcpServer(api, {

@@ -134,6 +134,9 @@ importers:
       '@ts-kizuna/fetch':
         specifier: workspace:*
         version: link:../../packages/fetch
+      '@ts-kizuna/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@ts-kizuna/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
@@ -291,6 +294,9 @@ importers:
       '@ts-kizuna/fetch':
         specifier: workspace:*
         version: link:../../packages/fetch
+      '@ts-kizuna/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@ts-kizuna/next':
         specifier: workspace:*
         version: link:../../packages/next

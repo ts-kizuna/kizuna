@@ -14,8 +14,10 @@ import {
     type RequestContextRun,
     type ApiParts,
     type ApiWithRouter,
+    type KizunaPlugin,
     assembleApi,
     createAdapter,
+    mountPlugins,
     headersToObject,
     matchRoute,
     parseFetchBody,
@@ -37,8 +39,10 @@ import type {
 } from '@ts-kizuna/core';
 import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
 import { type NextRequest, NextResponse } from 'next/server';
+import { type PluginHost, createPluginHost } from './plugins.js';
 
 export { NextRequest, NextResponse } from 'next/server';
+export type { PluginHost, PluginHandler, KizunaPlugin } from './plugins.js';
 
 export interface NextHandlerContext {
     request: NextRequest;
@@ -267,7 +271,7 @@ type HttpHandlers = {
     DELETE: HttpHandler;
     OPTIONS: HttpHandler;
 };
-type HttpHandler = (request: NextRequest) => Promise<NextResponse>;
+type HttpHandler = (request: NextRequest) => Promise<Response>;
 
 const _ON_ERROR: unique symbol = Symbol('ts-kizuna.next.onError');
 
@@ -299,8 +303,14 @@ function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions): HttpHa
     const guards = api[GUARDS_META] as GuardMap<NextHandlerContext> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<NextHandlerContext> | undefined;
-    const handler = (request: NextRequest) =>
-        handleNextRequest(
+    const { host, match } = createPluginHost(options?.basePath);
+    const pluginsReady = mountPlugins(api, host);
+    const handler = async (request: NextRequest) => {
+        await pluginsReady;
+        const plugin = match(request.method, new URL(request.url).pathname);
+        if (plugin) return plugin(request);
+
+        return handleNextRequest(
             request,
             api.routes,
             api[ROUTER_META] as CoreRouter<Routes, NextHandlerContext>,
@@ -314,6 +324,7 @@ function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions): HttpHa
             schemes,
             requestContext
         );
+    };
     return {
         GET: handler,
         HEAD: handler,
@@ -384,6 +395,7 @@ export interface Server<
             router: Router<ServerContract<R, Schemes, Auth, RequestContext>>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) & {
                 onError?: NextHandlerOptions['onError'];
+                plugins?: readonly KizunaPlugin<PluginHost>[];
             } & (string extends keyof RequestContext
                 ? { requestContext?: undefined }
                 : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<NextHandlerContext> }> })

@@ -7,70 +7,26 @@ description: Mount an MCP endpoint on your Express, Fastify, Hono, or Next.js ap
 
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
-## Express
+## Add it as a plugin
 
-```ts title="src/index.ts"
-import express from 'express';
-import { createMcpEndpoint } from '@ts-kizuna/mcp/express';
-import { api } from './lib/api';
+`mcpPlugin()` reads your contract and turns every route into a tool. Declare it where the rest of your API is configured, and `api.mount` serves it alongside your routes. This is the same on every adapter:
 
-const app = express();
-app.use(express.json());
+```ts title="src/lib/api.ts"
+import { mcpPlugin } from '@ts-kizuna/mcp/express';
 
-api.mount(app);
-createMcpEndpoint(api, app);
-
-app.listen(3000);
-```
-
-`createMcpEndpoint` mounts the MCP protocol handler at `/mcp` by default. Change it with the `path` option.
-
-## Fastify
-
-```ts title="src/index.ts"
-import Fastify from 'fastify';
-import { createMcpEndpoint } from '@ts-kizuna/mcp/fastify';
-import { api } from './lib/api';
-
-const app = Fastify();
-
-await api.mount(app);
-await createMcpEndpoint(api, app);
-
-app.listen({
-    port: 3000,
+export const api = server.api({
+    router,
+    plugins: [mcpPlugin()],
 });
 ```
 
-Mounts at `/mcp` by default, configurable with the `path` option.
-
-## Hono
-
 ```ts title="src/index.ts"
-import { Hono } from 'hono';
-import { createMcpEndpoint } from '@ts-kizuna/mcp/hono';
-import { api } from './lib/api';
-
-const app = new Hono();
-
 api.mount(app);
-createMcpEndpoint(api, app);
-
-export default app;
 ```
 
-Same as Express — mounts at `/mcp` by default, configurable with the `path` option.
+Import `mcpPlugin` from the subpath for your adapter: `@ts-kizuna/mcp/express`, `/hono`, `/fastify`, or `/next`. It mounts at `/mcp` by default, configurable with the `path` option.
 
-## Next.js
-
-```ts title="app/mcp/route.ts"
-import { createMcpEndpoint } from '@ts-kizuna/mcp/next';
-import { api } from '../../lib/api';
-
-export const { GET, POST, DELETE } = createMcpEndpoint(api);
-```
-
-Returns `{ GET, POST, DELETE }` — the three HTTP methods the MCP Streamable HTTP transport requires.
+On Next.js the endpoint is served by the catch-all route file that already serves your contract, so it resolves under that file's `basePath`. With the usual `app/api/[...ts-kizuna]/route.ts` and `basePath: '/api'`, it lands at `/api/mcp`.
 
 ## How it works
 
@@ -124,7 +80,7 @@ Public routes (`false` in the auth map) run without guards, credentials or not.
 | `name`        | `'MCP Server'`                         | Human-readable name shown to AI assistants    |
 | `version`     | `'1.0.0'`                              | Semantic version string                       |
 | `routeFilter` | excludes multipart and form-urlencoded | Predicate to filter which routes become tools |
-| `path`        | `'/mcp'`                               | Mount path (Express, Fastify, and Hono)       |
+| `path`        | `'/mcp'`                               | Path the endpoint is served from              |
 
 ## Connecting clients
 
@@ -211,5 +167,6 @@ await server.connect(new StdioServerTransport());
 
 ## Reference
 
-- [`createMcpEndpoint`](/docs/reference/create-mcp-endpoint)
+- [`mcp`](/docs/reference/mcp-plugin)
 - [`createMcpServer`](/docs/reference/create-mcp-server)
+- [Create a Plugin](/docs/extend/create-plugin) to write your own

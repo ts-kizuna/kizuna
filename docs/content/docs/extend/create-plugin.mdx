@@ -1,0 +1,122 @@
+---
+title: Create a Plugin
+description: Plugins get handed your whole contract, so they can build something new out of it and serve it from your app.
+---
+
+Your contract already knows every route you have: the paths, the inputs, the responses, who is allowed to call what. A plugin gets handed all of it, and gets to do something with it.
+
+That is how [MCP](/docs/mcp) works. `mcpPlugin()` reads your routes and turns each one into a tool an AI assistant can call, with the right input schema and the same guards. You wrote the contract once; the plugin turned it into a second way to use your API.
+
+```ts title="src/lib/api.ts"
+import { mcpPlugin } from '@ts-kizuna/mcp/express';
+
+export const api = server.api({
+    router,
+    plugins: [mcpPlugin()],
+});
+```
+
+```ts title="src/index.ts"
+api.mount(app);
+```
+
+You declare the plugin where the rest of your API is configured, and mounting the API brings it up too. There is nothing to remember at the call site, and nothing to forget in a second entry point.
+
+## Writing one
+
+A plugin has a name and a `mount` function. `mount` gets your app and your api:
+
+```ts
+interface KizunaPlugin<App> {
+    name: string;
+    mount: (app: App, api: ApiWithRouter) => void | Promise<void>;
+}
+```
+
+`api.routes` is the contract's whole route tree, so anything you can work out from the contract, a plugin can build. Here is one that publishes an index of your API, generated from the routes themselves and so never out of date:
+
+```ts title="src/plugins/route-index.ts"
+import { flattenRoutes } from '@ts-kizuna/core/adapter';
+import type { KizunaPlugin, App } from '@ts-kizuna/express';
+
+export const routeIndexPlugin = (options?: { path?: string }): KizunaPlugin<App> => ({
+    name: 'route-index',
+    mount: (app, api) => {
+        const routes = flattenRoutes(api.routes).map(({ routeKey, route }) => ({
+            key: routeKey,
+            method: route.method,
+            path: route.path,
+            summary: route.summary,
+        }));
+
+        app.get(options?.path ?? '/_routes', (_request, response) => {
+            response.json(routes);
+        });
+    },
+});
+```
+
+Write it as a function returning the plugin, the way `mcpPlugin()` does, so callers can pass options. Name it with a `Plugin` suffix while you are at it: inside a `plugins: [...]` list, that is what tells a reader the call is a plugin and not a handler.
+
+Not every plugin has to read the contract. A health check or a metrics endpoint ignores `api` entirely and just wants somewhere to register. That works too, and it still means one less thing to wire up by hand.
+
+## One plugin per framework
+
+`app` is your framework's real app object, so you register routes with the calls you already know, and you keep everything that makes that framework worth using: Fastify's encapsulation, Hono's typed env, Express middleware.
+
+The trade is that a plugin is written for one adapter. If you are publishing one, ship an export per framework you support, the way `@ts-kizuna/mcp` does:
+
+| adapter | import                   | `app` is                  |
+| ------- | ------------------------ | ------------------------- |
+| Express | `@ts-kizuna/mcp/express` | an Express app or router  |
+| Hono    | `@ts-kizuna/mcp/hono`    | the `Hono` instance       |
+| Fastify | `@ts-kizuna/mcp/fastify` | the `FastifyInstance`     |
+| Next.js | `@ts-kizuna/mcp/next`    | a [`PluginHost`](#nextjs) |
+
+Import the wrong one and it will not compile.
+
+## Setup that takes a moment
+
+Return a promise from `mount` and the next plugin waits for it. On Fastify that is how you get encapsulation, since `register` is async:
+
+```ts title="src/plugins/metrics.ts"
+import type { KizunaPlugin, App } from '@ts-kizuna/fastify';
+
+export const metricsPlugin = (): KizunaPlugin<App> => ({
+    name: 'metrics',
+    mount: async (app) => {
+        await app.register(async (instance) => {
+            instance.get('/metrics', async () => collectMetrics());
+        });
+    },
+});
+```
+
+On Fastify and Next you already `await api.mount(...)`, so async plugins finish before you serve traffic. On Express and Hono `mount` returns right away, so if something must be ready before the first request, do that work up front rather than inside `mount`.
+
+## Next.js
+
+Next has no app object to hand you, so `mount` makes one. A `PluginHost` takes the same `get`, `post`, `put`, `patch` and `delete` calls, and whatever you register is served by the catch-all route file that already serves your contract:
+
+```ts title="src/lib/api.ts"
+import { mcpPlugin } from '@ts-kizuna/mcp/next';
+
+export const api = server.api({
+    router,
+    plugins: [mcpPlugin()],
+});
+```
+
+```ts title="app/api/[...ts-kizuna]/route.ts"
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
+    basePath: '/api',
+});
+```
+
+Plugin paths sit under that `basePath`, so `mcpPlugin()` lands at `/api/mcp`. Incoming requests check plugins first and fall through to your routes, so a plugin only ever shadows a route if it claims the exact same path.
+
+## Reference
+
+- [`server.api`](/docs/reference/server-api) for the `plugins` option
+- [`mcpPlugin`](/docs/reference/mcp-plugin), the plugin ts-kizuna ships
+- [Create an Adapter](/docs/extend/create-adapter) if your runtime is the thing that's missing

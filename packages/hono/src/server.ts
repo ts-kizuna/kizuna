@@ -1,4 +1,7 @@
 import type { Context, Env, Hono, MiddlewareHandler } from 'hono';
+import type { App } from './plugins.js';
+
+export type { App, KizunaPlugin } from './plugins.js';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
     type AdapterRequest,
@@ -15,11 +18,13 @@ import {
     type RequestContextMap,
     type RequestContextRun,
     type ApiParts,
+    type KizunaPlugin,
     ROUTER_META,
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     assembleApi,
+    mountPlugins,
     createAdapter,
     renderJsonResult,
     parseFetchBody,
@@ -260,6 +265,7 @@ export interface Server<
     api(
         options: {
             router: Router<ServerContract<R, Schemes, Auth, RequestContext>, E>;
+            plugins?: readonly KizunaPlugin<App<E>>[];
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes, E>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
@@ -302,7 +308,10 @@ const init = <
         api: (options: ApiParts) => {
             const api = assembleApi(contract, options) as HonoApi<R>;
             return Object.assign(api, {
-                mount: <E extends Env = Env>(app: Hono<E>, mountOptions?: HonoOptions) => mountHono(api, app, mountOptions),
+                mount: <E extends Env = Env>(app: Hono<E>, mountOptions?: HonoOptions) => {
+                    mountHono(api, app, mountOptions);
+                    void mountPlugins(api, app);
+                },
             });
         },
     };

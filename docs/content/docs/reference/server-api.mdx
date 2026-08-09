@@ -29,3 +29,27 @@ export const api = server.api({
 | Next.js | [`api.mount()`](/docs/adapters/next)             |
 
 See the [Mounting guide](/docs/building/mounting) for full setup with each adapter.
+
+## Options
+
+| Option           | Required                              | Description                                                           |
+| ---------------- | ------------------------------------- | --------------------------------------------------------------------- |
+| `router`         | Yes                                   | The handler tree, typed against the contract                          |
+| `guards`         | When the contract declares identities | One [guard](/docs/reference/server-guard) per identity, keyed by name |
+| `requestContext` | When the contract declares context    | One [resolver](/docs/reference/server-request-context) per key        |
+| `plugins`        | No                                    | Extras that get your contract and serve something built from it       |
+
+## plugins
+
+A plugin is handed your whole contract and gets to build something out of it, and `api.mount` serves that alongside your routes. [`mcpPlugin()`](/docs/reference/mcp-plugin) is the one ts-kizuna ships: it turns every route into a tool an AI assistant can call.
+
+```ts title="src/lib/api.ts"
+import { mcpPlugin } from '@ts-kizuna/mcp/express';
+
+export const api = server.api({
+    router,
+    plugins: [mcpPlugin()],
+});
+```
+
+Plugins are typed to your adapter's app object, so import one from the subpath matching the adapter you are on. See [Create a Plugin](/docs/extend/create-plugin) to write your own.

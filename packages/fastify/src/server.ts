@@ -1,4 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginAsync } from 'fastify';
+import type { App } from './plugins.js';
+
+export type { App, KizunaPlugin } from './plugins.js';
 import fastifyPlugin from 'fastify-plugin';
 import {
     type AdapterRequest,
@@ -15,11 +18,13 @@ import {
     type RequestContextMap,
     type RequestContextRun,
     type ApiParts,
+    type KizunaPlugin,
     ROUTER_META,
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     assembleApi,
+    mountPlugins,
     createAdapter,
     renderJsonResult,
 } from '@ts-kizuna/core/adapter';
@@ -302,6 +307,7 @@ export interface Server<
     api(
         options: {
             router: Router<ServerContract<R, Schemes, Auth, RequestContext>>;
+            plugins?: readonly KizunaPlugin<App>[];
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
@@ -352,6 +358,7 @@ const init = <
                 plugin,
                 mount: async (app: FastifyInstance, mountOptions?: FastifyOptions) => {
                     await app.register(plugin, mountOptions ?? {});
+                    await mountPlugins(api, app);
                 },
             });
         },

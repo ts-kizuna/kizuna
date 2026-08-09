@@ -1,6 +1,6 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import type { Routes } from '@ts-kizuna/core';
-import { type ApiWithRouter, headersToObject } from '@ts-kizuna/core/adapter';
+import { type ApiWithRouter, type KizunaPlugin, headersToObject } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
 type HttpHandler = (request: Request) => Promise<Response>;
@@ -9,6 +9,12 @@ interface McpEndpoints {
     GET: HttpHandler;
     POST: HttpHandler;
     DELETE: HttpHandler;
+}
+
+interface NextApp {
+    get(path: string, handler: HttpHandler): void;
+    post(path: string, handler: HttpHandler): void;
+    delete(path: string, handler: HttpHandler): void;
 }
 
 export interface McpEndpointOptions {
@@ -93,3 +99,32 @@ export const createMcpEndpoint = (api: ApiWithRouter, options?: McpEndpointOptio
         DELETE,
     };
 };
+
+/**
+ * Let AI assistants use your API. This serves a Model Context Protocol endpoint
+ * at `/mcp`, where every route shows up as a tool an assistant can discover and
+ * call, behind the same guards as the HTTP endpoints.
+ *
+ * The catch-all route file that already serves your contract serves this too,
+ * so the path is relative to its `basePath`: the usual
+ * `app/api/[...ts-kizuna]/route.ts` with `basePath: '/api'` puts the endpoint
+ * at `/api/mcp`.
+ *
+ * @example
+ * ```ts
+ * export const api = server.api({
+ *     router,
+ *     plugins: [mcpPlugin()],
+ * });
+ * ```
+ */
+export const mcpPlugin = (options?: McpEndpointOptions & { path?: string }): KizunaPlugin<NextApp> => ({
+    name: '@ts-kizuna/mcp',
+    mount: (app, api) => {
+        const { GET, POST, DELETE } = createMcpEndpoint(api, options);
+        const mountPath = options?.path ?? '/mcp';
+        app.get(mountPath, GET);
+        app.post(mountPath, POST);
+        app.delete(mountPath, DELETE);
+    },
+});

@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Routes } from '@ts-kizuna/core';
 import { type ApiWithRouter } from '@ts-kizuna/core/adapter';
+import type { KizunaPlugin } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
 export interface McpEndpointOptions {
@@ -107,3 +108,23 @@ export const createMcpEndpoint = async (
 ): Promise<void> => {
     await app.register(async (instance) => register(instance, { ...options, api } as McpEndpointOptions));
 };
+
+/**
+ * Let AI assistants use your API. This serves a Model Context Protocol endpoint
+ * at `/mcp`, where every route shows up as a tool an assistant can discover and
+ * call, behind the same guards as the HTTP endpoints.
+ *
+ * @example
+ * ```ts
+ * export const api = server.api({
+ *     router,
+ *     plugins: [mcpPlugin()],
+ * });
+ * ```
+ */
+export const mcpPlugin = (options?: Omit<McpEndpointOptions, 'api'>): KizunaPlugin<FastifyInstance> => ({
+    name: '@ts-kizuna/mcp',
+    mount: async (app, api) => {
+        await createMcpEndpoint(api, app, options);
+    },
+});

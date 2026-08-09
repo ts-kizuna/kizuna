@@ -15,11 +15,13 @@ import {
     type RequestContextMap,
     type RequestContextRun,
     type ApiParts,
+    type KizunaPlugin,
     ROUTER_META,
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     assembleApi,
+    mountPlugins,
     createAdapter,
     renderJsonResult,
 } from '@ts-kizuna/core/adapter';
@@ -34,6 +36,9 @@ import type {
     RequestContextHeaderValues,
 } from '@ts-kizuna/core';
 import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
+import type { App } from './plugins.js';
+
+export type { App, KizunaPlugin } from './plugins.js';
 
 export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;
@@ -42,7 +47,7 @@ export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     /**
      * Register every contract route on an Express app or router.
      */
-    mount: (app: AppLike, options?: ExpressOptions) => ExpressRouter;
+    mount: (app: App, options?: ExpressOptions) => ExpressRouter;
 };
 
 /**
@@ -145,10 +150,6 @@ type RequestResolverFns<RequestContext extends Record<string, RequestContextSche
     ) => z.output<RequestContext[Name]['context']> | Promise<z.output<RequestContext[Name]['context']>>;
 };
 
-export interface AppLike {
-    use: (router: ExpressRouter) => unknown;
-}
-
 interface ExpressResponseContext {
     res: Response;
     next: NextFunction;
@@ -195,7 +196,7 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
  * @example
  * api.mount(app);
  */
-function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOptions): ExpressRouter {
+function mountExpress(api: ExpressApi, app: App, options?: ExpressOptions): ExpressRouter {
     const resolvedRouter = api[ROUTER_META] as CoreRouter<Routes, ExpressHandlerContext>;
     const guards = api[GUARDS_META] as GuardMap<ExpressHandlerContext> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
@@ -294,6 +295,7 @@ export interface Server<
     api(
         options: {
             router: Router<ServerContract<R, Schemes, Auth, RequestContext>>;
+            plugins?: readonly KizunaPlugin<App>[];
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
@@ -335,7 +337,11 @@ const init = <
         api: (options: ApiParts) => {
             const api = assembleApi(contract, options) as ExpressApi<R>;
             return Object.assign(api, {
-                mount: (app: AppLike, mountOptions?: ExpressOptions) => mountExpress(api, app, mountOptions),
+                mount: (app: App, mountOptions?: ExpressOptions) => {
+                    const router = mountExpress(api, app, mountOptions);
+                    void mountPlugins(api, app);
+                    return router;
+                },
             });
         },
     };

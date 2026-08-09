@@ -2,9 +2,10 @@ import type { Request, Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Routes } from '@ts-kizuna/core';
 import { type ApiWithRouter } from '@ts-kizuna/core/adapter';
+import type { KizunaPlugin } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
-interface AppLike {
+interface ExpressApp {
     post(path: string, ...handlers: Array<(req: Request, res: Response) => void>): void;
     get(path: string, ...handlers: Array<(req: Request, res: Response) => void>): void;
     delete(path: string, ...handlers: Array<(req: Request, res: Response) => void>): void;
@@ -50,7 +51,7 @@ export interface McpEndpointOptions {
  * createMcpEndpoint(api, app);
  * ```
  */
-export const createMcpEndpoint = (api: ApiWithRouter, app: AppLike, options?: McpEndpointOptions): void => {
+export const createMcpEndpoint = (api: ApiWithRouter, app: ExpressApp, options?: McpEndpointOptions): void => {
     const mountPath = options?.path ?? '/mcp';
 
     app.post(mountPath, async (request: Request, response: Response) => {
@@ -91,3 +92,23 @@ export const createMcpEndpoint = (api: ApiWithRouter, app: AppLike, options?: Mc
         });
     });
 };
+
+/**
+ * Let AI assistants use your API. This serves a Model Context Protocol endpoint
+ * at `/mcp`, where every route shows up as a tool an assistant can discover and
+ * call, behind the same guards as the HTTP endpoints.
+ *
+ * @example
+ * ```ts
+ * export const api = server.api({
+ *     router,
+ *     plugins: [mcpPlugin()],
+ * });
+ * ```
+ */
+export const mcpPlugin = (options?: Omit<McpEndpointOptions, 'api'>): KizunaPlugin<ExpressApp> => ({
+    name: '@ts-kizuna/mcp',
+    mount: (app, api) => {
+        createMcpEndpoint(api, app, options);
+    },
+});

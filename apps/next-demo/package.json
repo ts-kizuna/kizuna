@@ -13,6 +13,7 @@
     "@ts-kizuna-demo/shared": "workspace:*",
     "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/mcp": "workspace:*",
     "@ts-kizuna/next": "workspace:*",
     "@ts-kizuna/openapi": "workspace:*",
     "next": "catalog:",

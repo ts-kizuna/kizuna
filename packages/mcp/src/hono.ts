@@ -2,9 +2,10 @@ import type { Context } from 'hono';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import type { Routes } from '@ts-kizuna/core';
 import { type ApiWithRouter, headersToObject } from '@ts-kizuna/core/adapter';
+import type { KizunaPlugin } from '@ts-kizuna/core/adapter';
 import { createMcpServer, type McpServerOptions } from './server.js';
 
-interface AppLike {
+interface HonoApp {
     post(path: string, handler: (c: Context) => Response | Promise<Response>): unknown;
     get(path: string, handler: (c: Context) => Response | Promise<Response>): unknown;
     delete(path: string, handler: (c: Context) => Response | Promise<Response>): unknown;
@@ -50,7 +51,7 @@ export interface McpEndpointOptions {
  * createMcpEndpoint(api, app);
  * ```
  */
-export const createMcpEndpoint = (api: ApiWithRouter, app: AppLike, options?: McpEndpointOptions): void => {
+export const createMcpEndpoint = (api: ApiWithRouter, app: HonoApp, options?: McpEndpointOptions): void => {
     const mountPath = options?.path ?? '/mcp';
 
     app.post(mountPath, async (c: Context) => {
@@ -96,3 +97,23 @@ export const createMcpEndpoint = (api: ApiWithRouter, app: AppLike, options?: Mc
         );
     });
 };
+
+/**
+ * Let AI assistants use your API. This serves a Model Context Protocol endpoint
+ * at `/mcp`, where every route shows up as a tool an assistant can discover and
+ * call, behind the same guards as the HTTP endpoints.
+ *
+ * @example
+ * ```ts
+ * export const api = server.api({
+ *     router,
+ *     plugins: [mcpPlugin()],
+ * });
+ * ```
+ */
+export const mcpPlugin = (options?: Omit<McpEndpointOptions, 'api'>): KizunaPlugin<HonoApp> => ({
+    name: '@ts-kizuna/mcp',
+    mount: (app, api) => {
+        createMcpEndpoint(api, app, options);
+    },
+});

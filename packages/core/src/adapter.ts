@@ -20,6 +20,9 @@ import { STATUS_TITLES } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
+import { type KizunaPlugin, PLUGINS_META } from './plugins.js';
+
+export { type KizunaPlugin, PLUGINS_META, mountPlugins } from './plugins.js';
 
 export type { RouteDefinition, Routes, Method } from './types.js';
 
@@ -142,6 +145,7 @@ export interface ApiParts {
     router: unknown;
     guards?: unknown;
     requestContext?: unknown;
+    plugins?: readonly KizunaPlugin<never>[];
 }
 
 /**
@@ -165,6 +169,7 @@ export const assembleApi = <const R extends Routes>(
         [GUARDS_META]: parts.guards,
         [SCHEMES_META]: contract.securitySchemes,
         [REQUEST_CONTEXT_META]: parts.requestContext,
+        [PLUGINS_META]: parts.plugins,
     } as ApiWithRouter<R>;
 };
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
