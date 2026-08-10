@@ -136,9 +136,9 @@ const client = new KizunaClient(contract, {
 
 ## Server
 
-### `initServer` maps to `createServer`
+### `initServer` maps to `new KizunaServer()`
 
-`initServer` does not exist in ts-kizuna. Bind the contract with `createServer`, use `server.router` to bind implementations, and `server.api` to produce a mountable API object.
+`initServer` does not exist in ts-kizuna. Bind the contract with `new KizunaServer()`, use `server.router` to bind implementations, and `new KizunaApi()` to produce a mountable API object.
 
 ```ts
 // ts-rest
@@ -149,13 +149,14 @@ const router = s.router(contract, { ... });
 
 ```ts
 // ts-kizuna
-import { KizunaServer } from '@ts-kizuna/express';
+import { KizunaServer, KizunaApi } from '@ts-kizuna/express';
 
 const server = new KizunaServer(contract);
 
 const router = server.router({ ... });
 
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
 });
 ```
@@ -194,7 +195,7 @@ createExpressEndpoints(contract, router, app);
 api.mount(app);
 ```
 
-In ts-kizuna, `api.mount(app)` is a method on the `api` object (produced by `server.api`) rather than a function taking separate routes and handler arguments.
+In ts-kizuna, `api.mount(app)` is a method on the `api` object (produced by `new KizunaApi()`) rather than a function taking separate routes and handler arguments.
 
 ## Next.js adapter
 

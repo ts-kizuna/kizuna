@@ -125,14 +125,16 @@ export const router = server.router({
 
 ## Bind the contract to your server
 
-`server.api` joins your router into the API object the adapter mounts:
+`new KizunaApi()` joins your contract and your router into the API object the adapter mounts:
 
 ```ts
 // api.ts
-import { server } from './server';
+import { KizunaApi } from '@ts-kizuna/express';
+import { contract } from './contract';
 import { router } from './router';
 
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
 });
 ```

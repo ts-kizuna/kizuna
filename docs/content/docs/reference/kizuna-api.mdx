@@ -1,16 +1,20 @@
 ---
-title: server.api
-description: Assemble the router, guards and request context into the api object you mount.
+title: KizunaApi
+description: Assemble the contract, router, guards and request context into the api object you mount.
 ---
 
-`server.api({ router, guards, requestContext })` binds the router and guards into the API object an adapter mounts.
+`new KizunaApi({ contract, router, guards, requestContext })` binds the contract and the parts that serve it into the API object an adapter mounts. It comes from your adapter package, so `mount` is the one your framework needs.
+
+<AdapterTabs functionName="KizunaApi" showInstall={false} />
 
 ```ts title="src/lib/api.ts"
-import { server } from './server';
+import { KizunaApi } from '@ts-kizuna/express';
+import { contract } from './contract';
 import { router } from './router';
 import { requireUser, requireMember } from './guards';
 
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
     guards: {
         user: requireUser,
@@ -19,7 +23,7 @@ export const api = server.api({
 });
 ```
 
-`guards` is keyed by identity name and, when provided, must cover every identity the auth map uses. Mount the returned object with the adapter's mount verb:
+`guards` is keyed by identity name and, when provided, must cover every identity the auth map uses. Mount the result with the adapter's mount verb:
 
 | Adapter | Mount                                            |
 | ------- | ------------------------------------------------ |
@@ -35,7 +39,8 @@ See the [Mounting guide](/docs/building/mounting) for full setup with each adapt
 A [plugin](/docs/extend/create-plugin) is installed on [`new Kizuna()`](/docs/reference/kizuna). If it needs anything live, such as a store or a transport, pass it here under the same key:
 
 ```ts title="src/lib/api.ts"
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
     plugins: {
         audit: {

@@ -35,7 +35,7 @@ openApiPlugin(props: OpenApiPluginProps): KizunaPlugin
 | `pageTitle`     | the document title | The page's `<title>`                                         |
 | `configuration` | —                  | Extra config merged into the UI's initializer                |
 
-Props are pure data, and the plugin builds the document from the contract at serve time, so it needs nothing from `server.api`.
+Props are pure data, and the plugin builds the document from the contract at serve time, so it needs nothing from `new KizunaApi()`.
 
 They are also the options [`generateOpenApi`](/docs/reference/generate-openapi) uses when you call it without any, so a build step and the served document cannot disagree.
 

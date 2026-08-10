@@ -14,7 +14,7 @@ import {
     type ExpectedRouteHandler,
     type ExpectedRouter,
 } from '../../core/src/adapter-testing/type-testing.js';
-import { KizunaServer, type ExpressHandlerContext, type RouteHandler, type Router } from './server.js';
+import { KizunaServer, KizunaApi, type ExpressHandlerContext, type RouteHandler, type Router } from './server.js';
 
 const securedServer = new KizunaServer(securedContract);
 const gateServer = new KizunaServer(gateContract);
@@ -64,7 +64,8 @@ test('conforms to the shared adapter type catalogue', () => {
                 }),
             });
 
-            server.api({
+            new KizunaApi({
+                contract: inferenceGroupContract,
                 router: {
                     users,
                 },
@@ -192,7 +193,8 @@ test('conforms to the shared adapter type catalogue', () => {
         'guards.completeMap': () => {
             const requireUser = securedServer.guard('user', ({ deny }) => deny(401, 'Unauthorized'));
 
-            new KizunaServer(securedContract).api({
+            new KizunaApi({
+                contract: securedContract,
                 router: {
                     api: {
                         publicRoute: () => ({
@@ -228,7 +230,8 @@ test('conforms to the shared adapter type catalogue', () => {
                 },
             });
             // @ts-expect-error guards is required when the contract declares identities
-            new KizunaServer(securedContract).api({
+            new KizunaApi({
+                contract: securedContract,
                 router: {
                     api: {
                         publicRoute: () => ({
@@ -280,7 +283,8 @@ test('conforms to the shared adapter type catalogue', () => {
         },
         'requestContext.requiredOnApi': () => {
             // @ts-expect-error context resolvers are required when the contract declares context
-            new KizunaServer(requestContextContract).api({
+            new KizunaApi({
+                contract: requestContextContract,
                 router: {
                     api: {
                         publicRoute: () => ({

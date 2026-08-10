@@ -15,6 +15,7 @@ import {
     type RequestContextMap,
     type RequestContextRun,
     type ApiParts,
+    API_META,
     ROUTER_META,
     GUARDS_META,
     SCHEMES_META,
@@ -271,19 +272,28 @@ export interface Server<
             router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>
         ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>;
     };
-    /**
-     * Assemble the router and guards into the api object.
-     */
-    api(
-        options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>;
-            plugins?: PluginConfigs<Plugins>;
-        } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes, E>> }) &
-            (string extends keyof RequestContext
-                ? { requestContext?: undefined }
-                : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<HonoHandlerContext<E>> }> })
-    ): HonoApi<R>;
 }
+
+/**
+ * What a {@link KizunaApi} is assembled from: the contract it serves, the router
+ * that implements it, one guard per declared identity, one resolver per declared
+ * request context, and each plugin's live config.
+ */
+export type ApiConfig<
+    R extends Routes,
+    Schemes extends Record<string, SecurityScheme>,
+    Auth,
+    RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
+    E extends Env = Env,
+> = {
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>;
+    router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>;
+    plugins?: PluginConfigs<Plugins>;
+} & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes, E>> }) &
+    (string extends keyof RequestContext
+        ? { requestContext?: undefined }
+        : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<HonoHandlerContext<E>> }> });
 
 const createServerSurface = <
     const R extends Routes,
@@ -306,20 +316,14 @@ const createServerSurface = <
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
-        api: (options: ApiParts) => {
-            const api = assembleApi(contract, options) as HonoApi<R>;
-            return Object.assign(api, {
-                mount: <E extends Env = Env>(app: Hono<E>, mountOptions?: HonoOptions) => mountHono(api, app, mountOptions),
-            });
-        },
     };
     return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, E>;
 };
 
 /**
  * Bind a contract to a server handle: the serving counterpart to `Kizuna`. Keep
- * the instance and use `server.guard` to define guards, `server.router` to bind
- * typed handlers, and `server.api` to assemble them.
+ * the instance and use `server.guard` to define guards and `server.router` to
+ * bind typed handlers, then assemble them with `new KizunaApi()`.
  *
  * @example
  * const server = new KizunaServer(contract);
@@ -327,13 +331,6 @@ const createServerSurface = <
  * const requireUser = server.guard('user', ({ bearer, deny }) => {
  *     const session = bearer && sessions.get(bearer.token);
  *     return session ? { userId: session.userId } : deny(401, 'Unauthorized');
- * });
- *
- * export const api = server.api({
- *     router,
- *     guards: {
- *         user: requireUser,
- *     },
  * });
  */
 export class KizunaServer<
@@ -347,9 +344,44 @@ export class KizunaServer<
     declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, E>['guard'];
     declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, E>['requestContext'];
     declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, E>['router'];
-    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, E>['api'];
 
     constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>) {
         Object.assign(this, createServerSurface(contract));
+    }
+}
+
+/**
+ * Assemble a contract, its router, its guards and its request context resolvers
+ * into the api object Hono mounts.
+ *
+ * @example
+ * export const api = new KizunaApi({
+ *     contract,
+ *     router,
+ *     guards: {
+ *         user: requireUser,
+ *     },
+ * });
+ *
+ * api.mount(app);
+ */
+export class KizunaApi<
+    const R extends Routes,
+    Schemes extends Record<string, SecurityScheme>,
+    Auth,
+    RequestContext extends Record<string, RequestContextSchema>,
+    Plugins extends ContractPlugins,
+> implements HonoApi<R> {
+    declare readonly [API_META]: true;
+    declare readonly [ROUTER_META]: Record<string, unknown>;
+    declare readonly routes: R;
+    declare readonly mount: HonoApi<R>['mount'];
+
+    constructor(config: ApiConfig<R, Schemes, Auth, RequestContext, Plugins>) {
+        const { contract, ...parts } = config;
+        const api = assembleApi(contract, parts as ApiParts) as HonoApi<R>;
+        return Object.assign(api, {
+            mount: <MountEnv extends Env = Env>(app: Hono<MountEnv>, mountOptions?: HonoOptions) => mountHono(api, app, mountOptions),
+        }) as KizunaApi<R, Schemes, Auth, RequestContext, Plugins>;
     }
 }

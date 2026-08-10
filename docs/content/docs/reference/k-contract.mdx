@@ -3,7 +3,7 @@ title: k.contract
 description: Assemble route groups into the Contract your server, clients, and generators all read.
 ---
 
-`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/kizuna-client), [server](/docs/reference/server-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `new Kizuna()`.
+`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/kizuna-client), [server](/docs/reference/kizuna-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `new Kizuna()`.
 
 ```ts
 // contract.ts

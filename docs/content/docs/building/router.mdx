@@ -267,7 +267,7 @@ const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ par
 // One group, what each split file exports
 const users: Router<typeof contract>['users'] = { ... };
 
-// Whole tree, pass straight to `server.router` or `server.api`
+// Whole tree, pass straight to `server.router` or `new KizunaApi()`
 const router: Router<typeof contract> = { ... };
 ```
 

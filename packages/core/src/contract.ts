@@ -47,7 +47,7 @@ export interface Contract<
     securitySchemes?: Schemes;
     /**
      * The request context schemas passed to `new Kizuna()`. Each key names a
-     * provider registered on `server.api`; every handler receives its value.
+     * provider registered on `new KizunaApi()`; every handler receives its value.
      * Never gates a request and never appears in the OpenAPI document.
      */
     requestContext?: RequestContext;

@@ -35,9 +35,9 @@ export interface AdapterUnderTest<Api> {
     name: AdapterName;
     /**
      * @example
-     * initServerApi: (contract, options) => new KizunaServer(contract).api(options)
+     * initServerApi: (config) => new KizunaApi(config)
      */
-    initServerApi: (contract: never, options: never) => Api;
+    initServerApi: (config: never) => Api;
     mount: (api: Api, options: { responseValidation?: boolean }) => Transport | Promise<Transport>;
 }
 
@@ -53,14 +53,12 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
     const behaviour = ADAPTER_BEHAVIOUR[adapter.name];
 
     const mount = async (options: MountOptions): Promise<MountedApi> => {
-        const api = adapter.initServerApi(
-            options.contract as never,
-            {
-                router: options.router,
-                guards: options.guards,
-                plugins: options.plugins,
-            } as never
-        );
+        const api = adapter.initServerApi({
+            contract: options.contract,
+            router: options.router,
+            guards: options.guards,
+            plugins: options.plugins,
+        } as never);
         const transport = await adapter.mount(api, {
             responseValidation: options.responseValidation,
         });

@@ -131,7 +131,7 @@ export type PluginConfigOf<P> = P extends { server: (config: infer Config, api: 
 export type PluginExportsOf<P> = P extends { server: (...args: never[]) => { exports?: infer Exports } } ? Exports : never;
 
 /**
- * The config `server.api` takes per plugin. A plugin whose config is `void`
+ * The config `new KizunaApi()` takes per plugin. A plugin whose config is `void`
  * needs nothing, so its key is optional.
  */
 export type PluginConfigs<Plugins extends ContractPlugins> = {

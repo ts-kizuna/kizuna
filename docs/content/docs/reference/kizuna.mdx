@@ -66,7 +66,7 @@ export const k = new Kizuna({
 
 ## Request context
 
-`requestContext` registers declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) — request-scoped values like analytics ids or a logger. Every handler receives them typed under `requestContext`, keyed by their name; each is resolved per request by a [`server.requestContext`](/docs/reference/server-request-context) resolver wired on `server.api`.
+`requestContext` registers declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) — request-scoped values like analytics ids or a logger. Every handler receives them typed under `requestContext`, keyed by their name; each is resolved per request by a [`server.requestContext`](/docs/reference/server-request-context) resolver wired on `new KizunaApi()`.
 
 ```ts title="request-contexts.ts"
 import { z } from 'zod';

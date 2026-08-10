@@ -53,7 +53,7 @@ export const ADAPTER_TYPE_FEATURES = {
         summary: 'An identity the contract does not declare is refused.',
     },
     'guards.completeMap': {
-        summary: '`server.api` requires `guards`, with an entry per identity, when the contract declares any.',
+        summary: '`new KizunaApi()` requires `guards`, with an entry per identity, when the contract declares any.',
     },
     'requestContext.handlerArg': {
         summary: 'Handlers receive typed `requestContext` on every route.',
@@ -65,7 +65,7 @@ export const ADAPTER_TYPE_FEATURES = {
         summary: 'A context key the contract does not declare is refused.',
     },
     'requestContext.requiredOnApi': {
-        summary: '`server.api` requires providers when the contract declares request context.',
+        summary: '`new KizunaApi()` requires providers when the contract declares request context.',
     },
     'standalone.routeHandlerAuth': {
         summary: 'A standalone `RouteHandler` carries the route’s auth and drops into the group router.',

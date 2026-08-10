@@ -78,10 +78,12 @@ export const router = server.router({
 ```
 
 ```ts title="src/lib/api.ts"
-import { server } from './server';
+import { KizunaApi } from '@ts-kizuna/next';
+import { contract } from '@shared/contract';
 import { router } from './router';
 
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
 });
 ```
@@ -144,22 +146,24 @@ api.mount({
 });
 ```
 
-| Option               | Default | Description                                                                                                                                                   |
-| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `basePath`           | `''`    | Path prefix to strip when matching incoming paths                                                                                                             |
-| `requestMiddleware`  | `[]`    | Middleware run after route matching, before the handler — see [`requestMiddleware`](#requestmiddleware)                                                       |
-| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                               |
-| `onError`            | none    | Map a thrown error into a response (inbound migration seam); return an `AdapterResult`/`Response` to override the default 500. Also settable on `server.api`. |
+| Option               | Default | Description                                                                                                                                                        |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `basePath`           | `''`    | Path prefix to strip when matching incoming paths                                                                                                                  |
+| `requestMiddleware`  | `[]`    | Middleware run after route matching, before the handler — see [`requestMiddleware`](#requestmiddleware)                                                            |
+| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                                    |
+| `onError`            | none    | Map a thrown error into a response (inbound migration seam); return an `AdapterResult`/`Response` to override the default 500. Also settable on `new KizunaApi()`. |
 
 ## `onError`
 
-Set `onError` on `server.api` (or pass it to `api.mount`) to send a custom response instead of the default 500:
+Set `onError` on `new KizunaApi()` (or pass it to `api.mount`) to send a custom response instead of the default 500:
 
 ```ts title="src/lib/api.ts"
-import { server } from './server';
+import { KizunaApi } from '@ts-kizuna/next';
+import { contract } from '@shared/contract';
 import { router } from './router';
 
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
     onError: (error) => {
         if (error instanceof AuthError) {
@@ -233,5 +237,5 @@ uploadAvatar: async ({ body }) => {
 
 - [`new KizunaServer()`](/docs/reference/kizuna-server)
 - [`server.router`](/docs/reference/server-router)
-- [`server.api`](/docs/reference/server-api)
+- [`new KizunaApi()`](/docs/reference/kizuna-api)
 - [`server.guard`](/docs/reference/server-guard)

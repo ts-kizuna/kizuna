@@ -5,7 +5,7 @@ import type { Server, AddressInfo } from 'node:net';
 import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { KizunaClient, type Client } from '@ts-kizuna/fetch';
-import { KizunaServer } from '@ts-kizuna/express';
+import { KizunaServer, KizunaApi } from '@ts-kizuna/express';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -56,7 +56,8 @@ describe('end-to-end: typed client → Express server', () => {
         const app = express();
         app.use(express.json());
 
-        const api = new KizunaServer(contract).api({
+        const api = new KizunaApi({
+            contract,
             router: {
                 createUser: ({ body }) => {
                     const id = String(users.size + 1);
@@ -174,7 +175,8 @@ describe('end-to-end: response headers', () => {
         const app = express();
         app.use(express.json());
 
-        const api = new KizunaServer(contractWithResponseHeaders).api({
+        const api = new KizunaApi({
+            contract: contractWithResponseHeaders,
             router: {
                 getUser: ({ params, headers, res }) => {
                     const requestId = headers['x-request-id'];
@@ -271,7 +273,8 @@ describe('end-to-end: typed client → secured Express route', () => {
             };
         });
 
-        const api = securedServer.api({
+        const api = new KizunaApi({
+            contract: securedContract,
             router: {
                 api: {
                     whoAmI: ({ auth }) => ({

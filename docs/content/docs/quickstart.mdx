@@ -111,7 +111,7 @@ export const contract = k.contract({
 
 ## 3. Implement the server
 
-Pick an adapter, here Express. `new KizunaServer()` binds the contract to a `server` handle, `server.router` supplies the handlers, `server.api` produces the API object, and the mount attaches it to your app.
+Pick an adapter, here Express. `new KizunaServer()` binds the contract to a `server` handle, `server.router` supplies the handlers, `new KizunaApi()` produces the API object, and the mount attaches it to your app.
 
 <InstallTabs packageName="@ts-kizuna/express" />
 
@@ -177,13 +177,15 @@ export const router = server.router({
 });
 ```
 
-`server.api` binds the router into the API object the adapter mounts.
+`new KizunaApi()` binds the contract and the router into the API object the adapter mounts.
 
 ```ts title="src/lib/api.ts"
-import { server } from './server';
+import { KizunaApi } from '@ts-kizuna/express';
+import { contract } from '@shared/contract';
 import { router } from './router';
 
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
 });
 ```

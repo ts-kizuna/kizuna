@@ -4,7 +4,7 @@ import type { z } from 'zod';
  * A request context declaration from `Kizuna.requestContext`: the schema
  * of a request-scoped value every handler receives, and optionally the request
  * headers it derives from. Resolved per adapter with
- * `server.requestContext` and wired on `server.api` under
+ * `server.requestContext` and wired on `new KizunaApi()` under
  * `requestContext`.
  */
 export interface RequestContextSchema<

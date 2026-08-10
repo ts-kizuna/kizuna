@@ -1,9 +1,11 @@
-import { server } from './server';
+import { KizunaApi } from '@ts-kizuna/fastify';
+import { contract } from '@ts-kizuna-demo/shared';
 import { requireUser, requireMember, requireInviteToken } from './guards';
 import { captureAnalytics } from './request-context';
 import { router } from './router';
 
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
     guards: {
         user: requireUser,

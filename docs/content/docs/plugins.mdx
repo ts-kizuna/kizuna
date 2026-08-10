@@ -24,16 +24,17 @@ export const k = new Kizuna({
 });
 ```
 
-The key you choose is the plugin's name everywhere else: handlers read it under `plugins.mcp`, and `server.api` takes its config under the same key.
+The key you choose is the plugin's name everywhere else: handlers read it under `plugins.mcp`, and `new KizunaApi()` takes its config under the same key.
 
 `api.mount` serves its routes along with yours. There is nothing extra to mount, and it is the same on Express, Fastify, Hono and Next.js.
 
 ## Configuring one
 
-Anything live, a store or a transport, goes on `server.api`:
+Anything live, a store or a transport, goes on `new KizunaApi()`:
 
 ```ts title="src/lib/api.ts"
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
     plugins: {
         audit: {
@@ -85,7 +86,7 @@ A plugin's routes run through the same pipeline as yours, with the same validati
 
 That is deliberate. A protocol endpoint has no business being a method on your generated Swift client, and keeping the two apart makes that structural rather than something you remember to exclude.
 
-If a plugin claims a path your contract already uses, `server.api` throws and names both.
+If a plugin claims a path your contract already uses, `new KizunaApi()` throws and names both.
 
 ## Next
 

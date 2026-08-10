@@ -15,7 +15,7 @@ The standard setup:
 
 - `new KizunaServer()` binds the contract to a `server` handle
 - `server.router` binds typed implementations to the contract
-- `server.api` combines the router and guards into an API object
+- `new KizunaApi()` combines the contract, the router and the guards into an API object
 - `api.mount(app)` mounts the API on an Express app
 
 ```ts title="src/lib/server.ts"
@@ -70,10 +70,12 @@ export const router = server.router({
 ```
 
 ```ts title="src/lib/api.ts"
-import { server } from './server';
+import { KizunaApi } from '@ts-kizuna/express';
+import { contract } from '@shared/contract';
 import { router } from './router';
 
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
 });
 ```
@@ -190,5 +192,5 @@ api.mount(app);
 
 - [`new KizunaServer()`](/docs/reference/kizuna-server)
 - [`server.router`](/docs/reference/server-router)
-- [`server.api`](/docs/reference/server-api)
+- [`new KizunaApi()`](/docs/reference/kizuna-api)
 - [`server.guard`](/docs/reference/server-guard)

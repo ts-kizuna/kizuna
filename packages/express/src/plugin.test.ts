@@ -4,7 +4,7 @@ import request from 'supertest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { createPlugin } from '@ts-kizuna/core/adapter';
-import { KizunaServer } from './server.js';
+import { KizunaApi } from './server.js';
 
 const probePlugin = createPlugin({
     name: 'probe',
@@ -60,8 +60,8 @@ const contract = k.contract({
 });
 
 const serve = () => {
-    const server = new KizunaServer(contract);
-    const api = server.api({
+    const api = new KizunaApi({
+        contract,
         router: {
             indexUser: ({ params, plugins }) => ({
                 status: 200,
@@ -141,18 +141,19 @@ describe('plugin lane', () => {
             routes,
         });
 
-        const server = new KizunaServer(colliding);
-        expect(() =>
-            server.api({
-                router: {
-                    indexUser: () => ({
-                        status: 200,
-                        body: {
-                            queued: 'x',
-                        },
-                    }),
-                },
-            } as never)
+        expect(
+            () =>
+                new KizunaApi({
+                    contract: colliding,
+                    router: {
+                        indexUser: () => ({
+                            status: 200,
+                            body: {
+                                queued: 'x',
+                            },
+                        }),
+                    },
+                } as never)
         ).toThrow(/Duplicate route/);
     });
 });

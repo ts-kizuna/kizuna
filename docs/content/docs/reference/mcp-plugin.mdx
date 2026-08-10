@@ -30,7 +30,7 @@ mcpPlugin(props?: McpPluginProps): KizunaPlugin
 | `version`     | `'1.0.0'`          | Semantic version string                       |
 | `routeFilter` | excludes multipart | Predicate to filter which routes become tools |
 
-Props are pure data, because they reach the contract and the contract reaches your client. The plugin needs nothing at runtime, so it never appears in `server.api`.
+Props are pure data, because they reach the contract and the contract reaches your client. The plugin needs nothing at runtime, so it never appears in `new KizunaApi()`.
 
 ## Example
 

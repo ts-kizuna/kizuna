@@ -57,11 +57,13 @@ export const requireUser = server.guard('user', async ({ bearer, deny }) => {
 ```
 
 ```ts title="src/lib/api.ts"
-import { server } from './server';
+import { KizunaApi } from '@ts-kizuna/express';
+import { contract } from './contract';
 import { router } from './router';
 import { requireUser } from './guards';
 
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
     guards: {
         user: requireUser,
@@ -254,5 +256,5 @@ const apiClient = new KizunaClient(contract, {
 - [`Kizuna.identity`](/docs/reference/kizuna-identity)
 - [`k.contract`](/docs/reference/k-contract#the-auth-map) — the auth map's value forms
 - [`server.guard`](/docs/reference/server-guard)
-- [`server.api`](/docs/reference/server-api)
+- [`new KizunaApi()`](/docs/reference/kizuna-api)
 - [`new KizunaClient()`](/docs/reference/kizuna-client)

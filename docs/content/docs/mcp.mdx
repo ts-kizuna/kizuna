@@ -47,7 +47,7 @@ Handlers receive the same framework context they do over HTTP, passed through fr
 
 ## Auth
 
-Secured tools authenticate via the headers of the MCP transport request. When an assistant calls one, the endpoint runs the [guards](/docs/auth) registered on `server.api`, exactly like the HTTP pipeline: each identity's credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context as usual. Installing the plugin on a secured API gives you a secured MCP endpoint.
+Secured tools authenticate via the headers of the MCP transport request. When an assistant calls one, the endpoint runs the [guards](/docs/auth) registered on `new KizunaApi()`, exactly like the HTTP pipeline: each identity's credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context as usual. Installing the plugin on a secured API gives you a secured MCP endpoint.
 
 Configure the MCP client to send the credential as a header on the connection. For example, with Claude Code:
 

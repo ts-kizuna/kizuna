@@ -3,16 +3,18 @@ title: Mounting
 description: Bind your router to the contract and serve it with an adapter.
 ---
 
-The last step: `server.api` binds your [router](/docs/building/router) into the API object your framework adapter mounts. After this, your routes are live. The `server` handle comes from `new KizunaServer(contract)` (see [Router](/docs/building/router)).
+The last step: `new KizunaApi()` binds your contract and your [router](/docs/building/router) into the API object your framework adapter mounts. After this, your routes are live.
 
-## `server.api`
+## `new KizunaApi()`
 
 ```ts title="src/lib/api.ts"
-import { server } from './server'; // new KizunaServer(contract) from @ts-kizuna/express, fastify, hono, or next
+import { KizunaApi } from '@ts-kizuna/express'; // or fastify, hono, next
+import { contract } from './contract';
 import { router } from './router';
 import { requireUser, requireMember } from './guards';
 
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
     guards: {
         user: requireUser,
@@ -23,7 +25,7 @@ export const api = server.api({
 
 ## Guards
 
-If the contract declares identities, pass one guard per identity under `guards`. Created with `server.guard`, a guard verifies the extracted credential and returns the identity's context or a denial. The contract's auth map decides which routes each guard protects, so `server.api` attaches them automatically. See the [Auth guide](/docs/auth) for the whole pipeline and the adapter pages for each framework's guard context.
+If the contract declares identities, pass one guard per identity under `guards`. Created with `server.guard`, a guard verifies the extracted credential and returns the identity's context or a denial. The contract's auth map decides which routes each guard protects, so `new KizunaApi()` attaches them automatically. See the [Auth guide](/docs/auth) for the whole pipeline and the adapter pages for each framework's guard context.
 
 ## Request context
 
@@ -87,7 +89,7 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
 ## Reference
 
 - [`new KizunaServer()`](/docs/reference/kizuna-server)
-- [`server.api`](/docs/reference/server-api)
+- [`new KizunaApi()`](/docs/reference/kizuna-api)
 - [`server.guard`](/docs/reference/server-guard)
 
 ## Next steps

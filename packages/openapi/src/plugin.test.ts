@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { KizunaServer } from '@ts-kizuna/express';
+import { KizunaServer, KizunaApi } from '@ts-kizuna/express';
 import express from 'express';
 import request from 'supertest';
 import { generateOpenApi } from './generator.js';
@@ -36,8 +36,8 @@ const contract = k.contract({
 });
 
 const serve = () => {
-    const server = new KizunaServer(contract);
-    const api = server.api({
+    const api = new KizunaApi({
+        contract,
         router: {
             getUser: ({ params }) => ({
                 status: 200,
@@ -110,18 +110,17 @@ describe('openApiPlugin', () => {
         });
 
         const app = express();
-        new KizunaServer(servedContract)
-            .api({
-                router: {
-                    ping: () => ({
-                        status: 200,
-                        body: {
-                            ok: true,
-                        },
-                    }),
-                },
-            })
-            .mount(app);
+        new KizunaApi({
+            contract: servedContract,
+            router: {
+                ping: () => ({
+                    status: 200,
+                    body: {
+                        ok: true,
+                    },
+                }),
+            },
+        }).mount(app);
 
         const served = JSON.parse((await request(app).get('/openapi.json')).text);
 
@@ -183,18 +182,17 @@ describe('openApiPlugin', () => {
         });
 
         const app = express();
-        new KizunaServer(specOnly)
-            .api({
-                router: {
-                    ping: () => ({
-                        status: 200,
-                        body: {
-                            ok: true,
-                        },
-                    }),
-                },
-            })
-            .mount(app);
+        new KizunaApi({
+            contract: specOnly,
+            router: {
+                ping: () => ({
+                    status: 200,
+                    body: {
+                        ok: true,
+                    },
+                }),
+            },
+        }).mount(app);
 
         expect((await request(app).get('/openapi.json')).status).toBe(200);
         expect((await request(app).get('/docs')).status).toBe(404);
@@ -231,18 +229,17 @@ describe('openApiPlugin', () => {
         });
 
         const app = express();
-        new KizunaServer(custom)
-            .api({
-                router: {
-                    ping: () => ({
-                        status: 200,
-                        body: {
-                            ok: true,
-                        },
-                    }),
-                },
-            })
-            .mount(app);
+        new KizunaApi({
+            contract: custom,
+            router: {
+                ping: () => ({
+                    status: 200,
+                    body: {
+                        ok: true,
+                    },
+                }),
+            },
+        }).mount(app);
 
         expect((await request(app).get('/reference')).status).toBe(200);
         expect((await request(app).get('/spec.yaml')).status).toBe(200);
@@ -280,20 +277,18 @@ describe('openApiPlugin', () => {
             }),
         });
 
-        const server = new KizunaServer(jsonOnly);
         const app = express();
-        server
-            .api({
-                router: {
-                    ping: () => ({
-                        status: 200,
-                        body: {
-                            ok: true,
-                        },
-                    }),
-                },
-            })
-            .mount(app);
+        new KizunaApi({
+            contract: jsonOnly,
+            router: {
+                ping: () => ({
+                    status: 200,
+                    body: {
+                        ok: true,
+                    },
+                }),
+            },
+        }).mount(app);
 
         expect((await request(app).get('/openapi.json')).status).toBe(200);
         expect((await request(app).get('/openapi.yaml')).status).toBe(200);

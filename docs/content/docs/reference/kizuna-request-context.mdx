@@ -42,7 +42,8 @@ export const captureAnalytics = server.requestContext('analytics', ({ headers })
 ```
 
 ```ts title="src/lib/api.ts"
-export const api = server.api({
+export const api = new KizunaApi({
+    contract,
     router,
     requestContext: {
         analytics: captureAnalytics,
@@ -80,4 +81,4 @@ let client = APIClient(baseURL: url, requestContext: .init(xPosthogSessionId: se
 val client = APIClient(baseUrl = baseUrl, requestContext = APIClient.RequestContext(xPosthogSessionId = sessionId))
 ```
 
-Resolvers run on every route — public ones included — before the guards, and never deny a request. They receive the adapter's native request objects, the route's `params`, and the declared `headers` (validated). The return is checked against the `context` schema, and `server.api` requires a resolver for every declared key. Request context never appears in the OpenAPI document.
+Resolvers run on every route — public ones included — before the guards, and never deny a request. They receive the adapter's native request objects, the route's `params`, and the declared `headers` (validated). The return is checked against the `context` schema, and `new KizunaApi()` requires a resolver for every declared key. Request context never appears in the OpenAPI document.

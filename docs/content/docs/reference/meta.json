@@ -14,7 +14,7 @@
         "server-guard",
         "server-router",
         "server-request-context",
-        "server-api",
+        "kizuna-api",
         "kizuna-client",
         "problem-details-schema",
         "binary-and-file-schemas",
