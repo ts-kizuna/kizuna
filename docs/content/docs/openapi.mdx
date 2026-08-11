@@ -197,3 +197,7 @@ If a route already declares a `400` response, the automatic validation error is 
 ## Breaking changes
 
 Use [oasdiff](https://github.com/oasdiff/oasdiff) to compare your generated spec against a previous version and catch breaking changes before they ship. See the [Breaking Changes](/docs/breaking-changes) guide for setup and CI integration.
+
+## Scheduled jobs
+
+[Scheduled jobs](/docs/jobs) live under `jobs` on the contract rather than `routes`, so they are not in the document. A job has no path or method of its own to describe, and the two endpoints that serve them have one legitimate caller each.

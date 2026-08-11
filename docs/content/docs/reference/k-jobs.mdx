@@ -1,0 +1,107 @@
+---
+title: k.jobs
+description: Declare a contract's scheduled jobs, with their schedules, inputs, and results.
+---
+
+Declares the contract's scheduled jobs. The first argument is the identity every job requires, the credential your scheduler sends. Pass the result to `k.contract` under `jobs`, alongside `routes`.
+
+```ts
+import { z } from 'zod';
+import { cron } from '@ts-kizuna/core';
+
+export const jobs = k.jobs('scheduler', {
+    sendDigests: {
+        schedule: cron.daily('05:00'),
+        summary: 'Send the daily digest to every user',
+        result: z.object({
+            sent: z.int(),
+        }),
+    },
+    billing: {
+        reconcileInvoices: {
+            schedule: cron.every('15m'),
+            input: z.object({
+                since: z.string(),
+            }),
+        },
+    },
+});
+```
+
+Jobs nest to any depth. Omit the identity argument to declare them public, which is rarely what you want.
+
+Jobs carry their own identity, so they never appear in the contract's `auth` map.
+
+See the [Scheduled jobs guide](/docs/jobs) for handlers, triggering, and local development.
+
+## Job fields
+
+| Field         | Type                               | Notes                                                                                                                                                       |
+| ------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schedule`    | `string \| { cron, timezone }`     | A five-field cron expression, UTC unless a `timezone` is given. Validated when the contract is built. Omit it for a job that is only ever queued from code. |
+| `retry`       | `number`                           | How many attempts a failed run deserves. Handed to the transport, which is what actually retries.                                                           |
+| `input`       | `z.ZodType`                        | Schema for the payload the job is queued with. Validated on `run` and `queue`, and again at the run endpoint.                                               |
+| `result`      | `z.ZodType`                        | Schema for what the job reports on success. Omit it and the job answers `204`.                                                                              |
+| `summary`     | `string`                           |                                                                                                                                                             |
+| `description` | `string`                           |                                                                                                                                                             |
+| `responses`   | `{ [status]: ResponseDefinition }` | Extra responses beyond the synthesized ones.                                                                                                                |
+
+## Synthesized responses
+
+Every job answers with the same set, because a scheduler decides whether to retry from the status code:
+
+| Status                                | Meaning                         |
+| ------------------------------------- | ------------------------------- |
+| `200` with `result`, or `204` without | Done                            |
+| `422`                                 | Permanent failure; do not retry |
+| `500`                                 | Unexpected throw; retry         |
+| `503`                                 | Transient failure; retry        |
+
+`422`, `500`, and `503` take an RFC 9457 Problem Details body, so a handler supplies `detail` plus any extension members.
+
+## Schedule helpers
+
+Exported from `@ts-kizuna/core`. Each returns a plain cron string.
+
+| Helper                        | Expression     |
+| ----------------------------- | -------------- |
+| `cron.every('15m')`           | `*/15 * * * *` |
+| `cron.every('2h')`            | `0 */2 * * *`  |
+| `cron.hourly(30)`             | `30 * * * *`   |
+| `cron.daily('05:00')`         | `0 5 * * *`    |
+| `cron.weekly('mon', '09:00')` | `0 9 * * 1`    |
+| `cron.monthly(1, '05:00')`    | `0 5 1 * *`    |
+
+`nextRun(schedule, from?)` returns the next time a schedule fires, or `undefined` for a schedule that never can (`0 0 30 2 *`). `nextRuns(schedule, count, from?)` returns several.
+
+## Reaching a job
+
+Every handler receives a `jobs` runner shaped like the declaration, with two methods per job:
+
+```ts
+// Run it now, block, get the result.
+const result = await jobs.billing.reconcileInvoices.run({ since });
+
+// Put it in line and answer the request.
+await jobs.indexUser.queue({
+    input: {
+        userId,
+    },
+    dedupeKey: `index:${userId}`,
+    runAt: tomorrow,
+});
+```
+
+Input is validated against the job's `input` schema either way. Where a queued job goes is the [transport's](/docs/extend/create-job-transport) business; with none configured it runs in this process.
+
+## Validation at contract build
+
+`k.jobs` throws rather than letting a broken schedule reach production:
+
+- an invalid cron expression, naming the field
+- an unknown time zone
+- a `path` with a parameter in it, since a scheduler has no value to put there
+- two jobs on the same method and path
+- `retry` that is not a whole number of attempts
+- a job with a `schedule` **and** an `input` its schema will not accept as empty. A scheduler sends no body, so that job could only ever fail validation
+- a job answering `GET` with an `input`, which a GET request has no body to carry

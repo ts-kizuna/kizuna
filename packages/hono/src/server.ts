@@ -19,6 +19,10 @@ import {
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
+    JOBS_META,
+    warnUnsupportedJobOptions,
+    type ServerOptions,
+    type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
     type PluginImplementations,
@@ -27,6 +31,10 @@ import {
     pluginRouterOf,
     assembleApi,
     createAdapter,
+    jobRoutes,
+    jobRouter,
+    jobRunnerFrom,
+    type Jobs,
     renderJsonResult,
     parseFetchBody,
     headersToObject,
@@ -38,6 +46,8 @@ import type {
     SecurityScheme,
     GuardSuccess,
     CredentialOf,
+    JobHandlers,
+    JobsArg,
     RequestContextSchema,
     RequestContextHeaderValues,
 } from '@ts-kizuna/core';
@@ -47,6 +57,7 @@ export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
+    readonly [JOBS_META]?: unknown;
     /**
      * Register every contract route on a Hono app.
      */
@@ -69,11 +80,25 @@ export type RouteHandler<R extends RouteDefinition, E extends Env = Env> = CoreR
  * in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C, E extends Env = Env> =
-    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins>
-        ? HandlersFromAuth<R, HonoHandlerContext<E> & RequestContextValues<RequestContext> & PluginArgs<Plugins>, Schemes, Auth>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins, infer J>
+        ? HandlersFromAuth<
+              R,
+              HonoHandlerContext<E> & RequestContextValues<RequestContext> & PluginArgs<Plugins> & JobsArg<J>,
+              Schemes,
+              Auth
+          >
         : C extends Routes
           ? CoreRouter<C, HonoHandlerContext<E>>
           : never;
+
+/**
+ * The handler for each of a contract's scheduled jobs, typed against it. Each
+ * receives only the job's `input`, so the same handler can be run in process.
+ */
+export type JobsRouter<C> =
+    C extends Contract<infer _R, infer _Tags, infer _Codes, infer _Schemes, infer _Auth, infer _RequestContext, infer _Plugins, infer J>
+        ? JobHandlers<J>
+        : never;
 
 /**
  * The handlers for a group named on the contract, or for a bare route group.
@@ -170,58 +195,78 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
  * const app = new Hono();
  * api.mount(app);
  */
-function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, options?: HonoOptions): void {
+export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, options?: HonoOptions): void {
     const guards = api[GUARDS_META] as GuardMap<HonoHandlerContext<Env>> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<HonoHandlerContext<Env>> | undefined;
 
     const pluginExports = pluginExportsOf(api);
+    const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
+    const jobRunner = jobRunnerFrom(jobsMeta);
+
+    const mountRoute = (
+        routeKey: string,
+        route: RouteDefinition,
+        lane: Routes,
+        resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>
+    ): void => {
+        const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
+        const kizunaHandler = async (c: Context<E>) => {
+            const url = new URL(c.req.url);
+
+            const adapterRequest: AdapterRequest<Request> = {
+                request: c.req.raw,
+                method: c.req.method,
+                resolution: {
+                    kind: 'pre-resolved',
+                    routeKey,
+                    route,
+                    params: c.req.param() as Record<string, string>,
+                },
+                query: Object.fromEntries(url.searchParams),
+                headers: headersToObject(c.req.raw.headers),
+                readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),
+            };
+
+            return honoAdapter.handle({
+                routes: lane,
+                router: resolvedRouter,
+                request: adapterRequest,
+                responseContext: {
+                    c: c as unknown as Context<Env>,
+                    formatError: options?.formatError,
+                },
+                guards,
+                schemes,
+                requestContext,
+                pluginExports,
+                jobs: jobRunner,
+                responseValidation: options?.responseValidation,
+            });
+        };
+        (app.on as (method: string, path: string, ...handlers: MiddlewareHandler[]) => void)(
+            method,
+            route.path,
+            kizunaHandler as MiddlewareHandler
+        );
+    };
 
     const mountLane = (lane: Routes, resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>): void => {
         for (const { routeKey, route } of honoAdapter.eachRoute(lane, resolvedRouter)) {
-            const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
-            const kizunaHandler = async (c: Context<E>) => {
-                const url = new URL(c.req.url);
-
-                const adapterRequest: AdapterRequest<Request> = {
-                    request: c.req.raw,
-                    method: c.req.method,
-                    resolution: {
-                        kind: 'pre-resolved',
-                        routeKey,
-                        route,
-                        params: c.req.param() as Record<string, string>,
-                    },
-                    query: Object.fromEntries(url.searchParams),
-                    headers: headersToObject(c.req.raw.headers),
-                    readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),
-                };
-
-                return honoAdapter.handle({
-                    routes: lane,
-                    router: resolvedRouter,
-                    request: adapterRequest,
-                    responseContext: {
-                        c: c as unknown as Context<Env>,
-                        formatError: options?.formatError,
-                    },
-                    guards,
-                    schemes,
-                    requestContext,
-                    pluginExports,
-                    responseValidation: options?.responseValidation,
-                });
-            };
-            (app.on as (method: string, path: string, ...handlers: MiddlewareHandler[]) => void)(
-                method,
-                route.path,
-                kizunaHandler as MiddlewareHandler
-            );
+            mountRoute(routeKey, route, lane, resolvedRouter);
         }
     };
 
     mountLane(api.routes, api[ROUTER_META] as CoreRouter<Routes, HonoHandlerContext<Env>>);
     mountLane(pluginRoutesOf(api), pluginRouterOf(api) as CoreRouter<Routes, HonoHandlerContext<Env>>);
+
+    if (jobsMeta) {
+        const routes = jobRoutes(jobsMeta);
+        const router = jobRouter<HonoHandlerContext<Env>>(jobsMeta);
+        for (const [routeKey, route] of Object.entries(routes)) {
+            mountRoute(routeKey, route as RouteDefinition, routes, router);
+        }
+    }
 }
 
 type ServerContract<
@@ -230,7 +275,8 @@ type ServerContract<
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins>;
+    J extends Jobs = Jobs,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J>;
 
 export interface Server<
     R extends Routes,
@@ -239,6 +285,7 @@ export interface Server<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     E extends Env = Env,
+    J extends Jobs = Jobs,
 > {
     /**
      * Define a guard for one of the contract's identities. It runs before the
@@ -263,21 +310,47 @@ export interface Server<
      * Bind typed handlers to the contract or one of its route groups.
      */
     router: {
-        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>, string> | Routes>(
+        <
+            const GroupOrRoutes extends
+                | Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>, string>
+                | Routes,
+        >(
             group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes, E>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes, E>;
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes, E>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes, E>;
         (
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>
-        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>;
     };
     /**
-     * Assemble the router and guards into the api object.
+     * Bind a handler to each of the contract's jobs.
+     *
+     * Pass a `transport` to say where a queued job goes. Without one, `queue`
+     * runs the job in this process and it is lost on a crash.
+     *
+     * @example
+     * export const jobs = server.jobs({
+     *     sendDigests: async () => ({
+     *         status: 200,
+     *         body: {
+     *             sent: await sendPendingDigests(),
+     *         },
+     *     }),
+     * });
+     */
+    jobs(
+        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
+    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+    /**
+     * Assemble the router, guards, and job handlers into the api object.
      */
     api(
         options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes, E>> }) &
+            (string extends keyof J
+                ? { jobs?: undefined }
+                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
                 : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<HonoHandlerContext<E>> }> }) &
@@ -292,21 +365,35 @@ const createServerSurface = <
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     E extends Env = Env,
+    J extends Jobs = Jobs,
 >(
-    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>
-): Server<R, Schemes, Auth, RequestContext, Plugins, E> => {
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>,
+    options?: ServerOptions
+): Server<R, Schemes, Auth, RequestContext, Plugins, E, J> => {
+    warnUnsupportedJobOptions(contract.jobs, options?.jobTransport);
     const server = {
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
-        api: (options: ApiParts) => {
-            const api = assembleApi(contract, options) as HonoApi<R>;
+        jobs: (handlers: unknown) => handlers,
+        api: ({ jobs, ...parts }: ApiParts & { jobs?: Record<string, unknown> }) => {
+            const api = Object.assign(assembleApi(contract, parts), {
+                [JOBS_META]: contract.jobs
+                    ? {
+                          jobs: contract.jobs,
+                          handlers: jobs ?? {},
+                          config: contract.jobsConfig,
+                          transport: options?.jobTransport,
+                          onError: options?.onJobError,
+                      }
+                    : undefined,
+            }) as HonoApi<R>;
             return Object.assign(api, {
                 mount: <E extends Env = Env>(app: Hono<E>, mountOptions?: HonoOptions) => mountHono(api, app, mountOptions),
             });
         },
     };
-    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, E>;
+    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, E, J>;
 };
 
 /**
@@ -336,13 +423,15 @@ export class KizunaServer<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     E extends Env = Env,
-> implements Server<R, Schemes, Auth, RequestContext, Plugins, E> {
-    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, E>['guard'];
-    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, E>['requestContext'];
-    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, E>['router'];
-    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, E>['api'];
+    J extends Jobs = Jobs,
+> implements Server<R, Schemes, Auth, RequestContext, Plugins, E, J> {
+    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['guard'];
+    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['requestContext'];
+    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['router'];
+    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['jobs'];
+    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['api'];
 
-    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>) {
-        Object.assign(this, createServerSurface(contract));
+    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, options?: ServerOptions) {
+        Object.assign(this, createServerSurface(contract, options));
     }
 }

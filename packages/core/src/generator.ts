@@ -6,12 +6,15 @@ import {
     type SerializedDeprecationMap,
 } from './deprecation.js';
 import { flattenRoutes } from './handler-pipeline.js';
+import { flattenJobs, isCompiledJob, jobAt, type CompiledJob, type FlattenedJob, type Jobs } from './jobs.js';
 import { parsePath } from './path-params.js';
 import type { Routes, RouteDefinition } from './types.js';
 import type { Contract } from './contract.js';
 
 export { contractFingerprint, serializeDeprecationMap, deserializeDeprecationMap, type DeprecationMap, type SerializedDeprecationMap };
 export type { Routes, RouteDefinition };
+export { flattenJobs, isCompiledJob, jobAt };
+export type { CompiledJob, FlattenedJob, Jobs };
 export { parsePath };
 
 export {

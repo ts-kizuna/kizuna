@@ -13,6 +13,18 @@ ts-kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RF
 - **TRACE** — excluded from `Method`. Universally disabled in production and unsupported by modern frameworks. Do not add it.
 - **Auto HEAD-via-GET fallback** — ts-kizuna is contract-first; if HEAD isn't in the contract it doesn't exist. HEAD on a GET-only route returns 405. Authors who want HEAD declare an explicit HEAD route. Express handles HEAD natively for GET routes as a framework feature; Next and other adapters return 405. Might reconsider at a later time.
 
+# Jobs
+
+Jobs (`k.jobs`) are the one non-HTTP-shaped concept. Settled; don't relitigate.
+
+- A job is a sibling of a route, never inside one. Nothing that walks `contract.routes` sees a job.
+- A handler receives only `input`, `throwError`, and `jobs`.
+- A job declares no path and no method. `schedule` is optional.
+- Two endpoints serve every job, both under the `jobs.path` namespace (default `/jobs`, which serves nothing itself): `POST /jobs/dispatch` runs whatever is due, `POST /jobs/run` runs the one job its `{ job, input }` body names. A job is addressed by its dotted key.
+- `run` and `queue`, never a bare call. `run` takes the input; `queue` takes a message (`input`, `runAt`, `dedupeKey`).
+
+Deliberate omissions: no first-party transports, no stored state, and no per-job cron generation. Retries, deduplication, and run history belong to the transport. An occurrence's dedupe key is `job@occurrenceISO`.
+
 # Naming
 
 Use full English words.

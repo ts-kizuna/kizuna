@@ -20,6 +20,10 @@ import {
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
+    JOBS_META,
+    warnUnsupportedJobOptions,
+    type ServerOptions,
+    type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
     type PluginImplementations,
@@ -29,6 +33,10 @@ import {
     assembleApi,
     createAdapter,
     renderJsonResult,
+    jobRoutes,
+    jobRouter,
+    jobRunnerFrom,
+    type Jobs,
 } from '@ts-kizuna/core/adapter';
 import type { z } from 'zod';
 import type {
@@ -37,6 +45,8 @@ import type {
     SecurityScheme,
     GuardSuccess,
     CredentialOf,
+    JobHandlers,
+    JobsArg,
     RequestContextSchema,
     RequestContextHeaderValues,
 } from '@ts-kizuna/core';
@@ -46,6 +56,7 @@ export type FastifyApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
+    readonly [JOBS_META]?: unknown;
     /**
      * Register every contract route on a Fastify instance. Calls
      * `app.register` internally, so encapsulation behaves as Fastify expects.
@@ -74,11 +85,25 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, Fastif
  * identity's context in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C> =
-    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins>
-        ? HandlersFromAuth<R, FastifyHandlerContext & RequestContextValues<RequestContext> & PluginArgs<Plugins>, Schemes, Auth>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins, infer J>
+        ? HandlersFromAuth<
+              R,
+              FastifyHandlerContext & RequestContextValues<RequestContext> & PluginArgs<Plugins> & JobsArg<J>,
+              Schemes,
+              Auth
+          >
         : C extends Routes
           ? CoreRouter<C, FastifyHandlerContext>
           : never;
+
+/**
+ * The handler for each of a contract's scheduled jobs, typed against it. Each
+ * receives only the job's `input`, so the same handler can be run in process.
+ */
+export type JobsRouter<C> =
+    C extends Contract<infer _R, infer _Tags, infer _Codes, infer _Schemes, infer _Auth, infer _RequestContext, infer _Plugins, infer J>
+        ? JobHandlers<J>
+        : never;
 
 /**
  * The handlers for a group named on the contract, or for a bare route group.
@@ -219,7 +244,7 @@ export interface KizunaPluginOptions extends FastifyOptions {
  * const app = Fastify();
  * await api.mount(app);
  */
-const fastifyKizuna = fastifyPlugin(
+export const fastifyKizuna = fastifyPlugin(
     async (app: FastifyInstance, options: KizunaPluginOptions) => {
         const { api } = options;
         const guards = api[GUARDS_META] as GuardMap<FastifyHandlerContext> | undefined;
@@ -227,6 +252,56 @@ const fastifyKizuna = fastifyPlugin(
         const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<FastifyHandlerContext> | undefined;
 
         const pluginExports = pluginExportsOf(api);
+        const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
+        const jobRunner = jobRunnerFrom(jobsMeta);
+
+        const mountRoute = (
+            routeKey: string,
+            route: RouteDefinition,
+            lane: Routes,
+            resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>
+        ): void => {
+            app.route({
+                method: route.method,
+                url: route.path,
+                preHandler: [
+                    async (request: FastifyRequest) => {
+                        request.kizunaRoute = route;
+                    },
+                ],
+                handler: async (request: FastifyRequest, reply: FastifyReply) => {
+                    const adapterRequest: AdapterRequest<FastifyRequest> = {
+                        request,
+                        method: request.method,
+                        resolution: {
+                            kind: 'pre-resolved',
+                            routeKey,
+                            route,
+                            params: (request.params ?? {}) as Record<string, string>,
+                        },
+                        query: (request.query ?? {}) as Record<string, string>,
+                        headers: request.headers,
+                        readBody: () => request.body,
+                    };
+
+                    await adapter.handle({
+                        routes: lane,
+                        router: resolvedRouter,
+                        request: adapterRequest,
+                        responseContext: {
+                            reply,
+                            formatError: options?.formatError,
+                        },
+                        guards,
+                        schemes,
+                        requestContext,
+                        pluginExports,
+                        jobs: jobRunner,
+                        responseValidation: options?.responseValidation,
+                    });
+                },
+            });
+        };
 
         const mountLane = (lane: Routes, resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>): void => {
             // Fastify's auto-exposed HEAD collides with a declared one, but it skips paths that already have HEAD.
@@ -235,50 +310,20 @@ const fastifyKizuna = fastifyPlugin(
             );
 
             for (const { routeKey, route } of declaredRoutes) {
-                app.route({
-                    method: route.method,
-                    url: route.path,
-                    preHandler: [
-                        async (request: FastifyRequest) => {
-                            request.kizunaRoute = route;
-                        },
-                    ],
-                    handler: async (request: FastifyRequest, reply: FastifyReply) => {
-                        const adapterRequest: AdapterRequest<FastifyRequest> = {
-                            request,
-                            method: request.method,
-                            resolution: {
-                                kind: 'pre-resolved',
-                                routeKey,
-                                route,
-                                params: (request.params ?? {}) as Record<string, string>,
-                            },
-                            query: (request.query ?? {}) as Record<string, string>,
-                            headers: request.headers,
-                            readBody: () => request.body,
-                        };
-
-                        await adapter.handle({
-                            routes: lane,
-                            router: resolvedRouter,
-                            request: adapterRequest,
-                            responseContext: {
-                                reply,
-                                formatError: options?.formatError,
-                            },
-                            guards,
-                            schemes,
-                            requestContext,
-                            pluginExports,
-                            responseValidation: options?.responseValidation,
-                        });
-                    },
-                });
+                mountRoute(routeKey, route, lane, resolvedRouter);
             }
         };
 
         mountLane(api.routes, api[ROUTER_META] as CoreRouter<Routes, FastifyHandlerContext>);
         mountLane(pluginRoutesOf(api), pluginRouterOf(api) as CoreRouter<Routes, FastifyHandlerContext>);
+
+        if (jobsMeta) {
+            const routes = jobRoutes(jobsMeta);
+            const router = jobRouter<FastifyHandlerContext>(jobsMeta);
+            for (const [routeKey, route] of Object.entries(routes)) {
+                mountRoute(routeKey, route as RouteDefinition, routes, router);
+            }
+        }
     },
     {
         name: '@ts-kizuna/fastify',
@@ -291,7 +336,8 @@ type ServerContract<
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins>;
+    J extends Jobs = Jobs,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J>;
 
 export interface Server<
     R extends Routes,
@@ -299,6 +345,7 @@ export interface Server<
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
+    J extends Jobs = Jobs,
 > {
     /**
      * Define a guard for one of the contract's identities. It runs before the
@@ -323,21 +370,43 @@ export interface Server<
      * Bind typed handlers to the contract or one of its route groups.
      */
     router: {
-        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>, string> | Routes>(
+        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>, string> | Routes>(
             group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes>;
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes>;
         (
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>
-        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
     };
     /**
-     * Assemble the router and guards into the api object.
+     * Bind a handler to each of the contract's jobs.
+     *
+     * Pass a `transport` to say where a queued job goes. Without one, `queue`
+     * runs the job in this process and it is lost on a crash.
+     *
+     * @example
+     * export const jobs = server.jobs({
+     *     sendDigests: async () => ({
+     *         status: 200,
+     *         body: {
+     *             sent: await sendPendingDigests(),
+     *         },
+     *     }),
+     * });
+     */
+    jobs(
+        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
+    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+    /**
+     * Assemble the router, guards, and job handlers into the api object.
      */
     api(
         options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) &
+            (string extends keyof J
+                ? { jobs?: undefined }
+                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
                 : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<FastifyHandlerContext> }> }) &
@@ -351,15 +420,29 @@ const createServerSurface = <
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
+    J extends Jobs = Jobs,
 >(
-    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>
-): Server<R, Schemes, Auth, RequestContext, Plugins> => {
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>,
+    options?: ServerOptions
+): Server<R, Schemes, Auth, RequestContext, Plugins, J> => {
+    warnUnsupportedJobOptions(contract.jobs, options?.jobTransport);
     const server = {
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
-        api: (options: ApiParts) => {
-            const api = assembleApi(contract, options) as FastifyApi<R>;
+        jobs: (handlers: unknown) => handlers,
+        api: ({ jobs, ...parts }: ApiParts & { jobs?: Record<string, unknown> }) => {
+            const api = Object.assign(assembleApi(contract, parts), {
+                [JOBS_META]: contract.jobs
+                    ? {
+                          jobs: contract.jobs,
+                          handlers: jobs ?? {},
+                          config: contract.jobsConfig,
+                          transport: options?.jobTransport,
+                          onError: options?.onJobError,
+                      }
+                    : undefined,
+            }) as FastifyApi<R>;
             const plugin = fastifyPlugin(
                 async (app: FastifyInstance, pluginOptions: FastifyOptions) => {
                     await fastifyKizuna(app, { ...pluginOptions, api });
@@ -374,7 +457,7 @@ const createServerSurface = <
             });
         },
     };
-    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins>;
+    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, J>;
 };
 
 /**
@@ -403,13 +486,15 @@ export class KizunaServer<
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
-> implements Server<R, Schemes, Auth, RequestContext, Plugins> {
-    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins>['guard'];
-    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins>['requestContext'];
-    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins>['router'];
-    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins>['api'];
+    J extends Jobs = Jobs,
+> implements Server<R, Schemes, Auth, RequestContext, Plugins, J> {
+    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, J>['guard'];
+    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, J>['requestContext'];
+    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, J>['router'];
+    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, J>['jobs'];
+    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, J>['api'];
 
-    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>) {
-        Object.assign(this, createServerSurface(contract));
+    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, options?: ServerOptions) {
+        Object.assign(this, createServerSurface(contract, options));
     }
 }

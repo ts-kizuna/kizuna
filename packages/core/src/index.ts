@@ -54,6 +54,75 @@ export {
     type BuiltinIssueCode,
 } from './validation-error.js';
 export { isProblemDetails } from './error-response.js';
+export {
+    type JobDefinition,
+    type AuthoredJobs,
+    type Jobs,
+    type CompiledJob,
+    type JobResponses,
+    type JobHandler,
+    type JobHandlers,
+    type JobHandlerArgs,
+    type JobHandlerReturn,
+    type JobsArg,
+    type JobsConfig,
+    type CompiledJobs,
+    type FlattenedJob,
+    type NoJobs,
+    isCompiledJob,
+    isJobDefinition,
+    flattenJobs,
+    jobAt,
+} from './jobs.js';
+export {
+    dueJobs,
+    dispatchDueJobs,
+    dispatchSucceeded,
+    failedJobs,
+    DispatchResultSchema,
+    DispatchFailedSchema,
+    type DispatchOptions,
+    type DispatchOutcome,
+    type DispatchResult,
+} from './job-dispatch.js';
+export {
+    createJobRunner,
+    jobFnAt,
+    JobInputError,
+    type JobRunner,
+    type JobRunnerOptions,
+    type JobErrorHandler,
+    type JobFn,
+    type JobFnByKey,
+    type JobRunArgs,
+    type JobQueueArgs,
+    type JobQueueOptions,
+} from './job-runner.js';
+export {
+    createJobTransport,
+    JobDispatchError,
+    type JobTransport,
+    type JobTransportDefinition,
+    type JobTransportSupports,
+    type JobMessage,
+    type JobDescriptor,
+    type ScheduledJob,
+    type JobWorker,
+    type JobWorkerContext,
+} from './job-transport.js';
+export {
+    type JobSchedule,
+    type ParsedCron,
+    parseCron,
+    nextRun,
+    nextRuns,
+    firesBetween,
+    dueSchedules,
+    scheduleExpression,
+    scheduleTimezone,
+    assertValidSchedule,
+    cron,
+} from './schedule.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export { ResponseError } from './response-error.js';
 export { STATUS_TITLES, getStatusText } from './status-titles.js';

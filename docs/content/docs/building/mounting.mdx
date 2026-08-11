@@ -98,3 +98,19 @@ For adapter-specific options (error handling, middleware, `onError`, etc.) see t
 - [Fastify](/docs/adapters/fastify)
 - [Hono](/docs/adapters/hono)
 - [Next.js](/docs/adapters/next)
+
+## Scheduled jobs
+
+If the contract declares [scheduled jobs](/docs/jobs), bind their handlers with `server.jobs` and pass them to `server.api` next to the router:
+
+```ts
+export const api = server.api({
+    router,
+    jobs: jobHandlers,
+    guards: {
+        scheduler: requireScheduler,
+    },
+});
+```
+
+`api.mount` then serves the two [job endpoints](/docs/jobs#the-two-job-endpoints), and every handler receives a typed `jobs` runner so a route can run one in process.

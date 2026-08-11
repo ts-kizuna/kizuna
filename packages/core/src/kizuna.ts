@@ -3,7 +3,8 @@ import { tagRoutes } from './routes.js';
 import { assembleContract, type Contract } from './contract.js';
 import type { ContractPlugins } from './plugin.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
-import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
+import { flattenRoutes, isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
+import { assertNoJobEndpointCollision, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, type JobsConfig } from './jobs.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
 import { createIdentity } from './identity.js';
 import { createRequestContext } from './request-context.js';
@@ -237,15 +238,43 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         map: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>
     ): A;
     /**
+     * Declare scheduled jobs. Pass the identity every job requires — the one
+     * credential your scheduler sends — then the jobs themselves.
+     *
+     * Jobs are their own concept, not routes. Each is reachable over HTTP so a
+     * scheduler can trigger it, and runs through the same validation, guards, and
+     * Problem Details as a route; but jobs never appear in `contract.routes`, the
+     * OpenAPI document, or the generated Swift, Kotlin, and MCP surfaces.
+     *
+     * @example
+     * export const jobs = k.jobs('scheduler', {
+     *     sendDigests: {
+     *         schedule: '0 5 * * *',
+     *         summary: 'Send daily digest emails',
+     *         result: z.object({
+     *             sent: z.int(),
+     *         }),
+     *     },
+     * });
+     */
+    jobs<const J extends AuthoredJobs, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: J): CompiledJobs<J, Name>;
+    jobs<const J extends AuthoredJobs>(definitions: J): CompiledJobs<J, undefined>;
+    /**
      * Assemble route groups into a contract. The `auth` map assigns each group
      * (and optionally each route, via a `'*'` cascade) the identity it requires;
      * `k.contract` resolves it onto every route's `security` and `accessGate`.
+     *
+     * Jobs declared with `k.jobs` go under `jobs`, alongside `routes` rather than
+     * inside it. They carry their own identity, so they never appear in the
+     * `auth` map.
      */
     contract<
         const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
         const A extends AuthMap<IdentityNamesOf<Spec>, R>,
+        const J extends Jobs = Record<string, never>,
     >(definition: {
         routes: R;
+        jobs?: J;
         auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
     }): Contract<
         RoutesWithHandlerContext<R, Spec['identities'], A, Spec['requestContext']>,
@@ -254,10 +283,12 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         Spec['identities'],
         A,
         Spec['requestContext'],
-        PluginsOf<Spec>
+        PluginsOf<Spec>,
+        J
     >;
-    contract<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>>(definition: {
+    contract<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>, const J extends Jobs = Record<string, never>>(definition: {
         routes: R;
+        jobs?: J;
     }): Contract<
         RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext']>,
         Spec['tags'],
@@ -265,7 +296,8 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         Spec['identities'],
         unknown,
         Spec['requestContext'],
-        PluginsOf<Spec>
+        PluginsOf<Spec>,
+        J
     >;
     /**
      * Emit a validation issue with a machine-readable `code`, checked against the
@@ -323,6 +355,10 @@ export interface KizunaConfig<
      * `plugins`.
      */
     plugins?: Plugins;
+    /**
+     * Settings shared by every job. The jobs themselves are declared with `k.jobs`.
+     */
+    jobs?: JobsConfig;
 }
 
 const createSurface = <
@@ -345,8 +381,20 @@ const createSurface = <
         return tagRoutes(tagSet, tagOrDefs as Extract<keyof Tags, string>, defs as Routes<Extract<keyof Tags, string>>);
     }) as K<Spec>['routes'];
 
-    const contract = (definition: { routes: Routes; auth?: Record<string, GroupAuth> }) => {
-        const { routes: contractRoutes, auth } = definition;
+    const jobs = ((identityOrDefinitions: string | AuthoredJobs, definitions?: AuthoredJobs) =>
+        definitions === undefined
+            ? buildJobs(undefined, identityOrDefinitions as AuthoredJobs)
+            : buildJobs(identityOrDefinitions as string, definitions)) as K<Spec>['jobs'];
+
+    const contract = (definition: { routes: Routes; jobs?: Jobs; auth?: Record<string, GroupAuth> }) => {
+        const { routes: contractRoutes, jobs: contractJobs, auth } = definition;
+        if (contractJobs) {
+            const routePaths = new Map<string, string>();
+            for (const { routeKey, route } of flattenRoutes(contractRoutes)) {
+                routePaths.set(`${route.method}:${route.path}`, routeKey);
+            }
+            assertNoJobEndpointCollision(contractJobs, config?.jobs, routePaths);
+        }
         if (auth) {
             for (const groupKey of Object.keys(auth)) {
                 if (!(groupKey in contractRoutes)) {
@@ -365,17 +413,20 @@ const createSurface = <
         }
         return assembleContract({
             routes: contractRoutes as Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
+            jobs: contractJobs,
             auth,
             tags: config?.tags,
             securitySchemes: config?.identities,
             requestContext: config?.requestContext,
             validation: config?.validation,
             plugins: config?.plugins,
+            jobsConfig: config?.jobs,
         });
     };
 
     const k: K<Spec> = {
         routes,
+        jobs,
         auth: (_routes, map) => map,
         contract: contract as K<Spec>['contract'],
         issue: addCodedIssue,
@@ -417,6 +468,7 @@ export class Kizuna<
 
     declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['routes'];
     declare readonly auth: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['auth'];
+    declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['jobs'];
     declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['contract'];
     declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['issue'];
 

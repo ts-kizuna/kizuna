@@ -1,0 +1,31 @@
+---
+title: server.jobs
+description: Bind a handler to each of the contract's jobs.
+---
+
+`server.jobs(handlers)` binds a handler to each of the contract's [jobs](/docs/jobs), mirroring the declaration including its nesting.
+
+```ts title="src/lib/jobs.ts"
+import { server } from './server';
+
+export const jobHandlers = server.jobs({
+    sendDigests: async () => ({
+        status: 200,
+        body: {
+            sent: await sendPendingDigests(),
+        },
+    }),
+    billing: {
+        reconcileInvoices: async ({ input }) => ({
+            status: 200,
+            body: {
+                reconciled: await reconcile(input.since),
+            },
+        }),
+    },
+});
+```
+
+A job handler receives `input`, `throwError`, and `jobs`, and no request, response, or `auth`, so the same handler runs identically whether a tick reached it, a queue delivered it, or a script called it. A job with no declared `result` may return nothing rather than writing out `{ status: 204, body: undefined }`.
+
+Pass the result to [`server.api`](/docs/reference/server-api) under `jobs`.
