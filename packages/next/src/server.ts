@@ -20,10 +20,19 @@ import {
     matchRoute,
     parseFetchBody,
     renderJsonResult,
+    type Jobs,
+    type JobRunner,
     ROUTER_META,
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
+    JOBS_META,
+    warnUnsupportedJobOptions,
+    type ServerOptions,
+    type JobsMeta,
+    jobRoutes,
+    jobRouter,
+    jobRunnerFrom,
     pluginRoutesOf,
     pluginExportsOf,
     type PluginImplementations,
@@ -38,6 +47,8 @@ import type {
     SecurityScheme,
     GuardSuccess,
     CredentialOf,
+    JobHandlers,
+    JobsArg,
     RequestContextSchema,
     RequestContextHeaderValues,
 } from '@ts-kizuna/core';
@@ -61,11 +72,30 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, NextHa
  * in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C> =
-    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins>
-        ? HandlersFromAuth<R, NextHandlerContext & RequestContextValues<RequestContext> & PluginArgs<Plugins>, Schemes, Auth>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins, infer J>
+        ? HandlersFromAuth<R, NextHandlerContext & RequestContextValues<RequestContext> & PluginArgs<Plugins> & JobsArg<J>, Schemes, Auth>
         : C extends Routes
           ? CoreRouter<C, NextHandlerContext>
           : never;
+
+/**
+ * The handler for each of a contract's scheduled jobs, typed against it. Each
+ * receives only the job's `input`, so the same handler can be run in process.
+ */
+export type JobsRouter<C> =
+    C extends Contract<infer _R, infer _Tags, infer _Codes, infer _Schemes, infer _Auth, infer _RequestContext, infer _Plugins, infer J>
+        ? JobHandlers<J>
+        : never;
+
+/**
+ * A contract's jobs paired with their handlers, both in the shape the request
+ * pipeline takes.
+ */
+export interface MountedJobs {
+    routes: Routes;
+    router: CoreRouter<Routes, NextHandlerContext>;
+    runner: JobRunner<Jobs>;
+}
 
 /**
  * Passed to each middleware function as the second argument.
@@ -163,7 +193,8 @@ export const handleNextRequest = async <T extends Routes>(
     guards?: GuardMap<NextHandlerContext>,
     schemes?: Record<string, SecurityScheme>,
     requestContext?: RequestContextMap<NextHandlerContext>,
-    pluginExports?: Record<string, unknown>
+    pluginExports?: Record<string, unknown>,
+    jobs?: MountedJobs
 ): Promise<NextResponse> => {
     const url = new URL(request.url);
 
@@ -190,6 +221,37 @@ export const handleNextRequest = async <T extends Routes>(
             }
         },
     });
+
+    if (jobs) {
+        const matchedJob = matchRoute(request.method, url.pathname, jobs.routes, options?.basePath);
+        if (matchedJob.kind === 'matched') {
+            const jobRequest: AdapterRequest<NextRequest> = {
+                request,
+                method: request.method,
+                resolution: {
+                    kind: 'pre-resolved',
+                    routeKey: matchedJob.match.routeKey,
+                    route: matchedJob.match.route,
+                    params: matchedJob.match.params,
+                },
+                query: Object.fromEntries(url.searchParams),
+                headers: headersToObject(request.headers),
+                readBody: (route) => parseFetchBody(request, route),
+            };
+            return adapter.handle({
+                routes: jobs.routes,
+                router: jobs.router,
+                request: jobRequest,
+                responseContext: {},
+                guards,
+                schemes,
+                requestContext,
+                pluginExports,
+                jobs: jobs.runner,
+                responseValidation: options?.responseValidation,
+            });
+        }
+    }
 
     const globalMiddleware = options?.requestMiddleware;
 
@@ -235,6 +297,7 @@ export const handleNextRequest = async <T extends Routes>(
                 guards,
                 schemes,
                 requestContext,
+                jobs: jobs?.runner,
                 responseValidation: options?.responseValidation,
             });
         }
@@ -261,6 +324,7 @@ export const handleNextRequest = async <T extends Routes>(
         schemes,
         requestContext,
         pluginExports,
+        jobs: jobs?.runner,
         basePath: options?.basePath,
         responseValidation: options?.responseValidation,
     });
@@ -279,11 +343,12 @@ type HttpHandler = (request: NextRequest) => Promise<NextResponse>;
 
 const _ON_ERROR: unique symbol = Symbol('ts-kizuna.next.onError');
 
-type NextApiWithRouter = ApiWithRouter & {
+export type NextApiWithRouter = ApiWithRouter & {
     readonly [_ON_ERROR]?: NextHandlerOptions['onError'];
     readonly [GUARDS_META]?: unknown;
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
+    readonly [JOBS_META]?: unknown;
 };
 
 export type NextApi<R extends Routes = Routes> = ApiWithRouter<R> & {
@@ -291,6 +356,7 @@ export type NextApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
+    readonly [JOBS_META]?: unknown;
     mount: (options?: NextHandlerOptions) => HttpHandlers;
 };
 
@@ -299,14 +365,22 @@ export type NextApi<R extends Routes = Routes> = ApiWithRouter<R> & {
  *
  * @example
  * // app/api/[...ts-kizuna]/route.ts
- * export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = createNextEndpoints(api, {
+ * export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
  *     basePath: '/api',
  * });
  */
-function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions): HttpHandlers {
+export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions): HttpHandlers {
     const guards = api[GUARDS_META] as GuardMap<NextHandlerContext> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<NextHandlerContext> | undefined;
+    const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
+    const mountedJobs = jobsMeta
+        ? {
+              routes: jobRoutes(jobsMeta),
+              router: jobRouter<NextHandlerContext>(jobsMeta),
+              runner: jobRunnerFrom(jobsMeta)!,
+          }
+        : undefined;
     const handlerOptions = {
         basePath: options?.basePath,
         onError: options?.onError ?? api[_ON_ERROR],
@@ -346,7 +420,8 @@ function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions): HttpHa
             guards,
             schemes,
             requestContext,
-            pluginExports
+            pluginExports,
+            mountedJobs
         );
     };
     return {
@@ -366,7 +441,8 @@ type ServerContract<
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins>;
+    J extends Jobs = Jobs,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J>;
 
 /**
  * The handlers for a group named on the contract, or for a bare route group.
@@ -383,6 +459,7 @@ export interface Server<
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
+    J extends Jobs = Jobs,
 > {
     /**
      * Define a guard for one of the contract's identities. It runs before the
@@ -407,23 +484,45 @@ export interface Server<
      * Bind typed handlers to the contract or one of its route groups.
      */
     router: {
-        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>, string> | Routes>(
+        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>, string> | Routes>(
             group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, GroupOrRoutes>;
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes>;
         (
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>
-        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
     };
     /**
-     * Assemble the router and guards into the api object.
+     * Bind a handler to each of the contract's jobs.
+     *
+     * Pass a `transport` to say where a queued job goes. Without one, `queue`
+     * runs the job in this process and it is lost on a crash.
+     *
+     * @example
+     * export const jobs = server.jobs({
+     *     sendDigests: async () => ({
+     *         status: 200,
+     *         body: {
+     *             sent: await sendPendingDigests(),
+     *         },
+     *     }),
+     * });
+     */
+    jobs(
+        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
+    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+    /**
+     * Assemble the router, guards, and job handlers into the api object.
      */
     api(
         options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) & {
                 onError?: NextHandlerOptions['onError'];
-            } & (string extends keyof RequestContext
+            } & (string extends keyof J
+                ? { jobs?: undefined }
+                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>> }) &
+            (string extends keyof RequestContext
                 ? { requestContext?: undefined }
                 : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<NextHandlerContext> }> }) &
             (string extends keyof Plugins ? { plugins?: undefined } : { plugins: PluginImplementations<Plugins, NextHandlerContext> })
@@ -436,22 +535,35 @@ const createServerSurface = <
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
+    J extends Jobs = Jobs,
 >(
-    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>
-): Server<R, Schemes, Auth, RequestContext, Plugins> => {
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>,
+    options?: ServerOptions
+): Server<R, Schemes, Auth, RequestContext, Plugins, J> => {
+    warnUnsupportedJobOptions(contract.jobs, options?.jobTransport);
     const server = {
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
-        api: ({ onError, ...parts }: ApiParts & { onError?: NextHandlerOptions['onError'] }) =>
+        jobs: (handlers: unknown) => handlers,
+        api: ({ onError, jobs, ...parts }: ApiParts & { onError?: NextHandlerOptions['onError']; jobs?: Record<string, unknown> }) =>
             Object.assign(assembleApi(contract, parts), {
                 [_ON_ERROR]: onError,
+                [JOBS_META]: contract.jobs
+                    ? {
+                          jobs: contract.jobs,
+                          handlers: jobs ?? {},
+                          config: contract.jobsConfig,
+                          transport: options?.jobTransport,
+                          onError: options?.onJobError,
+                      }
+                    : undefined,
                 mount(mountOptions?: NextHandlerOptions) {
                     return mountNext(this as unknown as NextApiWithRouter, mountOptions);
                 },
             }),
     };
-    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins>;
+    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, J>;
 };
 
 /**
@@ -480,13 +592,15 @@ export class KizunaServer<
     Auth,
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
-> implements Server<R, Schemes, Auth, RequestContext, Plugins> {
-    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins>['guard'];
-    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins>['requestContext'];
-    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins>['router'];
-    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins>['api'];
+    J extends Jobs = Jobs,
+> implements Server<R, Schemes, Auth, RequestContext, Plugins, J> {
+    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, J>['guard'];
+    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, J>['requestContext'];
+    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, J>['router'];
+    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, J>['jobs'];
+    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, J>['api'];
 
-    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>) {
-        Object.assign(this, createServerSurface(contract));
+    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, options?: ServerOptions) {
+        Object.assign(this, createServerSurface(contract, options));
     }
 }

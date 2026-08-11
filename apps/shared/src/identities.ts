@@ -37,3 +37,13 @@ export const inviteToken = Kizuna.identity.custom({
         email: z.email(),
     }),
 });
+
+/**
+ * The platform scheduler, authenticated by the shared secret it sends. Every job
+ * requires it; no route does.
+ */
+export const scheduler = Kizuna.identity.bearer({
+    context: z.object({
+        invokedAt: z.string(),
+    }),
+});

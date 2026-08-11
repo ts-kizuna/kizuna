@@ -29,3 +29,16 @@ export const requireInviteToken = server.guard('inviteToken', async ({ params, d
         email: invite.email,
     };
 });
+
+/**
+ * The shared secret the platform scheduler sends. Every job requires it.
+ */
+export const requireScheduler = server.guard('scheduler', ({ bearer, deny }) => {
+    const secret = process.env.CRON_SECRET ?? 'dev-cron-secret';
+    if (bearer?.token !== secret) {
+        return deny(401, 'Unauthorized');
+    }
+    return {
+        invokedAt: new Date().toISOString(),
+    };
+});

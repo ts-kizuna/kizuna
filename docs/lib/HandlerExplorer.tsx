@@ -199,15 +199,47 @@ const FEATURES: Feature[] = [
 };`,
     },
     {
+        id: 'jobs',
+        file: 'users.router.ts',
+        token: 'jobs',
+        type: `jobs: {
+    indexUser: {
+        run: (input: { userId: string }) => Promise<void>;
+        queue: (message: {
+            input: { userId: string };
+            dedupeKey?: string;
+            runAt?: Date;
+        }) => Promise<void>;
+    };
+}`,
+        note: `Every job the contract declares, shaped like the declaration. queue answers the request without waiting; run blocks and gives you the result.`,
+        code: `export const users: Router<typeof contract.routes.users> = {
+    createUser: async ({ body, jobs }) => {
+        const user = await db.user.create({
+            data: body,
+        });
+        await jobs.indexUser.queue({
+            input: {
+                userId: user.id,
+            },
+        });
+        return {
+            status: 201,
+            body: user,
+        };
+    },
+};`,
+    },
+    {
         id: 'plugins',
         file: 'users.router.ts',
         token: 'plugins',
         type: `plugins: {
-    jobs: {
-        queue: (
-            job: 'users.indexUser',
-            input: { userId: string },
-        ) => Promise<void>;
+    email: {
+        send: (message: {
+            to: string;
+            template: 'welcome' | 'profile-updated';
+        }) => Promise<void>;
     };
 }`,
         note: `Whatever your plugins offer, keyed by name. Type plugins. and autocomplete lists them.`,
@@ -219,8 +251,9 @@ const FEATURES: Feature[] = [
             },
             data: body,
         });
-        await plugins.jobs.queue('users.indexUser', {
-            userId: user.id,
+        await plugins.email.send({
+            to: user.email,
+            template: 'profile-updated',
         });
         return {
             status: 200,

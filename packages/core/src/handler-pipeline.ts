@@ -36,7 +36,10 @@ type HandlerBody<S, Status> = S extends z.ZodType
       ? ApplyErrorEnvelope<z.input<S['body']>, Status>
       : never;
 
-export type HandlerReturn<R extends RouteDefinition> = {
+/**
+ * Constrained to `responses` alone so a job, which has no method or path, reuses it.
+ */
+export type HandlerReturn<R extends Pick<RouteDefinition, 'responses'>> = {
     [Status in keyof R['responses']]: {
         status: Status extends number ? Status : never;
         body: HandlerBody<R['responses'][Status], Status>;

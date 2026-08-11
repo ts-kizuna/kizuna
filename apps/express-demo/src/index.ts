@@ -1,4 +1,6 @@
 import express from 'express';
+import { startJobsDevRunner } from '@ts-kizuna/core/jobs';
+import { contract } from '@ts-kizuna-demo/shared';
 
 import { api } from './lib/api';
 
@@ -43,4 +45,11 @@ api.mount(app);
 const port = Number(process.env.PORT ?? 8000);
 app.listen(port, () => {
     console.log(`ts-kizuna express demo on http://localhost:${port}`);
+
+    if (process.env.NODE_ENV !== 'production') {
+        startJobsDevRunner(contract, {
+            baseUrl: `http://localhost:${port}`,
+            secret: process.env.CRON_SECRET ?? 'dev-cron-secret',
+        });
+    }
 });

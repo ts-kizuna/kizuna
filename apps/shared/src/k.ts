@@ -2,7 +2,7 @@ import { Kizuna } from '@ts-kizuna/core';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { openApiPlugin } from '@ts-kizuna/openapi';
 import { tags } from './tags.js';
-import { user, member, inviteToken } from './identities.js';
+import { user, member, inviteToken, scheduler } from './identities.js';
 import { analytics } from './request-contexts.js';
 
 export const k = new Kizuna({
@@ -10,6 +10,7 @@ export const k = new Kizuna({
         user,
         member,
         inviteToken,
+        scheduler,
     },
     requestContext: {
         analytics,

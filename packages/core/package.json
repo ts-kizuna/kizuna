@@ -75,6 +75,16 @@
         "types": "./dist/generator.d.cts",
         "default": "./dist/generator.cjs"
       }
+    },
+    "./jobs": {
+      "import": {
+        "types": "./dist/jobs-entry.d.mts",
+        "default": "./dist/jobs-entry.mjs"
+      },
+      "require": {
+        "types": "./dist/jobs-entry.d.cts",
+        "default": "./dist/jobs-entry.cjs"
+      }
     }
   },
   "kizuna": {
@@ -85,6 +95,7 @@
       "./plugin": "client",
       "./generator": "client",
       "./adapter": "server",
+      "./jobs": "server",
       "./load-deprecations": "server"
     }
   },
@@ -100,7 +111,7 @@
     "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/adapter.ts src/plugin.ts src/generator.ts src/schemas.ts src/authoring-names.ts src/load-deprecations.ts --format esm,cjs --dts --clean",
+    "build": "tsdown src/index.ts src/adapter.ts src/jobs-entry.ts src/plugin.ts src/generator.ts src/schemas.ts src/authoring-names.ts src/load-deprecations.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

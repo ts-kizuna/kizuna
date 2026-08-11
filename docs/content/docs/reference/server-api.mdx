@@ -3,7 +3,7 @@ title: server.api
 description: Assemble the router, guards and request context into the api object you mount.
 ---
 
-`server.api({ router, guards, requestContext })` binds the router and guards into the API object an adapter mounts.
+`server.api({ router, guards, requestContext, jobs })` binds the router and guards into the API object an adapter mounts.
 
 ```ts title="src/lib/api.ts"
 import { server } from './server';
@@ -29,6 +29,22 @@ export const api = server.api({
 | Next.js | [`api.mount()`](/docs/adapters/next)             |
 
 See the [Mounting guide](/docs/building/mounting) for full setup with each adapter.
+
+## jobs
+
+A contract that declares [scheduled jobs](/docs/jobs) needs their handlers here, bound with [`server.jobs`](/docs/reference/server-jobs):
+
+```ts title="src/lib/api.ts"
+export const api = server.api({
+    router,
+    jobs: jobHandlers,
+    guards: {
+        scheduler: requireScheduler,
+    },
+});
+```
+
+`api.mount` then serves the two [job endpoints](/docs/jobs#the-two-job-endpoints), and every handler receives a typed `jobs` runner so a route can run one in process.
 
 ## plugins
 

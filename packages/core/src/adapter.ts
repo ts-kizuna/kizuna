@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { RouteDefinition, Routes, Method } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { Credential, NoCredential } from './identity.js';
@@ -23,6 +23,19 @@ import { isRawResponse, type RawResponse } from './raw-response.js';
 import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from './plugin.js';
 import { resolvePluginServers, type PluginImplementation } from './plugin-server.js';
 import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
+import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from './jobs.js';
+import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
+import {
+    DispatchFailedSchema,
+    DispatchResultSchema,
+    JobRunRequestSchema,
+    dispatchDueJobs,
+    dispatchSucceeded,
+    failedJobs,
+} from './job-dispatch.js';
+import { ProblemDetailsSchema } from './schemas.js';
+import type { Contract } from './contract.js';
+import type { JobTransport } from './job-transport.js';
 
 export type { RouteDefinition, RoutePath, Routes, Method } from './types.js';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
@@ -39,6 +52,27 @@ export {
     type PluginPropsOf,
     type PluginExportsOf,
 } from './plugin.js';
+export type { CompiledJob, Jobs, JobHandler, JobHandlers, FlattenedJob } from './jobs.js';
+export { flattenJobs, isCompiledJob, jobAt } from './jobs.js';
+export {
+    createJobRunner,
+    jobFnAt,
+    JobInputError,
+    type JobRunner,
+    type JobRunnerOptions,
+    type JobErrorHandler,
+    type JobFnByKey,
+} from './job-runner.js';
+export {
+    createJobTransport,
+    JobDispatchError,
+    type JobTransport,
+    type JobMessage,
+    type JobDescriptor,
+    type ScheduledJob,
+    type JobWorker,
+    type JobWorkerContext,
+} from './job-transport.js';
 export {
     implementPlugin,
     pluginRoutesOf,
@@ -71,6 +105,7 @@ export const GUARDS_META: unique symbol = Symbol('ts-kizuna.guards');
 export const SCHEMES_META: unique symbol = Symbol('ts-kizuna.schemes');
 export const REQUEST_CONTEXT_META: unique symbol = Symbol('ts-kizuna.request-context');
 const CONTRACT_META: unique symbol = Symbol.for('ts-kizuna.contract');
+export const JOBS_META: unique symbol = Symbol('ts-kizuna.jobs');
 
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
@@ -225,6 +260,213 @@ export const assembleApi = <const R extends Routes>(
 
     return api as unknown as ApiWithRouter<R>;
 };
+
+/**
+ * The endpoints jobs are served on, in the {@link Routes} shape the request
+ * pipeline takes.
+ */
+export const jobRoutes = (meta: JobsMeta): Routes => ({
+    [DISPATCH_ROUTE_KEY]: dispatchRoute(meta),
+    [RUN_ROUTE_KEY]: runRoute(meta),
+});
+
+/**
+ * Their handlers, in the {@link Router} shape the request pipeline takes.
+ */
+export const jobRouter = <HandlerContext>(meta: JobsMeta): Router<Routes, HandlerContext> =>
+    ({
+        [DISPATCH_ROUTE_KEY]: dispatchHandler<HandlerContext>(meta),
+        [RUN_ROUTE_KEY]: runHandler<HandlerContext>(meta),
+    }) as unknown as Router<Routes, HandlerContext>;
+
+/**
+ * The job runner an adapter hands to every handler, built from what
+ * `server.jobs` stamped on the api.
+ */
+export interface ServerOptions {
+    /**
+     * Carries a queued job to whatever runs it. Without one, `queue` runs the job
+     * in this process and it is lost on a crash.
+     */
+    jobTransport?: JobTransport;
+    onJobError?: JobErrorHandler;
+}
+
+/**
+ * Warn when a job asks for something its transport will drop.
+ */
+export const warnUnsupportedJobOptions = (
+    jobs: Jobs | undefined,
+    transport: JobTransport | undefined,
+    logger: Pick<Console, 'warn'> = console
+): void => {
+    if (!jobs) return;
+    const retrying = flattenJobs(jobs)
+        .filter(({ job }) => job.definition.retry !== undefined)
+        .map(({ jobKey }) => jobKey);
+    if (retrying.length === 0) return;
+    const named = retrying.map((jobKey) => `"${jobKey}"`).join(', ');
+    if (!transport) {
+        logger.warn(
+            `[ts-kizuna] ${named} declare \`retry\`, but no transport is configured, so a failed run is not retried. ` +
+                'Pass one as `jobTransport` to `new KizunaServer()` to make retrying real.'
+        );
+        return;
+    }
+    if (!transport.supports.retry) {
+        logger.warn(
+            `[ts-kizuna] ${named} declare \`retry\`, but the "${transport.name}" transport does not retry, so the count is ignored.`
+        );
+    }
+};
+
+/**
+ * What `JOBS_META` carries: the contract's jobs, the handler for each, and how
+ * this deployment runs them.
+ */
+export interface JobsMeta extends JobRunnerOptions {
+    jobs: Jobs;
+    handlers: Record<string, unknown>;
+    config?: JobsConfig;
+}
+
+/**
+ * Namespaced so it cannot collide with a route key of your own.
+ */
+export const DISPATCH_ROUTE_KEY = 'kizuna:dispatch';
+
+/**
+ * The endpoint a scheduler ticks to run whichever jobs are due.
+ */
+export const dispatchRoute = (meta: JobsMeta): RouteDefinition => {
+    // Every job in a group shares one identity.
+    const identity = flattenJobs(meta.jobs).find(({ job }) => job.identity !== undefined)?.job.identity;
+    return {
+        method: meta.config?.method ?? 'POST',
+        path: `${meta.config?.path ?? DEFAULT_JOBS_PATH}/dispatch`,
+        summary: 'Run every scheduled job due this minute',
+        security: identity === undefined ? [] : [identity],
+        responses: {
+            200: DispatchResultSchema,
+            503: DispatchFailedSchema,
+        },
+    } as unknown as RouteDefinition;
+};
+
+/**
+ * Runs each due job rather than queueing it, so the transport never sees a tick.
+ */
+export const dispatchHandler = <HandlerContext>(meta: JobsMeta): RouteHandler<RouteDefinition, HandlerContext> => {
+    const runner = createJobRunner(meta.jobs, meta.handlers as never, meta);
+    const thunks: Record<string, () => Promise<unknown>> = {};
+    for (const { jobKey } of flattenJobs(meta.jobs)) {
+        const jobFn = jobFnAt(runner, jobKey);
+        if (!jobFn) continue;
+        thunks[jobKey] = () => jobFn.run();
+    }
+    return (async () => {
+        const result = await dispatchDueJobs({ jobs: meta.jobs } as unknown as Contract, thunks, {
+            windowMs: meta.config?.windowMs,
+            only: meta.config?.only,
+            exclude: meta.config?.exclude,
+        });
+        if (dispatchSucceeded(result)) {
+            return {
+                status: 200,
+                body: result,
+            };
+        }
+        const failed = failedJobs(result);
+        return {
+            status: 503,
+            body: {
+                detail: `${failed.length} of ${result.due.length} due jobs failed`,
+                failed,
+            },
+        };
+    }) as unknown as RouteHandler<RouteDefinition, HandlerContext>;
+};
+
+/**
+ * Namespaced so it cannot collide with a route key of your own.
+ */
+export const RUN_ROUTE_KEY = 'kizuna:run';
+
+/**
+ * The endpoint a queue delivers one job to, naming it in the body.
+ */
+export const runRoute = (meta: JobsMeta): RouteDefinition => {
+    const identity = flattenJobs(meta.jobs).find(({ job }) => job.identity !== undefined)?.job.identity;
+    return {
+        method: 'POST',
+        path: `${meta.config?.path ?? DEFAULT_JOBS_PATH}/run`,
+        summary: 'Run one job by name',
+        security: identity === undefined ? [] : [identity],
+        body: JobRunRequestSchema,
+        responses: {
+            200: z.unknown(),
+            204: z.void(),
+            404: ProblemDetailsSchema,
+            422: ProblemDetailsSchema,
+            500: ProblemDetailsSchema,
+            503: ProblemDetailsSchema,
+        },
+    } as unknown as RouteDefinition;
+};
+
+/**
+ * Answers with whatever the job answered, so a queue reads its own retry
+ * contract off the status.
+ */
+export const runHandler = <HandlerContext>(meta: JobsMeta): RouteHandler<RouteDefinition, HandlerContext> => {
+    const runner = createJobRunner(meta.jobs, meta.handlers as never, meta);
+    return (async (args: { body: { job: string; input?: unknown } }) => {
+        const { job, input } = args.body;
+        const jobFn = jobFnAt(runner, job);
+        if (!jobFn) {
+            return {
+                status: 404,
+                body: {
+                    detail: `No job named "${job}" on this contract.`,
+                },
+            };
+        }
+        try {
+            return await jobFn.run(input);
+        } catch (error) {
+            if (error instanceof JobInputError) {
+                return {
+                    status: 422,
+                    body: {
+                        detail: `Input for job "${job}" failed validation.`,
+                    },
+                };
+            }
+            throw error;
+        }
+    }) as unknown as RouteHandler<RouteDefinition, HandlerContext>;
+};
+
+export const jobRunnerFrom = (meta: JobsMeta | undefined): JobRunner<Jobs> | undefined =>
+    meta ? createJobRunner(meta.jobs, meta.handlers as never, meta) : undefined;
+
+/**
+ * The dotted keys of the jobs a handler was actually bound to. A job without one
+ * cannot run, so nothing should schedule or subscribe to it.
+ */
+export const boundJobKeys = (meta: JobsMeta | undefined): Set<string> => {
+    const bound = new Set<string>();
+    if (!meta) return bound;
+    for (const { jobKey } of flattenJobs(meta.jobs)) {
+        let handler: unknown = meta.handlers;
+        for (const segment of jobKey.split('.')) {
+            if (!handler || typeof handler !== 'object') break;
+            handler = (handler as Record<string, unknown>)[segment];
+        }
+        if (typeof handler === 'function') bound.add(jobKey);
+    }
+    return bound;
+};
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
 export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
 export type {
@@ -368,6 +610,11 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
      * the guards; its value lands in the handler args under `requestContext`, keyed by its name.
      */
     requestContext?: RequestContextMap<HandlerContext>;
+    /**
+     * The contract's jobs bound to their handlers. Every handler receives it as
+     * `jobs`, so a route can run a job in process without an HTTP hop.
+     */
+    jobs?: JobRunner<Jobs>;
     basePath?: string;
     responseValidation?: boolean;
 }
@@ -571,6 +818,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     schemes: Record<string, SecurityScheme> | undefined,
     contextResolvers: RequestContextMap<HandlerContext> | undefined,
     pluginExports: Record<string, unknown> | undefined,
+    jobRunner: JobRunner<Jobs> | undefined,
     basePath: string | undefined,
     responseValidation: boolean | undefined
 ): Promise<AdapterResult> => {
@@ -596,22 +844,26 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     if (route.body && !isVoidSchema(route.body)) {
         const expected = route.contentType ?? 'application/json';
         const contentTypeHeader = (raw.headers as Record<string, string | undefined>)['content-type'] ?? '';
-        const [mediaType = ''] = contentTypeHeader.split(';');
-        const received = mediaType.trim();
-        if (received.toLowerCase() !== expected) {
-            return {
-                kind: 'unsupported-media-type',
-                expected,
-                received,
-            };
-        }
-        try {
-            raw.body = await request.readBody(route);
-        } catch {
-            return {
-                kind: 'invalid-body',
-                detail: 'Bad Request',
-            };
+        // No content type is no representation, not an unsupported one (RFC 9110 §15.5.16).
+        const absent = contentTypeHeader === '' && route.body.safeParse(undefined).success;
+        if (!absent) {
+            const [mediaType = ''] = contentTypeHeader.split(';');
+            const received = mediaType.trim();
+            if (received.toLowerCase() !== expected) {
+                return {
+                    kind: 'unsupported-media-type',
+                    expected,
+                    received,
+                };
+            }
+            try {
+                raw.body = await request.readBody(route);
+            } catch {
+                return {
+                    kind: 'invalid-body',
+                    detail: 'Bad Request',
+                };
+            }
         }
     }
 
@@ -701,6 +953,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             headers: validation.parsed.headers,
             throwError,
             ...handlerContext,
+            ...(jobRunner ? { jobs: jobRunner } : {}),
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
             ...(pluginExports && Object.keys(pluginExports).length > 0 ? { plugins: pluginExports } : {}),
@@ -789,6 +1042,7 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
         schemes,
         requestContext,
         pluginExports,
+        jobs,
         basePath,
         responseValidation,
     }) => {
@@ -802,6 +1056,7 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
             schemes,
             requestContext,
             pluginExports,
+            jobs,
             basePath,
             responseValidation
         );

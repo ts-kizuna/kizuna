@@ -1,0 +1,292 @@
+---
+title: Create a Job Transport
+description: Connect any queue or scheduler to your kizuna jobs by implementing one function.
+---
+
+When you call `jobs.indexUser.queue(...)`, something has to carry that job to the process that runs it. That something is a transport.
+
+kizuna ships none. A transport is small, and yours should be written against the version of the queue you actually run.
+
+```ts
+import { createJobTransport } from '@ts-kizuna/core';
+
+export const myQueue = createJobTransport({
+    name: 'my-queue',
+    supports: {
+        retry: true,
+        dedupe: true,
+    },
+    dispatch: async (message) => {
+        await queue.add(message.job, message.input);
+    },
+});
+```
+
+```ts title="src/lib/server.ts"
+export const server = new KizunaServer(contract, {
+    jobTransport: myQueue,
+});
+```
+
+`dispatch` is the only method you must implement.
+
+## Two shapes
+
+**Push** systems deliver by calling a URL: QStash, Cloud Tasks, SQS to Lambda. Point them at the run endpoint, `POST /jobs/run`, with `{ job, input }` as the body. kizuna already guards and validates it, so these need `dispatch` and nothing else.
+
+**Pull** systems store work and a worker drains it: BullMQ, pg-boss, a table in your own database. These also implement `start`.
+
+## `dispatch`
+
+```ts
+dispatch: (message: JobMessage) => Promise<void> | void;
+```
+
+| Field       | What it is                                                          |
+| ----------- | ------------------------------------------------------------------- |
+| `job`       | The job's dotted key, e.g. `billing.reconcileInvoices`.             |
+| `input`     | The validated input, or `undefined`. JSON-safe.                     |
+| `runAt`     | Hold until then. Ignore unless you declare `supports.runAt`.        |
+| `dedupeKey` | Deliver at most one message with this key. Needs `supports.dedupe`. |
+| `retry`     | Attempts the job declared. Backoff is yours.                        |
+
+Resolve once the message is handed over, not once the job has run. Reject when it could not be handed over at all. That surfaces at the `queue` call site, wrapped in a `JobDispatchError` naming your transport and the job.
+
+## `start`
+
+```ts
+start?: (context: JobWorkerContext) => Promise<JobWorker>;
+```
+
+You get every job the contract declares, so you can subscribe by name, and a `run` that invokes one through the same handler a route would reach.
+
+```ts
+start: async ({ jobs, run }) => {
+    for (const job of jobs) {
+        await queue.process(job.job, async (stored) => {
+            await run({
+                ...job,
+                input: stored.data,
+            });
+        });
+    }
+    return {
+        stop: () => queue.close(),
+    };
+};
+```
+
+Call `run` once per message, and let its rejection propagate, which is how your queue learns to retry. Swallowing it turns every failure into a silent success.
+
+## `register`
+
+```ts
+register?: (schedules: readonly ScheduledJob[]) => Promise<void> | void;
+```
+
+For a system with a scheduler of its own. `startJobs` then hands the schedules across instead of ticking them, and you own missed occurrences. Throw on a `timezone` you cannot express rather than dropping it.
+
+```ts
+register: async (schedules) => {
+    for (const schedule of schedules) {
+        await queue.schedule(schedule.job, schedule.cron, {
+            tz: schedule.timezone,
+        });
+    }
+};
+```
+
+## `supports`
+
+`runAt`, `dedupeKey`, and `retry` are requests, not guarantees. Say which you honour and kizuna warns at startup when a job asks for one you drop.
+
+`dedupe` is what makes `startJobs` safe on more than one instance: every replica ticking 05:00 produces the same `dedupeKey`.
+
+## Example: QStash
+
+[QStash](https://upstash.com/docs/qstash) is a push transport. You publish to it with a destination URL, and it delivers your body to that URL verbatim, retrying on failure and holding messages until a delay elapses. It has a scheduler of its own, so it honours everything and implements `register` too.
+
+Every message goes to the same URL, the run endpoint, and names its job in the body.
+
+```ts title="src/lib/qstash.ts"
+import { createJobTransport, type JobMessage } from '@ts-kizuna/core';
+
+interface QstashOptions {
+    token: string;
+    baseUrl: string;
+    /**
+     * The secret the jobs' identity checks, forwarded so a delivery from QStash
+     * authenticates the same way a platform cron does.
+     */
+    schedulerSecret: string;
+}
+
+const runEndpoint = (options: QstashOptions): string => `${options.baseUrl}/jobs/run`;
+
+const delivery = (options: QstashOptions, retry?: number): Record<string, string> => ({
+    authorization: `Bearer ${options.token}`,
+    'content-type': 'application/json',
+    // Arrives at the run endpoint as `Authorization`.
+    'upstash-forward-authorization': `Bearer ${options.schedulerSecret}`,
+    // kizuna counts attempts, QStash counts retries after the first. Always
+    // sent: QStash defaults to 3, and a job asking for 1 should not get 3.
+    'upstash-retries': String((retry ?? 1) - 1),
+});
+
+export const qstash = (options: QstashOptions) =>
+    createJobTransport({
+        name: 'qstash',
+        supports: {
+            retry: true,
+            dedupe: true,
+            runAt: true,
+        },
+        dispatch: async (message) => {
+            const response = await fetch(`https://qstash.upstash.io/v2/publish/${runEndpoint(options)}`, {
+                method: 'POST',
+                headers: {
+                    ...delivery(options, message.retry),
+                    ...(message.dedupeKey ? { 'upstash-deduplication-id': message.dedupeKey } : {}),
+                    ...(message.runAt ? { 'upstash-not-before': String(Math.floor(message.runAt.getTime() / 1000)) } : {}),
+                },
+                body: JSON.stringify({
+                    job: message.job,
+                    input: message.input,
+                }),
+            });
+            if (!response.ok) throw new Error(`QStash answered ${response.status}: ${await response.text()}`);
+        },
+        register: async (schedules) => {
+            for (const schedule of schedules) {
+                const response = await fetch(`https://qstash.upstash.io/v2/schedules/${runEndpoint(options)}`, {
+                    method: 'POST',
+                    headers: {
+                        ...delivery(options),
+                        // A dotted job key is already a legal schedule id, and reusing
+                        // it updates the schedule in place rather than adding a second.
+                        'upstash-schedule-id': schedule.job,
+                        'upstash-cron': schedule.timezone ? `CRON_TZ=${schedule.timezone} ${schedule.cron}` : schedule.cron,
+                    },
+                    body: JSON.stringify({
+                        job: schedule.job,
+                    }),
+                });
+                if (!response.ok) throw new Error(`QStash refused the schedule for "${schedule.job}": ${response.status}`);
+            }
+        },
+    });
+```
+
+```ts title="src/lib/server.ts"
+export const server = new KizunaServer(contract, {
+    jobTransport: qstash({
+        token: process.env.QSTASH_TOKEN,
+        baseUrl: 'https://api.example.com',
+        schedulerSecret: process.env.CRON_SECRET,
+    }),
+});
+```
+
+Two things that are easy to get wrong here, and both look like a delivered job that never ran:
+
+- **`upstash-retries` is off by one.** kizuna's `retry` is a number of attempts; QStash's header is retries _after_ the first.
+- **The body is the message, not the input.** QStash delivers what you publish verbatim, and the run endpoint reads `job` from it. Publishing the bare input leaves it with nothing to run.
+
+`register` is worth implementing for QStash in particular: `CRON_TZ=` expresses a time zone, which platform cron cannot, since Vercel and GitHub read every expression as UTC. Note that a job you delete leaves its schedule behind, so prune what the contract no longer declares.
+
+Check the [QStash docs](https://upstash.com/docs/qstash) for the current header set before relying on the names above.
+
+### Authenticating what QStash sends back
+
+QStash calls the run endpoint, so the jobs' identity guards it. Forwarding the secret, as above, is the simplest thing that works: it arrives as `Authorization` and an ordinary bearer guard reads it, the same trust model as Vercel Cron's `CRON_SECRET`.
+
+```ts
+export const requireScheduler = server.guard('scheduler', ({ bearer, deny }) =>
+    bearer?.token === process.env.CRON_SECRET ? {} : deny(401, 'Unauthorized')
+);
+```
+
+<Callout type="warn">
+    A guard cannot verify QStash's `Upstash-Signature`. The signature covers the raw body, and the request pipeline reads the body before
+    guards run — so by then it is parsed on Express and the stream is consumed on Hono and Next. Verify it ahead of kizuna instead:
+    framework middleware on the run endpoint, or `express.json({verify})` to keep the raw buffer for a guard to read.
+</Callout>
+
+## Example: BullMQ
+
+[BullMQ](https://docs.bullmq.io/) is a pull transport, so it implements all three: `dispatch` adds to a Redis queue, `start` drains it, and `register` uses BullMQ's own repeatable jobs.
+
+```ts title="src/lib/bullmq.ts"
+import { Queue, Worker, type ConnectionOptions } from 'bullmq';
+import { createJobTransport } from '@ts-kizuna/core';
+
+export const bullmq = (connection: ConnectionOptions, queueName = 'jobs') => {
+    const queue = new Queue(queueName, { connection });
+
+    return createJobTransport({
+        name: 'bullmq',
+        supports: {
+            retry: true,
+            dedupe: true,
+            runAt: true,
+        },
+        dispatch: async (message) => {
+            await queue.add(message.job, message.input, {
+                delay: message.runAt ? Math.max(message.runAt.getTime() - Date.now(), 0) : undefined,
+                jobId: message.dedupeKey,
+                attempts: message.retry,
+            });
+        },
+        start: async ({ jobs, run }) => {
+            const byName = new Map(jobs.map((job) => [job.job, job]));
+            const worker = new Worker(
+                queueName,
+                async (stored) => {
+                    const job = byName.get(stored.name);
+                    if (!job) throw new Error(`No job named "${stored.name}" on this contract.`);
+                    await run({ ...job, input: stored.data });
+                },
+                { connection }
+            );
+            return {
+                stop: () => worker.close(),
+            };
+        },
+        register: async (schedules) => {
+            for (const schedule of schedules) {
+                await queue.add(
+                    schedule.job,
+                    {},
+                    {
+                        repeat: {
+                            pattern: schedule.cron,
+                            tz: schedule.timezone,
+                        },
+                    }
+                );
+            }
+        },
+    });
+};
+```
+
+Nothing calls `start` on its own. `startJobWorker` does, wherever you want the work done — the same process as the API, or its own:
+
+```ts title="src/worker.ts"
+import { startJobWorker } from '@ts-kizuna/core/jobs';
+
+const worker = await startJobWorker(api);
+process.on('SIGTERM', () => void worker?.stop());
+```
+
+`jobId` is how BullMQ deduplicates, so `dedupeKey` maps onto it — but only while the job exists: once it completes and is removed the id is free again, so `supports.dedupe` here is weaker than "never twice". `register` has the same edge in reverse, since changing a cron leaves the old repeatable job behind. Check the [BullMQ docs](https://docs.bullmq.io/) for the repeatable-job API in the version you run.
+
+## What you can assume
+
+- `input` is validated against the job's schema before you see it, and again when it runs, so a message that sat in your queue across a deploy is checked against the schema it lands on.
+- `job` is unique and stable, so it is safe as a queue name or routing key.
+
+## What you cannot
+
+- `input` survives only as JSON. A `Date` does not come back a `Date`.
+- Delivery is at least once. kizuna does not try to make it exactly once.
