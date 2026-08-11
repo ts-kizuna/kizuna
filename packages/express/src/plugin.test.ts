@@ -3,11 +3,12 @@ import express from 'express';
 import request from 'supertest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { createPlugin } from '@ts-kizuna/core/adapter';
+import { createPlugin, implementPlugin } from '@ts-kizuna/core/adapter';
 import { KizunaServer } from './server.js';
 
-const probePlugin = createPlugin({
+const probePlugin = createPlugin<{ queue: (id: string) => string }>()({
     name: 'probe',
+    serverModule: './plugin.test.js',
     routes: {
         ping: {
             method: 'GET',
@@ -19,7 +20,10 @@ const probePlugin = createPlugin({
             },
         },
     },
-    server: (config: { label: string }) => ({
+});
+
+const probeServer = (config: { label: string }) =>
+    implementPlugin(probePlugin, () => ({
         router: {
             ping: () => ({
                 status: 200 as const,
@@ -31,8 +35,7 @@ const probePlugin = createPlugin({
         exports: {
             queue: (id: string) => `${config.label}:${id}`,
         },
-    }),
-});
+    }));
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -71,9 +74,9 @@ const serve = () => {
             }),
         },
         plugins: {
-            probe: {
+            probe: probeServer({
                 label: 'probed',
-            },
+            }),
         },
     });
     const app = express();
@@ -106,6 +109,7 @@ describe('plugin lane', () => {
     it('reports a path a plugin and the contract both claim', () => {
         const collidingPlugin = createPlugin({
             name: 'collide',
+            serverModule: './plugin.test.js',
             routes: {
                 clash: {
                     method: 'POST',
@@ -117,16 +121,6 @@ describe('plugin lane', () => {
                     },
                 },
             },
-            server: () => ({
-                router: {
-                    clash: () => ({
-                        status: 200 as const,
-                        body: {
-                            ok: true,
-                        },
-                    }),
-                },
-            }),
         });
 
         const collidingK = new Kizuna({

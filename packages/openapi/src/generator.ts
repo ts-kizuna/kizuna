@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { stringify as stringifyYaml } from 'yaml';
+import { loadDeprecations } from '@ts-kizuna/core/load-deprecations';
 import {
     createGenerator,
     contractFingerprint,
-    loadDeprecations,
     isFileSchema,
     isBinarySchema,
     isVoidSchema,
@@ -21,95 +21,8 @@ import {
 } from '@ts-kizuna/core/generator';
 import { getStatusText } from '@ts-kizuna/core';
 import type { Contract, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
-
-/**
- * The OpenAPI Specification version declared in the document's `openapi` field.
- */
-export type OpenApiVersion = '3.1.0';
-
-export interface OpenApiInfo {
-    title: string;
-    version: string;
-    description?: string;
-}
-
-export interface OpenApiServer {
-    url: string;
-    description?: string;
-}
-
-export interface OpenApiParameter {
-    name: string;
-    in: 'path' | 'query' | 'header' | 'cookie';
-    required?: boolean;
-    description?: string;
-    schema: Record<string, unknown>;
-}
-
-export interface OpenApiResponseObject {
-    description: string;
-    content?: Record<string, { schema: Record<string, unknown> }>;
-}
-
-export interface OpenApiExternalDocs {
-    url: string;
-    description?: string;
-}
-
-export interface OpenApiTag {
-    name: string;
-    description?: string;
-    externalDocs?: OpenApiExternalDocs;
-}
-
-export interface OpenApiOperation {
-    operationId?: string;
-    summary?: string;
-    description?: string;
-    deprecated?: boolean;
-    tags?: string[];
-    security?: Array<Record<string, string[]>>;
-    /**
-     * The `custom` schemes guarding this operation. They emit no `security`
-     * requirement, so this marks the operation as protected, not public.
-     */
-    'x-kizuna-guarded'?: string[];
-    externalDocs?: OpenApiExternalDocs;
-    parameters?: OpenApiParameter[];
-    requestBody?: {
-        required?: boolean;
-        content: Record<string, { schema: Record<string, unknown> }>;
-    };
-    responses: Record<string, OpenApiResponseObject>;
-}
-
-export interface OpenApiDocument {
-    openapi: string;
-    info: OpenApiInfo;
-    servers?: OpenApiServer[];
-    paths: Record<string, Record<string, OpenApiOperation>>;
-    tags?: OpenApiTag[];
-    externalDocs?: OpenApiExternalDocs;
-    components?: {
-        securitySchemes?: Record<string, unknown>;
-        schemas?: Record<string, unknown>;
-    };
-}
-
-export interface GenerateOpenApiOptions {
-    /**
-     * The OpenAPI Specification version to declare in the document's `openapi` field.
-     *
-     * Defaults to `'3.1.0'`.
-     */
-    openApiVersion?: OpenApiVersion;
-    info: OpenApiInfo;
-    servers?: OpenApiServer[];
-    tags?: OpenApiTag[];
-    externalDocs?: OpenApiExternalDocs;
-    setOperationId?: boolean | 'concatenated-path';
-    operationMapper?: (operation: OpenApiOperation, route: RouteDefinition, operationId: string) => OpenApiOperation;
-}
+import { OPENAPI_PLUGIN_NAME } from './plugin.js';
+import type { GenerateOpenApiOptions, OpenApiDocument, OpenApiOperation, OpenApiParameter, OpenApiRenderer, OpenApiTag } from './types.js';
 
 const convertPath = (path: string): string => {
     const { segments } = parsePath(path);
@@ -303,11 +216,6 @@ const applyDeprecatedToOperation = (
     }
 };
 
-export interface OpenApiRenderer {
-    (format: 'json'): OpenApiDocument;
-    (format: 'yaml'): string;
-}
-
 /**
  * Internal generator options: the public options plus a `key → TagOptions`
  * lookup built from the contract's tag set, used to resolve tag keys to titles.
@@ -316,10 +224,10 @@ type GeneratorContext = GenerateOpenApiOptions & {
     tagLookup?: ReadonlyMap<string, TagOptions>;
 };
 
-const openApiGenerator = createGenerator((options: GeneratorContext, contract: Contract) => {
+const openApiGenerator = createGenerator((options: GeneratorContext, contract: Contract, deprecations) => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
     const pendingFieldDeprecations: Array<{ operation: OpenApiOperation; fieldDeprecations: Map<string, string> }> = [];
-    const schemaDeprecations = loadDeprecations(contractFingerprint(contract))?.schemas;
+    const schemaDeprecations = deprecations?.schemas;
 
     return {
         processRoute({ routeKey, route, routeTags, deprecated, fieldDeprecations }) {
@@ -634,17 +542,11 @@ const tagsFromContract = (contract: Contract): OpenApiTag[] => {
 };
 
 /**
- * Where `openApiPlugin` stamps the options it was given.
- */
-export const OPENAPI_OPTIONS: unique symbol = Symbol.for('ts-kizuna.openapi-options') as symbol as typeof OPENAPI_OPTIONS;
-
-/**
  * So a build step does not restate the options and drift from what is served.
  */
 const optionsFromInstalledPlugin = (contract: Contract): GenerateOpenApiOptions => {
-    for (const plugin of Object.values(contract.plugins ?? {})) {
-        const installed = (plugin as unknown as Record<symbol, GenerateOpenApiOptions | undefined>)[OPENAPI_OPTIONS];
-        if (installed) return installed;
+    for (const declaration of Object.values(contract.plugins ?? {})) {
+        if (declaration.name === OPENAPI_PLUGIN_NAME) return declaration.props as unknown as GenerateOpenApiOptions;
     }
     throw new Error(
         "generateOpenApi reads its options from the contract. Install `openApiPlugin` on `new Kizuna()` with the API's `info`."
@@ -652,10 +554,17 @@ const optionsFromInstalledPlugin = (contract: Contract): GenerateOpenApiOptions 
 };
 
 /**
- * Render from options held directly, for `openApiPlugin`.
+ * Render from options held directly, for `openApiPluginServer`.
  */
 export function renderOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer {
-    const renderer = openApiGenerator(contract, { ...options, tagLookup: buildTagLookup(contract) });
+    const renderer = openApiGenerator(
+        contract,
+        {
+            ...options,
+            tagLookup: buildTagLookup(contract),
+        },
+        loadDeprecations(contractFingerprint(contract))
+    );
     const tags = tagsFromContract(contract);
     if (tags.length > 0) {
         const originalJson = renderer('json') as OpenApiDocument;
@@ -672,8 +581,12 @@ export function renderOpenApi(contract: Contract, options: GenerateOpenApiOption
 /**
  * Generate an OpenAPI 3.1.0 document from a contract. Returns a renderer: call
  * it with `'json'` or `'yaml'`. Options come from the `openApiPlugin` installed
- * on the contract.
+ * on the contract, so the document matches the one the server serves.
+ *
+ * Pass `overrides` for what only a build step knows, such as the public
+ * `servers` list.
  */
-export function generateOpenApi(contract: Contract): OpenApiRenderer {
-    return renderOpenApi(contract, optionsFromInstalledPlugin(contract));
+export function generateOpenApi(contract: Contract, overrides?: Partial<GenerateOpenApiOptions>): OpenApiRenderer {
+    const options = optionsFromInstalledPlugin(contract);
+    return renderOpenApi(contract, overrides ? { ...options, ...overrides } : options);
 }

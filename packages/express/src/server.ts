@@ -22,7 +22,7 @@ import {
     REQUEST_CONTEXT_META,
     pluginRoutesOf,
     pluginExportsOf,
-    type PluginConfigs,
+    type PluginImplementations,
     type PluginArgs,
     type ContractPlugins,
     pluginRouterOf,
@@ -330,11 +330,11 @@ export interface Server<
     api(
         options: {
             router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>>;
-            plugins?: PluginConfigs<Plugins>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
-                : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<ExpressHandlerContext> }> })
+                : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<ExpressHandlerContext> }> }) &
+            (string extends keyof Plugins ? { plugins?: undefined } : { plugins: PluginImplementations<Plugins, ExpressHandlerContext> })
     ): ExpressApi<R>;
 }
 
@@ -348,13 +348,6 @@ const createServerSurface = <
     contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>
 ): Server<R, Schemes, Auth, RequestContext, Plugins> => {
     const server = {
-        plugins: new Proxy(
-            {},
-            {
-                get: (_target, pluginKey: string) => (config: unknown) =>
-                    (contract.plugins as ContractPlugins | undefined)?.[pluginKey]?.server(config as never, undefined),
-            }
-        ),
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,

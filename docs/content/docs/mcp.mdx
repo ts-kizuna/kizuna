@@ -26,7 +26,20 @@ export const k = new Kizuna({
 });
 ```
 
-Nothing else to mount. The endpoint answers at `/mcp` by default. On Next.js it is served by the catch-all route file that already serves your contract, so with `basePath: '/api'` it lands at `/api/mcp`.
+Then pass its server half to `server.api`, where the MCP SDK and the transport live:
+
+```ts title="src/lib/api.ts"
+import { mcpPluginServer } from '@ts-kizuna/mcp/server';
+
+export const api = server.api({
+    router,
+    plugins: {
+        mcp: mcpPluginServer(),
+    },
+});
+```
+
+The endpoint answers at `/mcp` by default. On Next.js it is served by the catch-all route file that already serves your contract, so with `basePath: '/api'` it lands at `/api/mcp`.
 
 ## It is not in your client
 

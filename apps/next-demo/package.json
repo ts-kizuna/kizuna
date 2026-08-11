@@ -15,6 +15,7 @@
     "@ts-kizuna/core": "workspace:*",
     "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/next": "workspace:*",
+    "@ts-kizuna/mcp": "workspace:*",
     "@ts-kizuna/openapi": "workspace:*",
     "next": "catalog:",
     "react": "catalog:",

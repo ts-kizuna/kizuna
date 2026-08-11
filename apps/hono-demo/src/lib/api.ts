@@ -1,3 +1,5 @@
+import { mcpPluginServer } from '@ts-kizuna/mcp/server';
+import { openApiPluginServer } from '@ts-kizuna/openapi/server';
 import { server } from './server';
 import { requireUser, requireMember, requireInviteToken } from './guards';
 import { captureAnalytics } from './request-context';
@@ -12,5 +14,9 @@ export const api = server.api({
     },
     requestContext: {
         analytics: captureAnalytics,
+    },
+    plugins: {
+        mcp: mcpPluginServer(),
+        openApi: openApiPluginServer(),
     },
 });

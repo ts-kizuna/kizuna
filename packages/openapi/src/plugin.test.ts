@@ -6,17 +6,19 @@ import express from 'express';
 import request from 'supertest';
 import { generateOpenApi } from './generator.js';
 import { openApiPlugin } from './plugin.js';
+import { openApiPluginServer } from './server.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
     plugins: {
-        openApiDocs: openApiPlugin({
+        openApi: openApiPlugin({
             info: {
                 title: 'Demo API',
                 version: '1.0.0',
             },
+            docsPath: '/docs',
         }),
     },
 });
@@ -45,6 +47,9 @@ const serve = () => {
                     id: params.id,
                 },
             }),
+        },
+        plugins: {
+            openApi: openApiPluginServer(),
         },
     });
     const app = express();
@@ -86,12 +91,12 @@ describe('openApiPlugin', () => {
                 api: 'API',
             }),
             plugins: {
-                openApiDocs: openApiPlugin({
+                openApi: openApiPlugin({
                     info: {
                         title: 'No drift',
                         version: '2.0.0',
                     },
-                    jsonPath: true,
+                    jsonPath: '/openapi.json',
                 }),
             },
         });
@@ -119,6 +124,9 @@ describe('openApiPlugin', () => {
                             ok: true,
                         },
                     }),
+                },
+                plugins: {
+                    openApi: openApiPluginServer(),
                 },
             })
             .mount(app);
@@ -152,19 +160,18 @@ describe('openApiPlugin', () => {
         expect(() => generateOpenApi(bare)).toThrow(/Install `openApiPlugin`/);
     });
 
-    it('serves the document without a UI when the page is turned off', async () => {
+    it('serves the document with no UI when only a document path is given', async () => {
         const specOnlyK = new Kizuna({
             tags: Kizuna.tags({
                 api: 'API',
             }),
             plugins: {
-                openApiDocs: openApiPlugin({
+                openApi: openApiPlugin({
                     info: {
                         title: 'Spec only',
                         version: '1.0.0',
                     },
-                    docsPath: false,
-                    jsonPath: true,
+                    jsonPath: '/openapi.json',
                 }),
             },
         });
@@ -193,6 +200,9 @@ describe('openApiPlugin', () => {
                         },
                     }),
                 },
+                plugins: {
+                    openApi: openApiPluginServer(),
+                },
             })
             .mount(app);
 
@@ -200,13 +210,13 @@ describe('openApiPlugin', () => {
         expect((await request(app).get('/docs')).status).toBe(404);
     });
 
-    it('takes a custom path as well as true', async () => {
+    it('takes a path for each of the three', async () => {
         const customK = new Kizuna({
             tags: Kizuna.tags({
                 api: 'API',
             }),
             plugins: {
-                openApiDocs: openApiPlugin({
+                openApi: openApiPlugin({
                     info: {
                         title: 'Custom',
                         version: '1.0.0',
@@ -241,6 +251,9 @@ describe('openApiPlugin', () => {
                         },
                     }),
                 },
+                plugins: {
+                    openApi: openApiPluginServer(),
+                },
             })
             .mount(app);
 
@@ -256,13 +269,13 @@ describe('openApiPlugin', () => {
                 api: 'API',
             }),
             plugins: {
-                openApiDocs: openApiPlugin({
+                openApi: openApiPlugin({
                     info: {
                         title: 'Both',
                         version: '1.0.0',
                     },
-                    jsonPath: true,
-                    yamlPath: true,
+                    jsonPath: '/openapi.json',
+                    yamlPath: '/openapi.yaml',
                 }),
             },
         });
@@ -291,6 +304,9 @@ describe('openApiPlugin', () => {
                             ok: true,
                         },
                     }),
+                },
+                plugins: {
+                    openApi: openApiPluginServer(),
                 },
             })
             .mount(app);

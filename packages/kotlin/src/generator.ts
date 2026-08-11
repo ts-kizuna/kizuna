@@ -1,6 +1,5 @@
 import type { z } from 'zod';
 import {
-    loadDeprecations,
     contractFingerprint,
     createGenerator,
     parsePath,
@@ -18,6 +17,7 @@ import {
     mergeHeaderFields,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
+import { loadDeprecations } from '@ts-kizuna/core/load-deprecations';
 import type { Contract } from '@ts-kizuna/core';
 import { KotlinWriter, stringLiteral } from './emit.js';
 import {
@@ -308,10 +308,10 @@ const buildRouteMethod = (
     };
 };
 
-const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, contract: Contract) => {
+const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, contract: Contract, deprecations) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
-    const deprecationSchemas = loadDeprecations(contractFingerprint(contract))?.schemas;
+    const deprecationSchemas = deprecations?.schemas;
 
     return {
         processRoute({ routeKey, route, deprecated, deprecationMessage, fieldDeprecations }) {
@@ -1574,10 +1574,14 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     const { namespaceName, packageName, camelCaseProperties = false, unknownEnumCase = false } = config;
 
     const registry = new TypeRegistry(camelCaseProperties, unknownEnumCase);
-    const partition = kotlinGenerator(contract, {
-        namespaceName,
-        registry,
-    });
+    const partition = kotlinGenerator(
+        contract,
+        {
+            namespaceName,
+            registry,
+        },
+        loadDeprecations(contractFingerprint(contract))
+    );
     const allMethods = [...partition.flatMethods, ...partition.groups.flatMap((group: RouteGroup) => group.methods)];
 
     const operationTypeMap = buildOperationTypeMap(allMethods, registry);

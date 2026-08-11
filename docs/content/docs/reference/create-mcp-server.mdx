@@ -10,7 +10,7 @@ To serve it from your app, install [`mcpPlugin`](/docs/reference/mcp-plugin) ins
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
 ```ts
-import { createMcpServer } from '@ts-kizuna/mcp';
+import { createMcpServer } from '@ts-kizuna/mcp/server';
 ```
 
 ## Parameters
@@ -56,7 +56,7 @@ An `McpServer` instance from `@modelcontextprotocol/sdk`. Connect it to any tran
 ## Example
 
 ```ts title="src/index.ts"
-import { createMcpServer } from '@ts-kizuna/mcp';
+import { createMcpServer } from '@ts-kizuna/mcp/server';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { api } from './api';
 

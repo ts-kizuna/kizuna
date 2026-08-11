@@ -32,6 +32,7 @@
     "@ts-kizuna/eslint-plugin": "workspace:*",
     "@types/supertest": "^6.0.2",
     "concurrently": "catalog:",
+    "esbuild": "^0.28.2",
     "eslint": "catalog:",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",

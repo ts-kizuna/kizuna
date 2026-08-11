@@ -5,23 +5,30 @@ description: Write a plugin once and it runs on every adapter, because it never 
 
 A plugin declares routes and hands back handlers. The adapter mounts them exactly as it mounts yours, so a plugin needs no `express`, `hono`, `fastify` or `next` import anywhere in it.
 
-```ts
-import { createPlugin } from '@ts-kizuna/core/adapter';
-```
+A plugin ships in two halves, in two modules:
 
-## The shape
+| half            | module                    | imported by                | may import                 |
+| --------------- | ------------------------- | -------------------------- | -------------------------- |
+| the declaration | your package's main entry | the contract, so everybody | whatever a browser bundles |
+| the server      | `your-package/server`     | the server app only        | anything                   |
+
+A plugin is declared on `new Kizuna()`, so whatever its declaration module imports lands in your contract's import graph, browser bundles included. Keep `node:fs`, a database driver or a heavy SDK in the server half.
+
+## The declaration
 
 ```ts title="@ts-kizuna/audit/src/index.ts"
-import { createPlugin } from '@ts-kizuna/core/adapter';
+import { createPlugin } from '@ts-kizuna/core/plugin';
 import { z } from 'zod';
+import type { AuditExports } from './server.js';
 
 export interface AuditPluginProps {
     path?: `/${string}`;
 }
 
 export const auditPlugin = (props: AuditPluginProps = {}) =>
-    createPlugin({
+    createPlugin<AuditExports>()({
         name: 'audit',
+        serverModule: '@ts-kizuna/audit/server',
 
         routes: {
             recent: {
@@ -33,65 +40,105 @@ export const auditPlugin = (props: AuditPluginProps = {}) =>
             },
         },
 
-        server: (config: { store: AuditStore }) => ({
-            router: {
-                recent: async () => ({
-                    status: 200 as const,
-                    body: await config.store.recent(),
-                }),
-            },
-            exports: {
-                record: (routeKey: string) => config.store.write(routeKey),
-            },
-        }),
+        props,
     });
 ```
 
-Two keys, and each says where its contents land.
+| key            | what it is                                                          |
+| -------------- | ------------------------------------------------------------------- |
+| `name`         | the plugin's own name, whatever key an app installs it under        |
+| `serverModule` | where the other half lives, named in the error if an app forgets it |
+| `routes`       | the routes it serves, in the contract, so pure data                 |
+| `props`        | how the caller configured it, in the contract, so pure data         |
 
-| key      | lands                                        |
-| -------- | -------------------------------------------- |
-| `routes` | in the contract, so it must be pure data     |
-| `server` | on the server, where everything live belongs |
+`import type` is erased, so the declaration can name types the server half owns without importing its code. `createPlugin<AuditExports>()` types what handlers get, which is what the extra `()` is for. A plugin that exports nothing to handlers writes `createPlugin({ ... })`.
 
-Inside `server`:
+## The server
+
+```ts title="@ts-kizuna/audit/src/server.ts"
+import { implementPlugin } from '@ts-kizuna/core/adapter';
+import { auditPlugin } from './index.js';
+
+export interface AuditExports {
+    record: (routeKey: string) => void;
+}
+
+export const auditPluginServer = (config: { store: AuditStore }) =>
+    implementPlugin(auditPlugin, ({ props }) => ({
+        router: {
+            recent: async () => ({
+                status: 200 as const,
+                body: await config.store.recent(props.path),
+            }),
+        },
+        exports: {
+            record: (routeKey: string) => config.store.write(routeKey),
+        },
+    }));
+```
 
 | key       | what it is                                               |
 | --------- | -------------------------------------------------------- |
 | `router`  | handlers for the plugin's own routes, typed against them |
 | `exports` | what every handler reaches at `plugins.<name>`           |
 
-`server` receives the api as a second argument, for plugins that read the contract's routes. MCP uses it to build its tool list; most plugins ignore it.
+`implementPlugin` reads its first argument for the type only, never calling it: that binds `router` to the declared routes and `exports` to what the declaration promised.
 
-## Props versus config
+`props` arrives from the contract. Anything live is your factory's own argument, which is why `auditPluginServer` takes `store` and the declaration does not.
 
-Curry the plugin so callers can shape what it declares. Props reach the contract, so keep them pure:
+The callback also receives `api`, for plugins that read the contract's routes. MCP uses it to build its tool list; most plugins ignore it.
 
-```ts
+## What the app writes
+
+```ts title="src/lib/k.ts"
 plugins: {
     audit: auditPlugin({ path: '/internal/audit' }),
 }
 ```
 
-Anything live is `config`, passed on `server.api` under the same key. A plugin whose config is `void` never appears there at all. See [Plugins](/docs/plugins) for the caller's side.
+```ts title="src/lib/api.ts"
+export const api = server.api({
+    router,
+    plugins: {
+        audit: auditPluginServer({ store }),
+    },
+});
+```
+
+Same key both times. Leave the second one out and `server.api` throws, naming your `serverModule`. See [Plugins](/docs/plugins) for the caller's side.
 
 ## Answering with something that is not JSON
 
-A plugin route can return `raw` when its wire format is not a JSON body, which is how MCP serves JSON-RPC over server-sent events:
+A plugin route can return `rawResponse` when its wire format is not a JSON body, which is how MCP serves JSON-RPC over server-sent events:
 
 ```ts
-import { raw } from '@ts-kizuna/core/adapter';
+import { rawResponse } from '@ts-kizuna/core/adapter';
 
-endpoint: async ({ body, headers }) => raw(await transport.handleRequest(request)),
+endpoint: async ({ body, headers }) => rawResponse(await transport.handleRequest(request)),
 ```
 
-Kizuna skips validation and rendering, and each adapter writes the response out in its own terms. Ordinary route handlers cannot reach `raw`.
+Kizuna skips validation and rendering, and each adapter writes the response out in its own terms. Ordinary route handlers cannot reach `rawResponse`.
 
 ## Staying adapter-agnostic
 
 A plugin's handlers receive the same arguments yours do: `params`, `query`, `body`, `headers`, plus the adapter's own context. Build from the parsed inputs and the plugin runs everywhere.
 
 If a plugin genuinely needs framework specifics, narrow its `HandlerContext` and it will compile only on the adapters that match.
+
+## Packaging
+
+Two export subpaths, one per half:
+
+```json title="package.json"
+{
+    "exports": {
+        ".": "./dist/index.mjs",
+        "./server": "./dist/server.mjs"
+    }
+}
+```
+
+Bundle the main entry for a browser target in CI and the boundary holds itself. Kizuna does that for core and every first-party plugin.
 
 ## Reference
 

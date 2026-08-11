@@ -21,7 +21,7 @@ import {
     REQUEST_CONTEXT_META,
     pluginRoutesOf,
     pluginExportsOf,
-    type PluginConfigs,
+    type PluginImplementations,
     type PluginArgs,
     type ContractPlugins,
     pluginRouterOf,
@@ -277,11 +277,11 @@ export interface Server<
     api(
         options: {
             router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins>, E>;
-            plugins?: PluginConfigs<Plugins>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes, E>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
-                : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<HonoHandlerContext<E>> }> })
+                : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<HonoHandlerContext<E>> }> }) &
+            (string extends keyof Plugins ? { plugins?: undefined } : { plugins: PluginImplementations<Plugins, HonoHandlerContext<E>> })
     ): HonoApi<R>;
 }
 
@@ -296,13 +296,6 @@ const createServerSurface = <
     contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins>
 ): Server<R, Schemes, Auth, RequestContext, Plugins, E> => {
     const server = {
-        plugins: new Proxy(
-            {},
-            {
-                get: (_target, pluginKey: string) => (config: unknown) =>
-                    (contract.plugins as ContractPlugins | undefined)?.[pluginKey]?.server(config as never, undefined),
-            }
-        ),
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,

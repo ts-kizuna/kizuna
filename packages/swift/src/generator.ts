@@ -1,6 +1,5 @@
 import type { z } from 'zod';
 import {
-    loadDeprecations,
     contractFingerprint,
     createGenerator,
     isVoidSchema,
@@ -24,6 +23,7 @@ import {
     type Routes,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
+import { loadDeprecations } from '@ts-kizuna/core/load-deprecations';
 import type { Contract } from '@ts-kizuna/core';
 import { SwiftWriter, stringLiteral } from './emit.js';
 import {
@@ -321,10 +321,10 @@ const buildRouteMethod = (
     };
 };
 
-const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }, contract: Contract) => {
+const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }, contract: Contract, deprecations) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
-    const deprecationSchemas = loadDeprecations(contractFingerprint(contract))?.schemas;
+    const deprecationSchemas = deprecations?.schemas;
 
     return {
         processRoute({ routeKey, route, deprecated, deprecationMessage, fieldDeprecations }) {
@@ -1826,10 +1826,14 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
     const { namespaceName, camelCaseProperties = false, unknownEnumCase = false } = options;
 
     const registry = new TypeRegistry(camelCaseProperties, unknownEnumCase);
-    const partition = swiftGenerator(contract, {
-        namespaceName,
-        registry,
-    });
+    const partition = swiftGenerator(
+        contract,
+        {
+            namespaceName,
+            registry,
+        },
+        loadDeprecations(contractFingerprint(contract))
+    );
     const allMethods = [...partition.flatMethods, ...partition.groups.flatMap((group: RouteGroup) => group.methods)];
 
     const operationTypeMap = buildOperationTypeMap(allMethods, registry);

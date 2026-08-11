@@ -230,8 +230,9 @@ export const requestContextContract = requestContextK.contract({
     },
 });
 
-const typedProbePlugin = createPlugin({
+const typedProbePlugin = createPlugin<{ label: () => string }>()({
     name: 'probe',
+    serverModule: '@ts-kizuna/core/adapter-testing',
     routes: {
         ping: {
             method: 'GET',
@@ -243,19 +244,6 @@ const typedProbePlugin = createPlugin({
             },
         },
     },
-    server: () => ({
-        router: {
-            ping: () => ({
-                status: 200 as const,
-                body: {
-                    pong: true,
-                },
-            }),
-        },
-        exports: {
-            label: (): string => 'probed',
-        },
-    }),
 });
 
 const pluginTypeK = new Kizuna({

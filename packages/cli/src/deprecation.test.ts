@@ -5,7 +5,8 @@ import * as fs from 'node:fs';
 import * as url from 'node:url';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { loadDeprecations, contractFingerprint, serializeDeprecationMap, deserializeDeprecationMap } from '@ts-kizuna/core/generator';
+import { contractFingerprint, serializeDeprecationMap, deserializeDeprecationMap } from '@ts-kizuna/core/generator';
+import { loadDeprecations } from '@ts-kizuna/core/load-deprecations';
 import { createDeprecationMap, writeKizunaDeprecations } from './deprecation-parser.js';
 import { contract } from './deprecation.fixture.js';
 

@@ -3,18 +3,20 @@ title: openApiPlugin
 description: Serve your OpenAPI document and an API reference UI for it, on any adapter.
 ---
 
-Serve a reference UI for the OpenAPI document generated from your contract, and the document itself if you want it public. Install it on [`new Kizuna()`](/docs/reference/kizuna) and `api.mount` serves the routes.
+Serve a reference UI for the OpenAPI document generated from your contract, and the document itself if you want it public. Declare it on [`new Kizuna()`](/docs/reference/kizuna), pass `openApiPluginServer()` to [`server.api`](/docs/reference/server-api), and `api.mount` serves the routes.
 
 <InstallTabs packageName="@ts-kizuna/openapi" />
 
 ```ts
 import { openApiPlugin } from '@ts-kizuna/openapi';
+import { openApiPluginServer } from '@ts-kizuna/openapi/server';
 ```
 
 ## Parameters
 
 ```ts
-openApiPlugin(props: OpenApiPluginProps): KizunaPlugin
+openApiPlugin(props: OpenApiPluginProps): PluginDeclaration
+openApiPluginServer(): PluginImplementation
 ```
 
 | Parameter | Type                 | Required | Description                                                                                    |
@@ -25,21 +27,21 @@ openApiPlugin(props: OpenApiPluginProps): KizunaPlugin
 
 `OpenApiPluginProps` extends `GenerateOpenApiOptions`, so `info`, `servers`, `setOperationId` and the rest work exactly as they do on `generateOpenApi`. On top of those:
 
-| Option          | Default            | Description                                                  |
-| --------------- | ------------------ | ------------------------------------------------------------ |
-| `docsPath`      | `'/docs'`          | The reference UI. A path moves it, `false` turns it off      |
-| `jsonPath`      | off                | The document. `true` uses `/openapi.json`, or give a path    |
-| `yamlPath`      | off                | The document as YAML. `true` uses `/openapi.yaml`, or a path |
-| `provider`      | `'scalar'`         | Which reference UI to render, `'scalar'` or `'swagger'`      |
-| `cdnUrl`        | the provider's CDN | Where to load the UI's assets from                           |
-| `pageTitle`     | the document title | The page's `<title>`                                         |
-| `configuration` | —                  | Extra config merged into the UI's initializer                |
+| Option          | Default            | Description                                             |
+| --------------- | ------------------ | ------------------------------------------------------- |
+| `docsPath`      | off                | The reference UI. Give it a path to serve it            |
+| `jsonPath`      | off                | The document. A path ending in `.json`                  |
+| `yamlPath`      | off                | The document as YAML. A path ending in `.yaml`          |
+| `provider`      | `'scalar'`         | Which reference UI to render, `'scalar'` or `'swagger'` |
+| `cdnUrl`        | the provider's CDN | Where to load the UI's assets from                      |
+| `pageTitle`     | the document title | The page's `<title>`                                    |
+| `configuration` | —                  | Extra config merged into the UI's initializer           |
 
-Props are pure data, and the plugin builds the document from the contract at serve time, so it needs nothing from `server.api`.
+Props are pure data, because they reach the contract and the contract reaches your client. The generator lives in `openApiPluginServer()`, which takes nothing: declaring the plugin is where it is configured.
 
 They are also the options [`generateOpenApi`](/docs/reference/generate-openapi) uses when you call it without any, so a build step and the served document cannot disagree.
 
-The three path props read their own defaults: `docsPath` takes `false` because the UI is on, `jsonPath` and `yamlPath` take `true` because the document is not.
+Each prop serves nothing until you give it a path. The document paths carry their extension in the type, so `jsonPath: '/docs'` does not compile.
 
 ## Example
 
@@ -50,7 +52,7 @@ import { openApiPlugin } from '@ts-kizuna/openapi';
 export const k = new Kizuna({
     tags,
     plugins: {
-        openApiDocs: openApiPlugin({
+        openApi: openApiPlugin({
             info: {
                 title: 'My API',
                 version: '1.0.0',
@@ -61,9 +63,24 @@ export const k = new Kizuna({
 });
 ```
 
+```ts title="src/lib/api.ts"
+import { openApiPluginServer } from '@ts-kizuna/openapi/server';
+
+export const api = server.api({
+    router,
+    plugins: {
+        openApi: openApiPluginServer(),
+    },
+});
+```
+
 ```ts title="src/index.ts"
 api.mount(app);
 ```
+
+## Two halves
+
+`@ts-kizuna/openapi` declares the paths it serves and the options the document is built from, as data on your contract. `@ts-kizuna/openapi/server` holds the generator that renders it. Miss the second half and `server.api` throws, naming the module to import. See [Plugins](/docs/plugins#why-two-halves).
 
 ## Not in your client
 

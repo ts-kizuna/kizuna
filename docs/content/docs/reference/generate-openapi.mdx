@@ -8,22 +8,25 @@ Generate an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from 
 <InstallTabs packageName="@ts-kizuna/openapi" />
 
 ```ts
-import { generateOpenApi } from '@ts-kizuna/openapi';
+import { generateOpenApi } from '@ts-kizuna/openapi/server';
 ```
 
 ## Parameters
 
 ```ts
-generateOpenApi(contract: Contract): OpenApiRenderer
+generateOpenApi(contract: Contract, overrides?: Partial<GenerateOpenApiOptions>): OpenApiRenderer
 ```
 
-| Parameter  | Type       | Description                                                  |
-| ---------- | ---------- | ------------------------------------------------------------ |
-| `contract` | `Contract` | The contract from [`k.contract`](/docs/reference/k-contract) |
+| Parameter   | Type                              | Description                                                     |
+| ----------- | --------------------------------- | --------------------------------------------------------------- |
+| `contract`  | `Contract`                        | The contract from [`k.contract`](/docs/reference/k-contract)    |
+| `overrides` | `Partial<GenerateOpenApiOptions>` | Merged over the contract's options, for what only a build knows |
+
+It lives on `@ts-kizuna/openapi/server` because it reads your deprecations file from disk. The contract-facing entry, `@ts-kizuna/openapi`, holds [`openApiPlugin`](/docs/reference/openapi-plugin) and the document types.
 
 ## Options
 
-Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin) in `k.ts`, and `generateOpenApi` reads them off the contract. There is nowhere else to put them, so a build step cannot write a document that differs from the one your server serves.
+Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin) in `k.ts`, and `generateOpenApi` reads them off the contract, so a build step cannot write a document that differs from the one your server serves. Pass `overrides` for what only a build step knows, such as the public `servers` list.
 
 | Option            | Type                                  | Default   | Description                                                                             |
 | ----------------- | ------------------------------------- | --------- | --------------------------------------------------------------------------------------- |
@@ -53,7 +56,7 @@ import { openApiPlugin } from '@ts-kizuna/openapi';
 
 export const k = new Kizuna({
     plugins: {
-        openApiDocs: openApiPlugin({
+        openApi: openApiPlugin({
             info: {
                 title: 'My API',
                 version: '1.0.0',
@@ -71,7 +74,7 @@ export const k = new Kizuna({
 ```
 
 ```ts
-import { generateOpenApi } from '@ts-kizuna/openapi';
+import { generateOpenApi } from '@ts-kizuna/openapi/server';
 import { contract } from './contract';
 
 const spec = generateOpenApi(contract);

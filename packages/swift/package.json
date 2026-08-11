@@ -17,6 +17,11 @@
       }
     }
   },
+  "kizuna": {
+    "entries": {
+      ".": "server"
+    }
+  },
   "bin": {
     "ts-kizuna-swift": "./dist/cli.mjs"
   },
