@@ -6,12 +6,9 @@ const info = {
     version: '1',
 };
 
-test('each path prop offers only the values that do something', () => {
+test('each path prop takes only a path that serves its own format', () => {
     openApiPlugin({
         info,
-        docsPath: false,
-        jsonPath: true,
-        yamlPath: true,
     });
 
     openApiPlugin({
@@ -23,25 +20,31 @@ test('each path prop offers only the values that do something', () => {
 
     openApiPlugin({
         info,
-        // @ts-expect-error the reference UI is on by default, so `true` says nothing
+        // @ts-expect-error nothing is on or off, so a boolean says nothing
         docsPath: true,
     });
 
     openApiPlugin({
         info,
-        // @ts-expect-error the document is off by default, so `false` says nothing
+        // @ts-expect-error the same for the document
         jsonPath: false,
-    });
-
-    openApiPlugin({
-        info,
-        // @ts-expect-error the same for YAML
-        yamlPath: false,
     });
 
     openApiPlugin({
         info,
         // @ts-expect-error a path has to start with a slash
         docsPath: 'reference',
+    });
+
+    openApiPlugin({
+        info,
+        // @ts-expect-error the JSON document is served from a `.json` path
+        jsonPath: '/spec',
+    });
+
+    openApiPlugin({
+        info,
+        // @ts-expect-error and YAML from a `.yaml` one
+        yamlPath: '/spec.json',
     });
 });

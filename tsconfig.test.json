@@ -1,5 +1,14 @@
 {
     "extends": "./tsconfig.json",
-    "include": ["packages/**/*.ts", "apps/shared/src/**/*.ts"],
-    "exclude": ["**/node_modules", "**/dist", "apps/next-demo", "apps/express-demo"]
+    "include": [
+        "packages/**/*.ts",
+        "apps/shared/src/**/*.ts",
+        "tests/**/*.ts"
+    ],
+    "exclude": [
+        "**/node_modules",
+        "**/dist",
+        "apps/next-demo",
+        "apps/express-demo"
+    ]
 }

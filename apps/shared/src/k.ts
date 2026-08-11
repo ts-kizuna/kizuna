@@ -22,13 +22,15 @@ export const k = new Kizuna({
         mcp: mcpPlugin({
             name: 'ts-kizuna demo',
         }),
-        openApiDocs: openApiPlugin({
+        openApi: openApiPlugin({
             info: {
                 title: 'ts-kizuna demo',
                 version: '1.0.0',
                 description: 'The ts-kizuna user API, shared by every adapter demo.',
             },
             setOperationId: true,
+            docsPath: '/docs',
+            jsonPath: '/openapi.json',
         }),
     },
 });

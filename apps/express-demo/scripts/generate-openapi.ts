@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { generateOpenApi } from '@ts-kizuna/openapi';
+import { generateOpenApi } from '@ts-kizuna/openapi/server';
 import { contract } from '@ts-kizuna-demo/shared';
 
 const spec = generateOpenApi(contract);

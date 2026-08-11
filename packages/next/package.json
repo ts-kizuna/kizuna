@@ -27,6 +27,12 @@
       }
     }
   },
+  "kizuna": {
+    "entries": {
+      ".": "server",
+      "./config": "server"
+    }
+  },
   "files": [
     "dist"
   ],

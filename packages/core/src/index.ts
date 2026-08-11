@@ -12,14 +12,15 @@ export {
 } from './kizuna.js';
 export { type Contract } from './contract.js';
 export {
-    type KizunaPlugin,
+    createPlugin,
+    type PluginDeclaration,
+    type PluginDefinition,
     type PluginRoutes,
-    type PluginServer,
     type ContractPlugins,
-    type PluginConfigs,
     type PluginExportValues,
     type PluginArgs,
-    type PluginConfigOf,
+    type PluginRoutesOf,
+    type PluginPropsOf,
     type PluginExportsOf,
 } from './plugin.js';
 export { type ModelOptions } from './model.js';
@@ -66,6 +67,7 @@ export {
     type SchemeNameOf,
     type AccessGate,
     type RouteDefinition,
+    type RoutePath,
     type Routes,
     type AuthoredRouteDefinition,
     type AuthoredRoutes,

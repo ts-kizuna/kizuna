@@ -17,6 +17,11 @@
       }
     }
   },
+  "kizuna": {
+    "entries": {
+      ".": "client"
+    }
+  },
   "files": [
     "dist"
   ],

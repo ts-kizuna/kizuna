@@ -5,20 +5,12 @@ import {
     type DeprecationMap,
     type SerializedDeprecationMap,
 } from './deprecation.js';
-import { loadDeprecations } from './load-deprecations.js';
 import { flattenRoutes } from './handler-pipeline.js';
 import { parsePath } from './path-params.js';
 import type { Routes, RouteDefinition } from './types.js';
 import type { Contract } from './contract.js';
 
-export {
-    loadDeprecations,
-    contractFingerprint,
-    serializeDeprecationMap,
-    deserializeDeprecationMap,
-    type DeprecationMap,
-    type SerializedDeprecationMap,
-};
+export { contractFingerprint, serializeDeprecationMap, deserializeDeprecationMap, type DeprecationMap, type SerializedDeprecationMap };
 export type { Routes, RouteDefinition };
 export { parsePath };
 
@@ -87,6 +79,9 @@ export interface GeneratorRouteContext {
  * Centralises routes walking and deprecation resolution so generator authors
  * only need to implement `processRoute` and `finalize`.
  *
+ * Deprecations are passed in, not read here, so this module keeps out of
+ * `node:fs`. Callers load them with `loadDeprecations`.
+ *
  * ```ts
  * const generateRouteList = createGenerator(() => {
  *     const routeList: string[] = [];
@@ -100,22 +95,22 @@ export interface GeneratorRouteContext {
  *     };
  * });
  *
- * const list = generateRouteList(contract, {});
+ * const list = generateRouteList(contract, {}, loadDeprecations(contractFingerprint(contract)));
  * ```
  */
 export const createGenerator =
     <Options, Output>(
         factory: (
             options: Options,
-            contract: Contract
+            contract: Contract,
+            deprecations: DeprecationMap | undefined
         ) => {
             processRoute: (context: GeneratorRouteContext) => void;
             finalize: () => Output;
         }
-    ): ((contract: Contract, options: Options) => Output) =>
-    (contract, options) => {
-        const { processRoute, finalize } = factory(options, contract);
-        const deprecation = loadDeprecations(contractFingerprint(contract));
+    ): ((contract: Contract, options: Options, deprecations?: DeprecationMap) => Output) =>
+    (contract, options, deprecation) => {
+        const { processRoute, finalize } = factory(options, contract, deprecation);
         for (const { routeKey, route, routeTags } of flattenRoutes(contract.routes)) {
             const rawMessage = deprecation?.routes.get(routeKey);
             processRoute({

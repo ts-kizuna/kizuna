@@ -3,18 +3,20 @@ title: mcpPlugin
 description: Install an MCP (Model Context Protocol) endpoint so AI assistants can call your API as tools.
 ---
 
-Serve an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint as part of your API. Install it on [`new Kizuna()`](/docs/reference/kizuna) and `api.mount` serves it, on every adapter.
+Serve an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint as part of your API. Declare it on [`new Kizuna()`](/docs/reference/kizuna), pass `mcpPluginServer()` to [`server.api`](/docs/reference/server-api), and `api.mount` serves it, on every adapter.
 
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
 ```ts
 import { mcpPlugin } from '@ts-kizuna/mcp';
+import { mcpPluginServer } from '@ts-kizuna/mcp/server';
 ```
 
 ## Parameters
 
 ```ts
-mcpPlugin(props?: McpPluginProps): KizunaPlugin
+mcpPlugin(props?: McpPluginProps): PluginDeclaration
+mcpPluginServer(): PluginImplementation
 ```
 
 | Parameter | Type             | Required | Description           |
@@ -30,7 +32,7 @@ mcpPlugin(props?: McpPluginProps): KizunaPlugin
 | `version`     | `'1.0.0'`          | Semantic version string                       |
 | `routeFilter` | excludes multipart | Predicate to filter which routes become tools |
 
-Props are pure data, because they reach the contract and the contract reaches your client. The plugin needs nothing at runtime, so it never appears in `server.api`.
+Props are pure data, because they reach the contract and the contract reaches your client. The MCP SDK lives in `mcpPluginServer()`, which takes nothing: declaring the plugin is where it is configured.
 
 ## Example
 
@@ -49,9 +51,24 @@ export const k = new Kizuna({
 });
 ```
 
+```ts title="src/lib/api.ts"
+import { mcpPluginServer } from '@ts-kizuna/mcp/server';
+
+export const api = server.api({
+    router,
+    plugins: {
+        mcp: mcpPluginServer(),
+    },
+});
+```
+
 ```ts title="src/index.ts"
 api.mount(app);
 ```
+
+## Two halves
+
+`@ts-kizuna/mcp` declares the path and the tool settings, as data on your contract. `@ts-kizuna/mcp/server` holds the endpoint and the MCP SDK. Miss the second half and `server.api` throws, naming the module to import. See [Plugins](/docs/plugins#why-two-halves).
 
 ## Next.js
 

@@ -74,14 +74,19 @@ export type SchemeNameOf<Entry> = Entry extends string ? Entry : Extract<keyof E
  */
 export type AccessGate = Record<string, Record<string, unknown>>;
 
+/**
+ * A path starting with `/`.
+ */
+export type RoutePath = `/${string}`;
+
 export interface RouteDefinition<TagKeys extends string = string, SchemeNames extends string = string> {
     method: Method;
     /**
-     * Route path starting with `/`. Use `:paramName` for path parameters.
+     * Use `:paramName` for path parameters.
      *
-     * Note: paths are matched exactly per RFC 3986 — `/users/1` and `/users/1/` are distinct resources.
+     * Note: paths are matched exactly per RFC 3986, so `/users/1` and `/users/1/` are distinct resources.
      */
-    path: `/${string}`;
+    path: RoutePath;
     summary?: string;
     description?: string;
     /**

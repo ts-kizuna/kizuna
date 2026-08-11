@@ -12,7 +12,7 @@ export interface RawResponse {
  * routes whose wire format is not JSON, such as MCP's JSON-RPC over
  * server-sent events. Ordinary route handlers cannot reach it.
  */
-export const raw = (response?: unknown): RawResponse => ({
+export const rawResponse = (response?: unknown): RawResponse => ({
     [RAW_RESPONSE]: true,
     response,
 });

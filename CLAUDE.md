@@ -75,6 +75,17 @@ First-party adapters (in `packages/`) always ship with:
 - **Documentation** — an adapter page in `docs/content/docs/adapters/`, plus updates to every doc page that lists adapters
 - **Shared suites**: a `testAdapterFeatures(...)` call in its `*.test.ts` and a `checkAdapterTypeFeatures(...)` call in its `*.test-d.ts`, both from `packages/core/src/adapter-testing/`. Both catalogues are exhaustive, so adding a feature to either one breaks every adapter until each answers it. Legitimate framework differences belong in `ADAPTER_BEHAVIOUR` or in a plain `test()` beside the catalogue call, never silently dropped.
 
+# Plugins
+
+A plugin ships in two halves, and which half a module belongs to decides what it may import:
+
+- **Declaration**: the package's main entry, built with `createPlugin` from `@ts-kizuna/core/plugin`. It rides on the contract, and a contract is shared with browser bundles, so it may import only what a browser bundles. Use `import type` for anything the server half owns; types are erased, values are not.
+- **Server**: the `./server` subpath, built with `implementPlugin` from `@ts-kizuna/core/adapter`. Only the server app imports it, so it may import anything, including Node built-ins and Node-only dependencies.
+
+Every export subpath of every package under `packages/` declares its reach under `kizuna.entries` in its own `package.json`. `tests/client-safe.test.ts` enforces the boundary rather than documenting it: it bundles each `client` entry for a browser target and fails on any Node built-in, derives reach from the demo contract's own import graph so a mislabelled entry is caught, and requires every plugin to be installed on `apps/shared/src/k.ts`. It reads `dist`, so run `pnpm build` before it.
+
+Nothing else needs to know a plugin exists: its routes never join `contract.routes`, so the client and the generators do not see them.
+
 # Documentation
 
 When changing any exported function, type, or option in `packages/*/src/`, check if README.md, JSDoc examples, guide pages in `docs/content/docs/`, or API reference pages in `docs/content/docs/reference/` reference the old API. If so, update them in the same change. When in doubt, grep the `docs/` directory for the function or type name.

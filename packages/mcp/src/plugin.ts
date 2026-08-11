@@ -1,7 +1,6 @@
-import { createMcpHandler } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { adapterContextOf, createPlugin, raw, type ApiWithRouter } from '@ts-kizuna/core/adapter';
-import { createMcpServer, type McpServerOptions } from './server.js';
+import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
+import type { McpServerOptions } from './mcp-server.js';
 
 export interface McpPluginProps {
     /**
@@ -9,7 +8,7 @@ export interface McpPluginProps {
      *
      * @default '/mcp'
      */
-    path?: `/${string}`;
+    path?: RoutePath;
 
     /**
      * Human-readable name shown to AI assistants.
@@ -33,21 +32,6 @@ export interface McpPluginProps {
     routeFilter?: McpServerOptions['routeFilter'];
 }
 
-type HandlerArgs = {
-    body: unknown;
-    headers: Record<string, string | string[] | undefined>;
-    [key: string]: unknown;
-};
-
-const toHeaders = (headers: HandlerArgs['headers']): Headers => {
-    const built = new Headers();
-    for (const [name, value] of Object.entries(headers)) {
-        if (value === undefined) continue;
-        for (const entry of Array.isArray(value) ? value : [value]) built.append(name, entry);
-    }
-    return built;
-};
-
 /**
  * Let AI assistants use the API. Serves an MCP (Model Context Protocol)
  * endpoint where every route is a tool an assistant can discover and call,
@@ -56,6 +40,9 @@ const toHeaders = (headers: HandlerArgs['headers']): Headers => {
  * The endpoint is an ordinary kizuna route, so `api.mount` serves it on any
  * adapter, and it stays out of `contract.routes` so the client and the
  * generators do not see it.
+ *
+ * Pass `mcpPluginServer()` from `@ts-kizuna/mcp/server` to `server.api({ plugins })`
+ * to serve it.
  *
  * @example
  * ```ts
@@ -73,6 +60,7 @@ const toHeaders = (headers: HandlerArgs['headers']): Headers => {
 export const mcpPlugin = (props: McpPluginProps = {}) =>
     createPlugin({
         name: 'mcp',
+        serverModule: '@ts-kizuna/mcp/server',
         routes: {
             endpoint: {
                 method: 'POST',
@@ -84,29 +72,5 @@ export const mcpPlugin = (props: McpPluginProps = {}) =>
                 },
             },
         },
-        server: (_config: void, api: unknown) => ({
-            router: {
-                endpoint: async (args: HandlerArgs) => {
-                    const handler = createMcpHandler(() =>
-                        createMcpServer(api as ApiWithRouter, {
-                            ...props,
-                            handlerContext: adapterContextOf(args),
-                            credentialHeaders: args.headers,
-                        })
-                    );
-
-                    // Rebuilt from the inputs the pipeline already parsed, so
-                    // the handler gets a web request on every adapter.
-                    return raw(
-                        await handler.fetch(
-                            new Request('http://mcp.local/', {
-                                method: 'POST',
-                                headers: toHeaders(args.headers),
-                                body: JSON.stringify(args.body),
-                            })
-                        )
-                    );
-                },
-            },
-        }),
+        props,
     });

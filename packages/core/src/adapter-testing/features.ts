@@ -94,7 +94,10 @@ export const ADAPTER_FEATURES = {
         summary: 'A contract route wins a path a plugin route also matches, such as a static path against the plugin’s param.',
     },
     'plugins.rawResponse': {
-        summary: 'A plugin route answering with `raw` sends its response untouched by validation or rendering.',
+        summary: 'A plugin route answering with `rawResponse` sends its response untouched by validation or rendering.',
+    },
+    'plugins.serverRequired': {
+        summary: 'A plugin declared on the contract with no server half passed to `server.api` throws, naming the module to import.',
     },
 } as const satisfies Record<string, AdapterFeatureMeta>;
 

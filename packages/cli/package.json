@@ -17,6 +17,11 @@
       }
     }
   },
+  "kizuna": {
+    "entries": {
+      ".": "server"
+    }
+  },
   "bin": {
     "kizuna": "./dist/cli.mjs"
   },

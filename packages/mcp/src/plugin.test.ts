@@ -7,6 +7,7 @@ import { KizunaServer } from '@ts-kizuna/express';
 import { Client } from '@modelcontextprotocol/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { mcpPlugin } from './plugin.js';
+import { mcpPluginServer } from './server.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -48,6 +49,9 @@ const api = server.api({
                 name: 'Ada',
             },
         }),
+    },
+    plugins: {
+        mcp: mcpPluginServer(),
     },
 });
 

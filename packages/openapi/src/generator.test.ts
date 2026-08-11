@@ -7,7 +7,8 @@ import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
 import { contractFingerprint } from '@ts-kizuna/core/generator';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
-import { generateOpenApi, renderOpenApi, type GenerateOpenApiOptions } from './generator.js';
+import { generateOpenApi, renderOpenApi } from './generator.js';
+import type { GenerateOpenApiOptions } from './types.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
 const k = new Kizuna({

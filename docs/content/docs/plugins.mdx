@@ -7,7 +7,7 @@ A plugin adds endpoints, helpers your handlers can call, or both. It gets your c
 
 ## Installing one
 
-Plugins go on `new Kizuna()`, beside the rest of your API's vocabulary:
+A plugin comes in two halves. The declaration goes on `new Kizuna()`, beside the rest of your API's vocabulary:
 
 ```ts title="src/lib/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
@@ -24,28 +24,42 @@ export const k = new Kizuna({
 });
 ```
 
-The key you choose is the plugin's name everywhere else: handlers read it under `plugins.mcp`, and `server.api` takes its config under the same key.
-
-`api.mount` serves its routes along with yours. There is nothing extra to mount, and it is the same on Express, Fastify, Hono and Next.js.
-
-## Configuring one
-
-Anything live, a store or a transport, goes on `server.api`:
+The server half goes on `server.api`, under the same key:
 
 ```ts title="src/lib/api.ts"
+import { mcpPluginServer } from '@ts-kizuna/mcp/server';
+
 export const api = server.api({
     router,
     plugins: {
-        audit: {
-            store,
-        },
+        mcp: mcpPluginServer(),
     },
 });
 ```
 
-A plugin that needs nothing live never appears there. `mcpPlugin` is one, which is why installing it is the whole setup.
+The key you choose is the plugin's name everywhere else: handlers read it under `plugins.mcp`, and both halves are keyed by it. Miss the second half and `server.api` throws, naming the module to import.
 
-The split is not arbitrary: `new Kizuna()` reaches your client through the contract, so only pure data can go there. A database handle passed at install would end up in your browser bundle.
+`api.mount` serves its routes along with yours. There is nothing extra to mount, and it is the same on Express, Fastify, Hono and Next.js.
+
+## Why two halves
+
+Your contract is shared: the API app imports it, and so does every client, including the ones bundled for a browser. Plugins are declared on the contract, so the declaration stays browser-safe and the server half is free to use `node:fs`, a database driver or a heavy SDK.
+
+That decides where your configuration goes. Pure data describing what the plugin serves goes in the declaration:
+
+```ts title="src/lib/k.ts"
+plugins: {
+    audit: auditPlugin({ path: '/internal/audit' }),
+}
+```
+
+Anything live goes to the server half:
+
+```ts title="src/lib/api.ts"
+plugins: {
+    audit: auditPluginServer({ store }),
+}
+```
 
 ## Using what a plugin offers
 

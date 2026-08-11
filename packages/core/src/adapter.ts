@@ -20,28 +20,36 @@ import { STATUS_TITLES } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
-import { pluginRouteTree, resolvePluginServers, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from './plugin.js';
+import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from './plugin.js';
+import { resolvePluginServers, type PluginImplementation } from './plugin-server.js';
 import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
 
-export type { RouteDefinition, Routes, Method } from './types.js';
-export { raw, isRawResponse, type RawResponse } from './raw-response.js';
+export type { RouteDefinition, RoutePath, Routes, Method } from './types.js';
+export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
 export {
     createPlugin,
     pluginRouteTree,
-    pluginRoutesOf,
-    pluginRouterOf,
-    pluginExportsOf,
-    type KizunaPlugin,
+    type PluginDeclaration,
+    type PluginDefinition,
     type PluginRoutes,
-    type PluginServer,
-    type PluginRouter,
-    type PluginConfigs,
     type ContractPlugins,
     type PluginExportValues,
     type PluginArgs,
-    type PluginConfigOf,
+    type PluginRoutesOf,
+    type PluginPropsOf,
     type PluginExportsOf,
 } from './plugin.js';
+export {
+    implementPlugin,
+    pluginRoutesOf,
+    pluginRouterOf,
+    pluginExportsOf,
+    resolvePluginServers,
+    type PluginImplementation,
+    type PluginImplementations,
+    type PluginServer,
+    type PluginRouter,
+} from './plugin-server.js';
 
 export class ResponseValidationError extends Error {
     readonly routeKey: string;
@@ -180,9 +188,9 @@ export interface ApiParts {
     guards?: unknown;
     requestContext?: unknown;
     /**
-     * Each plugin's config, keyed by install name.
+     * Each plugin's server half, keyed by install name.
      */
-    plugins?: Record<string, unknown>;
+    plugins?: Record<string, PluginImplementation>;
 }
 
 /**

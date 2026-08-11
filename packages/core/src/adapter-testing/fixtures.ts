@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '../error-response.js';
 import { Kizuna } from '../kizuna.js';
-import { createPlugin, raw } from '../adapter.js';
+import { createPlugin, implementPlugin, rawResponse } from '../adapter.js';
 import type { Router } from '../handler-pipeline.js';
 import type { GuardDeny } from '../adapter.js';
 
@@ -581,7 +581,7 @@ export const createMethodRouter = <Context>(): Router<typeof methodRoutes, Conte
     };
 };
 
-const probePlugin = createPlugin({
+const probePlugin = createPlugin<{ label: () => string }>()({
     name: 'probe',
     routes: {
         ping: {
@@ -612,7 +612,11 @@ const probePlugin = createPlugin({
             },
         },
     },
-    server: (config: { label: string }) => ({
+    serverModule: '@ts-kizuna/core/adapter-testing',
+});
+
+const probeServer = (config: { label: string }) =>
+    implementPlugin(probePlugin, () => ({
         router: {
             ping: () => ({
                 status: 200 as const,
@@ -627,7 +631,7 @@ const probePlugin = createPlugin({
                 },
             }),
             stream: () =>
-                raw(
+                rawResponse(
                     new Response('not json at all', {
                         status: 200,
                         headers: {
@@ -639,8 +643,7 @@ const probePlugin = createPlugin({
         exports: {
             label: () => config.label,
         },
-    }),
-});
+    }));
 
 const pluginK = new Kizuna({
     tags: Kizuna.tags({
@@ -676,10 +679,10 @@ export const pluginContract = pluginK.contract({
     routes: pluginRoutes,
 });
 
-export const pluginConfigs = {
-    probe: {
+export const pluginImplementations = {
+    probe: probeServer({
         label: 'probed',
-    },
+    }),
 };
 
 export const createPluginRouter = <Context>(): Router<typeof pluginRoutes, Context> =>

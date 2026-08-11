@@ -23,7 +23,7 @@ import {
     userContract,
     pluginContract,
     createPluginRouter,
-    pluginConfigs,
+    pluginImplementations,
 } from './fixtures.js';
 import { toMountedApi, type MountedApi, type Transport, type TestResponse } from './transport.js';
 
@@ -81,7 +81,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             {
                 contract: pluginContract,
                 router: createPluginRouter(),
-                plugins: pluginConfigs,
+                plugins: pluginImplementations,
             },
             use
         );
@@ -649,6 +649,16 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(response.status).toBe(200);
                 expect(response.text).toBe('not json at all');
             });
+        },
+        'plugins.serverRequired': async () => {
+            expect(() =>
+                adapter.initServerApi(
+                    pluginContract as never,
+                    {
+                        router: createPluginRouter(),
+                    } as never
+                )
+            ).toThrow(/Plugin 'probe' is declared on the contract but has no server/);
         },
     };
 

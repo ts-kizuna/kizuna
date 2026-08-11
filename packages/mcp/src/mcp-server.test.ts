@@ -4,7 +4,7 @@ import { Kizuna } from '@ts-kizuna/core';
 import { assembleApi, type GuardDeny } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/client';
-import { buildToolDefinitions, createMcpServer } from './server.js';
+import { buildToolDefinitions, createMcpServer } from './mcp-server.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
