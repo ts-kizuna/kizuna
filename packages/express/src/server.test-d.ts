@@ -32,7 +32,7 @@ test('conforms to the shared adapter type catalogue', () => {
             >();
         },
         'surface.guardRun': () => {
-            expectTypeOf(securedServer.guard('user', ({ deny }) => deny(401, 'Unauthorized'))).toEqualTypeOf<
+            expectTypeOf(securedServer.guard('user', ({ unauthenticated }) => unauthenticated())).toEqualTypeOf<
                 GuardRun<ExpressHandlerContext>
             >();
         },
@@ -142,18 +142,18 @@ test('conforms to the shared adapter type catalogue', () => {
                 .toMatchTypeOf<{ auth: { user: { userId: string } } }>();
         },
         'guards.credentialByKind': () => {
-            securedServer.guard('user', ({ bearer, deny, scopes }) => {
+            securedServer.guard('user', ({ bearer, unauthenticated, scopes }) => {
                 expectTypeOf(bearer).toEqualTypeOf<{ token: string } | null>();
                 expectTypeOf(scopes).toEqualTypeOf<string[]>();
-                if (!bearer) return deny(401, 'Unauthorized');
+                if (!bearer) return unauthenticated();
                 return {
                     userId: bearer.token,
                 };
             });
 
-            securedServer.guard('member', ({ apiKey, deny }) => {
+            securedServer.guard('member', ({ apiKey, unauthenticated }) => {
                 expectTypeOf(apiKey).toEqualTypeOf<{ in: 'header'; name: 'x-workspace-token'; value: string } | null>();
-                if (!apiKey) return deny(403, 'Forbidden');
+                if (!apiKey) return unauthenticated();
                 return {
                     workspaceUserId: apiKey.value,
                     role: 'owner' as const,
@@ -164,8 +164,8 @@ test('conforms to the shared adapter type catalogue', () => {
             securedServer.guard(
                 'user',
                 // @ts-expect-error the guard result must match the identity's context schema
-                ({ deny }) => {
-                    void deny;
+                ({ unauthenticated }) => {
+                    void unauthenticated;
                     return {
                         wrongField: true,
                     };
@@ -173,15 +173,15 @@ test('conforms to the shared adapter type catalogue', () => {
             );
         },
         'guards.gateOnlyVoid': () => {
-            gateServer.guard('apiConsumer', ({ apiKey, deny }) => {
-                if (!apiKey) return deny(401, 'Unauthorized');
+            gateServer.guard('apiConsumer', ({ apiKey, unauthenticated }) => {
+                if (!apiKey) return unauthenticated();
             });
 
             gateServer.guard(
                 'user',
                 // @ts-expect-error a context-ful guard must return its context, not void
-                ({ deny }) => {
-                    void deny;
+                ({ unauthenticated }) => {
+                    void unauthenticated;
                 }
             );
         },
@@ -189,8 +189,17 @@ test('conforms to the shared adapter type catalogue', () => {
             // @ts-expect-error 'admin' is not a declared identity
             securedServer.guard('admin', () => ({}));
         },
+        'guards.noHandWrittenStatus': () => {
+            securedServer.guard('user', ({ unauthenticated }) => {
+                // @ts-expect-error a guard does not pick the status; the identity owns it
+                unauthenticated(403, 'Forbidden');
+                // @ts-expect-error nor any other number
+                unauthenticated(200);
+                return unauthenticated('Session expired');
+            });
+        },
         'guards.completeMap': () => {
-            const requireUser = securedServer.guard('user', ({ deny }) => deny(401, 'Unauthorized'));
+            const requireUser = securedServer.guard('user', ({ unauthenticated }) => unauthenticated());
 
             new KizunaServer(securedContract).api({
                 router: {

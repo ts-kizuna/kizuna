@@ -8,7 +8,7 @@ import {
     type ErrorFormatter,
     type GuardMap,
     type GuardRun,
-    type GuardDeny,
+    type Unauthenticated,
     type GuardDenial,
     type RequestContextMap,
     type RequestContextRun,
@@ -121,7 +121,7 @@ export type GuardFns<Schemes extends Record<string, SecurityScheme>, Params> = {
         args: NextHandlerContext &
             CredentialOf<Schemes[Name]> & {
                 params: Params;
-                deny: GuardDeny;
+                unauthenticated: Unauthenticated;
                 scopes: string[];
             }
     ) => [keyof GuardSuccess<Schemes[Name]>] extends [never]

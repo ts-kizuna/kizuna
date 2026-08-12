@@ -140,15 +140,15 @@ const makeAdapter = () => {
  */
 const memberGuardForRole = (role: string | undefined) =>
     ({
-        member: ({ apiKey, deny }) => {
-            if (!apiKey || role === undefined) return deny(403, 'Forbidden');
+        member: ({ apiKey, unauthenticated }) => {
+            if (!apiKey || role === undefined) return unauthenticated();
             return {
                 workspaceUserId: 'wsu_1',
                 role,
             };
         },
-        user: ({ bearer, deny }) => {
-            if (!bearer) return deny(401, 'Unauthorized');
+        user: ({ bearer, unauthenticated }) => {
+            if (!bearer) return unauthenticated();
             return {
                 userId: 'u_1',
             };
@@ -261,7 +261,7 @@ describe('access gate enforcement', () => {
         expect(overriddenRoute?.kind).toBe('guard-denied');
     });
 
-    it('separates an identity failure from an authorization failure', async () => {
+    it('separates an identity failure from an authorization failure by status', async () => {
         const noCredential = await call({
             method: 'DELETE',
             path: '/workspace',
@@ -273,10 +273,9 @@ describe('access gate enforcement', () => {
             headers: ADMIN_TOKEN,
             role: 'admin',
         });
-        expect(noCredential?.kind).toBe('guard-denied');
-        expect(insufficientRole?.kind).toBe('guard-denied');
-        // This guard also denies 403 for a missing token, so only the detail separates them.
-        expect((noCredential as { detail: string }).detail).not.toEqual((insufficientRole as { detail: string }).detail);
+        expect(statusOf(noCredential)).toBe(401);
+        expect(statusOf(insufficientRole)).toBe(403);
+        expect(statusOf(noCredential)).not.toBe(statusOf(insufficientRole));
         expect((insufficientRole as { detail: string }).detail).toContain('member.role');
     });
 
@@ -363,11 +362,6 @@ describe('a route with no auth-map entry', () => {
     });
 });
 
-/**
- * The gate check sits behind `typeof guardResult === 'object'`, so a guard that
- * returns nothing bypasses it. Reachable only past the type layer, which requires
- * a `GuardSuccess` from any identity that declares context or access.
- */
 describe('a guard that returns no object', () => {
     const gated = k.contract({
         routes: {
@@ -392,7 +386,7 @@ describe('a guard that returns no object', () => {
         },
     });
 
-    it('reaches the handler when the guard resolves to undefined', async () => {
+    it('is denied by a gate it returned nothing to satisfy', async () => {
         const { adapter, results } = makeAdapter();
         await adapter.handle({
             routes: gated.routes as Routes,
@@ -408,7 +402,7 @@ describe('a guard that returns no object', () => {
             } as unknown as GuardMap<Record<string, never>>,
             schemes: gated.securitySchemes,
         });
-        // Fails open. Flip to 'guard-denied' if the gate moves ahead of that check.
-        expect(results[0]?.kind).toBe('success');
+        expect(results[0]?.kind).toBe('guard-denied');
+        expect(statusOf(results[0])).toBe(403);
     });
 });

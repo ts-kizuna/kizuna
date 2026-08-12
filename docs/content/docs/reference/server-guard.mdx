@@ -8,10 +8,10 @@ description: Implement one identity by turning the extracted credential into typ
 ```ts title="src/lib/guards.ts"
 import { server } from './server';
 
-export const requireUser = server.guard('user', ({ bearer, deny }) => {
+export const requireUser = server.guard('user', ({ bearer, unauthenticated }) => {
     const session = bearer ? sessions.get(bearer.token) : undefined;
     if (!session) {
-        return deny(401, 'Unauthorized');
+        return unauthenticated();
     }
     return {
         userId: session.userId,
@@ -27,6 +27,27 @@ Guard arguments:
 | ----------------- | ----------------------------------------------------------------------------------------- |
 | credential        | The extracted credential, keyed by the identity's method. `null` when absent.             |
 | `params`          | The matched route's path params, for guards that check access to the resource in the URL. |
-| `deny`            | `(status, detail) => GuardDenial`, rejects with a Problem Details response.               |
+| `unauthenticated` | `(detail?) => GuardDenial`, rejects a credential that did not resolve.                    |
 | `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).      |
 | framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).    |
+
+## The two failure modes
+
+A guard decides one thing: whether the credential resolves to an identity. When it doesn't, `unauthenticated()` rejects the request with the identity's configured status, 401 by default, carrying the `WWW-Authenticate` challenge RFC 9110 requires. Pass a detail string to explain the specific case (`unauthenticated('Session expired')`); the status stays the identity's to set.
+
+There is no way for a guard to name its own status, and that is the point. An unresolved credential is an authentication failure and gets 401. The other failure, a credential that resolves but doesn't carry enough access, is authorization and gets 403, raised by the framework from the [auth map](/docs/reference/k-contract#the-auth-map) before your handler runs:
+
+```ts
+workspace: {
+    '*': 'member',
+    deleteWorkspace: {
+        member: {
+            role: 'owner',
+        },
+    },
+},
+```
+
+A member whose `role` is `admin` calling `deleteWorkspace` gets 403 without the guard being consulted about it. You write the requirement once in the auth map; kizuna enforces it everywhere the route is reachable, including over [MCP](/docs/reference/mcp-plugin).
+
+An identity that needs to hide its own existence, like an invite token in a URL, sets [`onUnauthenticated`](/docs/reference/kizuna-identity#custom-identities) and its guards follow without changing a line.

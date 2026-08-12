@@ -201,8 +201,8 @@ Check the [QStash docs](https://upstash.com/docs/qstash) for the current header 
 QStash calls the run endpoint, so the jobs' identity guards it. Forwarding the secret, as above, is the simplest thing that works: it arrives as `Authorization` and an ordinary bearer guard reads it, the same trust model as Vercel Cron's `CRON_SECRET`.
 
 ```ts
-export const requireScheduler = server.guard('scheduler', ({ bearer, deny }) =>
-    bearer?.token === process.env.CRON_SECRET ? {} : deny(401, 'Unauthorized')
+export const requireScheduler = server.guard('scheduler', ({ bearer, unauthenticated }) =>
+    bearer?.token === process.env.CRON_SECRET ? {} : unauthenticated()
 );
 ```
 

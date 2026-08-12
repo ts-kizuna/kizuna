@@ -264,8 +264,8 @@ describe('end-to-end: typed client → secured Express route', () => {
 
         const securedServer = new KizunaServer(securedContract);
 
-        const requireUser = securedServer.guard('user', ({ bearer, deny }) => {
-            if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
+        const requireUser = securedServer.guard('user', ({ bearer, unauthenticated }) => {
+            if (bearer?.token !== 'tok_ada') return unauthenticated();
             return {
                 userId: '1',
             };

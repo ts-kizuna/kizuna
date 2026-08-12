@@ -131,18 +131,50 @@ export interface GuardDenial {
     readonly [GUARD_DENY]: true;
     status: number;
     detail: string;
+    headers?: Record<string, string>;
 }
 
 /**
- * Reject the request from inside a guard.
+ * Reject the request from inside a guard because the credential could not be
+ * resolved to an identity. The status is the identity's `onUnauthenticated`
+ * (`401` unless it declares otherwise), never the guard's to choose.
+ *
+ * There is deliberately no counterpart for insufficient access: that is the
+ * framework's `403`, raised from the route's `accessGate`.
  */
-export type GuardDeny = (status: number, detail: string) => GuardDenial;
+export type Unauthenticated = (detail?: string) => GuardDenial;
 
-export const guardDeny: GuardDeny = (status, detail) => ({
-    [GUARD_DENY]: true,
-    status,
-    detail,
-});
+/**
+ * The `WWW-Authenticate` challenge a `401` carries, per RFC 9110 §11.6.1.
+ * `undefined` for schemes with no registered HTTP authentication scheme to name
+ * (`apiKey`, and `custom` identities, which have no OpenAPI scheme at all).
+ */
+export const authenticateChallenge = (scheme: SecurityScheme | undefined): string | undefined => {
+    const openapi = scheme?.openapi;
+    if (!openapi) return undefined;
+    if (openapi.type === 'http') {
+        const name = openapi.scheme ?? 'bearer';
+        return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+    if (openapi.type === 'oauth2' || openapi.type === 'openIdConnect') return 'Bearer';
+    return undefined;
+};
+
+/**
+ * Build the `unauthenticated` helper one identity's guard receives. A `404`
+ * override carries no challenge header: naming the scheme would confirm the
+ * credential was the problem, which is the point of overriding.
+ */
+export const makeUnauthenticated = (scheme: SecurityScheme | undefined): Unauthenticated => {
+    const status = (scheme as { onUnauthenticated?: 401 | 404 } | undefined)?.onUnauthenticated ?? 401;
+    const challenge = status === 401 ? authenticateChallenge(scheme) : undefined;
+    return (detail) => ({
+        [GUARD_DENY]: true,
+        status,
+        detail: detail ?? (status === 404 ? 'Not Found' : 'Unauthorized'),
+        ...(challenge ? { headers: { 'www-authenticate': challenge } } : {}),
+    });
+};
 
 export const isGuardDenial = (value: unknown): value is GuardDenial => typeof value === 'object' && value !== null && GUARD_DENY in value;
 
@@ -151,13 +183,14 @@ export const isGuardDenial = (value: unknown): value is GuardDenial => typeof va
  * context (e.g. `req`/`res`) plus the credential the identity's method extracted
  * from the request (or `null` if absent), a `deny` helper, and the matched
  * route's required `scopes`. It returns the context the scheme provides (nested
- * under `auth`, keyed by the identity's name in the handler args) or `deny(...)` to reject.
+ * under `auth`, keyed by the identity's name in the handler args) or
+ * `unauthenticated(...)` to reject a credential it could not resolve.
  */
 export type GuardRun<HandlerContext = unknown> = (
     args: HandlerContext &
         Credential & {
             params: Record<string, string>;
-            deny: GuardDeny;
+            unauthenticated: Unauthenticated;
             scopes: string[];
         }
 ) => Promise<Record<string, unknown> | GuardDenial | void> | Record<string, unknown> | GuardDenial | void;
@@ -551,6 +584,7 @@ export type AdapterResult =
           kind: 'guard-denied';
           status: number;
           detail: string;
+          headers?: Record<string, string>;
       }
     | {
           kind: 'handler-error';
@@ -912,7 +946,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 ...(handlerContext as Record<string, unknown>),
                 ...credential,
                 params,
-                deny: guardDeny,
+                unauthenticated: makeUnauthenticated(schemeDefinition),
                 scopes,
             } as Parameters<typeof guard>[0]);
             if (isGuardDenial(guardResult)) {
@@ -920,23 +954,26 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                     kind: 'guard-denied',
                     status: guardResult.status,
                     detail: guardResult.detail,
+                    headers: guardResult.headers,
                 };
             }
-            if (guardResult && typeof guardResult === 'object') {
-                const gate = route.accessGate?.[scheme];
-                if (gate) {
-                    for (const [field, allowed] of Object.entries(gate)) {
-                        const value = (guardResult as Record<string, unknown>)[field];
-                        const permitted = gatePermits(value, allowed);
-                        if (!permitted) {
-                            return {
-                                kind: 'guard-denied',
-                                status: 403,
-                                detail: `Forbidden: ${scheme}.${field} is not permitted on this route.`,
-                            };
-                        }
+            // The gate is checked before the guard result is trusted for anything
+            // else, and outside the object test: a route that declares a gate must
+            // never pass because the guard returned nothing to check it against.
+            const gate = route.accessGate?.[scheme];
+            if (gate) {
+                const access = (guardResult ?? {}) as Record<string, unknown>;
+                for (const [field, allowed] of Object.entries(gate)) {
+                    if (!gatePermits(access[field], allowed)) {
+                        return {
+                            kind: 'guard-denied',
+                            status: 403,
+                            detail: `Forbidden: ${scheme}.${field} is not permitted on this route.`,
+                        };
                     }
                 }
+            }
+            if (guardResult && typeof guardResult === 'object') {
                 securityContext[scheme] = guardResult;
             }
         }
@@ -1216,7 +1253,7 @@ export const renderJsonResult = (
         case 'no-handler':
             return renderError(500, `Handler not implemented: ${result.routeKey}`);
         case 'guard-denied':
-            return renderError(result.status, result.detail);
+            return renderError(result.status, result.detail, undefined, result.headers);
         case 'unsupported-media-type':
             return renderError(415, `Unsupported Media Type: expected ${result.expected}, received ${result.received}`);
         case 'not-acceptable':

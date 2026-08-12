@@ -52,6 +52,9 @@ export const ADAPTER_TYPE_FEATURES = {
     'guards.unknownIdentity': {
         summary: 'An identity the contract does not declare is refused.',
     },
+    'guards.noHandWrittenStatus': {
+        summary: 'A guard cannot choose its own denial status; `unauthenticated` takes only an optional detail.',
+    },
     'guards.completeMap': {
         summary: '`server.api` requires `guards`, with an entry per identity, when the contract declares any.',
     },

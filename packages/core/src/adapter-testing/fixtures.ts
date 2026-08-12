@@ -3,7 +3,7 @@ import { ProblemDetailsSchema } from '../error-response.js';
 import { Kizuna } from '../kizuna.js';
 import { createPlugin, implementPlugin, rawResponse } from '../adapter.js';
 import type { Router } from '../handler-pipeline.js';
-import type { GuardDeny } from '../adapter.js';
+import type { Unauthenticated } from '../adapter.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -286,8 +286,8 @@ export const securedContract = securedK.contract({
 /**
  * The guard body every adapter shares. `server.guard` is an identity function in all four, so only the wiring differs.
  */
-export const requireUserGuard = ({ bearer, deny }: { bearer?: { token: string }; deny: GuardDeny }) => {
-    if (bearer?.token !== sessionToken) return deny(401, 'Unauthorized');
+export const requireUserGuard = ({ bearer, unauthenticated }: { bearer?: { token: string }; unauthenticated: Unauthenticated }) => {
+    if (bearer?.token !== sessionToken) return unauthenticated();
     return {
         userId: '1',
     };
@@ -298,9 +298,16 @@ const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | '
     [adminToken, { workspaceUserId: '2', role: 'admin' }],
 ]);
 
-export const requireMemberGuard = ({ apiKey, deny }: { apiKey?: { value: string } | null; deny: GuardDeny }) => {
+export const requireMemberGuard = ({
+    apiKey,
+    unauthenticated,
+}: {
+    apiKey?: { value: string } | null;
+    unauthenticated: Unauthenticated;
+}) => {
     const membership = apiKey ? memberships.get(apiKey.value) : undefined;
-    if (!membership) return deny(403, 'Forbidden');
+    // An unresolvable API key is an authentication failure, not an authorization one.
+    if (!membership) return unauthenticated();
     return membership;
 };
 

@@ -45,10 +45,10 @@ export const contract = k.contract({
 ```ts title="src/lib/guards.ts"
 import { server } from './server';
 
-export const requireUser = server.guard('user', async ({ bearer, deny }) => {
+export const requireUser = server.guard('user', async ({ bearer, unauthenticated }) => {
     const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
-        return deny(401, 'Unauthorized');
+        return unauthenticated();
     }
     return {
         userId: session.userId,
@@ -101,7 +101,7 @@ export const member = Kizuna.identity.apiKey({
 });
 ```
 
-Omit `context` for an authentication-only identity — a pure gate like an API key that only proves the caller is a known client. Its guard returns nothing on success (or `deny(...)`), and routes secured by it receive no handler arg for it:
+Omit `context` for an authentication-only identity — a pure gate like an API key that only proves the caller is a known client. Its guard returns nothing on success (or `unauthenticated()`), and routes secured by it receive no handler arg for it:
 
 ```ts title="packages/contract/src/identities.ts"
 export const apiConsumer = Kizuna.identity.apiKey({
@@ -198,16 +198,39 @@ A route requiring several identities receives all of them under `auth` — `tran
 One guard per identity, not per route. The credential arrives extracted and typed, along with the route's path `params`. For a request to `/workspaces/ws_42/members`, `params.workspaceId` is `'ws_42'`, so the guard can check not just that the token is valid, but that the caller belongs to that workspace:
 
 ```ts title="src/lib/guards.ts"
-export const requireMember = server.guard('member', async ({ apiKey, params, deny }) => {
+export const requireMember = server.guard('member', async ({ apiKey, params, unauthenticated }) => {
     const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
     if (!membership) {
-        return deny(403, 'Forbidden');
+        return unauthenticated();
     }
     return membership;
 });
 ```
 
-The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) instead.
+The return is checked against the identity's schemas. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) instead.
+
+### The two ways auth fails
+
+A guard answers one question: does this credential resolve to an identity? When it doesn't, call `unauthenticated()` and you get a 401 with the `WWW-Authenticate` challenge RFC 9110 asks for.
+
+Notice what the guard never does: decide a status. It reports what happened and the identity supplies the code, so a credential that fails to resolve cannot accidentally answer 403.
+
+The other failure is the framework's. When a credential resolves but the `access` it carries doesn't satisfy the route's requirement (a member whose `role` is `admin` calling an owner-only route), kizuna answers 403 from the auth map, before your handler runs. You never write that check, and a guard cannot emit it by hand.
+
+401 means "I don't know who you are", 403 means "I know, and no". Keeping them in separate hands is what keeps them honest.
+
+Some credentials shouldn't admit they exist. An invite token in a URL is the resource identifier, so a 401 confirms which tokens are real and turns the endpoint into an enumeration oracle. Declare the answer on the identity and every guard for it follows suit:
+
+```ts title="src/lib/identities.ts"
+export const inviteToken = Kizuna.identity.custom({
+    context: z.object({
+        inviteId: z.string(),
+    }),
+    onUnauthenticated: 404,
+});
+```
+
+`unauthenticated()` in that identity's guard now answers 404, with no challenge header to give the game away. The choice lives next to the identity it protects rather than inside a guard body, so it reads as intent instead of a stray number.
 
 ## What falls out for free
 

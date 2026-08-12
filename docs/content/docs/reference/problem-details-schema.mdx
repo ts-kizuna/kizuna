@@ -3,7 +3,7 @@ title: ProblemDetailsSchema
 description: RFC 9457 Problem Details error response schema (ProblemDetailsSchema) used across kizuna.
 ---
 
-The standard [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) error response shape used by kizuna. Matches the format produced by [`deny()`](/docs/reference/server-guard#deny-and-problemdetailsschema) in guards and all built-in error responses (404, 405, 415, etc.).
+The standard [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) error response shape used by kizuna. Matches the format produced by [guards](/docs/reference/server-guard) and all built-in error responses (401, 403, 404, 405, 415, etc.).
 
 ```ts
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
@@ -195,7 +195,8 @@ Everything in kizuna that returns a non-success response uses this shape:
 
 | Source                 | Example                      |
 | ---------------------- | ---------------------------- |
-| Guards (`deny`)        | `deny(403, 'Forbidden')`     |
+| Guards                 | 401 from `unauthenticated()` |
+| Access gates           | 403 from the auth map        |
 | Route not found        | 404 for unmatched paths      |
 | Method not allowed     | 405 with `Allow` header      |
 | Unsupported media type | 415 for wrong `Content-Type` |

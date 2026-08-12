@@ -51,6 +51,17 @@ export type Credential =
  */
 export type NoCredential = Record<never, never>;
 
+/**
+ * The status an identity returns when its guard cannot resolve the credential.
+ * `401` is the RFC 9110 §15.5.2 answer and the default. `404` is for a credential
+ * that is itself the resource identifier, where admitting the credential is
+ * unknown would confirm which ones exist.
+ *
+ * Insufficient access is not in this union: that is the framework's `403`,
+ * derived from the route's `accessGate`, and a guard cannot emit it.
+ */
+export type UnauthenticatedStatus = 401 | 404;
+
 declare const CREDENTIAL: unique symbol;
 
 /**
@@ -70,6 +81,10 @@ export interface Identity<
      * identity's name. `undefined` when the identity declares no access fields.
      */
     readonly access: AccessSchema;
+    /**
+     * The status this identity's `unauthenticated(...)` returns. Defaults to `401`.
+     */
+    readonly onUnauthenticated: UnauthenticatedStatus;
     /**
      * Phantom marker carrying the {@link Credential} the method extracts. Never
      * present at runtime.
@@ -110,13 +125,15 @@ const make = <
     openapi: OpenApiSecuritySchemeObject | undefined,
     context: ContextSchema,
     access: AccessSchema,
-    scheme: string | undefined
+    scheme: string | undefined,
+    onUnauthenticated: UnauthenticatedStatus | undefined
 ): Identity<ContextSchema, AccessSchema, CredentialType> => ({
     __brand: 'SecurityScheme',
     openapi,
     context,
     access,
     scheme,
+    onUnauthenticated: onUnauthenticated ?? 401,
 });
 
 export interface BearerConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
@@ -125,6 +142,11 @@ export interface BearerConfig<ContextSchema extends z.ZodType | undefined, Acces
     bearerFormat?: string;
     description?: string;
     scheme?: string;
+    /**
+     * The status this identity returns when its guard calls `unauthenticated(...)`.
+     * Defaults to `401`.
+     */
+    onUnauthenticated?: UnauthenticatedStatus;
 }
 
 export interface ApiKeyConfig<
@@ -139,6 +161,11 @@ export interface ApiKeyConfig<
     access?: AccessSchema;
     description?: string;
     scheme?: string;
+    /**
+     * The status this identity returns when its guard calls `unauthenticated(...)`.
+     * Defaults to `401`.
+     */
+    onUnauthenticated?: UnauthenticatedStatus;
 }
 
 export interface BasicConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
@@ -146,6 +173,11 @@ export interface BasicConfig<ContextSchema extends z.ZodType | undefined, Access
     access?: AccessSchema;
     description?: string;
     scheme?: string;
+    /**
+     * The status this identity returns when its guard calls `unauthenticated(...)`.
+     * Defaults to `401`.
+     */
+    onUnauthenticated?: UnauthenticatedStatus;
 }
 
 export interface OAuth2Config<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
@@ -154,6 +186,11 @@ export interface OAuth2Config<ContextSchema extends z.ZodType | undefined, Acces
     access?: AccessSchema;
     description?: string;
     scheme?: string;
+    /**
+     * The status this identity returns when its guard calls `unauthenticated(...)`.
+     * Defaults to `401`.
+     */
+    onUnauthenticated?: UnauthenticatedStatus;
 }
 
 export interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
@@ -162,6 +199,11 @@ export interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined
     access?: AccessSchema;
     description?: string;
     scheme?: string;
+    /**
+     * The status this identity returns when its guard calls `unauthenticated(...)`.
+     * Defaults to `401`.
+     */
+    onUnauthenticated?: UnauthenticatedStatus;
 }
 
 export interface CustomConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
@@ -169,6 +211,11 @@ export interface CustomConfig<ContextSchema extends z.ZodType | undefined, Acces
     access?: AccessSchema;
     description?: string;
     scheme?: string;
+    /**
+     * The status this identity returns when its guard calls `unauthenticated(...)`.
+     * Defaults to `401`.
+     */
+    onUnauthenticated?: UnauthenticatedStatus;
 }
 
 /**
@@ -205,7 +252,8 @@ export const createIdentity = {
             { type: 'http', scheme: 'bearer', bearerFormat: config.bearerFormat, description: config.description },
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
+            config.scheme,
+            config.onUnauthenticated
         ),
     apiKey: <
         ContextSchema extends z.ZodType | undefined = undefined,
@@ -219,7 +267,8 @@ export const createIdentity = {
             { type: 'apiKey', name: config.name, in: config.in, description: config.description },
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
+            config.scheme,
+            config.onUnauthenticated
         ),
     basic: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
         config: BasicConfig<ContextSchema, AccessSchema>
@@ -228,7 +277,8 @@ export const createIdentity = {
             { type: 'http', scheme: 'basic', description: config.description },
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
+            config.scheme,
+            config.onUnauthenticated
         ),
     oauth2: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
         config: OAuth2Config<ContextSchema, AccessSchema>
@@ -237,7 +287,8 @@ export const createIdentity = {
             { type: 'oauth2', flows: config.flows, description: config.description },
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
+            config.scheme,
+            config.onUnauthenticated
         ),
     openIdConnect: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
         config: OpenIdConnectConfig<ContextSchema, AccessSchema>
@@ -246,7 +297,8 @@ export const createIdentity = {
             { type: 'openIdConnect', openIdConnectUrl: config.openIdConnectUrl, description: config.description },
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
+            config.scheme,
+            config.onUnauthenticated
         ),
     /**
      * An identity whose credential no OpenAPI scheme can express, such as a
@@ -269,6 +321,7 @@ export const createIdentity = {
             undefined,
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
+            config.scheme,
+            config.onUnauthenticated
         ),
 };

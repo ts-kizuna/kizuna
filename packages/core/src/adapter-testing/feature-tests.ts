@@ -534,7 +534,9 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                         authorization: sessionAuthorization,
                     },
                 });
-                expect(partial.status).toBe(403);
+                // The member credential is absent, so the member identity never
+                // resolves. That is an authentication failure, not a gate failure.
+                expect(partial.status).toBe(401);
 
                 const complete = await secured.request({
                     method: 'GET',
@@ -549,6 +551,39 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     userId: '1',
                     workspaceUserId: '1',
                 });
+            });
+        },
+
+        'guards.authFailureModes': async () => {
+            await usingSecured(async (secured) => {
+                const unresolved = await secured.request({
+                    method: 'GET',
+                    path: '/who-am-i',
+                    headers: {},
+                });
+                expect(unresolved.status).toBe(401);
+                expect(unresolved.headers.get('content-type')).toContain('application/problem+json');
+                expect(unresolved.body).toMatchObject({
+                    status: 401,
+                    title: 'Unauthorized',
+                });
+                // RFC 9110 §11.6.1: a 401 names the scheme the client should use.
+                expect(unresolved.headers.get('www-authenticate')).toBe('Bearer');
+
+                const gated = await secured.request({
+                    method: 'GET',
+                    path: '/owner-only',
+                    headers: {
+                        'x-workspace-token': adminToken,
+                    },
+                });
+                expect(gated.status).toBe(403);
+                expect(gated.body).toMatchObject({
+                    status: 403,
+                    title: 'Forbidden',
+                });
+                // A resolved identity needs no challenge; the credential was fine.
+                expect(gated.headers.get('www-authenticate')).toBeNull();
             });
         },
 

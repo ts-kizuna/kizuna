@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { assembleApi, type GuardDeny } from '@ts-kizuna/core/adapter';
+import { assembleApi, type Unauthenticated } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/client';
 import { buildToolDefinitions, createMcpServer } from './mcp-server.js';
@@ -719,8 +719,8 @@ describe('MCP server — guards', () => {
                 },
             },
             guards: {
-                user: ({ bearer, deny }: { bearer: { token: string } | null; deny: GuardDeny }) => {
-                    if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
+                user: ({ bearer, unauthenticated }: { bearer: { token: string } | null; unauthenticated: Unauthenticated }) => {
+                    if (bearer?.token !== 'tok_ada') return unauthenticated();
                     return {
                         userId: '1',
                     };

@@ -13,7 +13,7 @@ import {
     extractCredential,
     gatePermits,
     resolveSecurityRequirements,
-    guardDeny,
+    makeUnauthenticated,
     isGuardDenial,
 } from '@ts-kizuna/core/adapter';
 import type { Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
@@ -197,7 +197,7 @@ const runGuards = async (
             ...(handlerContext ?? {}),
             ...credential,
             params,
-            deny: guardDeny,
+            unauthenticated: makeUnauthenticated(schemeDefinition),
             scopes,
         } as Parameters<typeof guard>[0]);
         if (isGuardDenial(guardResult)) {
@@ -206,20 +206,21 @@ const runGuards = async (
                 result: toolError(guardResult.status, guardResult.detail),
             };
         }
-        if (guardResult && typeof guardResult === 'object') {
-            const gate = route.accessGate?.[scheme];
-            if (gate) {
-                for (const [field, allowed] of Object.entries(gate)) {
-                    const value = (guardResult as Record<string, unknown>)[field];
-                    const permitted = gatePermits(value, allowed);
-                    if (!permitted) {
-                        return {
-                            ok: false,
-                            result: toolError(403, `Forbidden: ${scheme}.${field} is not permitted on this route.`),
-                        };
-                    }
+        // Checked outside the object test, as in the HTTP pipeline: a declared gate
+        // must never pass because the guard returned nothing to check it against.
+        const gate = route.accessGate?.[scheme];
+        if (gate) {
+            const access = (guardResult ?? {}) as Record<string, unknown>;
+            for (const [field, allowed] of Object.entries(gate)) {
+                if (!gatePermits(access[field], allowed)) {
+                    return {
+                        ok: false,
+                        result: toolError(403, `Forbidden: ${scheme}.${field} is not permitted on this route.`),
+                    };
                 }
             }
+        }
+        if (guardResult && typeof guardResult === 'object') {
             securityContext[scheme] = guardResult;
         }
     }

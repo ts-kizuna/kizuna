@@ -118,10 +118,10 @@ One guard per identity. The credential arrives extracted and typed, alongside th
 ```ts title="src/lib/guards.ts"
 import { server } from './server';
 
-export const requireUser = server.guard('user', async ({ bearer, deny }) => {
+export const requireUser = server.guard('user', async ({ bearer, unauthenticated }) => {
     const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
-        return deny(401, 'Unauthorized');
+        return unauthenticated();
     }
     return {
         userId: session.userId,

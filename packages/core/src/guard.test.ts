@@ -184,7 +184,7 @@ describe('guard pipeline', () => {
             request: makeRequest('/secret'),
             responseContext: {},
             guards: {
-                user: ({ deny }) => deny(401, 'Unauthorized'),
+                user: ({ unauthenticated }) => unauthenticated(),
             } as GuardMap<Record<string, never>>,
             schemes: contract.securitySchemes,
         });
@@ -192,6 +192,9 @@ describe('guard pipeline', () => {
             kind: 'guard-denied',
             status: 401,
             detail: 'Unauthorized',
+            headers: {
+                'www-authenticate': 'Bearer',
+            },
         });
     });
 
@@ -613,6 +616,7 @@ describe('custom identity guard', () => {
         context: z.object({
             inviteId: z.string(),
         }),
+        onUnauthenticated: 404,
     });
 
     const inviteK = new Kizuna({
@@ -672,7 +676,7 @@ describe('custom identity guard', () => {
         });
         expect(results[0]?.kind).toBe('success');
         // The guard receives exactly the framework args, with no credential key.
-        expect(receivedKeys?.sort()).toEqual(['deny', 'params', 'scopes']);
+        expect(receivedKeys?.sort()).toEqual(['params', 'scopes', 'unauthenticated']);
         expect(received).toEqual({
             inviteId: 'invite-for-inv_1',
         });
@@ -690,14 +694,15 @@ describe('custom identity guard', () => {
             request: makeRequest('/invites/nope'),
             responseContext: {},
             guards: {
-                inviteToken: ({ deny }) => deny(404, 'Not found'),
+                inviteToken: ({ unauthenticated }) => unauthenticated(),
             } as GuardMap<Record<string, never>>,
             schemes: inviteContract.securitySchemes,
         });
+        // 404 comes from the identity's `onUnauthenticated`, not from the guard.
         expect(results[0]).toEqual({
             kind: 'guard-denied',
             status: 404,
-            detail: 'Not found',
+            detail: 'Not Found',
         });
     });
 });

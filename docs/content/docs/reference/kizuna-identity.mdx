@@ -77,11 +77,11 @@ export const apiConsumer = Kizuna.identity.apiKey({
 });
 ```
 
-Its [guard](/docs/reference/server-guard) returns nothing on success (or `deny(...)` to reject) — no `return {}` boilerplate:
+Its [guard](/docs/reference/server-guard) returns nothing on success (or `unauthenticated()` to reject) — no `return {}` boilerplate:
 
 ```ts
-export const requireApiKey = server.guard('apiConsumer', ({ apiKey, deny }) => {
-    if (!apiKey || !(await isKnownKey(apiKey.value))) return deny(401, 'Unauthorized');
+export const requireApiKey = server.guard('apiConsumer', ({ apiKey, unauthenticated }) => {
+    if (!apiKey || !(await isKnownKey(apiKey.value))) return unauthenticated();
 });
 ```
 
@@ -98,20 +98,23 @@ export const inviteToken = Kizuna.identity.custom({
     context: z.object({
         inviteId: z.string(),
     }),
+    onUnauthenticated: 404,
 });
 ```
 
 ```ts
-export const requireInviteToken = server.guard('inviteToken', ({ params, deny }) => {
+export const requireInviteToken = server.guard('inviteToken', ({ params, unauthenticated }) => {
     const inviteId = await resolveInvite(params.token);
-    if (!inviteId) return deny(404, 'Not found');
+    if (!inviteId) return unauthenticated();
     return {
         inviteId,
     };
 });
 ```
 
-The guard receives the usual `{ params, deny, scopes }` (plus your framework's handler context) with no credential key, since there is nothing for the runtime to pre-extract. Everything else is ordinary typed auth: the identity registers under `identities`, the `auth` map references it, handlers read `auth.inviteToken.inviteId`, and `access` gates work as usual.
+`onUnauthenticated: 404` is doing real work here. The token is the resource identifier, so a 401 would confirm which tokens exist and let a caller enumerate them. Declaring it on the identity means every guard for it answers the same way, and the reason sits where the credential is defined instead of buried in a guard body. See [`server.guard`](/docs/reference/server-guard) for how the two failure modes divide.
+
+The guard receives the usual `{ params, unauthenticated, scopes }` (plus your framework's handler context) with no credential key, since there is nothing for the runtime to pre-extract. Everything else is ordinary typed auth: the identity registers under `identities`, the `auth` map references it, handlers read `auth.inviteToken.inviteId`, and `access` gates work as usual.
 
 Because it emits no `security`, a custom-guarded route would otherwise look public in the spec. To keep the distinction honest, [`generateOpenApi`](/docs/reference/generate-openapi) marks the operation with an `x-kizuna-guarded` extension listing the custom identities — so a genuinely public route (no `security`, no extension) stays distinguishable from one protected out-of-band.
 

@@ -56,8 +56,8 @@ const contract = k.contract({
 
 const server = new KizunaServer(contract);
 
-const requireScheduler = server.guard('scheduler', ({ bearer, deny }) =>
-    bearer?.token === 'cron-secret' ? { invokedBy: 'platform' } : deny(401, 'Unauthorized')
+const requireScheduler = server.guard('scheduler', ({ bearer, unauthenticated }) =>
+    bearer?.token === 'cron-secret' ? { invokedBy: 'platform' } : unauthenticated()
 );
 
 const buildApp = (options?: { failing?: boolean }) => {

@@ -84,7 +84,7 @@ With the default `path`, the endpoint is at `/api/mcp`.
 
 ## Secured routes
 
-Each tool call runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request, reading credentials from the MCP transport request's headers. A `deny(...)` becomes a tool error result. See the [MCP guide](/docs/mcp) for configuring clients to send credentials.
+Each tool call runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request, reading credentials from the MCP transport request's headers. An `unauthenticated()` becomes a tool error result. See the [MCP guide](/docs/mcp) for configuring clients to send credentials.
 
 ## Not in your client
 
