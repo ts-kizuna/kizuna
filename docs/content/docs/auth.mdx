@@ -226,7 +226,7 @@ export const inviteToken = Kizuna.identity.custom({
 });
 ```
 
-Every guard for it now answers 404, with no challenge header to give the game away.
+Every guard for it now answers 404, so a token that was never valid is indistinguishable from one that never existed.
 
 ## What falls out for free
 

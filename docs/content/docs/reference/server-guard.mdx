@@ -33,6 +33,8 @@ Guard arguments:
 
 ## Denying
 
-`unauthenticated()` rejects a credential that didn't resolve, using the identity's status: 401 by default, with the `WWW-Authenticate` challenge RFC 9110 requires. Pass a detail to explain the case (`unauthenticated('Session expired')`); the status stays the identity's, set once via [`onUnauthenticated`](/docs/reference/kizuna-identity#custom-identities).
+`unauthenticated()` rejects a credential that didn't resolve, using the identity's status: 401 by default. Pass a detail to explain the case (`unauthenticated('Session expired')`); the status stays the identity's, set once via [`onUnauthenticated`](/docs/reference/kizuna-identity#custom-identities).
+
+A 401 carries the `WWW-Authenticate` challenge RFC 9110 asks for, naming the identity's scheme: `Bearer` for `bearer`, `oauth2` and `openIdConnect`, `Basic` for `basic`. `apiKey` and `custom` name no registered HTTP scheme, so they answer 401 without one.
 
 A guard has no way to name a status, which keeps the two failures apart. Insufficient access is 403, raised by the framework from the [auth map](/docs/reference/k-contract#the-auth-map) before the handler runs, everywhere the route is reachable including [MCP](/docs/reference/mcp-plugin).
