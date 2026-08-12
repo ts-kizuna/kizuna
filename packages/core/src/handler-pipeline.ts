@@ -18,12 +18,12 @@ type StripProblemEnvelope<T extends ProblemDetailsEnvelope> = Omit<T, 'type' | '
 /**
  * True when a literal status key is in the 4xx/5xx range. Widened `number` keys (no
  * `const` inference) resolve to `false`, so enforcement only kicks in when the concrete
- * status is known — exactly where the wire output matters.
+ * status is known, exactly where the wire output matters.
  */
 type IsErrorStatus<Status> = `${Status & number}` extends `4${string}` | `5${string}` ? true : false;
 
 /**
- * Error responses (4xx/5xx) must be RFC 9457 Problem Details — a schema assignable to the
+ * Error responses (4xx/5xx) must be RFC 9457 Problem Details, a schema assignable to the
  * envelope. Anything else resolves to `never`, surfacing as a compile error at the handler
  * return / `throwError()` site. Success responses pass through unchanged.
  */
@@ -79,7 +79,7 @@ export type Router<T extends Routes, HandlerContext = unknown> = {
  *
  * @example
  * type Narrowed = NarrowAccess<typeof member, { role: 'owner' }>;
- * // { role: 'owner' } — even though member.access allows 'owner' | 'admin'
+ * // { role: 'owner' }, even though member.access allows 'owner' | 'admin'
  */
 type NarrowAccess<Id, Constraint> = Constraint extends readonly unknown[]
     ? IdentityAccess<Id>
@@ -97,7 +97,7 @@ type NarrowAccess<Id, Constraint> = Constraint extends readonly unknown[]
  * The object a passing guard returns for an identity: its `context` and `access`
  * fields flattened into one type. Read in a handler under the identity's name and
  * checked against the route's access gate. Flattened (rather than left as an
- * intersection) so it works as a contextual type — letting a guard return literal
+ * intersection) so it works as a contextual type, letting a guard return literal
  * access values like `role: 'owner'` without an annotation.
  */
 export type GuardSuccess<S> = {

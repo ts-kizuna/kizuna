@@ -116,7 +116,7 @@ interface EmitContext {
     clientName: string;
     operationTypeMap: Map<string, string>;
     fileLevelTypeNames: Set<string>;
-    // Types owned by a struct (by name-prefix convention) — nested inside that struct.
+    // Types owned by a struct (by name-prefix convention), nested inside that struct.
     // resolveType returns API.OwningStruct.ShortName for these.
     ownedTypeMap: Map<string, string>; // typeName → owningStructName
     // Lets the tuple-based call surface recurse into nested object / union payload fields.
@@ -859,8 +859,8 @@ const buildOperationTypeMap = (allMethods: RouteMethod[], registry: TypeRegistry
 const SWIFT_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Bool', 'Date', 'Void', 'Foundation.Data']);
 
 // Resolve a registry type name to the Swift reference expression appropriate for the given context.
-// scope 'operation-enum': inside the operation's nested enum — same-op types use unqualified short name.
-// scope 'actor': anywhere else — operation types are fully qualified (works inside actor AND sub-client structs).
+// scope 'operation-enum': inside the operation's nested enum, same-op types use unqualified short name.
+// scope 'actor': anywhere else, operation types are fully qualified (works inside actor AND sub-client structs).
 const resolveType = (
     typeName: string,
     currentOperation: string | undefined,
@@ -1037,7 +1037,7 @@ const emitBodyType = (writer: SwiftWriter, method: RouteMethod, context: EmitCon
             }));
             emitNamedFactory(writer, 'body', resolved, (args) => `.init(payload: ${payloadType}(${args}))`);
         } else {
-            // union / non-object / AnyCodable body — the value is passed straight through, unlabeled.
+            // union / non-object / AnyCodable body, the value is passed straight through, unlabeled.
             writer.block(`public static func body(_ value: ${payloadType}) -> Self`, () => {
                 writer.line('.init(payload: value)');
             });
@@ -1374,7 +1374,7 @@ const decodeBodyStatement = (
     return `    let ${name} = try Kizuna.decode(${resolvedType}.self, from: data, using: ${receiver}decoder, statusCode: statusCode, failure: ${failure}.self)`;
 };
 
-// Whether any status code maps to more than one error body type — the case that needs `Kizuna.firstError`.
+// Whether any status code maps to more than one error body type, the case that needs `Kizuna.firstError`.
 const hasMultiErrorGroup = (method: RouteMethod): boolean => {
     const counts = new Map<number, number>();
     for (const errorCase of method.errorCases) {
@@ -1820,7 +1820,7 @@ const emitClient = (
 /**
  * Generate a Swift API client from a kizuna config.
  *
- *   - `namespaceName` — the actor class. Defaults to `APIClient`.
+ *   - `namespaceName`: the actor class. Defaults to `APIClient`.
  */
 export const generateSwiftClient = (contract: Contract, options: SwiftConfig): string => {
     const { namespaceName, camelCaseProperties = false, unknownEnumCase = false } = options;

@@ -3,6 +3,12 @@ title: Kotlin
 description: Generate a native Kotlin client from your contract with the ts-kizuna-kotlin CLI.
 ---
 
+<BetaNotice>
+
+The Kotlin client is new and still settling. The generated API surface may change before v2, so pin your version if you depend on it.
+
+</BetaNotice>
+
 `@ts-kizuna/kotlin` generates a native Kotlin client from your ts-kizuna contract. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
 
 <InstallTabs packageName="@ts-kizuna/kotlin" />
@@ -23,13 +29,13 @@ ts-kizuna-kotlin generate --contract src/contract.ts --out android/app/src/main/
 | `--unknown-enum-case` | Emit enums as a sealed interface with an `Unknown` member so new server values don't break decoding |
 | `--export`            | Export name to read when none is suffixed on `--contract`. Default: `contract`                      |
 
-The CLI reads the contract at runtime — no build step needed. Add the generated file to your Kotlin project as a regular source file. Pass `--package` so the file declares a package matching its directory (Android/JVM projects expect this).
+The CLI reads the contract at runtime, with no build step needed. Add the generated file to your Kotlin project as a regular source file. Pass `--package` so the file declares a package matching its directory (Android/JVM projects expect this).
 
 ### Property naming
 
-By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. The types mirror the wire shape, so it's easy to see what came from the API. A `@file:Suppress(...)` header keeps the IDE green: the snake_case naming inspections (`PropertyName`, `LocalVariableName`, `ConstructorParameterNaming`) for the verbatim names, plus a few that always apply — `SpellCheckingInspection` for brand terms, `unused` for methods only your own code calls, and the `Redundant*` style inspections.
+By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. The types mirror the wire shape, so it's easy to see what came from the API. A `@file:Suppress(...)` header keeps the IDE green: the snake_case naming inspections (`PropertyName`, `LocalVariableName`, `ConstructorParameterNaming`) for the verbatim names, plus a few that always apply: `SpellCheckingInspection` for brand terms, `unused` for methods only your own code calls, and the `Redundant*` style inspections.
 
-Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `@SerialName`. The naming inspections drop out of the header then — there are no underscores left to flag — while the rest stay.
+Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `@SerialName`. The naming inspections drop out of the header then, since there are no underscores left to flag, while the rest stay.
 
 ### Unknown enum case (open enums)
 
@@ -46,12 +52,12 @@ The raw value is preserved as `wireValue`, so re-encoding writes it back unchang
 
 ## Usage
 
-Request inputs are built inside a lambda — `params` (path), `query`, `headers`, and `body`. No type names, autocomplete guides you, and missing a required field is a compile error:
+Request inputs are built inside a lambda: `params` (path), `query`, `headers`, and `body`. No type names, autocomplete guides you, and missing a required field is a compile error:
 
 ```kotlin
 val client = APIClient(baseUrl = "https://api.example.com")
 
-// path param + header — groups chain in order
+// path param + header, groups chain in order
 val user = client.users.getUser {
     params(
         id = "1",
@@ -60,7 +66,7 @@ val user = client.users.getUser {
     )
 }
 
-// query — all-optional, so it can be omitted entirely
+// query, all-optional, so it can be omitted entirely
 val page = client.users.listUsers {
     query(
         page = 1,
@@ -84,7 +90,7 @@ Each method returns a `Result` holding the decoded `body` (no unwrapping, no cas
 println(page.body.users)
 ```
 
-Void routes return `Unit` — call them and let errors propagate:
+Void routes return `Unit`, so call them and let errors propagate:
 
 ```kotlin
 client.users.deleteUser {
@@ -111,7 +117,7 @@ try {
 
 ## Generated client
 
-The generated file exports a typed class with `suspend` methods for each route and sub-clients for grouped routes. Each method takes a request-builder lambda whose receiver (`Scope`) exposes one factory per input group. The lambda must return the operation's `Args`, and only chains that provide every required group produce an `Args` — that is what makes missing required inputs a compile error. Each method returns the route's `Response` (or `Unit` for routes with no success body) and throws its `Failure`:
+The generated file exports a typed class with `suspend` methods for each route and sub-clients for grouped routes. Each method takes a request-builder lambda whose receiver (`Scope`) exposes one factory per input group. The lambda must return the operation's `Args`, and only chains that provide every required group produce an `Args`, which is what makes missing required inputs a compile error. Each method returns the route's `Response` (or `Unit` for routes with no success body) and throws its `Failure`:
 
 ```kotlin
 import kotlinx.serialization.*
@@ -151,7 +157,7 @@ class APIClient(
 
 ## Interceptors &amp; auth
 
-`requestInterceptor` runs before every request — attach auth headers here. `responseInterceptor` observes every response. Both may suspend (e.g. to refresh a token):
+`requestInterceptor` runs before every request, so attach auth headers here. `responseInterceptor` observes every response. Both may suspend (e.g. to refresh a token):
 
 ```kotlin
 val client = APIClient(
@@ -169,7 +175,7 @@ val client = APIClient(
 
 Success returns a `Result` with the decoded `body` (and `headers` when the route declares them). Routes with multiple success codes give you a sealed `Success` to `when` over; void routes return `Unit`.
 
-Errors **throw** a sealed `Failure` with one named subtype per declared status (`NotFound`, `BadRequest`, …) carrying its typed `body`, plus `Unexpected(statusCode, data)` for undeclared statuses and `Decoding(cause, statusCode, data)` for bodies that don't parse. Catch one subtype, or `when` over the sealed class — the compiler lists every case:
+Errors **throw** a sealed `Failure` with one named subtype per declared status (`NotFound`, `BadRequest`, …) carrying its typed `body`, plus `Unexpected(statusCode, data)` for undeclared statuses and `Decoding(cause, statusCode, data)` for bodies that don't parse. Catch one subtype, or `when` over the sealed class, and the compiler lists every case:
 
 ```kotlin
 try {

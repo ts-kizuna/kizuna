@@ -50,8 +50,8 @@ export const UserSchema = Kizuna.model({
 
 Without a title, generators inline the schema everywhere it appears. With `Kizuna.model`:
 
-- **OpenAPI** — the schema is extracted into `components.schemas.User` and every usage becomes a `$ref` reference
-- **Swift** — the schema becomes a named `public struct User` in the generated client, shared across all routes that reference it
+- **OpenAPI**: the schema is extracted into `components.schemas.User` and every usage becomes a `$ref` reference
+- **Swift**: the schema becomes a named `public struct User` in the generated client, shared across all routes that reference it
 
 ## Extracting TypeScript types
 

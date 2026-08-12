@@ -36,7 +36,7 @@ Props are pure data, because they reach the contract and the contract reaches yo
 
 ## Example
 
-```ts title="src/lib/k.ts"
+```ts title="src/contract/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 
@@ -51,7 +51,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 import { mcpPluginServer } from '@ts-kizuna/mcp/server';
 
 export const api = server.api({
@@ -74,7 +74,7 @@ api.mount(app);
 
 The endpoint is served by the catch-all route file that already serves your contract, so `path` resolves under its `basePath`:
 
-```ts title="app/api/[...ts-kizuna]/route.ts"
+```ts title="src/app/api/[...ts-kizuna]/route.ts"
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
     basePath: '/api',
 });

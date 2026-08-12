@@ -1,9 +1,9 @@
 ---
 title: Migrating from ts-rest
-description: Side-by-side comparison of ts-rest and ts-kizuna APIs, with notes on deliberate differences.
+description: Side-by-side comparison of ts-rest and ts-kizuna, for anyone weighing a ts-rest alternative, with notes on deliberate differences.
 ---
 
-ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered. ts-rest proved that routes-first TypeScript APIs could work beautifully, and a lot of people built real things with it — we did too. We truly appreciate what the team behind ts-rest built. ts-kizuna borrows several of its core concepts and keeps the public API deliberately familiar, but takes a different approach under the hood. This page maps every changed API to its ts-kizuna equivalent.
+ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered. ts-rest proved that routes-first TypeScript APIs could work beautifully, and a lot of people built real things with it, ourselves included. We truly appreciate what the team behind ts-rest built. ts-kizuna borrows several of its core concepts and keeps the public API deliberately familiar, but takes a different approach under the hood. This page maps every changed API to its ts-kizuna equivalent.
 
 ## Package mapping
 
@@ -52,7 +52,7 @@ export const contract = c.router({
 ```
 
 ```ts
-// ts-kizuna — one group per tag, assembled in the contract
+// ts-kizuna: one group per tag, assembled in the contract
 export const users = k.routes('users', { ... });
 export const health = k.routes('health', { ... });
 ```
@@ -81,7 +81,7 @@ export const contract = c.router({
 ```
 
 ```ts
-// ts-kizuna — remove `body`, use z.void() for empty responses
+// ts-kizuna: remove `body`, use z.void() for empty responses
 import { z } from 'zod';
 import { k } from './k';
 
@@ -201,7 +201,7 @@ In ts-kizuna, `api.mount(app)` is a method on the `api` object (produced by `ser
 ### Route file setup
 
 ```ts
-// ts-rest — App Router via @ts-rest/serverless/next
+// ts-rest: App Router via @ts-rest/serverless/next
 import { createNextHandler } from '@ts-rest/serverless/next';
 import { contract } from '@shared/contract';
 import { router } from './router';
@@ -214,8 +214,8 @@ export { handler as GET, handler as POST, handler as PUT, handler as PATCH, hand
 ```
 
 ```ts
-// ts-kizuna — App Router catch-all
-import { api } from '../../lib/server';
+// ts-kizuna: App Router catch-all
+import { api } from '../../server/api';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
     basePath: '/api',
@@ -253,7 +253,7 @@ deleteUser: {
 ```
 
 ```ts
-// ts-kizuna — JSDoc only
+// ts-kizuna: JSDoc only
 /**
  * @deprecated
  */
@@ -268,11 +268,11 @@ deleteUser: {
 },
 ```
 
-The `/** @deprecated */` JSDoc tag drives IDE strikethrough, the OpenAPI `deprecated` flag, and the Swift `@available(*, deprecated)` attribute — all from a single annotation.
+The `/** @deprecated */` JSDoc tag drives IDE strikethrough, the OpenAPI `deprecated` flag, and the Swift `@available(*, deprecated)` attribute, all from a single annotation.
 
 ## Error responses
 
-This is a deliberate departure from ts-rest. ts-kizuna returns [RFC 9457 Problem Details](/docs/reference/problem-details-schema) (`application/problem+json`) for every error response — error responses in a contract must use `ProblemDetailsSchema` (or `ProblemDetailsSchema.extend({...})` for extra fields), not an arbitrary shape. Validation errors are Problem Details with a `detail` string and an `errors` array (instead of ts-rest's `{ message, issues }`). If you're porting an API whose clients expect the old shape, see [Migrating an existing API](/docs/migration/existing-api) for how to keep old clients working during the transition.
+This is a deliberate departure from ts-rest. ts-kizuna returns [RFC 9457 Problem Details](/docs/reference/problem-details-schema) (`application/problem+json`) for every error response. Error responses in a contract must use `ProblemDetailsSchema` (or `ProblemDetailsSchema.extend({...})` for extra fields), not an arbitrary shape. Validation errors are Problem Details with a `detail` string and an `errors` array (instead of ts-rest's `{ message, issues }`). If you're porting an API whose clients expect the old shape, see [Migrating an existing API](/docs/migration/existing-api) for how to keep old clients working during the transition.
 
 ## Method mismatch behaviour
 

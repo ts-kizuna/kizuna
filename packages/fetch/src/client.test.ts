@@ -359,7 +359,7 @@ describe('KizunaClient', () => {
     });
 });
 
-describe('KizunaClient — onRequest', () => {
+describe('KizunaClient: onRequest', () => {
     beforeEach(() => {
         vi.restoreAllMocks();
     });
@@ -432,7 +432,7 @@ describe('KizunaClient — onRequest', () => {
     });
 });
 
-describe('KizunaClient — nested routers', () => {
+describe('KizunaClient: nested routers', () => {
     beforeEach(() => {
         vi.restoreAllMocks();
     });
@@ -503,7 +503,7 @@ describe('KizunaClient — nested routers', () => {
     });
 });
 
-describe('KizunaClient — relative baseUrl', () => {
+describe('KizunaClient: relative baseUrl', () => {
     beforeEach(() => {
         vi.restoreAllMocks();
     });

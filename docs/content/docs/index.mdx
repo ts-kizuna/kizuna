@@ -1,74 +1,286 @@
 ---
-title: Introduction
-description: Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, powered by Zod.
+title: Quickstart
+description: Define a contract, implement a server, and call it from a typed client in 8 minutes.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+A ts-kizuna project has three parts:
 
-<BetaNotice>
+1. **The contract** holds your routes and their Zod schemas, in a package both sides import.
+2. **The server** holds handlers that implement those routes, mounted on your framework.
+3. **The client** is built from the same contract, so it knows every route, input, and response.
 
-**Why is it already 1.0 if it's in beta?** We built ts-kizuna for our own apps and have been battle-testing it in production since before we open-sourced it. It's labeled beta because the syntax for how you write contracts, routers, and clients may still change before v2.
+## Installation
 
-We recommend pinning your version, then upgrading whenever it suits you.
+Install `@ts-kizuna/core`, the package that defines routes and contracts.
 
-[See the release notes](https://github.com/ts-kizuna/kizuna/releases) · [Read the FAQ](/docs/faq)
+<InstallTabs packageName="@ts-kizuna/core zod" />
 
-</BetaNotice>
+ts-kizuna requires Zod 4. It leans on Zod 4 features directly, so older versions won't work.
 
-- 🛟 **Contract-first** — define request/response schemas once, share between server and client
-- 🔒 **Type-safe everywhere** — full inference on both sides, no casting
-- 🛡️ **Typed auth** — identities and per-route auth declared on the contract
-- 🔥 **RPC-like client** — call your API like a function, get fully typed responses back
-- 🔌 **Adapters** — mount your API on Express, Fastify, Hono, or Next.js
-- ✅ **HTTP/REST** — follows HTTP and REST standards. RFC 9110 semantics, RFC 9457 Problem Details
-- 🔄 **Built-in coercion** — query, path, and header params are coerced to their declared types (`z.number()`, `z.boolean()`, `z.date()`, `z.bigint()`) — no manual parsing or `z.coerce` needed
-- 📦 **OpenAPI generation** — from the same contract, no annotations needed
-- 📱 **Native client generation** — typed API clients for Swift (iOS/macOS) and Kotlin (Android/JVM)
-- 🧩 **Plugins** — extend your API with features built on the contract you already wrote, and get them fully typed in your handlers
-- 🤖 **MCP server generation** — expose your API as MCP tools so AI assistants can call your endpoints
-- ⏰ **Scheduled jobs** — declare cron work next to its handler, tick it from any platform scheduler, or run it in process from a route handler
-- ⚠️ **Deprecation support** — mark endpoints and fields as deprecated with a JSDoc `@deprecated` tag — IDEs show strikethroughs, OpenAPI, Swift, and Kotlin pick it up automatically
+Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
-<div className="rounded-lg border bg-fd-card px-4 py-3 text-sm text-fd-muted-foreground [&>p]:m-0">
-    The name comes from 絆 (kizuna) — a Japanese word for deep, enduring bonds. This library bonds your server, your clients, and your
-    contracts together. Ship faster knowing that when you change or deprecate a field or endpoint, every client knows.
-</div>
+```json title="tsconfig.json"
+{
+    "compilerOptions": {
+        "strict": true
+    }
+}
+```
 
-<Callout type="info">
-    ts-kizuna is Zod only and will not support Standard Schema or other validation libraries. We rely heavily on Zod features.
-</Callout>
+<Steps>
 
-## The idea
+<Step>
 
-One contract is the source of truth — your server, your clients, and every generated artifact read from it.
+## Define the routes
 
-<ContractExplorer />
+Bind your API surface once with `new Kizuna()` and export `k`, then group your routes with `k.routes`. Keep each piece in its own file (a package both your server and client import).
 
-<div className="text-sm text-fd-muted-foreground [&>p]:m-0">
+```ts title="src/contract/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
 
-Simplified for illustration. In real projects you split routes and schemas across files and compose them — see [organizing the contract](/docs/building/contract#splitting-routes-across-files).
+export const k = new Kizuna();
+```
 
-</div>
+`new Kizuna()` takes optional tags, identities, request contexts and validation settings. See [`new Kizuna()`](/docs/reference/kizuna) for the full options.
 
-## Inside a handler
+Each route pairs a method and path with Zod schemas:
 
-Whatever the contract declares, the handler gets it validated and typed.
+```ts title="src/contract/routes/users.ts"
+import { z } from 'zod';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { k } from './k';
 
-<HandlerExplorer />
+export const UserSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.email(),
+});
 
-## Start here
+export const usersRoutes = k.routes({
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        query: z.object({
+            page: z.number().int().min(1).default(1),
+            limit: z.number().int().min(1).max(100).default(10),
+        }),
+        responses: {
+            200: z.object({
+                users: z.array(UserSchema),
+                total: z.number(),
+            }),
+        },
+    },
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        body: z.object({
+            name: z.string().min(1),
+            email: z.email(),
+        }),
+        responses: {
+            201: UserSchema,
+            400: ProblemDetailsSchema,
+        },
+    },
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
+            404: ProblemDetailsSchema,
+        },
+    },
+});
+```
 
-<Cards>
-    <Card title="Quickstart" href="/docs/quickstart">
-        Build a working API and a typed client in five minutes.
-    </Card>
-    <Card title="Building an API" href="/docs/building/contract">
-        Contract, router, and mounting — explained in depth.
-    </Card>
-    <Card title="Adapters" href="/docs/adapters/express">
-        Mount your handlers on Express, Fastify, Hono, or Next.js.
-    </Card>
-    <Card title="Clients" href="/docs/clients/fetch">
-        The typed fetch client and Swift client generation.
-    </Card>
-</Cards>
+</Step>
+
+<Step>
+
+## Bundle them into a contract
+
+The contract is the one object you hand to both the server and the client.
+
+```ts title="src/contract/contract.ts"
+import { k } from './k';
+import { usersRoutes } from './routes';
+
+export const contract = k.contract({
+    routes: {
+        users: usersRoutes,
+    },
+});
+```
+
+</Step>
+
+<Step>
+
+## Implement the server
+
+Pick an adapter, here Next.js. `new KizunaServer()` binds the contract to a `server` handle.
+
+<InstallTabs packageName="@ts-kizuna/next" />
+
+`server.router` takes one function per route. Inputs arrive validated and typed, and return values are checked against the contract's declared responses.
+
+```ts title="src/server/server.ts"
+import { KizunaServer } from '@ts-kizuna/next';
+import { contract } from '@shared/contract';
+
+export const server = new KizunaServer(contract);
+```
+
+```ts title="src/server/router/index.ts"
+import { server } from './server';
+
+export const router = server.router({
+    users: {
+        listUsers: async ({ query }) => {
+            const users = await db.users.findMany({
+                skip: (query.page - 1) * query.limit,
+                take: query.limit,
+            });
+            return {
+                status: 200,
+                body: {
+                    users,
+                    total: await db.users.count(),
+                },
+            };
+        },
+        createUser: async ({ body }) => {
+            const existing = await db.users.findByEmail(body.email);
+            if (existing) {
+                return {
+                    status: 400,
+                    body: {
+                        detail: 'Email already in use',
+                    },
+                };
+            }
+            const user = await db.users.create(body);
+            return {
+                status: 201,
+                body: user,
+            };
+        },
+        getUser: async ({ params }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: user,
+            };
+        },
+    },
+});
+```
+
+`server.api` binds the router into the API object the adapter mounts.
+
+```ts title="src/server/api.ts"
+import { server } from './server';
+import { router } from './router';
+
+export const api = server.api({
+    router,
+});
+```
+
+Mount it on a catch-all route.
+
+```ts title="src/app/api/[...ts-kizuna]/route.ts"
+import { api } from '@/server/api';
+
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
+    basePath: '/api',
+});
+```
+
+</Step>
+
+<Step>
+
+## Call it from a typed client
+
+The client is built from the same contract, so every route, input, and response is already typed.
+
+<InstallTabs packageName="@ts-kizuna/fetch" />
+
+```ts title="src/lib/api-client.ts"
+import { KizunaClient } from '@ts-kizuna/fetch';
+import { contract } from '@shared/contract';
+
+export const apiClient = new KizunaClient(contract, {
+    baseUrl: 'http://localhost:3000/api',
+});
+```
+
+```tsx title="src/app/users/page.tsx"
+import { apiClient } from '@/lib/api-client';
+
+export default async function UsersPage() {
+    const { body } = await apiClient.users.listUsers({
+        query: {
+            page: 1,
+            limit: 10,
+        },
+    });
+
+    // body.users is User[]
+    return (
+        <ul>
+            {body.users.map((user) => (
+                <li key={user.id}>{user.name}</li>
+            ))}
+        </ul>
+    );
+}
+```
+
+Writing is the same, and the status tells you which body you got:
+
+```tsx title="src/app/users/actions.ts"
+'use server';
+
+import { apiClient } from '@/lib/api-client';
+
+export async function createUser(name: string, email: string) {
+    const result = await apiClient.users.createUser({
+        body: {
+            name,
+            email,
+        },
+    });
+
+    // result.status is 201 | 400, and TypeScript narrows the body from there
+    if (result.status === 201) {
+        return result.body.id;
+    }
+
+    throw new Error(result.body.detail);
+}
+```
+
+Every field is typed straight from the contract with no extra work, including `query.page`, `body.name`, and the response shape.
+
+</Step>
+
+</Steps>
+
+## Next steps
+
+- [Building an API](/docs/building/contract) covers the contract, router, and mounting in depth
+- [Auth](/docs/auth) declares identities and per-route auth on the contract, and guards, handler types, OpenAPI security, and client access checks all follow
+- [Adapters](/docs/adapters/express) covers Express, Fastify, Hono, and Next.js setup and options
+- [Fetch client](/docs/clients/fetch) covers headers, custom fetch, and error handling
+- [OpenAPI generation](/docs/openapi) serves a spec alongside your API

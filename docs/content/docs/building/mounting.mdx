@@ -7,7 +7,7 @@ The last step: `server.api` binds your [router](/docs/building/router) into the 
 
 ## `server.api`
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 import { server } from './server'; // new KizunaServer(contract) from @ts-kizuna/express, fastify, hono, or next
 import { router } from './router';
 import { requireUser, requireMember } from './guards';
@@ -29,6 +29,41 @@ If the contract declares identities, pass one guard per identity under `guards`.
 
 For request-scoped values every handler needs (analytics ids, a logger, a tenant), declare them with [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), register them on `new Kizuna()`, and resolve each with `server.requestContext`. Resolvers run on every route, never deny, and handlers receive their values typed under each name.
 
+## Scheduled jobs
+
+If the contract declares [scheduled jobs](/docs/jobs), bind their handlers with `server.jobs` and pass them to `server.api` next to the router:
+
+```ts
+export const api = server.api({
+    router,
+    jobs: jobHandlers,
+    guards: {
+        scheduler: requireScheduler,
+    },
+});
+```
+
+`api.mount` then serves the two [job endpoints](/docs/jobs#the-two-job-endpoints), and every handler receives a typed `jobs` runner so a route can run one in process.
+
+## Plugins
+
+If the contract declares [plugins](/docs/plugins), pass their server implementations under `plugins`. A plugin is declared on the contract and implemented on the server, so the server half is imported separately:
+
+```ts title="src/server/api.ts"
+import { mcpPluginServer } from '@ts-kizuna/mcp/server';
+import { openApiPluginServer } from '@ts-kizuna/openapi/server';
+
+export const api = server.api({
+    router,
+    plugins: {
+        mcp: mcpPluginServer(),
+        openApi: openApiPluginServer(),
+    },
+});
+```
+
+Whatever a plugin exports then arrives on every handler under `plugins`, keyed by name.
+
 ## Middleware
 
 For everything else (rate limiting, multipart parsing) use your framework's own middleware (`app.use`, Fastify hooks). Authentication belongs in guards, request-scoped values in `requestContext`.
@@ -41,7 +76,7 @@ Once you have an `api` object, mount it with the adapter's mount verb:
 
 ```ts title="src/index.ts"
 import express from 'express';
-import { api } from './lib/api';
+import { api } from './server/api';
 
 const app = express();
 app.use(express.json());
@@ -53,7 +88,7 @@ app.listen(3000);
 
 ```ts title="src/index.ts"
 import Fastify from 'fastify';
-import { api } from './lib/api';
+import { api } from './server/api';
 
 const app = Fastify();
 await api.mount(app);
@@ -66,7 +101,7 @@ app.listen({
 
 ```ts title="src/index.ts"
 import { Hono } from 'hono';
-import { api } from './lib/api';
+import { api } from './server/api';
 
 const app = new Hono();
 api.mount(app);
@@ -77,7 +112,7 @@ export default app;
 **Next.js:**
 
 ```ts title="src/app/api/[...ts-kizuna]/route.ts"
-import { api } from '../../../lib/api';
+import { api } from '../../../server/api';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
     basePath: '/api',
@@ -98,19 +133,3 @@ For adapter-specific options (error handling, middleware, `onError`, etc.) see t
 - [Fastify](/docs/adapters/fastify)
 - [Hono](/docs/adapters/hono)
 - [Next.js](/docs/adapters/next)
-
-## Scheduled jobs
-
-If the contract declares [scheduled jobs](/docs/jobs), bind their handlers with `server.jobs` and pass them to `server.api` next to the router:
-
-```ts
-export const api = server.api({
-    router,
-    jobs: jobHandlers,
-    guards: {
-        scheduler: requireScheduler,
-    },
-});
-```
-
-`api.mount` then serves the two [job endpoints](/docs/jobs#the-two-job-endpoints), and every handler receives a typed `jobs` runner so a route can run one in process.

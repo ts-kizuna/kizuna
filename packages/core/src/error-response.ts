@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { createModel } from './model.js';
 
 /**
- * RFC 9457 Problem Details — the single error schema used across kizuna.
+ * RFC 9457 Problem Details, the single error schema used across kizuna.
  *
  * Matches the shape returned by `deny()` in guards, validation errors,
  * and all built-in error responses (404, 405, 415, etc.).
@@ -22,7 +22,7 @@ import { createModel } from './model.js';
  * });
  * ```
  *
- * Add domain fields as RFC 9457 **extension members** with native `.extend` — inline:
+ * Add domain fields as RFC 9457 **extension members** with native `.extend`, inline:
  *
  * ```ts
  * responses: {
@@ -45,7 +45,7 @@ import { createModel } from './model.js';
  *
  * The handler supplies `detail` plus any extensions; `type`/`title`/`status` are
  * auto-filled. Extension members are also how an API migrating onto kizuna keeps its
- * existing error fields (e.g. `errorCode`, `requestId`) — old clients still read them.
+ * existing error fields (e.g. `errorCode`, `requestId`), old clients still read them.
  */
 export const ProblemDetailsSchema = createModel({
     title: 'ProblemDetails',
@@ -71,7 +71,7 @@ export const ProblemDetailsSchema = createModel({
 });
 
 /**
- * Type guard for an RFC 9457 Problem Details body — the shared shape behind every kizuna
+ * Type guard for an RFC 9457 Problem Details body, the shared shape behind every kizuna
  * error response (validation failures, guards, handler errors, built-in 404/405/415, …).
  */
 export function isProblemDetails(body: unknown): body is {

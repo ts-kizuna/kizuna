@@ -27,7 +27,7 @@ const ELEMENT_WRAPPERS: ReadonlySet<string> = new Set([
 const entityNameRight = (name: ts.EntityName): string => (ts.isQualifiedName(name) ? name.right.text : name.text);
 
 /**
- * The right-most type name, ignoring the qualifier — so `ZodObject`,
+ * The right-most type name, ignoring the qualifier, so `ZodObject`,
  * `z.ZodObject`, and `import("zod").ZodObject` all read as `ZodObject`.
  */
 const rightmostTypeName = (node: ts.TypeNode): string | undefined => {
@@ -174,8 +174,8 @@ const walkDeclarationFiles = (dir: string, into: string[]): void => {
 /**
  * Re-injects the JSDoc blocks from {@link collectExportedSchemaDocs} onto Zod
  * schema shape properties in the `.d.ts` files under `distDir`. Declaration emit
- * drops the comments an author wrote on schema fields; this restores them — full
- * descriptions, `@deprecated`, `@example`, etc. — so they reach `z.infer`
+ * drops the comments an author wrote on schema fields; this restores them, full
+ * descriptions, `@deprecated`, `@example`, etc., so they reach `z.infer`
  * consumers in other repos. Skips properties that already have JSDoc. Idempotent.
  */
 export const patchDeclarationDocs = (distDir: string, exportFieldMap: Map<string, Map<string, string>>): PatchResult => {

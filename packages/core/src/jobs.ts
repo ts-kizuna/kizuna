@@ -121,7 +121,7 @@ export interface CompiledJob<
 }
 
 /**
- * A contract's jobs. Nestable, like routes, so a large codebase can group them —
+ * A contract's jobs. Nestable, like routes, so a large codebase can group them ,
  * `jobs.billing.reconcileInvoices`.
  */
 export interface Jobs {

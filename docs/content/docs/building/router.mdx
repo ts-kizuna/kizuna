@@ -75,21 +75,25 @@ You can also type a single group inline by passing its key as the first argument
 
 Each handler receives an object with the validated inputs for that route:
 
-| Property            | Available when                                               |
-| ------------------- | ------------------------------------------------------------ |
-| `params`            | Route path has `:param` placeholders                         |
-| `query`             | Route has a `query` schema                                   |
-| `body`              | Route has a `body` schema                                    |
-| `headers`           | Route has a `headers` schema                                 |
-| `user`, `member`, … | Route is secured by that identity in the contract's auth map |
-| `req`, `res`        | Express adapter                                              |
-| `c`                 | Hono adapter                                                 |
-| `request`, `reply`  | Fastify adapter                                              |
-| `request`           | Next.js adapter                                              |
+| Property           | Available when                                                               |
+| ------------------ | ---------------------------------------------------------------------------- |
+| `params`           | Route path has `:param` placeholders                                         |
+| `query`            | Route has a `query` schema                                                   |
+| `body`             | Route has a `body` schema                                                    |
+| `headers`          | Route has a `headers` schema                                                 |
+| `throwError`       | Always                                                                       |
+| `auth`             | Route is secured by the contract's [auth map](/docs/auth)                    |
+| `requestContext`   | Contract declares [`requestContext`](/docs/reference/kizuna-request-context) |
+| `plugins`          | Contract declares [plugins](/docs/plugins)                                   |
+| `jobs`             | Contract declares [jobs](/docs/jobs)                                         |
+| `req`, `res`       | Express adapter                                                              |
+| `c`                | Hono adapter                                                                 |
+| `request`, `reply` | Fastify adapter                                                              |
+| `request`          | Next.js adapter                                                              |
 
 ## Identity context
 
-When the contract's [auth map](/docs/auth) secures a route, the handler receives the identity's context — whatever its guard returned — under `auth`, keyed by the identity's name. There's nothing to look up or cast; the guard already ran, so the value is simply there, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/kizuna-request-context) arrive the same way, under `requestContext` on every route.
+When the contract's [auth map](/docs/auth) secures a route, the handler receives the identity's context under `auth`, keyed by the identity's name. That context is whatever the guard returned. There is nothing to look up or cast, because the guard already ran, so the value is simply there, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/kizuna-request-context) arrive the same way, under `requestContext` on every route.
 
 ```ts
 listMembers: ({ auth }) => ({
@@ -108,7 +112,7 @@ transfer: ({ body, auth }) => {
 },
 ```
 
-On routes with an [access gate](/docs/auth#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `auth.member.role` is typed `'owner'` — the runtime check and the type agree by construction:
+On routes with an [access gate](/docs/auth#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `auth.member.role` is typed `'owner'`. The runtime check and the type agree by construction:
 
 ```ts
 deleteWorkspace: ({ auth }) => ({
@@ -154,7 +158,7 @@ return {
 
 Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` in your routes to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/server-guard) in guards and all built-in kizuna errors.
 
-```ts title="src/contract.ts"
+```ts title="src/contract/contract.ts"
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { k } from './k';
 
@@ -170,7 +174,7 @@ const usersRoutes = k.routes('users', {
 });
 ```
 
-In the handler, use the `throwError` helper to return typed error responses. It accepts the same `{ status, body }` as a normal return but throws internally — useful in branching logic where you want to bail out early.
+In the handler, use the `throwError` helper to return typed error responses. It accepts the same `{ status, body }` as a normal return but throws internally, which is useful in branching logic where you want to bail out early.
 
 ```ts
 getUser: async ({ params, throwError }) => {
@@ -190,7 +194,7 @@ getUser: async ({ params, throwError }) => {
 },
 ```
 
-TypeScript enforces that the status and body match the routes — same as a return value.
+TypeScript enforces that the status and body match the routes, same as a return value.
 
 ## Validation errors
 
@@ -217,7 +221,7 @@ When a request body or query fails schema validation, kizuna automatically retur
 }
 ```
 
-Each issue includes a `code` that tells you _why_ the field failed — not just _that_ it failed. Codes come from Zod's built-in validation:
+Each issue includes a `code` that tells you _why_ the field failed, not just _that_ it failed. Codes come from Zod's built-in validation:
 
 | Code                    | When it fires                             |
 | ----------------------- | ----------------------------------------- |
@@ -229,11 +233,11 @@ Each issue includes a `code` that tells you _why_ the field failed — not just 
 | `not_multiple_of`       | Failed `multipleOf()`                     |
 | `custom`                | `.refine()` or `.superRefine()` check     |
 
-User-defined checks (`.refine()`) report as `custom` by default. To emit a **typed** code instead — like `invalid_phone_number` above — declare it in `validation.issueCodes` on [`new Kizuna()`](/docs/reference/kizuna) and raise it with [`k.issue`](/docs/reference/k-issue). It then shows up in `errors[].code` as a typed literal on both the server and the generated client, not a bare `string`.
+User-defined checks (`.refine()`) report as `custom` by default. To emit a **typed** code instead, like `invalid_phone_number` above, declare it in `validation.issueCodes` on [`new Kizuna()`](/docs/reference/kizuna) and raise it with [`k.issue`](/docs/reference/k-issue). It then shows up in `errors[].code` as a typed literal on both the server and the generated client, not a bare `string`.
 
 The `message` and `path` fields come directly from your Zod schemas. If you use custom messages (e.g. `z.string().min(1, "Name is required")`), those are what the client receives.
 
-You don't need to handle this yourself — kizuna validates against the routes and rejects invalid requests automatically.
+You don't need to handle this yourself. kizuna validates against the routes and rejects invalid requests automatically.
 
 This `400` response is reflected in the [fetch client](/docs/clients/fetch#validation-errors) return type and the [OpenAPI spec](/docs/openapi) for any route that declares a `body` or `query` schema.
 

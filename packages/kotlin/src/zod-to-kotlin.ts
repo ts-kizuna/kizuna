@@ -179,7 +179,7 @@ const objectFields = (
         const previousWireName = seen.get(kotlinName);
         if (previousWireName !== undefined && previousWireName !== key) {
             throw new Error(
-                `@ts-kizuna/kotlin: field key collision in ${hint} — ${stringify(previousWireName)} and ${stringify(key)} both sanitize to ${stringify(kotlinName)}.`
+                `@ts-kizuna/kotlin: field key collision in ${hint}, ${stringify(previousWireName)} and ${stringify(key)} both sanitize to ${stringify(kotlinName)}.`
             );
         }
         seen.set(kotlinName, key);

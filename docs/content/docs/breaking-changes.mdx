@@ -7,7 +7,7 @@ We recommend using [oasdiff](https://github.com/oasdiff/oasdiff) to detect break
 
 ## Print your spec to stdout
 
-Create a script that prints your OpenAPI spec as YAML to stdout — this is the interface oasdiff and CI workflows consume.
+Create a script that prints your OpenAPI spec as YAML to stdout. This is the interface oasdiff and CI workflows consume.
 
 ```ts title="scripts/print-openapi.ts"
 import { generateOpenApi } from '@ts-kizuna/openapi';
@@ -98,4 +98,4 @@ jobs:
                   fi
 ```
 
-If oasdiff detects breaking changes, the PR is blocked until someone adds the `breaking changes` label — forcing explicit acknowledgment from the team.
+If oasdiff detects breaking changes, the PR is blocked until someone adds the `breaking changes` label, forcing explicit acknowledgment from the team.

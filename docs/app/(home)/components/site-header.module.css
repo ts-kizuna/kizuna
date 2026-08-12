@@ -1,0 +1,118 @@
+.header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background-color: color-mix(in srgb, var(--kz-canvas) 80%, transparent);
+    backdrop-filter: blur(12px);
+}
+
+.inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    max-width: var(--kz-max-width);
+    margin: 0 auto;
+    padding: 24px var(--kz-gutter);
+}
+
+.left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.right {
+    display: flex;
+    align-items: center;
+    gap: var(--kz-gap-actions);
+}
+
+.logoLink {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--kz-ink);
+}
+
+.logo {
+    width: var(--kz-logo-width);
+    height: auto;
+    margin-top: -6px;
+}
+
+.links {
+    display: none;
+    align-items: center;
+    gap: 24px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.link {
+    font-size: var(--kz-text-nav);
+    font-weight: var(--font-weight-600);
+    color: var(--kz-ink);
+    text-decoration: none;
+}
+
+.github {
+    display: inline-flex;
+    color: var(--kz-ink);
+}
+
+.githubIcon {
+    width: 26px;
+    height: 26px;
+}
+
+.divider {
+    display: none;
+    width: var(--kz-border-button);
+    height: 28px;
+    margin-inline: 8px;
+    background-color: var(--kz-ink);
+}
+
+.cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--kz-button-height);
+    border: var(--kz-border-button) solid var(--kz-ink);
+    border-radius: var(--kz-radius-pill);
+    padding-inline: var(--kz-button-padding-inline);
+    font-size: var(--kz-text-nav);
+    font-weight: var(--font-weight-600);
+    color: var(--kz-ink);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+    .inner {
+        gap: 16px;
+        padding: 20px var(--kz-gutter);
+    }
+
+    .logo {
+        width: 112px;
+        margin-top: -4px;
+    }
+}
+
+@media (min-width: 768px) {
+    .left {
+        gap: 32px;
+    }
+
+    .links {
+        display: flex;
+    }
+}
+
+@media (min-width: 1024px) {
+    .divider {
+        display: block;
+    }
+}

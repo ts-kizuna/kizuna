@@ -13,7 +13,7 @@ export interface DispatchOptions {
     at?: Date;
     /**
      * How far back the tick looks for due jobs. Widen it when the platform
-     * delivers less punctually than its cron expression suggests — GitHub Actions
+     * delivers less punctually than its cron expression suggests, GitHub Actions
      * and Vercel both run late under load.
      *
      * @default 60000

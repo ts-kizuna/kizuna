@@ -14,7 +14,7 @@ const baseConfig = {
     namespaceName: 'TestAPI',
 };
 
-describe('Kotlin generator — z.void()', () => {
+describe('Kotlin generator: z.void()', () => {
     it('emits no body param and Response return for z.void() body and response', () => {
         const contract = k.contract({
             routes: {
@@ -31,13 +31,13 @@ describe('Kotlin generator — z.void()', () => {
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('suspend fun ping(build: TestAPIClient.Ping.Scope.() -> TestAPIClient.Ping.Args)');
         expect(output).not.toContain('class Body');
-        // Void success returns Unit — no Response wrapper is emitted.
+        // Void success returns Unit, no Response wrapper is emitted.
         expect(output).not.toContain(': TestAPIClient.Ping.Result');
         expect(output).toContain('sealed class Failure');
     });
 });
 
-describe('Kotlin generator — z.union()', () => {
+describe('Kotlin generator: z.union()', () => {
     it('resolves one-or-many union (array | single.transform) to list type', () => {
         const contract = k.contract({
             routes: {
@@ -89,7 +89,7 @@ describe('Kotlin generator — z.union()', () => {
     });
 });
 
-describe('Kotlin generator — z.iso.datetime()', () => {
+describe('Kotlin generator: z.iso.datetime()', () => {
     it('maps z.iso.datetime() to Kotlin Instant, not String', () => {
         const contract = k.contract({
             routes: {
@@ -129,7 +129,7 @@ describe('Kotlin generator — z.iso.datetime()', () => {
     });
 });
 
-describe('Kotlin generator — z.pipe() and z.string().transform()', () => {
+describe('Kotlin generator: z.pipe() and z.string().transform()', () => {
     it('resolves z.string().pipe(z.coerce.number()) to Double', () => {
         const contract = k.contract({
             routes: {
@@ -176,7 +176,7 @@ describe('Kotlin generator — z.pipe() and z.string().transform()', () => {
     });
 });
 
-describe('Kotlin generator — namespace wrapper', () => {
+describe('Kotlin generator: namespace wrapper', () => {
     it('wraps all types in an object named after config.namespaceName', () => {
         const contract = k.contract({
             routes: {
@@ -196,7 +196,7 @@ describe('Kotlin generator — namespace wrapper', () => {
     });
 });
 
-describe('Kotlin generator — keyword property @SerialName', () => {
+describe('Kotlin generator: keyword property @SerialName', () => {
     it('emits @SerialName when a field name is a Kotlin keyword', () => {
         const contract = k.contract({
             routes: {
@@ -219,7 +219,7 @@ describe('Kotlin generator — keyword property @SerialName', () => {
     });
 });
 
-describe('Kotlin generator — Unit error responses', () => {
+describe('Kotlin generator: Unit error responses', () => {
     it('emits data object for Unit error status in sealed Failure', () => {
         const contract = k.contract({
             routes: {
@@ -239,7 +239,7 @@ describe('Kotlin generator — Unit error responses', () => {
     });
 });
 
-describe('Kotlin generator — z.int() maps to Int', () => {
+describe('Kotlin generator: z.int() maps to Int', () => {
     it('maps z.int() to Kotlin Int, not Double', () => {
         const contract = k.contract({
             routes: {
@@ -261,7 +261,7 @@ describe('Kotlin generator — z.int() maps to Int', () => {
     });
 });
 
-describe('Kotlin generator — doc comments on auto-named types', () => {
+describe('Kotlin generator: doc comments on auto-named types', () => {
     it('emits a KDoc comment for an auto-named data class with a description', () => {
         const contract = k.contract({
             routes: {
@@ -279,7 +279,7 @@ describe('Kotlin generator — doc comments on auto-named types', () => {
     });
 });
 
-describe('Kotlin generator — array type qualification', () => {
+describe('Kotlin generator: array type qualification', () => {
     it('array response type is placed inside Ok body field', () => {
         const contract = k.contract({
             routes: {
@@ -356,14 +356,14 @@ describe('Kotlin generator — array type qualification', () => {
             },
         });
         const output = generateKotlinClient(contract, baseConfig);
-        // Within the operation object, the enum element resolves to its local name — a List of the
+        // Within the operation object, the enum element resolves to its local name, a List of the
         // user-defined type, never the built-in List mis-qualified with the client namespace.
         expect(output).toContain('val kinds: List<QueryKindsItem>');
         expect(output).not.toContain('TestAPIClient.List<');
     });
 });
 
-describe('Kotlin generator — nested sub-client routing', () => {
+describe('Kotlin generator: nested sub-client routing', () => {
     it('emits a sub-client class for a grouped router key', () => {
         const contract = k.contract({
             routes: {
@@ -458,7 +458,7 @@ describe('Kotlin generator — nested sub-client routing', () => {
     });
 });
 
-describe('Kotlin generator — responseHeaders', () => {
+describe('Kotlin generator: responseHeaders', () => {
     it('emits Ok with body and headers when response headers are declared', () => {
         const contract = k.contract({
             routes: {
@@ -523,7 +523,7 @@ describe('Kotlin generator — responseHeaders', () => {
     });
 });
 
-describe('Kotlin generator — owned type nesting', () => {
+describe('Kotlin generator: owned type nesting', () => {
     it('nests an enum class inside its owning data class and removes it from top level', () => {
         const contract = k.contract({
             routes: {
@@ -682,7 +682,7 @@ describe('Kotlin generator — owned type nesting', () => {
     });
 });
 
-describe('Kotlin generator — @Deprecated', () => {
+describe('Kotlin generator: @Deprecated', () => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-kotlin-'));
     const previousCwd = process.cwd();
     const fixturePath = path.resolve(import.meta.dirname, '../../cli/src/deprecation.fixture.ts');
@@ -731,7 +731,7 @@ describe('Kotlin generator — @Deprecated', () => {
     });
 });
 
-describe('Kotlin generator — HEAD method', () => {
+describe('Kotlin generator: HEAD method', () => {
     it('returns Unit on success and throws a void NotFound for HEAD', () => {
         const contract = k.contract({
             routes: {
@@ -774,7 +774,7 @@ describe('Kotlin generator — HEAD method', () => {
     });
 });
 
-describe('Kotlin generator — automatic validation error', () => {
+describe('Kotlin generator: automatic validation error', () => {
     it('adds BadRequest variant in sealed Failure for route with body', () => {
         const contract = k.contract({
             routes: {
@@ -868,7 +868,7 @@ describe('Kotlin generator — automatic validation error', () => {
     });
 });
 
-describe('Kotlin generator — @SerialName for wire names', () => {
+describe('Kotlin generator: @SerialName for wire names', () => {
     it('emits @SerialName when property name is sanitized from a hyphenated wire name', () => {
         const contract = k.contract({
             routes: {
@@ -917,7 +917,7 @@ describe('Kotlin generator — @SerialName for wire names', () => {
     });
 });
 
-describe('Kotlin generator — camelCaseProperties option', () => {
+describe('Kotlin generator: camelCaseProperties option', () => {
     const contract = k.contract({
         routes: {
             getStats: {
@@ -947,7 +947,7 @@ describe('Kotlin generator — camelCaseProperties option', () => {
         expect(output).toContain('@SerialName("total_count") val totalCount: Int');
         expect(output).toContain('@SerialName("page_size") val pageSize: Int');
         expect(output).not.toContain('val total_count');
-        // camelCase output has no underscores to flag, so the naming inspections are dropped —
+        // camelCase output has no underscores to flag, so the naming inspections are dropped ,
         // but the brand/library/redundancy suppressions still apply.
         expect(output).toContain(
             '@file:Suppress("SpellCheckingInspection", "unused", "RedundantVisibilityModifier", "RedundantUnitReturnType")'
@@ -956,7 +956,7 @@ describe('Kotlin generator — camelCaseProperties option', () => {
     });
 });
 
-describe('Kotlin generator — z.bigint() maps to Long', () => {
+describe('Kotlin generator: z.bigint() maps to Long', () => {
     it('maps z.bigint() to Kotlin Long', () => {
         const contract = k.contract({
             routes: {
@@ -976,7 +976,7 @@ describe('Kotlin generator — z.bigint() maps to Long', () => {
     });
 });
 
-describe('Kotlin generator — discriminated union', () => {
+describe('Kotlin generator: discriminated union', () => {
     it('emits a sealed interface with @JsonClassDiscriminator for discriminated unions', () => {
         const contract = k.contract({
             routes: {
@@ -1071,7 +1071,7 @@ describe('Kotlin generator — discriminated union', () => {
         });
         const output = generateKotlinClient(contract, baseConfig);
         // Members are top-level data classes named after their title, implementing the sealed
-        // interface — never nested under the discriminant literal.
+        // interface, never nested under the discriminant literal.
         expect(output).toContain('sealed interface Attachment');
         expect(output).toContain('data class ImageAttachment(');
         expect(output).toContain('data class VideoAttachment(');
@@ -1089,7 +1089,7 @@ describe('Kotlin generator — discriminated union', () => {
     });
 });
 
-describe('Kotlin generator — imports', () => {
+describe('Kotlin generator: imports', () => {
     it('includes required imports in the generated file', () => {
         const contract = k.contract({
             routes: {
@@ -1110,7 +1110,7 @@ describe('Kotlin generator — imports', () => {
     });
 });
 
-describe('Kotlin generator — throw-on-error model', () => {
+describe('Kotlin generator: throw-on-error model', () => {
     it('returns a Response wrapper and a sealed Failure for single-success routes', () => {
         const contract = k.contract({
             routes: {
@@ -1178,7 +1178,7 @@ describe('Kotlin generator — throw-on-error model', () => {
     });
 });
 
-describe('Kotlin generator — inline response body name', () => {
+describe('Kotlin generator: inline response body name', () => {
     it('names the inline 200 body Response, distinct from the Result wrapper', () => {
         const contract = k.contract({
             routes: {
@@ -1200,7 +1200,7 @@ describe('Kotlin generator — inline response body name', () => {
     });
 });
 
-describe('Kotlin generator — enum query wire value', () => {
+describe('Kotlin generator: enum query wire value', () => {
     it('carries the @SerialName as wireValue rather than guessing from the constant name', () => {
         const contract = k.contract({
             routes: {
@@ -1227,7 +1227,7 @@ describe('Kotlin generator — enum query wire value', () => {
     });
 });
 
-describe('Kotlin generator — package declaration', () => {
+describe('Kotlin generator: package declaration', () => {
     it('emits a package declaration when packageName is set', () => {
         const contract = k.contract({
             routes: {
@@ -1264,7 +1264,7 @@ describe('Kotlin generator — package declaration', () => {
     });
 });
 
-describe('Kotlin generator — bodyless POST/PUT/PATCH', () => {
+describe('Kotlin generator: bodyless POST/PUT/PATCH', () => {
     it('sends an empty body so OkHttp does not reject a null body', () => {
         const contract = k.contract({
             routes: {
@@ -1299,7 +1299,7 @@ describe('Kotlin generator — bodyless POST/PUT/PATCH', () => {
     });
 });
 
-describe('Kotlin generator — grouped request components (params/body/query/headers)', () => {
+describe('Kotlin generator: grouped request components (params/body/query/headers)', () => {
     it('emits each group as a builder class and a builder-lambda method parameter', () => {
         const contract = k.contract({
             routes: {
@@ -1384,7 +1384,7 @@ describe('Kotlin generator — grouped request components (params/body/query/hea
         expect(output).toContain('suspend fun createUser(build: TestAPIClient.CreateUser.Scope.() -> TestAPIClient.CreateUser.Args)');
         expect(output).toContain('data class Body(');
         expect(output).toContain('val name: String,');
-        // the flattened body fields build the payload — required `name` non-null, optional `email` nullable
+        // the flattened body fields build the payload, required `name` non-null, optional `email` nullable
         expect(output).toContain('val payload = TestAPIClient.CreateUser.Input(name = body.name, email = body.email)');
         expect(output).toContain('json.encodeToString(payload)');
     });
@@ -1461,7 +1461,7 @@ describe('Kotlin generator — grouped request components (params/body/query/hea
     });
 });
 
-describe('Kotlin generator — request context', () => {
+describe('Kotlin generator: request context', () => {
     const analytics = Kizuna.requestContext({
         headers: z.object({
             'x-session-id': z.string().optional(),
@@ -1524,7 +1524,7 @@ describe('Kotlin generator — request context', () => {
     });
 });
 
-describe('Kotlin generator — ByteArray structural equality', () => {
+describe('Kotlin generator: ByteArray structural equality', () => {
     it('emits Failure.Unexpected/Decoding as plain classes, not data classes (no per-op boilerplate)', () => {
         const contract = k.contract({
             routes: {
@@ -1540,7 +1540,7 @@ describe('Kotlin generator — ByteArray structural equality', () => {
             },
         });
         const output = generateKotlinClient(contract, baseConfig);
-        // Thrown exceptions are never compared by value, so they stay plain classes —
+        // Thrown exceptions are never compared by value, so they stay plain classes ,
         // no `data`, no ByteArray equals/hashCode boilerplate, no ArrayInDataClass warning.
         expect(output).toContain('class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")');
         expect(output).toContain(
@@ -1579,7 +1579,7 @@ describe('Kotlin generator — ByteArray structural equality', () => {
     });
 });
 
-describe('Kotlin generator — emitted-syntax cleanups', () => {
+describe('Kotlin generator: emitted-syntax cleanups', () => {
     it('inlines the status code into the when expression', () => {
         const contract = k.contract({
             routes: {
@@ -1645,7 +1645,7 @@ describe('Kotlin generator — emitted-syntax cleanups', () => {
     });
 });
 
-describe('Kotlin generator — unknownEnumCase', () => {
+describe('Kotlin generator: unknownEnumCase', () => {
     const tolerantConfig = {
         namespaceName: 'TestAPI',
         unknownEnumCase: true,
@@ -1693,7 +1693,7 @@ describe('Kotlin generator — unknownEnumCase', () => {
     });
 });
 
-describe('Kotlin generator — union variants owned by a name-prefix class', () => {
+describe('Kotlin generator: union variants owned by a name-prefix class', () => {
     it('does not duplicate sealed variant payloads as nested classes', () => {
         const contract = k.contract({
             routes: {

@@ -465,7 +465,7 @@ export interface Server<
      * Define a guard for one of the contract's identities. It runs before the
      * handlers of every route whose `auth` entry requires the identity, and
      * receives the credential its method extracted (`bearer`, `apiKey`, or
-     * `basic` — `null` when absent). Return the identity's context and access
+     * `basic`, `null` when absent). Return the identity's context and access
      * fields to allow the request, or call `deny(status, detail)`.
      */
     guard<const Name extends Extract<keyof Schemes, string>>(
@@ -474,7 +474,7 @@ export interface Server<
     ): GuardRun<NextHandlerContext>;
     /**
      * Define a request context resolver declared on the contract. It runs on
-     * every route — public ones included — and never denies.
+     * every route, public ones included, and never denies.
      */
     requestContext<const Name extends Extract<keyof RequestContext, string>>(
         name: Name,

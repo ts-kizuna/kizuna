@@ -1,7 +1,7 @@
 /**
  * RFC 9110 status code reason phrases.
  *
- * The single source of truth for human-readable status phrases across kizuna —
+ * The single source of truth for human-readable status phrases across kizuna ,
  * used for Problem Details `title` fields and OpenAPI response descriptions.
  */
 export const STATUS_TITLES: Record<number, string> = {

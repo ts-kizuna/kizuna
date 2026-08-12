@@ -27,7 +27,7 @@ Each entry is keyed by an id you choose; routes reference tags by these keys. A 
 
 ## Returns
 
-A `TagSet`. Pass it to [`new Kizuna()`](/docs/reference/kizuna) so `k.routes` completes the group tag and route-level `tags`. `k.contract` carries the set onto the contract — so the generated OpenAPI document lists each tag with its title and description without you passing it again.
+A `TagSet`. Pass it to [`new Kizuna()`](/docs/reference/kizuna) so `k.routes` completes the group tag and route-level `tags`. `k.contract` carries the set onto the contract, so the generated OpenAPI document lists each tag with its title and description without you passing it again.
 
 ## Example
 
@@ -73,7 +73,7 @@ export const usersRoutes = k.routes('users', {
 
 ## Cross-tagging
 
-Routes reference tags by key, with completion. A route can list more than one tag — useful for tagging it across groups:
+Routes reference tags by key, with completion. A route can list more than one tag, which is useful for tagging it across groups:
 
 ```ts
 cancelAccount: {

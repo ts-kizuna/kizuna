@@ -3,7 +3,6 @@ import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page
 import { notFound } from 'next/navigation';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
 import { getMDXComponents } from '@/mdx-components';
-import { BetaLogo } from '@/app/components/beta-logo';
 import type { Metadata } from 'next';
 
 interface PageProps {
@@ -15,20 +14,12 @@ export default async function Page({ params }: PageProps) {
     const page = source.getPage(slug);
     if (!page) notFound();
 
-    const isIndex = !slug || slug.length === 0;
     const MDX = page.data.body;
 
     return (
         <DocsPage toc={page.data.toc}>
-            {isIndex ? (
-                <>
-                    <DocsTitle className="sr-only">{page.data.title}</DocsTitle>
-                    <BetaLogo />
-                </>
-            ) : (
-                <DocsTitle>{page.data.title}</DocsTitle>
-            )}
-            <DocsDescription className={isIndex ? 'mb-2' : undefined}>{page.data.description}</DocsDescription>
+            <DocsTitle>{page.data.title}</DocsTitle>
+            <DocsDescription>{page.data.description}</DocsDescription>
             <DocsBody>
                 <MDX components={getMDXComponents(defaultMdxComponents)} />
             </DocsBody>

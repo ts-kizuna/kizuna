@@ -5,7 +5,7 @@ description: Assemble the router, guards and request context into the api object
 
 `server.api({ router, guards, requestContext, jobs })` binds the router and guards into the API object an adapter mounts.
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 import { server } from './server';
 import { router } from './router';
 import { requireUser, requireMember } from './guards';
@@ -34,7 +34,7 @@ See the [Mounting guide](/docs/building/mounting) for full setup with each adapt
 
 A contract that declares [scheduled jobs](/docs/jobs) needs their handlers here, bound with [`server.jobs`](/docs/reference/server-jobs):
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 export const api = server.api({
     router,
     jobs: jobHandlers,
@@ -48,17 +48,27 @@ export const api = server.api({
 
 ## plugins
 
-A [plugin](/docs/extend/create-plugin) is installed on [`new Kizuna()`](/docs/reference/kizuna). If it needs anything live, such as a store or a transport, pass it here under the same key:
+A [plugin](/docs/plugins) comes in two halves. The declaration is installed on [`new Kizuna()`](/docs/reference/kizuna), and its server half goes here under the same key:
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
+import { mcpPluginServer } from '@ts-kizuna/mcp/server';
+import { openApiPluginServer } from '@ts-kizuna/openapi/server';
+
 export const api = server.api({
     router,
     plugins: {
-        audit: {
-            store,
-        },
+        mcp: mcpPluginServer(),
+        openApi: openApiPluginServer(),
     },
 });
 ```
 
-A plugin that needs nothing live, such as [`mcpPlugin`](/docs/reference/mcp-plugin), never appears here at all. `api.mount` serves every installed plugin's routes either way.
+Every plugin the contract declares needs its server half here, and `server.api` throws if one is missing, naming the module to import. Anything live the plugin needs, such as a store or a transport, is passed to that server half:
+
+```ts title="src/server/api.ts"
+plugins: {
+    audit: auditPluginServer({ store }),
+}
+```
+
+`api.mount` serves every plugin's routes alongside yours, and whatever a plugin exports arrives on each handler under `plugins`, keyed by name.

@@ -69,7 +69,7 @@ test('HandlerReturn rejects body that does not match the status', () => {
     expectTypeOf<{ status: 404; body: { id: string; name: string } }>().not.toMatchTypeOf<HandlerReturn<GetUserRoute>>();
 });
 
-test('error statuses (4xx/5xx) require a Problem Details schema — non-envelope shapes resolve to never', () => {
+test('error statuses (4xx/5xx) require a Problem Details schema: non-envelope shapes resolve to never', () => {
     const customErrorContractRoutes = k.routes('api', {
         getThing: {
             method: 'GET',

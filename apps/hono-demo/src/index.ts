@@ -1,7 +1,7 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 
-import { api } from './lib/api';
+import { api } from './server/api';
 
 const app = new Hono();
 
@@ -22,10 +22,10 @@ app.get('/', (c) => {
         <h1>ts-kizuna Hono demo</h1>
         <p>This demo shares the same routes from <code>@ts-kizuna-demo/shared</code>.</p>
         <ul>
-            <li><a href="http://localhost:8001/users">Hono API</a> — <code>:8001/users</code></li>
-            <li><a href="http://localhost:8001/docs">Hono API docs (Scalar)</a> — <code>:8001/docs</code></li>
-            <li><a href="http://localhost:8001/openapi.json">OpenAPI spec (JSON)</a> — <code>:8001/openapi.json</code></li>
-            <li><a href="http://localhost:8001/openapi.yaml">OpenAPI spec (YAML)</a> — <code>:8001/openapi.yaml</code></li>
+            <li><a href="http://localhost:8001/users">Hono API</a>, <code>:8001/users</code></li>
+            <li><a href="http://localhost:8001/docs">Hono API docs (Scalar)</a>, <code>:8001/docs</code></li>
+            <li><a href="http://localhost:8001/openapi.json">OpenAPI spec (JSON)</a>, <code>:8001/openapi.json</code></li>
+            <li><a href="http://localhost:8001/openapi.yaml">OpenAPI spec (YAML)</a>, <code>:8001/openapi.yaml</code></li>
         </ul>
     </body>
 </html>`);

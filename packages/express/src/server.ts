@@ -229,7 +229,7 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
             res.status(rendered.status).end();
         } else if (rendered.raw) {
             const body = rendered.body;
-            // Strings go out as-is; binary (Uint8Array/Buffer) is sent as bytes — never JSON-serialized.
+            // Strings go out as-is; binary (Uint8Array/Buffer) is sent as bytes, never JSON-serialized.
             res.status(rendered.status).send(typeof body === 'string' || Buffer.isBuffer(body) ? body : Buffer.from(body as Uint8Array));
         } else {
             res.status(rendered.status).json(rendered.body);
@@ -344,7 +344,7 @@ export interface Server<
      * Define a guard for one of the contract's identities. It runs before the
      * handlers of every route whose `auth` entry requires the identity, and
      * receives the credential its method extracted (`bearer`, `apiKey`, or
-     * `basic` — `null` when absent). Return the identity's context and access
+     * `basic`, `null` when absent). Return the identity's context and access
      * fields to allow the request, or call `deny(status, detail)`.
      */
     guard<const Name extends Extract<keyof Schemes, string>>(
@@ -353,7 +353,7 @@ export interface Server<
     ): GuardRun<ExpressHandlerContext>;
     /**
      * Define a request context resolver declared on the contract. It runs on
-     * every route — public ones included — and never denies.
+     * every route, public ones included, and never denies.
      */
     requestContext<const Name extends Extract<keyof RequestContext, string>>(
         name: Name,

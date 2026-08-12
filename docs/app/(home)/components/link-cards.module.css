@@ -1,0 +1,33 @@
+.grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+.card {
+    display: block;
+    border-radius: var(--kz-radius-card);
+    background-color: var(--kz-surface);
+    padding: 24px;
+    text-decoration: none;
+}
+
+.title {
+    margin: 0;
+    font-size: var(--kz-text-ui);
+    font-weight: var(--font-weight-600);
+    color: var(--kz-ink);
+}
+
+.description {
+    margin: 8px 0 0;
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--kz-muted);
+}
+
+@media (min-width: 640px) {
+    .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

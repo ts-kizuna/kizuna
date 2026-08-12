@@ -1,23 +1,23 @@
 ---
 title: Migrating an existing API
-description: Move an existing API onto kizuna without breaking deployed clients — the additive pattern, and the escape hatch for the rest.
+description: Move an existing API onto kizuna without breaking deployed clients, using the additive pattern and the escape hatch for the rest.
 ---
 
-You have an API already running, and you want to move it onto kizuna. Most of it ports as-is — routes, schemas, and success responses. The one area worth understanding first is errors, and the good news is the migration is almost always **additive**: you keep your existing error fields and just gain the standard envelope around them. This page walks you through it.
+You have an API already running, and you want to move it onto kizuna. Most of it ports as-is, including routes, schemas, and success responses. The one area worth understanding first is errors, and the good news is the migration is almost always **additive**: you keep your existing error fields and just gain the standard envelope around them. This page walks you through it.
 
-ts-kizuna gives every error one shape: [RFC 9457 Problem Details](/docs/reference/problem-details-schema) — `type`, `title`, `status`, `detail`, plus any extra fields you add. That one shared shape is what lets guards, validation, the [`isProblemDetails`](/docs/reference/problem-details-schema#checking-for-a-problem-details-body) / [`isValidationError`](/docs/reference/is-validation-error) guards, generated clients, and the OpenAPI spec all describe errors the same way.
+ts-kizuna gives every error one shape: [RFC 9457 Problem Details](/docs/reference/problem-details-schema): `type`, `title`, `status`, `detail`, plus any extra fields you add. That one shared shape is what lets guards, validation, the [`isProblemDetails`](/docs/reference/problem-details-schema#checking-for-a-problem-details-body) / [`isValidationError`](/docs/reference/is-validation-error) guards, generated clients, and the OpenAPI spec all describe errors the same way.
 
 ## Do you need a new API version?
 
-The textbook answer to "I'm changing my API" is a new version — a `/v2` path is the pragmatic default — and kizuna sits behind whatever versioning you choose. So it's worth saying up front: **for adopting Problem Details, you almost certainly don't need one.** Moving to this error shape is _additive_ — you keep your existing fields (see below), status codes don't change, and old clients keep working on the same endpoints. Save a new version for a genuinely incompatible API; you don't need one just to standardize your errors.
+The textbook answer to "I'm changing my API" is a new version, usually a `/v2` path, and kizuna sits behind whatever versioning you choose. So it's worth saying up front: **for adopting Problem Details, you almost certainly don't need one.** Moving to this error shape is _additive_. You keep your existing fields (see below), status codes don't change, and old clients keep working on the same endpoints. Save a new version for a genuinely incompatible API; you don't need one just to standardize your errors.
 
 ## Success responses are unchanged
 
-Only error statuses (`>= 400`) are constrained. A `2xx`/`3xx` response can be any shape — port those exactly as they are. Everything below is about errors.
+Only error statuses (`>= 400`) are constrained. A `2xx`/`3xx` response can be any shape, so port those exactly as they are. Everything below is about errors.
 
 ## Errors are Problem Details
 
-A contract that declares an error with a bespoke shape no longer typechecks — the handler's error body resolves to `never`:
+A contract that declares an error with a bespoke shape no longer typechecks, and the handler's error body resolves to `never`:
 
 ```ts
 responses: {
@@ -37,9 +37,9 @@ responses: {
 }
 ```
 
-## The additive pattern — keep your old fields (start here)
+## The additive pattern: keep your old fields (start here)
 
-This is the path for nearly every migration. If your errors carry fields beyond a message — an application code, a request ID — you keep them as RFC 9457 **extension members** with `.extend()`:
+This is the path for nearly every migration. If your errors carry fields beyond a message, such as an application code or a request ID, you keep them as RFC 9457 **extension members** with `.extend()`:
 
 ```ts
 import { z } from 'zod';
@@ -73,17 +73,17 @@ The body is now valid Problem Details **and** still has `errorCode` / `requestId
 }
 ```
 
-So a client reading `errorCode` keeps working untouched, and a new client can read the standard fields — **one body, both audiences, no negotiation.** Status codes never changed either. When clients have moved to the standard fields, you drop the extras. That's the whole migration for most APIs.
+So a client reading `errorCode` keeps working untouched, and a new client can read the standard fields. **One body, both audiences, no negotiation.** Status codes never changed either. When clients have moved to the standard fields, you drop the extras. That's the whole migration for most APIs.
 
 ## The content type
 
-Errors go out as `application/problem+json` (success stays `application/json`). That's still JSON — any client doing `response.json()` parses it identically and finds its fields. The only client that notices the difference is one that _strictly_ asserts `Content-Type: application/json`, or one whose error body is **structurally** different (a wrapper like `{ ok: false, error: {...} }`, which extension members can't reproduce because they only add fields — they can't nest or rename).
+Errors go out as `application/problem+json` (success stays `application/json`). That's still JSON, so any client doing `response.json()` parses it identically and finds its fields. The only client that notices the difference is one that _strictly_ asserts `Content-Type: application/json`, or one whose error body is **structurally** different (a wrapper like `{ ok: false, error: {...} }`, which extension members can't reproduce because they only add fields and can't nest or rename).
 
-For those two cases — and only those — there's `formatError`.
+For those two cases, and only those, there's `formatError`.
 
-## `formatError` — the escape hatch
+## `formatError`, the escape hatch
 
-`formatError` decides the bytes for an error response — use it to stamp a different content type or reshape the body into a legacy structure. It receives the **request**, which is the important part: you serve old and new clients at the same time. Old clients keep their existing shape; new clients get Problem Details. Your contract, types, and OpenAPI spec stay pure Problem Details — only the wire output changes.
+`formatError` decides the bytes for an error response. Use it to stamp a different content type or reshape the body into a legacy structure. It receives the **request**, which is the important part: you serve old and new clients at the same time. Old clients keep their existing shape; new clients get Problem Details. Your contract, types, and OpenAPI spec stay pure Problem Details, and only the wire output changes.
 
 Say old clients expect this body, as `application/json`:
 
@@ -98,13 +98,13 @@ Say old clients expect this body, as `application/json`:
 }
 ```
 
-Branch on whatever signal tells your clients apart — a version header, a build header, `Accept`, whatever you already use — and reshape to the legacy body only for the old ones:
+Branch on whatever signal tells your clients apart, such as a version header, a build header, or `Accept`, and reshape to the legacy body only for the old ones:
 
 ```ts
 api.mount(app, {
     // `problem` is the full Problem Details object (envelope + extension members).
     formatError: (problem, { request }) => {
-        // new clients opt in via a signal you control — here, a version header
+        // new clients opt in via a signal you control, here a version header
         if (request.headers.get('x-api-version') === '2') {
             return {
                 contentType: 'application/problem+json',
@@ -127,7 +127,7 @@ api.mount(app, {
 });
 ```
 
-This applies to every error — built-in 404/405/415, validation 400s, guard denials, your handlers' `error(...)` — and the option exists on every first-party adapter (`api.mount` options on Express, Hono and Fastify; Next.js maps inbound errors via `onError`). Remove the branch once the old clients are gone. kizuna doesn't dictate the signal — most APIs don't send a useful `Accept`, so you negotiate on whatever you've got.
+This applies to every error, including built-in 404/405/415, validation 400s, guard denials, and your handlers' `error(...)`, and the option exists on every first-party adapter (`api.mount` options on Express, Hono and Fastify; Next.js maps inbound errors via `onError`). Remove the branch once the old clients are gone. kizuna doesn't dictate the signal. Most APIs don't send a useful `Accept`, so you negotiate on whatever you've got.
 
 (Doing a coordinated cutover with no per-client split? Skip the branch, always return the legacy shape, and delete `formatError` entirely on flip day. The same `request` branch also lets a future error standard ship alongside RFC 9457 without a hard cutover.)
 
@@ -153,12 +153,12 @@ handleNextRequest(request, contract, router, undefined, {
 
 ## Errors that aren't JSON
 
-For an error that genuinely isn't JSON — proxying an upstream body, an HTML error page — adapters expose a `raw-response` result you return directly. It bypasses validation and the spec, so use it only when neither extension members nor `formatError` fit.
+For an error that genuinely isn't JSON, such as proxying an upstream body or an HTML error page, adapters expose a `raw-response` result you return directly. It bypasses validation and the spec, so use it only when neither extension members nor `formatError` fit.
 
 ## A typical migration, in order
 
-1. Move error responses to `ProblemDetailsSchema`, using `.extend({...})` to keep any extra fields. **For most APIs, you're done here** — old clients still read their fields.
+1. Move error responses to `ProblemDetailsSchema`, using `.extend({...})` to keep any extra fields. **For most APIs, you're done here.** Old clients still read their fields.
 2. Only if a client strictly checks the content type, or needs a structurally different body: add `formatError`.
 3. Serving old and new clients simultaneously? Branch inside `formatError` on a signal your API has.
 4. Map any errors your handlers throw into Problem Details at the boundary.
-5. As clients adopt the standard shape, drop the extras and remove `formatError` — leaving a clean, fully standard API.
+5. As clients adopt the standard shape, drop the extras and remove `formatError`, leaving a clean, fully standard API.

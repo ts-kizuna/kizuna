@@ -525,7 +525,7 @@ const buildSecuritySchemes = (contract: Contract): Record<string, unknown> | und
 const buildTagLookup = (contract: Contract): ReadonlyMap<string, TagOptions> => new Map(Object.entries(contract.tags?.tags ?? {}));
 
 /**
- * Document-level tag definitions from the contract's declared tag set — one
+ * Document-level tag definitions from the contract's declared tag set, one
  * entry per declared tag, in declaration order, named by its `title`.
  */
 const tagsFromContract = (contract: Contract): OpenApiTag[] => {

@@ -24,19 +24,19 @@ export type AccessConstraint = Record<string, unknown>;
 /**
  * The auth a route or group resolves to:
  *
- * - a scheme name — require that identity, no field constraint;
- * - `false` — public;
- * - `{ scheme: true }` — require that identity inside a multi-identity value
+ * - a scheme name: require that identity, no field constraint;
+ * - `false`: public;
+ * - `{ scheme: true }`: require that identity inside a multi-identity value
  *   (multiple scheme keys are combined with AND);
- * - `{ scheme: { field: value | values } }` — constrain `access` fields;
- * - `{ scheme: [...scopes] }` — oauth2 scopes.
+ * - `{ scheme: { field: value | values } }`: constrain `access` fields;
+ * - `{ scheme: [...scopes] }`: oauth2 scopes.
  */
 export type AuthValue<Id extends string = string> = Id | false | { [Name in Id]?: true | AccessConstraint | readonly string[] };
 
 /**
  * A group's entry in the `auth` map: one {@link AuthValue} for the whole group,
  * or a cascade `{ '*': default, key: override }` whose named keys are the
- * group's own routes and subgroups — an {@link AuthValue}, or a nested cascade
+ * group's own routes and subgroups, an {@link AuthValue}, or a nested cascade
  * (an object with its own `'*'`) for a subgroup.
  */
 export type GroupAuth<Id extends string = string, Group = Routes> = Group extends RouteDefinition
@@ -238,8 +238,8 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         map: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>
     ): A;
     /**
-     * Declare scheduled jobs. Pass the identity every job requires — the one
-     * credential your scheduler sends — then the jobs themselves.
+     * Declare scheduled jobs. Pass the identity every job requires, the one
+     * credential your scheduler sends, then the jobs themselves.
      *
      * Jobs are their own concept, not routes. Each is reachable over HTTP so a
      * scheduler can trigger it, and runs through the same validation, guards, and

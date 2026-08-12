@@ -359,7 +359,7 @@ class APIClientTest {
 
     @Test
     fun testCheckUserNotFoundThrows() = runTest {
-        // HEAD responses carry no body (RFC 9110), so the 404 cannot decode into ProblemDetails —
+        // HEAD responses carry no body (RFC 9110), so the 404 cannot decode into ProblemDetails ,
         // it still surfaces as a typed Failure for this operation.
         assertFailsWith<APIClient.UsersCheckUser.Failure> {
             client.users.checkUser {

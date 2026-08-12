@@ -34,7 +34,7 @@ export interface ApiKeyCredential<In extends 'header' | 'query' | 'cookie' = 'he
 
 /**
  * The credential a guard receives, keyed by the identity's authentication method.
- * A guard destructures the one key its identity declares — `{ bearer }`,
+ * A guard destructures the one key its identity declares, `{ bearer }`,
  * `{ apiKey }`, `{ basic }`, `{ oauth2 }`, or `{ openIdConnect }`. The value is
  * `null` when the request carried no such credential.
  */
@@ -79,7 +79,7 @@ export interface Identity<
 
 /**
  * The {@link Credential} an identity's authentication method extracts and passes
- * to its guard — a single discriminated member, e.g. `{ apiKey: { in; name;
+ * to its guard, a single discriminated member, e.g. `{ apiKey: { in; name;
  * value } | null }` for an `apiKey` identity.
  */
 export type CredentialOf<Id> = Id extends Identity<z.ZodType | undefined, z.ZodType | undefined, infer Extracted> ? Extracted : Credential;
@@ -96,7 +96,7 @@ export type AccessOf<Id> =
         : never;
 
 /**
- * An identity's access type, or `{}` when it declares none — used where access is
+ * An identity's access type, or `{}` when it declares none, used where access is
  * intersected with context (in a guard's return and the handler's scheme-keyed
  * args) so a missing access schema never collapses the result to `never`.
  */
@@ -177,7 +177,7 @@ export interface CustomConfig<ContextSchema extends z.ZodType | undefined, Acces
  * OpenAPI security scheme can express, such as a capability-URL path token).
  * Each takes, optionally, the `context` a passing guard returns and the `access`
  * fields the `auth` map may constrain. Omit `context` for an authentication-only
- * identity — a pure gate whose guard returns nothing on success and contributes
+ * identity, a pure gate whose guard returns nothing on success and contributes
  * no handler args.
  *
  * @example
@@ -191,7 +191,7 @@ export interface CustomConfig<ContextSchema extends z.ZodType | undefined, Acces
  * });
  *
  * @example
- * // Authentication-only — no context, no handler args:
+ * // Authentication-only, no context, no handler args:
  * const apiConsumer = Kizuna.identity.apiKey({
  *     name: 'x-api-key',
  *     in: 'header',

@@ -22,7 +22,7 @@ export const myQueue = createJobTransport({
 });
 ```
 
-```ts title="src/lib/server.ts"
+```ts title="src/server/server.ts"
 export const server = new KizunaServer(contract, {
     jobTransport: myQueue,
 });
@@ -108,7 +108,7 @@ register: async (schedules) => {
 
 Every message goes to the same URL, the run endpoint, and names its job in the body.
 
-```ts title="src/lib/qstash.ts"
+```ts title="src/server/qstash.ts"
 import { createJobTransport, type JobMessage } from '@ts-kizuna/core';
 
 interface QstashOptions {
@@ -177,7 +177,7 @@ export const qstash = (options: QstashOptions) =>
     });
 ```
 
-```ts title="src/lib/server.ts"
+```ts title="src/server/server.ts"
 export const server = new KizunaServer(contract, {
     jobTransport: qstash({
         token: process.env.QSTASH_TOKEN,
@@ -208,15 +208,15 @@ export const requireScheduler = server.guard('scheduler', ({ bearer, deny }) =>
 
 <Callout type="warn">
     A guard cannot verify QStash's `Upstash-Signature`. The signature covers the raw body, and the request pipeline reads the body before
-    guards run — so by then it is parsed on Express and the stream is consumed on Hono and Next. Verify it ahead of kizuna instead:
-    framework middleware on the run endpoint, or `express.json({verify})` to keep the raw buffer for a guard to read.
+    guards run, so by then it is parsed on Express and the stream is consumed on Hono and Next. Verify it ahead of kizuna instead: framework
+    middleware on the run endpoint, or `express.json({verify})` to keep the raw buffer for a guard to read.
 </Callout>
 
 ## Example: BullMQ
 
 [BullMQ](https://docs.bullmq.io/) is a pull transport, so it implements all three: `dispatch` adds to a Redis queue, `start` drains it, and `register` uses BullMQ's own repeatable jobs.
 
-```ts title="src/lib/bullmq.ts"
+```ts title="src/server/bullmq.ts"
 import { Queue, Worker, type ConnectionOptions } from 'bullmq';
 import { createJobTransport } from '@ts-kizuna/core';
 
@@ -270,7 +270,7 @@ export const bullmq = (connection: ConnectionOptions, queueName = 'jobs') => {
 };
 ```
 
-Nothing calls `start` on its own. `startJobWorker` does, wherever you want the work done — the same process as the API, or its own:
+Nothing calls `start` on its own. `startJobWorker` does, wherever you want the work done, whether that is the same process as the API or its own:
 
 ```ts title="src/worker.ts"
 import { startJobWorker } from '@ts-kizuna/core/jobs';
@@ -279,7 +279,7 @@ const worker = await startJobWorker(api);
 process.on('SIGTERM', () => void worker?.stop());
 ```
 
-`jobId` is how BullMQ deduplicates, so `dedupeKey` maps onto it — but only while the job exists: once it completes and is removed the id is free again, so `supports.dedupe` here is weaker than "never twice". `register` has the same edge in reverse, since changing a cron leaves the old repeatable job behind. Check the [BullMQ docs](https://docs.bullmq.io/) for the repeatable-job API in the version you run.
+`jobId` is how BullMQ deduplicates, so `dedupeKey` maps onto it, but only while the job exists. Once it completes and is removed the id is free again, so `supports.dedupe` here is weaker than "never twice". `register` has the same edge in reverse, since changing a cron leaves the old repeatable job behind. Check the [BullMQ docs](https://docs.bullmq.io/) for the repeatable-job API in the version you run.
 
 ## What you can assume
 

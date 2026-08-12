@@ -1748,7 +1748,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// Export users as CSV — exercises a non-JSON (text/csv) raw response body
+    /// Export users as CSV, exercises a non-JSON (text/csv) raw response body
     public func exportUsers() async throws(APIClient.UsersExportUsers.Failure) -> APIClient.UsersExportUsers.Result {
         let path = "/users/export"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersExportUsers.Failure.self)
@@ -1765,7 +1765,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// Download a user badge — exercises a binary (BinarySchema) response body
+    /// Download a user badge, exercises a binary (BinarySchema) response body
     public func userBadge(_ params: APIClient.UsersUserBadge.Params) async throws(APIClient.UsersUserBadge.Failure) -> APIClient.UsersUserBadge.Result {
         var path = "/users/:id/badge"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -1786,7 +1786,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// A user's most recent login or logout — inline union variants nest under the User model in native clients
+    /// A user's most recent login or logout, inline union variants nest under the User model in native clients
     public func lastSessionEvent(_ params: APIClient.UsersLastSessionEvent.Params) async throws(APIClient.UsersLastSessionEvent.Failure) -> APIClient.UsersLastSessionEvent.Result {
         var path = "/users/:id/last-session-event"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -1807,7 +1807,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// Search users — required coerced limit and cursor
+    /// Search users, required coerced limit and cursor
     public func searchUsers(_ query: APIClient.UsersSearchUsers.Query) async throws(APIClient.UsersSearchUsers.Failure) -> APIClient.UsersSearchUsers.Result {
         let path = "/users/search"
         var queryItems: [URLQueryItem] = []
@@ -1922,7 +1922,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// Archive a user — first call returns 201, subsequent calls 200
+    /// Archive a user, first call returns 201, subsequent calls 200
     public func archiveUser(_ params: APIClient.UsersArchiveUser.Params) async throws(APIClient.UsersArchiveUser.Failure) -> APIClient.UsersArchiveUser.Result {
         var path = "/users/:id/archive"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -1968,7 +1968,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// Ping a user — exercises z.void() body and response
+    /// Ping a user, exercises z.void() body and response
     public func pingUser(_ params: APIClient.UsersPingUser.Params) async throws(APIClient.UsersPingUser.Failure) {
         var path = "/users/:id/ping"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -1988,7 +1988,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// List work items — exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers
+    /// List work items, exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers
     public func getMyWork() async throws(APIClient.UsersGetMyWork.Failure) -> APIClient.UsersGetMyWork.Result {
         let path = "/work"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersGetMyWork.Failure.self)
@@ -2007,7 +2007,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// Check user existence — exercises HEAD body stripping
+    /// Check user existence, exercises HEAD body stripping
     public func checkUser(_ params: APIClient.UsersCheckUser.Params) async throws(APIClient.UsersCheckUser.Failure) {
         var path = "/users/:id/check"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -2027,7 +2027,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// Describe allowed operations — exercises OPTIONS routing
+    /// Describe allowed operations, exercises OPTIONS routing
     public func describeUsers() async throws(APIClient.UsersDescribeUsers.Failure) -> APIClient.UsersDescribeUsers.Result {
         let path = "/users/describe"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersDescribeUsers.Failure.self)
@@ -2052,7 +2052,7 @@ public struct APIHealthClient: Sendable {
         self.client = client
     }
 
-    /// Health check — exercises nested sub-client routing
+    /// Health check, exercises nested sub-client routing
     public func check() async throws(APIClient.HealthCheck.Failure) -> APIClient.HealthCheck.Result {
         let path = "/health"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.HealthCheck.Failure.self)
@@ -2069,7 +2069,7 @@ public struct APIHealthClient: Sendable {
         }
     }
 
-    /// Version — exercises second method in a sub-client group
+    /// Version, exercises second method in a sub-client group
     public func version() async throws(APIClient.HealthVersion.Failure) -> APIClient.HealthVersion.Result {
         let path = "/health/version"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.HealthVersion.Failure.self)
@@ -2086,7 +2086,7 @@ public struct APIHealthClient: Sendable {
         }
     }
 
-    /// Health history — exercises array return type qualification
+    /// Health history, exercises array return type qualification
     public func history() async throws(APIClient.HealthHistory.Failure) -> APIClient.HealthHistory.Result {
         let path = "/health/history"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.HealthHistory.Failure.self)
@@ -2133,7 +2133,7 @@ public struct APINotificationsClient: Sendable {
         }
     }
 
-    /// List events — exercises Date / enum / array query params
+    /// List events, exercises Date / enum / array query params
     public func listEvents(_ query: APIClient.NotificationsListEvents.Query = .query()) async throws(APIClient.NotificationsListEvents.Failure) -> APIClient.NotificationsListEvents.Result {
         let path = "/events"
         var queryItems: [URLQueryItem] = []
@@ -2159,7 +2159,7 @@ public struct APINotificationsClient: Sendable {
         }
     }
 
-    /// Validate contract — exercises generator bug coverage
+    /// Validate contract, exercises generator bug coverage
     public func validateConfig(_ body: APIClient.NotificationsValidateConfig.Body) async throws(APIClient.NotificationsValidateConfig.Failure) -> APIClient.NotificationsValidateConfig.Result {
         let path = "/contract/validate"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.NotificationsValidateConfig.Failure.self)
@@ -2185,7 +2185,7 @@ public struct APINotificationsClient: Sendable {
         }
     }
 
-    /// Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen
+    /// Receive arbitrary webhook payload, exercises z.any() / AnyCodable codegen
     public func webhook(_ body: APIClient.NotificationsWebhook.Body) async throws(APIClient.NotificationsWebhook.Failure) -> APIClient.NotificationsWebhook.Result {
         let path = "/webhook"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.NotificationsWebhook.Failure.self)
@@ -2282,7 +2282,7 @@ public struct APIWorkspaceClient: Sendable {
         }
     }
 
-    /// Delete the workspace — owner-only via the auth map
+    /// Delete the workspace, owner-only via the auth map
     public func deleteWorkspace() async throws(APIClient.WorkspaceDeleteWorkspace.Failure) -> APIClient.WorkspaceDeleteWorkspace.Result {
         let path = "/workspace"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
@@ -2299,7 +2299,7 @@ public struct APIWorkspaceClient: Sendable {
         }
     }
 
-    /// Transfer ownership — owner-only via the auth map
+    /// Transfer ownership, owner-only via the auth map
     public func transfer(_ body: APIClient.WorkspaceTransfer.Body) async throws(APIClient.WorkspaceTransfer.Failure) -> APIClient.WorkspaceTransfer.Result {
         let path = "/workspace/transfer"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceTransfer.Failure.self)

@@ -22,7 +22,7 @@ const waitForServer = async (timeoutMs: number): Promise<void> => {
 const main = async (): Promise<void> => {
     const generated = readFileSync('kotlin/src/main/kotlin/com/kizuna/demo/APIClient.kt', 'utf8');
     if (!generated.includes('@Deprecated')) {
-        throw new Error('Generated APIClient.kt is missing @Deprecated — deprecation annotations were not emitted');
+        throw new Error('Generated APIClient.kt is missing @Deprecated, deprecation annotations were not emitted');
     }
 
     console.log(`Starting express-demo server on port ${PORT}...`);

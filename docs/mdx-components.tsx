@@ -8,6 +8,7 @@ import { ContractExplorer } from '@/lib/ContractExplorer';
 import { HandlerExplorer } from '@/lib/HandlerExplorer';
 import { BetaNotice } from '@/lib/BetaNotice';
 import { InstallTabs } from '@/lib/InstallTabs';
+import { FeatureList } from '@/lib/FeatureList';
 
 export function getMDXComponents(components: MDXComponents): MDXComponents {
     return {
@@ -26,5 +27,6 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         HandlerExplorer,
         BetaNotice,
         InstallTabs,
+        FeatureList,
     };
 }

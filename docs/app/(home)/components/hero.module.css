@@ -1,0 +1,93 @@
+.hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    max-width: var(--kz-max-width);
+    margin: 0 auto;
+    padding: 80px var(--kz-gutter) 112px;
+}
+
+.headline {
+    max-width: 18ch;
+    margin: 0;
+    font-size: clamp(2.125rem, 6vw, 4.125rem);
+    font-weight: var(--font-weight-700);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+    color: var(--kz-ink);
+}
+
+.tagline {
+    max-width: 46ch;
+    margin: 24px 0 0;
+    font-size: 1.35rem;
+    line-height: 1.5;
+    color: var(--kz-ink);
+    opacity: 0.7;
+    text-wrap: balance;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--kz-gap-actions);
+    margin-top: 32px;
+}
+
+.primary,
+.secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: var(--kz-button-height);
+    border: var(--kz-border-button) solid var(--kz-ink);
+    border-radius: var(--kz-radius-pill);
+    padding-inline: var(--kz-button-padding-inline);
+    font-size: var(--kz-text-button);
+    font-weight: var(--font-weight-600);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.primary {
+    background-color: var(--kz-ink);
+    color: var(--kz-canvas);
+}
+
+.secondary {
+    color: var(--kz-ink);
+}
+
+.secondaryIcon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+    .hero {
+        padding: 30px var(--kz-gutter) 56px;
+    }
+
+    .headline {
+        max-width: 14ch;
+        font-size: 2rem;
+        letter-spacing: -0.02em;
+        text-wrap: pretty;
+    }
+
+    .tagline {
+        margin-top: 16px;
+        font-size: 1.0625rem;
+    }
+
+    .actions {
+        margin-top: 20px;
+    }
+}

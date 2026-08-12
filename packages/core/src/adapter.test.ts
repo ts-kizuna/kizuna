@@ -198,7 +198,7 @@ describe('responseValidation', () => {
     });
 });
 
-describe('renderJsonResult — error formatting', () => {
+describe('renderJsonResult: error formatting', () => {
     it('emits RFC 9457 Problem Details as application/problem+json by default', () => {
         const rendered = renderJsonResult({
             kind: 'success',
@@ -239,7 +239,7 @@ describe('renderJsonResult — error formatting', () => {
         });
     });
 
-    it('routes errors through a custom formatError — legacy shape + content-type', () => {
+    it('routes errors through a custom formatError: legacy shape + content-type', () => {
         // A team migrating onto kizuna keeps its old wire shape for clients that cannot
         // move yet; the canonical Problem Details object is reshaped, not bypassed.
         const rendered = renderJsonResult(
@@ -320,7 +320,7 @@ describe('eachRoute', () => {
     });
 });
 
-describe('renderJsonResult — non-JSON and binary bodies', () => {
+describe('renderJsonResult: non-JSON and binary bodies', () => {
     const rawContract = k.routes('api', {
         exportCsv: {
             method: 'GET',

@@ -123,9 +123,9 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
      * @example
      * ```ts
      * responses: {
-     *     // Bare schema — the response body, sent as application/json
+     *     // Bare schema, the response body, sent as application/json
      *     200: UserSchema,
-     *     // Object form — body plus headers and/or a non-default content type
+     *     // Object form, body plus headers and/or a non-default content type
      *     201: {
      *         body: UserSchema,
      *         headers: z.object({ 'x-request-id': z.string() }),
@@ -140,7 +140,7 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
 }
 
 /**
- * Key under which a routes group carries its group tag key — the source
+ * Key under which a routes group carries its group tag key, the source
  * `flattenRoutes` and the generator use to apply the group's tag to every route
  * in it. Stamped by `k.routes`.
  */

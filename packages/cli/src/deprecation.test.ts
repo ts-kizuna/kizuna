@@ -63,7 +63,7 @@ describe('createDeprecationMap', () => {
     });
 
     test('follows generic wrapper functions to produce correct field paths', () => {
-        // Paginated(UserSchema) returns { items: UserSchema[], total } — the deprecated
+        // Paginated(UserSchema) returns { items: UserSchema[], total }, the deprecated
         // email field should appear at responses.200.items.email, not responses.200.email.
         expect(map.fields.get('listUsersPaginated')?.has('responses.200.items.email')).toBe(true);
         expect(map.fields.get('listUsersPaginated')?.has('responses.200.email')).toBe(false);

@@ -1,0 +1,63 @@
+.grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+.card {
+    border-radius: var(--kz-radius-card);
+    background-color: var(--kz-surface);
+    padding: 24px;
+}
+
+.icons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.icon {
+    width: 18px;
+    height: 18px;
+    color: var(--kz-ink);
+    stroke-width: 2.25;
+}
+
+.icon[aria-label='Model Context Protocol'] {
+    width: 22px;
+    height: 22px;
+    stroke-width: 12;
+}
+
+.title {
+    margin: 10px 0 0;
+    font-size: var(--kz-text-ui);
+    font-weight: var(--font-weight-600);
+    letter-spacing: -0.01em;
+    color: var(--kz-ink);
+}
+
+.description {
+    margin: 8px 0 0;
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--kz-muted);
+}
+
+@media (min-width: 640px) {
+    .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1024px) {
+    .grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    .grid {
+        row-gap: 28px;
+    }
+}

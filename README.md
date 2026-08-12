@@ -2,9 +2,9 @@
 
 ![ts-kizuna](docs/public/readme-beta.png)
 
-Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, powered by Zod.
+Build fully typed REST APIs with TypeScript. Contract-first, RFC-correct, powered by Zod.
 
-![npm](https://img.shields.io/badge/npm-v1.23.0-blue)
+![npm](https://img.shields.io/npm/v/@ts-kizuna/core?color=blue&label=npm)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
 [Documentation](https://ts-kizuna.com)
@@ -18,19 +18,19 @@ Build fully typed REST APIs with TypeScript — contract-first, RFC-correct, pow
 
 ## Features
 
-- **Contract-first** — define request/response schemas once, share between server and client
-- **Type-safe everywhere** — full inference on both sides, no casting
-- **Typed auth** — identities and per-route auth declared on the contract
-- **RPC-like client** — call your API like a function, get fully typed responses back
-- **Adapters** — mount your API on Express, Fastify, Hono, or Next.js
-- **HTTP/REST** — follows HTTP and REST standards. RFC 9110 semantics, RFC 9457 Problem Details
-- **Built-in coercion** — query, path, and header params are coerced to their declared types (`z.number()`, `z.boolean()`, `z.date()`, `z.bigint()`) — no manual parsing or `z.coerce` needed
-- **OpenAPI generation** — from the same contract, no annotations needed
-- **Native client generation** — typed API clients for Swift (iOS/macOS) and Kotlin (Android/JVM)
-- **Plugins** — extend your API with features built on the contract you already wrote, and get them fully typed in your handlers
-- **MCP server generation** — expose your API as MCP tools so AI assistants can call your endpoints
-- **Scheduled jobs** — declare cron work next to its handler, tick it from any platform scheduler, or run it in process from a route handler
-- **Deprecation support** — mark endpoints and fields as deprecated with a JSDoc `@deprecated` tag — IDEs show strikethroughs, OpenAPI, Swift, and Kotlin pick it up automatically
+- **Contract-first**: define request/response schemas once, share between server and client
+- **Type-safe everywhere**: full inference on both sides, no casting
+- **Typed auth**: identities and per-route auth declared on the contract
+- **RPC-like client**: call your API like a function, get fully typed responses back
+- **Adapters**: mount your API on Express, Fastify, Hono, or Next.js
+- **HTTP/REST**: follows HTTP and REST standards. RFC 9110 semantics, RFC 9457 Problem Details
+- **Built-in coercion**: query, path, and header params are coerced to their declared types (`z.number()`, `z.boolean()`, `z.date()`, `z.bigint()`), with no manual parsing or `z.coerce` needed
+- **OpenAPI generation**: from the same contract, no annotations needed
+- **Native client generation**: typed API clients for Swift (iOS/macOS) and Kotlin (Android/JVM)
+- **Plugins**: extend your API with features built on the contract you already wrote, and get them fully typed in your handlers
+- **MCP server generation**: expose your API as MCP tools so AI assistants can call your endpoints
+- **Scheduled jobs**: declare cron work next to its handler, tick it from any platform scheduler, or run it in process from a route handler
+- **Deprecation support**: mark endpoints and fields as deprecated with a JSDoc `@deprecated` tag. IDEs show strikethroughs, and OpenAPI, Swift, and Kotlin pick it up automatically
 
 ## Define your API routes
 

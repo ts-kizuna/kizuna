@@ -53,16 +53,16 @@ export const usersRoutes = k.routes('users', {
 | Field         | Required | Type                                                                                           |
 | ------------- | -------- | ---------------------------------------------------------------------------------------------- |
 | `method`      | Yes      | `'GET'` `'POST'` `'PUT'` `'PATCH'` `'DELETE'` `'HEAD'` `'OPTIONS'`                             |
-| `path`        | Yes      | URL path — use `:name` for path parameters                                                     |
-| `pathParams`  | —        | Zod schema for the path parameters, keyed by placeholder name                                  |
-| `body`        | —        | Zod schema for the request body                                                                |
-| `query`       | —        | Zod schema for the query string                                                                |
-| `headers`     | —        | Zod schema for request headers                                                                 |
+| `path`        | Yes      | URL path. Use `:name` for path parameters                                                      |
+| `pathParams`  | No       | Zod schema for the path parameters, keyed by placeholder name                                  |
+| `body`        | No       | Zod schema for the request body                                                                |
+| `query`       | No       | Zod schema for the query string                                                                |
+| `headers`     | No       | Zod schema for request headers                                                                 |
 | `responses`   | Yes      | Response schemas keyed by status code                                                          |
-| `contentType` | —        | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
-| `summary`     | —        | Short description shown in OpenAPI                                                             |
-| `tags`        | —        | OpenAPI tag keys (from the tag set), resolved to titles in the spec                            |
+| `contentType` | No       | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
+| `summary`     | No       | Short description shown in OpenAPI                                                             |
+| `tags`        | No       | OpenAPI tag keys (from the tag set), resolved to titles in the spec                            |
 
 `pathParams` keys must be exactly the `:name` placeholders in `path`. A key the path does not have, or a placeholder the schema does not declare, is a type error on `pathParams`, and `k.routes` throws the same mismatch at runtime.
 
-Auth is deliberately absent from this table. A route's `security` is owned by the contract's `auth` map — writing `security` inline in `k.routes` is a type error. This keeps the whole API's auth policy in one place instead of scattered across route files.
+Auth is deliberately absent from this table. A route's `security` is owned by the contract's `auth` map, and writing `security` inline in `k.routes` is a type error. This keeps the whole API's auth policy in one place instead of scattered across route files.

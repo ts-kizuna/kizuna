@@ -11,7 +11,7 @@ const k = new Kizuna({
     }),
 });
 
-describe('Fastify — handler context', () => {
+describe('Fastify: handler context', () => {
     it('provides the Fastify request and reply objects', async () => {
         const contextApp = Fastify();
         const contextRoutes = k.routes('api', {

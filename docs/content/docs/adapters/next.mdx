@@ -26,14 +26,14 @@ export default withKizuna(nextConfig);
 
 Then create a catch-all route at `src/app/api/[...ts-kizuna]/route.ts`. The adapter exports handlers for every HTTP method, which Next.js dispatches automatically.
 
-```ts title="src/lib/server.ts"
+```ts title="src/server/server.ts"
 import { KizunaServer } from '@ts-kizuna/next';
 import { contract } from '@shared/contract';
 
 export const server = new KizunaServer(contract);
 ```
 
-```ts title="src/lib/router.ts"
+```ts title="src/server/router/index.ts"
 import { server } from './server';
 
 export const router = server.router({
@@ -77,7 +77,7 @@ export const router = server.router({
 });
 ```
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 import { server } from './server';
 import { router } from './router';
 
@@ -87,7 +87,7 @@ export const api = server.api({
 ```
 
 ```ts title="src/app/api/[...ts-kizuna]/route.ts"
-import { api } from '../../../lib/api';
+import { api } from '../../../server/api';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
     basePath: '/api',
@@ -98,7 +98,7 @@ The `basePath` option tells the adapter to strip the prefix when matching reques
 
 ## Handler context
 
-Each handler receives `{ params, query, body, headers, request }`. The `request` is the native `NextRequest` — useful when you need to read cookies or access other request properties.
+Each handler receives `{ params, query, body, headers, request }`. The `request` is the native `NextRequest`, useful when you need to read cookies or access other request properties.
 
 ```ts
 getUser: async ({ params, request }) => {
@@ -113,9 +113,9 @@ getUser: async ({ params, request }) => {
 
 ## Guards
 
-One guard per identity. The credential arrives extracted and typed, alongside the native `request` — see the [Auth guide](/docs/auth).
+One guard per identity. The credential arrives extracted and typed, alongside the native `request`. See the [Auth guide](/docs/auth).
 
-```ts title="src/lib/guards.ts"
+```ts title="src/server/guards.ts"
 import { server } from './server';
 
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
@@ -131,7 +131,7 @@ export const requireUser = server.guard('user', async ({ bearer, deny }) => {
 
 ## Middleware
 
-For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context). For other middleware — logging, rate limiting, cache headers — use Next.js's own [middleware](https://nextjs.org/docs/app/building-your-application/routing/middleware), or the [`requestMiddleware`](#requestmiddleware) option to run middleware after route matching. Authentication belongs in [guards](#guards).
+For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context). For other middleware, such as logging, rate limiting, and cache headers, use Next.js's own [middleware](https://nextjs.org/docs/app/building-your-application/routing/middleware), or the [`requestMiddleware`](#requestmiddleware) option to run middleware after route matching. Authentication belongs in [guards](#guards).
 
 ## Options
 
@@ -147,7 +147,7 @@ api.mount({
 | Option               | Default | Description                                                                                                                                                   |
 | -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `basePath`           | `''`    | Path prefix to strip when matching incoming paths                                                                                                             |
-| `requestMiddleware`  | `[]`    | Middleware run after route matching, before the handler — see [`requestMiddleware`](#requestmiddleware)                                                       |
+| `requestMiddleware`  | `[]`    | Middleware run after route matching, before the handler. See [`requestMiddleware`](#requestmiddleware)                                                        |
 | `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                               |
 | `onError`            | none    | Map a thrown error into a response (inbound migration seam); return an `AdapterResult`/`Response` to override the default 500. Also settable on `server.api`. |
 
@@ -155,7 +155,7 @@ api.mount({
 
 Set `onError` on `server.api` (or pass it to `api.mount`) to send a custom response instead of the default 500:
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 import { server } from './server';
 import { router } from './router';
 
@@ -186,11 +186,11 @@ Returning `undefined` lets the default 500 flow run.
 
 ## `requestMiddleware`
 
-`requestMiddleware` applies a flat array of middleware to every matched route, after route matching and before the handler. Each middleware receives `(request, route)` — the `route` is the matched route's `path` and `method` — and may return a `Response` to short-circuit.
+`requestMiddleware` applies a flat array of middleware to every matched route, after route matching and before the handler. Each middleware receives `(request, route)`, where `route` is the matched route's `path` and `method`, and may return a `Response` to short-circuit.
 
 ## Type-safe request properties
 
-Auth data doesn't need request mutation — guards return typed context that handlers receive directly. But if non-auth middleware sets custom properties on the request, such as a request id, use module augmentation to extend `NextRequest` so handlers can access them without casts:
+Auth data doesn't need request mutation, because guards return typed context that handlers receive directly. But if non-auth middleware sets custom properties on the request, such as a request id, use module augmentation to extend `NextRequest` so handlers can access them without casts:
 
 ```ts title="types/next.d.ts"
 import 'next/server';
@@ -213,7 +213,7 @@ getUser: async ({ params, request }) => {
 
 ## Multipart / file uploads
 
-Routes with `contentType: 'multipart/form-data'` work natively. The adapter calls `request.formData()` internally — no additional middleware needed.
+Routes with `contentType: 'multipart/form-data'` work natively. The adapter calls `request.formData()` internally, with no additional middleware needed.
 
 ```ts
 uploadAvatar: async ({ body }) => {

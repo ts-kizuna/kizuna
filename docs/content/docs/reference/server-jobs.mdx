@@ -5,7 +5,7 @@ description: Bind a handler to each of the contract's jobs.
 
 `server.jobs(handlers)` binds a handler to each of the contract's [jobs](/docs/jobs), mirroring the declaration including its nesting.
 
-```ts title="src/lib/jobs.ts"
+```ts title="src/server/jobs.ts"
 import { server } from './server';
 
 export const jobHandlers = server.jobs({

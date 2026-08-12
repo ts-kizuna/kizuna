@@ -1,6 +1,6 @@
 export interface TagOptions {
     /**
-     * The tag name — used as the OpenAPI tag and shown in rendered API docs.
+     * The tag name, used as the OpenAPI tag and shown in rendered API docs.
      */
     title: string;
     /**

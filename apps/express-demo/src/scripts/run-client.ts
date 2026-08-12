@@ -96,7 +96,7 @@ const main = async () => {
     });
     if (badPhone.status === 400 && isValidationError(badPhone.body)) {
         for (const issue of badPhone.body.errors) {
-            // `issue.code` is typed as ValidationIssueCode — comparing against
+            // `issue.code` is typed as ValidationIssueCode, comparing against
             // the custom `invalid_phone_number` is fully type-checked.
             if (issue.code === 'invalid_phone_number') {
                 console.log('custom code:', issue.code, '->', issue.message);

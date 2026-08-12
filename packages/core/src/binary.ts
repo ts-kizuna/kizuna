@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Schema for a raw binary body — a `Uint8Array` (a Node `Buffer` also satisfies it).
+ * Schema for a raw binary body, a `Uint8Array` (a Node `Buffer` also satisfies it).
  *
  * Use it for binary responses (and binary request bodies). Pair it with a
  * `contentType` on the response; it defaults to `application/octet-stream`.
@@ -27,7 +27,7 @@ import { z } from 'zod';
 export const BinarySchema = z.instanceof(Uint8Array);
 
 /**
- * Schema for an uploaded file — a web `File` (bytes plus `name` and `type`).
+ * Schema for an uploaded file, a web `File` (bytes plus `name` and `type`).
  *
  * Use it for `multipart/form-data` request fields, where the filename and media
  * type matter. For a plain blob of bytes with no metadata, use {@link BinarySchema}.

@@ -3,7 +3,7 @@ title: ESLint
 description: Catch ts-kizuna mistakes in your editor with the official ESLint plugin.
 ---
 
-`@ts-kizuna/eslint-plugin` catches ts-kizuna mistakes in your editor — things the type system can't express on its own, surfaced as you type instead of at runtime.
+`@ts-kizuna/eslint-plugin` catches ts-kizuna mistakes in your editor. These are things the type system can't express on its own, surfaced as you type instead of at runtime.
 
 <InstallTabs packageName="@ts-kizuna/eslint-plugin" />
 
@@ -19,7 +19,7 @@ import kizuna from '@ts-kizuna/eslint-plugin';
 export default [js.configs.recommended, ...tseslint.configs.recommended, kizuna.configs.recommended];
 ```
 
-That's it — every rule below is now active.
+That's it. Every rule below is now active.
 
 ## Turning a rule off
 
@@ -49,11 +49,11 @@ query: z.object({
 
 ## `no-unsupported-schema`
 
-Flags `body`, `query`, `pathParams`, `headers`, and response schemas in your routes — plus `Kizuna.model` schemas, inline or imported — that use something ts-kizuna can't support. It follows imports, so the error lands on the offending field when it's local, or on the reference when the schema comes from another file.
+Flags anything using something ts-kizuna can't support: `body`, `query`, `pathParams`, `headers`, and response schemas in your routes, plus `Kizuna.model` schemas, inline or imported. It follows imports, so the error lands on the offending field when it's local, or on the reference when the schema comes from another file.
 
 ### `z.coerce`
 
-kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/building/contract#query-path-and-header-coercion)), so `z.coerce` is redundant — and `k.routes` throws on it. Use the plain schema:
+kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/building/contract#query-path-and-header-coercion)), so `z.coerce` is redundant, and `k.routes` throws on it. Use the plain schema:
 
 ```ts
 // flagged
@@ -61,7 +61,7 @@ query: z.object({
     page: z.coerce.number(),
 });
 
-// good — kizuna coerces the string for you
+// good, kizuna coerces the string for you
 query: z.object({
     page: z.number(),
 });
@@ -69,7 +69,7 @@ query: z.object({
 
 ### JSDoc tags in `@deprecated`
 
-kizuna serializes the text after `@deprecated` verbatim and surfaces it to every generated client. Native and mobile clients can't parse JSDoc inline tags (`{@link}`, `{@linkcode}`, any `{@…}`), so they'd show the raw markup. Write plain text — backticks are fine:
+kizuna serializes the text after `@deprecated` verbatim and surfaces it to every generated client. Native and mobile clients can't parse JSDoc inline tags (`{@link}`, `{@linkcode}`, any `{@…}`), so they'd show the raw markup. Write plain text, and backticks are fine:
 
 ```ts
 // flagged
@@ -85,10 +85,10 @@ kizuna serializes the text after `@deprecated` verbatim and surfaces it to every
 
 ### Duplicate `@deprecated`
 
-kizuna serializes only the **first** `@deprecated` message — any later one is silently dropped and never reaches a client. Collapse them into one:
+kizuna serializes only the **first** `@deprecated` message. Any later one is silently dropped and never reaches a client, so collapse them into one:
 
 ```ts
-// flagged — clients never see the second line
+// flagged, clients never see the second line
 /**
  * @deprecated Use `createUser` instead.
  * @deprecated Numeric ids are no longer accepted.
@@ -102,9 +102,9 @@ kizuna serializes only the **first** `@deprecated` message — any later one is 
 
 ### Across files
 
-A schema is often defined elsewhere — a shared `PaginationQuery` in its own `zod`-only module that no per-file linter would ever connect to your contract. Because the rule resolves what your contract references, it catches it anyway and reports on the reference:
+A schema is often defined elsewhere, such as a shared `PaginationQuery` in its own `zod`-only module that no per-file linter would ever connect to your contract. Because the rule resolves what your contract references, it catches it anyway and reports on the reference:
 
-```ts title="pagination.ts"
+```ts title="src/contract/pagination.ts"
 import { z } from 'zod';
 
 export const PaginationQuery = z.object({
@@ -112,14 +112,14 @@ export const PaginationQuery = z.object({
 });
 ```
 
-```ts title="routes.ts"
+```ts title="src/contract/routes/users.ts"
 import { PaginationQuery } from './pagination.js';
 
 export const users = k.routes('users', {
     listUsers: {
         method: 'GET',
         path: '/users',
-        query: PaginationQuery, // flagged here — PaginationQuery uses z.coerce
+        query: PaginationQuery, // flagged here, PaginationQuery uses z.coerce
         responses: {
             200: UserListSchema,
         },

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import type { ShikiTransformer } from 'shiki';
-import { DynamicCodeBlock } from 'fumadocs-ui/components/dynamic-codeblock';
+import { CodeWindow } from './CodeWindow';
+import styles from './handler-explorer.module.css';
 
 function TsLogo({ className }: { className?: string }) {
     return (
@@ -324,58 +325,50 @@ export function HandlerExplorer() {
     const feature = FEATURES.find((candidate) => candidate.id === active) ?? FEATURES[0];
 
     return (
-        <div className="not-prose kz-handler my-6 overflow-hidden rounded-xl border bg-fd-card">
-            <div className="flex overflow-x-auto border-b bg-fd-secondary/30">
+        <div className={`not-prose kz-handler ${styles.root}`}>
+            <div className={styles.tabs}>
                 {FEATURES.map((candidate) => (
                     <button
                         key={candidate.id}
                         type="button"
                         aria-pressed={active === candidate.id}
                         onClick={() => setActive(candidate.id)}
-                        className={`shrink-0 border-b-2 px-3.5 py-2.5 font-mono text-xs transition-colors ${
-                            active === candidate.id
-                                ? 'border-fd-primary text-fd-foreground'
-                                : 'border-transparent text-fd-muted-foreground hover:text-fd-foreground'
-                        }`}>
+                        className={active === candidate.id ? `${styles.tab} ${styles.tabActive}` : styles.tab}>
                         {candidate.id}
                     </button>
                 ))}
             </div>
 
-            <div className="p-4">
-                <div className="overflow-hidden rounded-lg border border-fd-border/60 [&_button]:!hidden [&_figure]:!my-0 [&_figure]:!rounded-none [&_figure]:!border-0 [&_pre]:!py-2.5 [&_pre]:!text-[12px] [&_pre]:!leading-relaxed">
-                    <DynamicCodeBlock
-                        lang="ts"
-                        code={feature.code}
-                        options={{
-                            themes: {
-                                light: 'github-light',
-                                dark: 'github-dark',
-                            },
-                            transformers: [TRANSFORMERS.get(feature.id)!],
-                        }}
-                        codeblock={{
-                            title: feature.file,
-                            icon: <TsLogo key="ts" className="size-3.5" />,
-                        }}
-                    />
-                </div>
+            <CodeWindow
+                lang="ts"
+                code={feature.code}
+                dots
+                title={feature.file}
+                icon={<TsLogo key="ts" className={styles.brandIcon} />}
+                options={{
+                    themes: {
+                        light: 'github-light',
+                        dark: 'github-dark',
+                    },
+                    transformers: [TRANSFORMERS.get(feature.id)!],
+                }}
+            />
 
-                <div className="mt-3 overflow-hidden rounded-lg border bg-fd-popover [&_button]:!hidden [&_figure]:!my-0 [&_figure]:!rounded-none [&_figure]:!border-0 [&_figure]:!bg-transparent [&_pre]:!bg-transparent [&_pre]:!py-2 [&_pre]:!text-[11.5px]">
-                    <DynamicCodeBlock
-                        lang="ts"
-                        code={feature.type}
-                        options={{
-                            themes: {
-                                light: 'github-light',
-                                dark: 'github-dark',
-                            },
-                        }}
-                    />
-                </div>
-
-                <p className="m-0 mt-3 text-sm text-fd-muted-foreground">{feature.note}</p>
+            <div className={styles.types}>
+                <CodeWindow
+                    lang="ts"
+                    code={feature.type}
+                    size="small"
+                    options={{
+                        themes: {
+                            light: 'github-light',
+                            dark: 'github-dark',
+                        },
+                    }}
+                />
             </div>
+
+            <p className={styles.note}>{feature.note}</p>
         </div>
     );
 }

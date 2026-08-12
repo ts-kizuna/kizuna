@@ -49,7 +49,7 @@ export interface RegisteredIssue<Codes extends string, Input> {
  * Emit a single validation issue with a custom machine-readable `code`.
  *
  * Zod's runtime accepts any `code` string, but its types restrict
- * `ctx.addIssue()` to the built-in issue union — so a custom code fails to
+ * `ctx.addIssue()` to the built-in issue union, so a custom code fails to
  * type-check without a cast. This helper owns that cast in one place so call
  * sites stay cast-free.
  *

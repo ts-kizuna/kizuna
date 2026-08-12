@@ -158,7 +158,7 @@ const objectFields = (
         const previousWireName = seen.get(swiftName);
         if (previousWireName !== undefined && previousWireName !== key) {
             throw new Error(
-                `@ts-kizuna/swift: field key collision in ${hint} — ${stringify(previousWireName)} and ${stringify(key)} both sanitize to ${stringify(swiftName)}.`
+                `@ts-kizuna/swift: field key collision in ${hint}, ${stringify(previousWireName)} and ${stringify(key)} both sanitize to ${stringify(swiftName)}.`
             );
         }
         seen.set(swiftName, key);

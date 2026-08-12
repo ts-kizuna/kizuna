@@ -3,16 +3,16 @@ title: Create a Generator
 description: Build and ship your own code generator or client from a ts-kizuna contract using createGenerator.
 ---
 
-`createGenerator` from `@ts-kizuna/core/generator` lets you walk your contract and produce any output — a typed client for another language, documentation, a route manifest, whatever you need. The OpenAPI and Swift generators are both built on it.
+`createGenerator` from `@ts-kizuna/core/generator` lets you walk your contract and produce any output, such as a typed client for another language, documentation, or a route manifest. The OpenAPI and Swift generators are both built on it.
 
-New first-party generator PRs will be declined — we can't maintain what we don't know well. The generator API is public so you can build your own.
+New first-party generator PRs will be declined, because we can't maintain what we don't know well. The generator API is public so you can build your own.
 
 ## How it works
 
 You provide a factory function that receives your options and returns two methods:
 
-- `processRoute` — called once for every route in the contract
-- `finalize` — called after all routes are processed, returns your output
+- `processRoute` is called once for every route in the contract
+- `finalize` is called after all routes are processed and returns your output
 
 `createGenerator` handles walking the contract, flattening nested route groups, and resolving `/** @deprecated */` annotations automatically.
 
@@ -61,7 +61,7 @@ Each `processRoute` call receives:
 
 ## Deprecation
 
-Deprecation data resolves automatically. When `.kizuna/deprecations.json` exists — produced by `kizuna deprecations` (see [Deprecations](/docs/deprecations)) — each `processRoute` call gets `deprecated`, `deprecationMessage`, and `fieldDeprecations` filled in for the matching route. Without that file, `deprecated` is always `false` and `fieldDeprecations` is always `undefined`.
+Deprecation data resolves automatically. When `.kizuna/deprecations.json` exists, produced by `kizuna deprecations` (see [Deprecations](/docs/deprecations)), each `processRoute` call gets `deprecated`, `deprecationMessage`, and `fieldDeprecations` filled in for the matching route. Without that file, `deprecated` is always `false` and `fieldDeprecations` is always `undefined`.
 
 ## Publishing
 

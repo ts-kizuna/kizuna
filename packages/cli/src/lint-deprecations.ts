@@ -22,7 +22,7 @@ const editDistance = (a: string, b: string): number => {
 const lineOf = (text: string, index: number): number => text.slice(0, index).split('\n').length;
 
 /**
- * Warns about JSDoc that would silently disable a deprecation — a misspelled
+ * Warns about JSDoc that would silently disable a deprecation, a misspelled
  * `@deprecated` tag, or more than one on the same comment. Scans the contract
  * source and the files it imports.
  */
@@ -41,7 +41,7 @@ export const lintDeprecations = (entryPath: string): DeprecationLintWarning[] =>
                 warnings.push({
                     file: filePath,
                     line: lineOf(text, blockStart + deprecatedTags[1]!.index),
-                    message: 'Duplicate `@deprecated` tag in one comment — only the first message is used.',
+                    message: 'Duplicate `@deprecated` tag in one comment, only the first message is used.',
                 });
             }
 
@@ -51,7 +51,7 @@ export const lintDeprecations = (entryPath: string): DeprecationLintWarning[] =>
                     warnings.push({
                         file: filePath,
                         line: lineOf(text, blockStart + tag.index),
-                        message: `\`@${tag[1]}\` looks like a typo of \`@deprecated\` — it will be ignored.`,
+                        message: `\`@${tag[1]}\` looks like a typo of \`@deprecated\`, it will be ignored.`,
                     });
                 }
             }

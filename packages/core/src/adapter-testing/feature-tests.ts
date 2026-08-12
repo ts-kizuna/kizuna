@@ -666,7 +666,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         for (const group of featureGroups()) {
             describe(group, () => {
                 for (const name of featuresInGroup(group)) {
-                    it(`${name} — ${ADAPTER_FEATURES[name].summary}`, tests[name]);
+                    it(`${name}: ${ADAPTER_FEATURES[name].summary}`, tests[name]);
                 }
             });
         }
