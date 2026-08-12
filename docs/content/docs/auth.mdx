@@ -209,19 +209,15 @@ export const requireMember = server.guard('member', async ({ apiKey, params, una
 
 The return is checked against the identity's schemas. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) instead.
 
-### The two ways auth fails
+### Failing correctly
 
-A guard answers one question: does this credential resolve to an identity? When it doesn't, call `unauthenticated()` and you get a 401 with the `WWW-Authenticate` challenge RFC 9110 asks for.
+A guard answers one question: does this credential resolve? When it doesn't, `unauthenticated()` returns 401 with the `WWW-Authenticate` challenge RFC 9110 asks for. The guard never names a status, so an unresolved credential can't accidentally answer 403.
 
-Notice what the guard never does: decide a status. It reports what happened and the identity supplies the code, so a credential that fails to resolve cannot accidentally answer 403.
+403 is the other failure, and it's the framework's. A credential that resolves but whose `access` doesn't satisfy the [auth map](#access-gates) is rejected before your handler runs. You don't write that check.
 
-The other failure is the framework's. When a credential resolves but the `access` it carries doesn't satisfy the route's requirement (a member whose `role` is `admin` calling an owner-only route), kizuna answers 403 from the auth map, before your handler runs. You never write that check, and a guard cannot emit it by hand.
+An identity whose credential shouldn't admit it exists sets its own answer:
 
-401 means "I don't know who you are", 403 means "I know, and no". Keeping them in separate hands is what keeps them honest.
-
-Some credentials shouldn't admit they exist. An invite token in a URL is the resource identifier, so a 401 confirms which tokens are real and turns the endpoint into an enumeration oracle. Declare the answer on the identity and every guard for it follows suit:
-
-```ts title="src/lib/identities.ts"
+```ts title="packages/contract/src/identities.ts"
 export const inviteToken = Kizuna.identity.custom({
     context: z.object({
         inviteId: z.string(),
@@ -230,7 +226,7 @@ export const inviteToken = Kizuna.identity.custom({
 });
 ```
 
-`unauthenticated()` in that identity's guard now answers 404, with no challenge header to give the game away. The choice lives next to the identity it protects rather than inside a guard body, so it reads as intent instead of a stray number.
+Every guard for it now answers 404, with no challenge header to give the game away.
 
 ## What falls out for free
 

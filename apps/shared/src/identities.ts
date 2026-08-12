@@ -31,10 +31,8 @@ export const member = Kizuna.identity.apiKey({
  * An invite capability URL (`/invites/:token`) whose path token is the credential.
  * No OpenAPI scheme can express a path segment, so it uses `custom`.
  *
- * An unresolvable token answers 404 rather than 401. The token is the resource
- * identifier here, so a 401 would confirm that the URL names a real invite and
- * turn the endpoint into an enumeration oracle. This is a deliberate override of
- * the RFC 9110 default, declared here rather than chosen inside the guard.
+ * The token is the resource identifier, so a 401 would confirm the URL names a
+ * real invite and let a caller enumerate them. 404 instead.
  */
 export const inviteToken = Kizuna.identity.custom({
     context: z.object({

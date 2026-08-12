@@ -534,8 +534,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                         authorization: sessionAuthorization,
                     },
                 });
-                // The member credential is absent, so the member identity never
-                // resolves. That is an authentication failure, not a gate failure.
+                // No member credential, so the identity never resolves: 401, not the gate's 403.
                 expect(partial.status).toBe(401);
 
                 const complete = await secured.request({

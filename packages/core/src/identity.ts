@@ -52,13 +52,9 @@ export type Credential =
 export type NoCredential = Record<never, never>;
 
 /**
- * The status an identity returns when its guard cannot resolve the credential.
- * `401` is the RFC 9110 §15.5.2 answer and the default. `404` is for a credential
- * that is itself the resource identifier, where admitting the credential is
- * unknown would confirm which ones exist.
- *
- * Insufficient access is not in this union: that is the framework's `403`,
- * derived from the route's `accessGate`, and a guard cannot emit it.
+ * The status an identity answers when its guard cannot resolve the credential.
+ * `404` obscures existence where the credential is itself the resource
+ * identifier. Insufficient access is not here: that is the framework's `403`.
  */
 export type UnauthenticatedStatus = 401 | 404;
 
@@ -142,10 +138,6 @@ export interface BearerConfig<ContextSchema extends z.ZodType | undefined, Acces
     bearerFormat?: string;
     description?: string;
     scheme?: string;
-    /**
-     * The status this identity returns when its guard calls `unauthenticated(...)`.
-     * Defaults to `401`.
-     */
     onUnauthenticated?: UnauthenticatedStatus;
 }
 
@@ -161,10 +153,6 @@ export interface ApiKeyConfig<
     access?: AccessSchema;
     description?: string;
     scheme?: string;
-    /**
-     * The status this identity returns when its guard calls `unauthenticated(...)`.
-     * Defaults to `401`.
-     */
     onUnauthenticated?: UnauthenticatedStatus;
 }
 
@@ -173,10 +161,6 @@ export interface BasicConfig<ContextSchema extends z.ZodType | undefined, Access
     access?: AccessSchema;
     description?: string;
     scheme?: string;
-    /**
-     * The status this identity returns when its guard calls `unauthenticated(...)`.
-     * Defaults to `401`.
-     */
     onUnauthenticated?: UnauthenticatedStatus;
 }
 
@@ -186,10 +170,6 @@ export interface OAuth2Config<ContextSchema extends z.ZodType | undefined, Acces
     access?: AccessSchema;
     description?: string;
     scheme?: string;
-    /**
-     * The status this identity returns when its guard calls `unauthenticated(...)`.
-     * Defaults to `401`.
-     */
     onUnauthenticated?: UnauthenticatedStatus;
 }
 
@@ -199,10 +179,6 @@ export interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined
     access?: AccessSchema;
     description?: string;
     scheme?: string;
-    /**
-     * The status this identity returns when its guard calls `unauthenticated(...)`.
-     * Defaults to `401`.
-     */
     onUnauthenticated?: UnauthenticatedStatus;
 }
 
@@ -211,10 +187,6 @@ export interface CustomConfig<ContextSchema extends z.ZodType | undefined, Acces
     access?: AccessSchema;
     description?: string;
     scheme?: string;
-    /**
-     * The status this identity returns when its guard calls `unauthenticated(...)`.
-     * Defaults to `401`.
-     */
     onUnauthenticated?: UnauthenticatedStatus;
 }
 

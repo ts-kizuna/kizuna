@@ -135,19 +135,15 @@ export interface GuardDenial {
 }
 
 /**
- * Reject the request from inside a guard because the credential could not be
- * resolved to an identity. The status is the identity's `onUnauthenticated`
- * (`401` unless it declares otherwise), never the guard's to choose.
- *
- * There is deliberately no counterpart for insufficient access: that is the
- * framework's `403`, raised from the route's `accessGate`.
+ * Reject a credential the guard could not resolve. The status is the identity's
+ * `onUnauthenticated`, never the guard's to choose. Insufficient access has no
+ * counterpart here: that is the framework's `403`, raised from `accessGate`.
  */
 export type Unauthenticated = (detail?: string) => GuardDenial;
 
 /**
  * The `WWW-Authenticate` challenge a `401` carries, per RFC 9110 §11.6.1.
- * `undefined` for schemes with no registered HTTP authentication scheme to name
- * (`apiKey`, and `custom` identities, which have no OpenAPI scheme at all).
+ * `undefined` for `apiKey` and `custom`, which name no HTTP auth scheme.
  */
 export const authenticateChallenge = (scheme: SecurityScheme | undefined): string | undefined => {
     const openapi = scheme?.openapi;
@@ -162,8 +158,8 @@ export const authenticateChallenge = (scheme: SecurityScheme | undefined): strin
 
 /**
  * Build the `unauthenticated` helper one identity's guard receives. A `404`
- * override carries no challenge header: naming the scheme would confirm the
- * credential was the problem, which is the point of overriding.
+ * override carries no challenge: naming the scheme would give away what the
+ * override exists to hide.
  */
 export const makeUnauthenticated = (scheme: SecurityScheme | undefined): Unauthenticated => {
     const status = (scheme as { onUnauthenticated?: 401 | 404 } | undefined)?.onUnauthenticated ?? 401;
@@ -957,9 +953,8 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                     headers: guardResult.headers,
                 };
             }
-            // The gate is checked before the guard result is trusted for anything
-            // else, and outside the object test: a route that declares a gate must
-            // never pass because the guard returned nothing to check it against.
+            // Outside the object test below: a declared gate must not pass just
+            // because the guard returned nothing to check it against.
             const gate = route.accessGate?.[scheme];
             if (gate) {
                 const access = (guardResult ?? {}) as Record<string, unknown>;

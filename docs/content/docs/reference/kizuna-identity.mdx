@@ -112,7 +112,7 @@ export const requireInviteToken = server.guard('inviteToken', ({ params, unauthe
 });
 ```
 
-`onUnauthenticated: 404` is doing real work here. The token is the resource identifier, so a 401 would confirm which tokens exist and let a caller enumerate them. Declaring it on the identity means every guard for it answers the same way, and the reason sits where the credential is defined instead of buried in a guard body. See [`server.guard`](/docs/reference/server-guard) for how the two failure modes divide.
+`onUnauthenticated: 404` earns its place: the token is the resource identifier, so a 401 would confirm which tokens exist and let a caller enumerate them. Declared on the identity, every guard for it answers the same way. Defaults to 401 when unset.
 
 The guard receives the usual `{ params, unauthenticated, scopes }` (plus your framework's handler context) with no credential key, since there is nothing for the runtime to pre-extract. Everything else is ordinary typed auth: the identity registers under `identities`, the `auth` map references it, handlers read `auth.inviteToken.inviteId`, and `access` gates work as usual.
 

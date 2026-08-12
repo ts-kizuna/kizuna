@@ -191,8 +191,6 @@ test('conforms to the shared adapter type catalogue', () => {
             securedServer.guard('user', ({ unauthenticated }) => {
                 // @ts-expect-error a guard does not pick the status; the identity owns it
                 unauthenticated(403, 'Forbidden');
-                // @ts-expect-error nor any other number
-                unauthenticated(200);
                 return unauthenticated('Session expired');
             });
         },

@@ -31,23 +31,8 @@ Guard arguments:
 | `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).      |
 | framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).    |
 
-## The two failure modes
+## Denying
 
-A guard decides one thing: whether the credential resolves to an identity. When it doesn't, `unauthenticated()` rejects the request with the identity's configured status, 401 by default, carrying the `WWW-Authenticate` challenge RFC 9110 requires. Pass a detail string to explain the specific case (`unauthenticated('Session expired')`); the status stays the identity's to set.
+`unauthenticated()` rejects a credential that didn't resolve, using the identity's status: 401 by default, with the `WWW-Authenticate` challenge RFC 9110 requires. Pass a detail to explain the case (`unauthenticated('Session expired')`); the status stays the identity's, set once via [`onUnauthenticated`](/docs/reference/kizuna-identity#custom-identities).
 
-There is no way for a guard to name its own status, and that is the point. An unresolved credential is an authentication failure and gets 401. The other failure, a credential that resolves but doesn't carry enough access, is authorization and gets 403, raised by the framework from the [auth map](/docs/reference/k-contract#the-auth-map) before your handler runs:
-
-```ts
-workspace: {
-    '*': 'member',
-    deleteWorkspace: {
-        member: {
-            role: 'owner',
-        },
-    },
-},
-```
-
-A member whose `role` is `admin` calling `deleteWorkspace` gets 403 without the guard being consulted about it. You write the requirement once in the auth map; kizuna enforces it everywhere the route is reachable, including over [MCP](/docs/reference/mcp-plugin).
-
-An identity that needs to hide its own existence, like an invite token in a URL, sets [`onUnauthenticated`](/docs/reference/kizuna-identity#custom-identities) and its guards follow without changing a line.
+A guard has no way to name a status, which keeps the two failures apart. Insufficient access is 403, raised by the framework from the [auth map](/docs/reference/k-contract#the-auth-map) before the handler runs, everywhere the route is reachable including [MCP](/docs/reference/mcp-plugin).

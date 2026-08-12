@@ -206,8 +206,7 @@ const runGuards = async (
                 result: toolError(guardResult.status, guardResult.detail),
             };
         }
-        // Checked outside the object test, as in the HTTP pipeline: a declared gate
-        // must never pass because the guard returned nothing to check it against.
+        // Outside the object test below, as in the HTTP pipeline.
         const gate = route.accessGate?.[scheme];
         if (gate) {
             const access = (guardResult ?? {}) as Record<string, unknown>;
