@@ -5,6 +5,8 @@ import { Plus_Jakarta_Sans } from 'next/font/google';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
+import { siteUrl } from '@/lib/site';
+
 import './global.css';
 
 import styles from './layout.module.css';
@@ -16,7 +18,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-    metadataBase: new URL('https://ts-kizuna.com'),
+    metadataBase: new URL(siteUrl),
     title: {
         default: 'ts-kizuna',
         template: '%s | ts-kizuna',
@@ -27,16 +29,16 @@ export const metadata: Metadata = {
         url: '/',
         images: [
             {
-                url: '/readme-beta.png',
-                width: 1024,
-                height: 241,
+                url: '/open-graph.jpg',
+                width: 1200,
+                height: 630,
                 alt: 'ts-kizuna',
             },
         ],
     },
     twitter: {
         card: 'summary_large_image',
-        images: ['/readme-beta.png'],
+        images: ['/open-graph.jpg'],
     },
     icons: [
         {
