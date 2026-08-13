@@ -1,8 +1,13 @@
 import { RootProvider } from 'fumadocs-ui/provider/next';
+
 import { Plus_Jakarta_Sans } from 'next/font/google';
+
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+
 import './global.css';
+
+import styles from './layout.module.css';
 
 const plusJakartaSans = Plus_Jakarta_Sans({
     subsets: ['latin'],
@@ -10,20 +15,15 @@ const plusJakartaSans = Plus_Jakarta_Sans({
     display: 'swap',
 });
 
-const description = 'Build fully typed REST APIs with TypeScript. Contract-first, RFC-correct, powered by Zod 4.';
-
 export const metadata: Metadata = {
     metadataBase: new URL('https://ts-kizuna.com'),
     title: {
         default: 'ts-kizuna',
         template: '%s | ts-kizuna',
     },
-    description,
     openGraph: {
         type: 'website',
         siteName: 'ts-kizuna',
-        title: 'ts-kizuna',
-        description,
         url: '/',
         images: [
             {
@@ -36,8 +36,6 @@ export const metadata: Metadata = {
     },
     twitter: {
         card: 'summary_large_image',
-        title: 'ts-kizuna',
-        description,
         images: ['/readme-beta.png'],
     },
     icons: [
@@ -57,7 +55,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
     return (
         <html lang="en" className={plusJakartaSans.variable} suppressHydrationWarning>
-            <body className="flex flex-col min-h-screen">
+            <body className={styles.body}>
                 <RootProvider>{children}</RootProvider>
             </body>
         </html>

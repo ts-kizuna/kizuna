@@ -3,10 +3,6 @@ import { source } from '@/lib/source';
 
 export const revalidate = false;
 
-/**
- * Every page's markdown in one file, for pasting into a model with a large
- * enough context to take the whole thing.
- */
 export async function GET() {
     const pages = source.getPages();
 

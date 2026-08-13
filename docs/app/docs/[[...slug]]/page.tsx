@@ -2,7 +2,7 @@ import { source } from '@/lib/source';
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page';
 import { notFound } from 'next/navigation';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
-import { getMDXComponents } from '@/mdx-components';
+import { getMDXComponents } from '@/components/docs/mdx-components';
 import type { Metadata } from 'next';
 
 interface PageProps {

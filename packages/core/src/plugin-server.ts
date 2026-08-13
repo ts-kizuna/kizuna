@@ -48,9 +48,9 @@ type DeclarationOf<Source> = Source extends (...args: never[]) => infer Produced
 
 /**
  * Implement a declared plugin. The first argument is read for its type only,
- * never called: it binds the router to the declared routes and the exports to
- * what the declaration promised. `props` comes from the contract; anything live
- * is the factory's own argument.
+ * never called: it types the router against the declared routes and the exports
+ * against what the declaration promised. `props` comes from the contract;
+ * anything live is the factory's own argument.
  *
  * `HandlerContext` comes from the adapter rather than being chosen here. Left
  * open, the plugin runs on every adapter; narrowed, it compiles only on the

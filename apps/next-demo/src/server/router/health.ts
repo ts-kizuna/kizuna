@@ -1,7 +1,7 @@
 import type { Router } from '@ts-kizuna/next';
 import type { contract } from '@ts-kizuna-demo/shared';
 
-export const health: Router<typeof contract>['health'] = {
+export const health: Router<typeof contract.routes.health> = {
     check: () => ({
         status: 200,
         body: {

@@ -267,4 +267,12 @@ export const pluginTypeContract = pluginTypeK.contract({
             },
         },
     }),
+    jobs: pluginTypeK.jobs({
+        reindex: {
+            summary: 'Re-index one record',
+            input: z.object({
+                recordId: z.string(),
+            }),
+        },
+    }),
 });

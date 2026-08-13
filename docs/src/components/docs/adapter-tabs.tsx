@@ -1,0 +1,49 @@
+'use client';
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { DynamicCodeBlock } from 'fumadocs-ui/components/dynamic-codeblock';
+import { InstallTabs } from './install-tabs';
+import styles from './adapter-tabs.module.css';
+
+interface AdapterTabsProps {
+    functionName: string;
+    adapters?: Array<string | { label: string; package: string }>;
+    showInstall?: boolean;
+}
+
+const adapterPackages: Record<string, string> = {
+    Express: '@ts-kizuna/express',
+    Fastify: '@ts-kizuna/fastify',
+    Hono: '@ts-kizuna/hono',
+    'Next.js': '@ts-kizuna/next',
+};
+
+function resolveAdapter(adapter: string | { label: string; package: string }) {
+    if (typeof adapter === 'string') {
+        return {
+            label: adapter,
+            package: adapterPackages[adapter],
+        };
+    }
+    return adapter;
+}
+
+export function AdapterTabs({ functionName, adapters = ['Express', 'Fastify', 'Hono', 'Next.js'], showInstall = true }: AdapterTabsProps) {
+    const resolved = adapters.map(resolveAdapter);
+    return (
+        <Tabs groupId="adapter" items={resolved.map((adapter) => adapter.label)}>
+            {resolved.map((adapter) => (
+                <Tab key={adapter.label} value={adapter.label}>
+                    {showInstall ? (
+                        <div className={styles.install}>
+                            <InstallTabs packageName={adapter.package} />
+                            <DynamicCodeBlock lang="ts" code={`import { ${functionName} } from '${adapter.package}';`} />
+                        </div>
+                    ) : (
+                        <DynamicCodeBlock lang="ts" code={`import { ${functionName} } from '${adapter.package}';`} />
+                    )}
+                </Tab>
+            ))}
+        </Tabs>
+    );
+}

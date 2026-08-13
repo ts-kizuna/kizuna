@@ -1,0 +1,36 @@
+.section {
+    scroll-margin-top: 96px;
+}
+
+.section:only-child {
+    max-width: var(--kizuna-max-width);
+    margin-inline: auto;
+    padding: 40px var(--kizuna-gutter) 86px;
+}
+
+.head {
+    max-width: 704px;
+    margin-bottom: var(--kizuna-head-gap);
+}
+
+.title {
+    margin: 0;
+    font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+    font-weight: var(--font-weight-600);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--kizuna-ink);
+}
+
+.description {
+    margin: 10px 0 0;
+    font-size: 1.125rem;
+    line-height: 1.6;
+    color: var(--kizuna-muted);
+}
+
+@media (max-width: 767px) {
+    .section:only-child {
+        padding-block: 24px;
+    }
+}

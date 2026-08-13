@@ -1,0 +1,57 @@
+.kizuna-landing-page {
+    --kizuna-canvas: #ffffff;
+    --kizuna-surface: #f3f3f3;
+    --kizuna-ink: #0b0b0b;
+    --kizuna-muted: #5c5c5c;
+    --kizuna-line: #e4e4e4;
+    --kizuna-line-strong: #cfcfcf;
+    --kizuna-field: #f0f0f0;
+
+    --kizuna-max-width: 1152px;
+    --kizuna-gutter: 20px;
+    --kizuna-section-gap: 96px;
+    --kizuna-head-gap: 22px;
+    --kizuna-footer-gap: 32px;
+
+    --kizuna-text-ui: 1.0625rem;
+    --kizuna-text-button: 1rem;
+    --kizuna-text-nav: 1rem;
+
+    --font-weight-400: 400;
+    --font-weight-500: 500;
+    --font-weight-600: 600;
+    --font-weight-700: 700;
+
+    --kizuna-hairline: 1px;
+    --kizuna-border-button: 1.5px;
+    --kizuna-radius-pill: 999px;
+    --kizuna-radius-card: 14px;
+    --kizuna-button-height: 51px;
+    --kizuna-button-padding-inline: 20px;
+    --kizuna-logo-width: 137px;
+    --kizuna-gap-actions: 12px;
+
+    background-color: var(--kizuna-canvas);
+    color: var(--kizuna-ink);
+    font-family: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+}
+
+.dark .kizuna-landing-page {
+    --kizuna-canvas: #131313;
+    --kizuna-surface: #212121;
+    --kizuna-ink: #ffffff;
+    --kizuna-muted: #a0a0a0;
+    --kizuna-line: #2a2a2a;
+    --kizuna-line-strong: #3d3d3d;
+    --kizuna-field: #2b2b2b;
+}
+
+@media (max-width: 767px) {
+    .kizuna-landing-page {
+        --kizuna-section-gap: 40px;
+        --kizuna-text-nav: 0.95rem;
+        --kizuna-text-button: 0.95rem;
+        --kizuna-button-height: 44px;
+        --kizuna-button-padding-inline: 18px;
+    }
+}

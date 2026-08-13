@@ -1,0 +1,9 @@
+.install {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.install > *:first-child {
+    margin-top: 0;
+}

@@ -1,0 +1,33 @@
+.grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+.card {
+    display: block;
+    border-radius: var(--kizuna-radius-card);
+    background-color: var(--kizuna-surface);
+    padding: 24px;
+    text-decoration: none;
+}
+
+.title {
+    margin: 0;
+    font-size: var(--kizuna-text-ui);
+    font-weight: var(--font-weight-600);
+    color: var(--kizuna-ink);
+}
+
+.description {
+    margin: 8px 0 0;
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--kizuna-muted);
+}
+
+@media (min-width: 640px) {
+    .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

@@ -5,7 +5,7 @@ description: Define your routes and bundle them into a contract, the source of t
 
 The contract is the source of truth for your API. Building one is three small steps:
 
-1. **`new Kizuna()`** binds your surface once and exports `k`.
+1. **`new Kizuna()`** creates your surface once and exports `k`.
 2. **`k.routes`** describes each endpoint in a group: method, path, and Zod schemas.
 3. **`k.contract`** bundles those groups (plus optional settings) into the object you share everywhere.
 
@@ -391,4 +391,4 @@ function UserCard({ user }: { user: User }) {
 ## Next steps
 
 - [Router](/docs/building/router) to implement a handler for each route
-- [Mounting](/docs/building/mounting) to bind the router to the contract and serve it
+- [Mounting](/docs/building/mounting) to connect the router to the contract and serve it

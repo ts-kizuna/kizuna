@@ -13,8 +13,8 @@ description: Mount a ts-kizuna API on a Fastify application.
 
 The standard setup:
 
-- `new KizunaServer()` binds the contract to a `server` handle
-- `server.router` binds typed implementations to the contract
+- `new KizunaServer()` turns the contract into a `server` handle
+- `server.router` takes one typed handler per route
 - `server.api` combines the router and guards into an API object
 - `fastifyKizuna` is the Fastify plugin that mounts the API
 

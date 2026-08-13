@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { Faq } from '../components/faq';
-import { Section } from '../components/section';
+import { Faq } from '@/components/landing-page/faq';
+import { Section } from '@/components/landing-page/section';
 
 export const metadata: Metadata = {
     title: 'FAQ',

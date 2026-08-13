@@ -272,21 +272,23 @@ type GroupHandlerContextOverlay<G extends Routes, Identities, GroupAuth, Contrac
 };
 
 /**
- * A contract's routes, each branded with the `auth` and `requestContext` its
- * `auth`-map entry resolves to, read back by {@link RouteHandler}.
+ * A contract's routes, each branded with what the contract adds to a handler's
+ * args: `auth`, `requestContext`, plugins, and jobs. Read back by
+ * {@link RouteHandler}.
  */
-export type RoutesWithHandlerContext<R extends Routes, Identities, Auth, RequestContext> = R & {
+export type RoutesWithHandlerContext<R extends Routes, Identities, Auth, RequestContext, ContractContext = unknown> = R & {
     [Group in keyof R]: R[Group] extends RouteDefinition
         ? RouteContextBrand<
               AuthArg<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>, Identities> &
-                  RequestContextValues<RequestContext>
+                  RequestContextValues<RequestContext> &
+                  ContractContext
           >
         : R[Group] extends Routes
           ? GroupHandlerContextOverlay<
                 R[Group],
                 Identities,
                 Group extends keyof Auth ? Auth[Group] : false,
-                RequestContextValues<RequestContext>
+                RequestContextValues<RequestContext> & ContractContext
             >
           : unknown;
 };

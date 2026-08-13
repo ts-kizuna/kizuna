@@ -1,0 +1,20 @@
+.logo {
+    width: auto;
+    height: 48px;
+    margin-top: 12px;
+    margin-bottom: 32px;
+}
+
+@media (min-width: 768px) {
+    .logo {
+        height: 64px;
+        margin-top: 0;
+        margin-bottom: 40px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .logo {
+        height: 80px;
+    }
+}

@@ -1,7 +1,7 @@
 import type { Router } from '@ts-kizuna/next';
 import type { contract } from '@ts-kizuna-demo/shared';
 
-export const notifications: Router<typeof contract>['notifications'] = {
+export const notifications: Router<typeof contract.routes.notifications> = {
     sendNotification: () => {
         return {
             status: 202,

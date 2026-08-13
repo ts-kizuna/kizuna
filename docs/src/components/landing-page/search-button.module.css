@@ -1,0 +1,45 @@
+.button {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    min-width: 256px;
+    height: var(--kizuna-button-height);
+    border: none;
+    border-radius: var(--kizuna-radius-pill);
+    background-color: var(--kizuna-field);
+    padding-inline: var(--kizuna-button-padding-inline);
+    font: inherit;
+    font-size: var(--kizuna-text-nav);
+    font-weight: var(--font-weight-600);
+    color: var(--kizuna-muted);
+    text-align: left;
+    cursor: pointer;
+}
+
+.icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    stroke-width: 2.75;
+}
+
+.hotKey {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    margin-inline-start: auto;
+    border: var(--kizuna-border-button) solid var(--kizuna-ink);
+    border-radius: var(--kizuna-radius-pill);
+    padding: 3px 8px;
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: var(--font-weight-600);
+    line-height: 1.2;
+    color: var(--kizuna-ink);
+}
+
+@media (min-width: 1024px) {
+    .button {
+        display: flex;
+    }
+}

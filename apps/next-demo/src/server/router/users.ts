@@ -4,7 +4,7 @@ import { toCsv } from '@ts-kizuna-demo/shared/csv';
 import type { Router } from '@ts-kizuna/next';
 import type { contract } from '@ts-kizuna-demo/shared';
 
-export const users: Router<typeof contract>['users'] = {
+export const users: Router<typeof contract.routes.users> = {
     listUsers: async ({ query }) => {
         const skip = (query.page - 1) * query.limit;
         const [users, total] = await Promise.all([db.users.findMany({ skip, take: query.limit }), db.users.count()]);

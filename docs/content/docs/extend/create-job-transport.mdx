@@ -3,6 +3,12 @@ title: Create a Job Transport
 description: Connect any queue or scheduler to your kizuna jobs by implementing one function.
 ---
 
+<BetaNotice>
+
+The transport API is new and still settling. The message shape and the dispatch contract may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
 When you call `jobs.indexUser.queue(...)`, something has to carry that job to the process that runs it. That something is a transport.
 
 kizuna ships none. A transport is small, and yours should be written against the version of the queue you actually run.

@@ -1,9 +1,9 @@
 ---
 title: Mounting
-description: Bind your router to the contract and serve it with an adapter.
+description: Connect your router to the contract and serve it with an adapter.
 ---
 
-The last step: `server.api` binds your [router](/docs/building/router) into the API object your framework adapter mounts. After this, your routes are live. The `server` handle comes from `new KizunaServer(contract)` (see [Router](/docs/building/router)).
+The last step: `server.api` puts your [router](/docs/building/router) into the API object your framework adapter mounts. After this, your routes are live. The `server` handle comes from `new KizunaServer(contract)` (see [Router](/docs/building/router)).
 
 ## `server.api`
 
@@ -31,7 +31,7 @@ For request-scoped values every handler needs (analytics ids, a logger, a tenant
 
 ## Scheduled jobs
 
-If the contract declares [scheduled jobs](/docs/jobs), bind their handlers with `server.jobs` and pass them to `server.api` next to the router:
+If the contract declares [scheduled jobs](/docs/jobs), write their handlers with `server.jobs` and pass them to `server.api` next to the router:
 
 ```ts
 export const api = server.api({

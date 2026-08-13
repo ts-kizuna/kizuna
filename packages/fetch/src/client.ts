@@ -249,7 +249,7 @@ function buildClient(contract: Contract, config: ClientConfig): unknown {
  * validates its arguments and returns the typed response. The contract's custom
  * issue codes are carried through to `errors[].code` on `400` responses.
  *
- * When the contract declares a request context with header bindings, pass their
+ * When the contract declares a request context that reads headers, pass their
  * values under `requestContext`; the client sends them with every request.
  *
  * @example

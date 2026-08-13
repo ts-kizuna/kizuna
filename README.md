@@ -2,7 +2,7 @@
 
 ![ts-kizuna](docs/public/readme-beta.png)
 
-Build fully typed REST APIs with TypeScript. Contract-first, RFC-correct, powered by Zod.
+Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typed server, an OpenAPI spec, Swift and Kotlin clients, and more.
 
 ![npm](https://img.shields.io/npm/v/@ts-kizuna/core?color=blue&label=npm)
 ![license](https://img.shields.io/badge/license-MIT-blue)
@@ -32,48 +32,51 @@ Build fully typed REST APIs with TypeScript. Contract-first, RFC-correct, powere
 - **Scheduled jobs**: declare cron work next to its handler, tick it from any platform scheduler, or run it in process from a route handler
 - **Deprecation support**: mark endpoints and fields as deprecated with a JSDoc `@deprecated` tag. IDEs show strikethroughs, and OpenAPI, Swift, and Kotlin pick it up automatically
 
-## Define your API routes
+## Getting started
 
-Define each route: pick a method and path, then describe what it takes in and sends back with Zod.
+### Define your API routes
+
+Export a `k` instance once. It takes optional tags, identities, request contexts, validation settings, and plugins.
+
+```ts
+// k.ts
+import { Kizuna } from '@ts-kizuna/core';
+
+export const k = new Kizuna();
+```
+
+Then define each route: pick a method and path, then describe what it takes in and sends back with Zod.
 
 ```ts
 // routes.ts
-const UserSchema = Kizuna.model({
-    title: 'User',
-    schema: z.object({
-        id: z.string(),
-        name: z.string(),
-    }),
-});
+import { z } from 'zod';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { k } from './k';
 
-export const users = k.routes('users', {
+export const users = k.routes({
     getUser: {
         method: 'GET',
         path: '/users/:id',
         responses: {
-            200: UserSchema,
+            200: z.object({
+                id: z.string(),
+                name: z.string(),
+            }),
             404: ProblemDetailsSchema,
-        },
-    },
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        body: z.object({
-            name: z.string(),
-        }),
-        responses: {
-            201: UserSchema,
         },
     },
 });
 ```
 
-## Bundle into a contract
+### Bundle into a contract
 
-The contract is the single object you hand to the client and the server adapters.
+The contract is the single object you hand to the server and the client.
 
 ```ts
 // contract.ts
+import { k } from './k';
+import { users } from './routes';
+
 export const contract = k.contract({
     routes: {
         users,
@@ -81,10 +84,13 @@ export const contract = k.contract({
 });
 ```
 
-## Implement your routes on the server
+### Implement your routes on the server
+
+Handlers get validated, typed input, and their return values are checked against the responses the contract declares.
 
 ```ts
 // server.ts
+import { KizunaServer } from '@ts-kizuna/express'; // or any other adapter
 import { contract } from './contract';
 
 export const server = new KizunaServer(contract);
@@ -111,22 +117,13 @@ export const router = server.router({
                 body: user,
             };
         },
-        createUser: async ({ body }) => {
-            const user = await db.users.create({
-                name: body.name,
-            });
-            return {
-                status: 201,
-                body: user,
-            };
-        },
     },
 });
 ```
 
-## Bind the contract to your server
+### Mount it on your app
 
-`server.api` joins your router into the API object the adapter mounts:
+`api.ts` is where the router, guards, jobs, and plugins come together, and what the adapter mounts.
 
 ```ts
 // api.ts
@@ -138,10 +135,11 @@ export const api = server.api({
 });
 ```
 
-Then mount it on your app:
-
 ```ts
 // index.ts
+import express from 'express';
+import { api } from './api';
+
 const app = express();
 app.use(express.json());
 
@@ -149,10 +147,15 @@ api.mount(app);
 app.listen(3000);
 ```
 
-## Use the API on the client
+### Use the API on the client
+
+Every route, input, and response comes from the same contract, so the client already knows them.
 
 ```ts
 // client.ts
+import { KizunaClient } from '@ts-kizuna/fetch';
+import { contract } from './contract';
+
 const client = new KizunaClient(contract, {
     baseUrl: 'http://localhost:3000',
 });
@@ -167,6 +170,8 @@ if (result.status === 200) {
     result.body; // { id: string; name: string }
 }
 ```
+
+[Read the full docs](https://ts-kizuna.com/docs)
 
 ## Packages
 
