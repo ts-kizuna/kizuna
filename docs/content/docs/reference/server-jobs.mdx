@@ -26,6 +26,6 @@ export const jobHandlers = server.jobs({
 });
 ```
 
-A job handler receives `input`, `throwError`, and `jobs`, and no request, response, or `auth`, so the same handler runs identically whether a tick reached it, a queue delivered it, or a script called it. A job with no declared `result` may return nothing rather than writing out `{ status: 204, body: undefined }`.
+A job handler receives `input`, `throwError`, and `jobs`, so it runs the same whether a tick reached it, a queue delivered it, or a script called it. A job with no declared `result` may return nothing.
 
 Pass the result to [`server.api`](/docs/reference/server-api) under `jobs`.

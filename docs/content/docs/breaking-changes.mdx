@@ -3,11 +3,11 @@ title: Breaking Changes
 description: Detect breaking API changes between versions using oasdiff.
 ---
 
-We recommend using [oasdiff](https://github.com/oasdiff/oasdiff) to detect breaking changes in your API. oasdiff compares OpenAPI specs and reports breaking changes, changelogs, and diffs. Since ts-kizuna generates OpenAPI specs from your routes, you can wire up oasdiff to catch breaking changes before they ship.
+We recommend [oasdiff](https://github.com/oasdiff/oasdiff). It compares two OpenAPI specs and reports breaking changes, changelogs, and diffs, so pointing it at the spec ts-kizuna generates from your routes catches them before they ship.
 
 ## Print your spec to stdout
 
-Create a script that prints your OpenAPI spec as YAML to stdout. This is the interface oasdiff and CI workflows consume.
+This is the interface oasdiff and CI workflows consume.
 
 ```ts title="scripts/print-openapi.ts"
 import { generateOpenApi } from '@ts-kizuna/openapi';
@@ -30,7 +30,7 @@ Add a script to your `package.json`:
 
 ## GitHub Actions
 
-Add a workflow that runs oasdiff on every pull request. This generates the OpenAPI spec from both the base branch and the PR branch, then checks for breaking changes.
+Generate the spec from both the base branch and the PR branch, then compare them.
 
 ```yaml title=".github/workflows/breaking-changes.yml"
 # .github/workflows/breaking-changes.yml
@@ -98,4 +98,4 @@ jobs:
                   fi
 ```
 
-If oasdiff detects breaking changes, the PR is blocked until someone adds the `breaking changes` label, forcing explicit acknowledgment from the team.
+A detected breaking change blocks the PR until someone adds the `breaking changes` label.

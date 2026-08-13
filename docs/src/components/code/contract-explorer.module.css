@@ -88,3 +88,9 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+
+@media (max-width: 767px) {
+    .connector {
+        padding-bottom: 30px;
+    }
+}

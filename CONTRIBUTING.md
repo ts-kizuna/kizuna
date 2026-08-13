@@ -6,11 +6,12 @@ Thanks for helping out. Here's what we take and how to get set up.
 
 Bug reports, small reproductions, and documentation fixes are always welcome, as an issue or a PR.
 
-## What we won't merge
+## What we rarely merge
 
-Everything we merge into the core is something we commit to maintaining for the long haul, so we don't take additions lightly. We keep it small and stick to the packages we actually use, which is why new first-party adapters and clients won't be merged. The APIs are public, though, so you can build exactly what you need and own it:
+Anything we merge into the core, we maintain, so we keep it to the packages we actually use. Whether an adapter or client goes first-party comes down to adoption, not age: if a framework picks up real usage, we will very likely add it. What we will not take on is a framework a handful of people use. The APIs are public, so you can build exactly what you need and own it today:
 
 - [Adapter](https://ts-kizuna.com/docs/extend/create-adapter)
+- [Plugin](https://ts-kizuna.com/docs/extend/create-plugin)
 - [Client](https://ts-kizuna.com/docs/extend/create-ts-client)
 - [Generator](https://ts-kizuna.com/docs/extend/create-generator)
 
@@ -18,7 +19,7 @@ For anything bigger than a fix or docs, open an issue first. What lands comes do
 
 ## Support
 
-ts-kizuna is provided as-is. The docs are thorough and the source is open, so most answers are within reach. For anything else, [open an issue](https://github.com/ts-kizuna/kizuna/issues).
+ts-kizuna is provided as-is. Most answers are in the docs or the source. For anything else, [open an issue](https://github.com/ts-kizuna/kizuna/issues).
 
 ## Development
 

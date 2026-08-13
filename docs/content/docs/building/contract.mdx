@@ -3,17 +3,11 @@ title: Contract
 description: Define your routes and bundle them into a contract, the source of truth shared by your server and clients.
 ---
 
-The contract is the source of truth for your API. Building one is three small steps:
-
-1. **`new Kizuna()`** creates your surface once and exports `k`.
-2. **`k.routes`** describes each endpoint in a group: method, path, and Zod schemas.
-3. **`k.contract`** bundles those groups (plus optional settings) into the object you share everywhere.
-
-You hand the result to [`new KizunaServer()`](/docs/building/router) on the server and [`new KizunaClient()`](/docs/clients/fetch) on every client. This page covers defining it. The [Router](/docs/building/router) and [Mounting](/docs/building/mounting) pages cover implementing and serving it.
+The contract is the source of truth for your API. You hand it to [`new KizunaServer()`](/docs/building/router) on the server and [`new KizunaClient()`](/docs/clients/fetch) on every client.
 
 ## Create the factory
 
-Construct it once, usually in a `k.ts` file, and export `k`. Pass a tag set so route groups have a tag to sit under, where the keys become the allowed group names. Then import `k` wherever you define routes.
+Construct it once, usually in a `k.ts` file, and export `k`. Pass a tag set so route groups have a tag to sit under, where the keys become the allowed group names.
 
 ```ts title="src/contract/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
@@ -29,7 +23,7 @@ export const k = new Kizuna({
 
 ## Define your routes
 
-Call `k.routes` with a tag and your routes. For each one, pick a method and path, then describe what it takes in (`body`, `query`, `headers`) and what it sends back (`responses`) with Zod schemas.
+Call `k.routes` with a tag and your routes.
 
 ```ts title="src/contract/routes/users.ts"
 import { z } from 'zod';
@@ -124,7 +118,7 @@ pathParams: z.object({
 
 ## Query, path, and header coercion
 
-Values in the URL and in headers always arrive as strings. ts-kizuna coerces them to the types you declare, so you write the schema you actually mean and get the parsed value on both the client and the server:
+Values in the URL and in headers always arrive as strings. ts-kizuna coerces them to the types you declare, so both the client and the server see the parsed value:
 
 | Declare                  | Accepts on the wire  | You get             |
 | ------------------------ | -------------------- | ------------------- |
@@ -133,13 +127,13 @@ Values in the URL and in headers always arrive as strings. ts-kizuna coerces the
 | `z.bigint()`             | `"9007199254740993"` | `9007199254740993n` |
 | `z.date()`               | an ISO 8601 string   | `Date`              |
 
-Arrays of these coerce too (`z.array(z.number())`). The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without any manual formatting. Request bodies are sent as JSON and keep their types, so they are never coerced.
+Arrays of these coerce too (`z.array(z.number())`). The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without manual formatting. Request bodies are sent as JSON and keep their types.
 
-Because coercion is built in, **`z.coerce` is not supported**, and `k.routes` throws if any schema uses it. Use the plain schema (`z.number()`, `z.date()`, `z.bigint()`) instead. When you genuinely want to receive a different type than you send, `z.string().transform(...)` is the explicit, type-safe way to do it.
+Because coercion is built in, **`z.coerce` is not supported**, and `k.routes` throws if any schema uses it. Declare the plain schema (`z.number()`, `z.date()`, `z.bigint()`). To receive a different type than you send, use `z.string().transform(...)`.
 
 ### Response schemas
 
-The simple form is one Zod schema per status code:
+One Zod schema per status code:
 
 ```ts
 responses: {
@@ -174,7 +168,7 @@ responses: {
 
 Assemble your route groups with `k.contract` and default-export the result. This is the object `client` and `server.api` consume.
 
-```ts title="src/contract/contract.ts"
+```ts title="src/contract/index.ts"
 import { k } from './k';
 import { usersRoutes } from './routes';
 
@@ -211,15 +205,13 @@ responses: {
 },
 ```
 
-That's everything you need to define an API. The rest of this page is optional, so reach for it when you need it.
-
 ## Auth
 
 Auth is part of the contract too: you declare identities with [`Kizuna.identity`](/docs/reference/kizuna-identity), register them on `new Kizuna()`, and give `k.contract` an `auth` map saying which routes require which identity. That one declaration drives runtime enforcement, typed handler context, the OpenAPI spec's security, and client-side access checks. The [Auth guide](/docs/auth) walks the whole pipeline.
 
 ## Jobs
 
-Scheduled work is declared on the contract too. [`k.jobs`](/docs/reference/k-jobs) takes the identity every job requires and the jobs themselves, and the result goes under `jobs` on `k.contract`, alongside `routes` rather than inside it:
+Scheduled work is declared on the contract too. [`k.jobs`](/docs/reference/k-jobs) takes the identity every job requires and the jobs themselves, and the result goes under `jobs` on `k.contract`, beside `routes`:
 
 ```ts
 export const contract = k.contract({
@@ -230,7 +222,7 @@ export const contract = k.contract({
 });
 ```
 
-Jobs carry their own identity, so they never appear in the `auth` map, and they stay out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. The [Jobs guide](/docs/jobs) covers declaring, handling, and triggering them.
+A job carries its own identity, so it takes no entry in the `auth` map, and it stays out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. The [Jobs guide](/docs/jobs) covers declaring, handling, and triggering them.
 
 ## Going further
 
@@ -290,7 +282,7 @@ export const usersRoutes = k.routes('users', {
 });
 ```
 
-An `index.ts` beside them collects the groups, so `contract.ts` has one import to make:
+An `index.ts` beside them collects the groups, so the contract has one import to make:
 
 ```ts title="src/contract/routes/index.ts"
 import { usersRoutes } from './users';
@@ -302,7 +294,7 @@ export const routes = {
 };
 ```
 
-```ts title="src/contract/contract.ts"
+```ts title="src/contract/index.ts"
 import { k } from './k';
 import { routes } from './routes';
 
@@ -375,7 +367,7 @@ export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 ```
 
 ```ts
-import type { User } from '@shared/contract/types';
+import type { User } from '@/contract/types';
 
 function UserCard({ user }: { user: User }) {
     return <div>{user.name}</div>;

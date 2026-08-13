@@ -329,24 +329,14 @@ describe('operation metadata passthrough', () => {
         });
     });
 
-    it('emits document-level tags and externalDocs from config', () => {
+    it('emits document-level tags from the contract, and externalDocs from config', () => {
         const spec = generateJson(annotated, {
             ...baseConfig,
-            tags: [
-                {
-                    name: 'users',
-                    description: 'User-related operations',
-                },
-            ],
             externalDocs: {
                 url: 'https://example.com/docs',
             },
         });
         expect(spec.tags).toEqual([
-            {
-                name: 'users',
-                description: 'User-related operations',
-            },
             {
                 name: 'API',
             },

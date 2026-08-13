@@ -3,7 +3,7 @@ title: ESLint
 description: Catch ts-kizuna mistakes in your editor with the official ESLint plugin.
 ---
 
-`@ts-kizuna/eslint-plugin` catches ts-kizuna mistakes in your editor. These are things the type system can't express on its own, surfaced as you type instead of at runtime.
+`@ts-kizuna/eslint-plugin` catches ts-kizuna mistakes in your editor, as you type. These are things the type system can't express on its own.
 
 <InstallTabs packageName="@ts-kizuna/eslint-plugin" />
 
@@ -18,8 +18,6 @@ import kizuna from '@ts-kizuna/eslint-plugin';
 
 export default [js.configs.recommended, ...tseslint.configs.recommended, kizuna.configs.recommended];
 ```
-
-That's it. Every rule below is now active.
 
 ## Turning a rule off
 
@@ -102,7 +100,7 @@ kizuna serializes only the **first** `@deprecated` message. Any later one is sil
 
 ### Across files
 
-A schema is often defined elsewhere, such as a shared `PaginationQuery` in its own `zod`-only module that no per-file linter would ever connect to your contract. Because the rule resolves what your contract references, it catches it anyway and reports on the reference:
+A schema defined elsewhere, such as a shared `PaginationQuery` in its own `zod`-only module, is still caught, and the error lands on the reference:
 
 ```ts title="src/contract/pagination.ts"
 import { z } from 'zod';

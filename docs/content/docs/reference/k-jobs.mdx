@@ -28,27 +28,27 @@ export const jobs = k.jobs('scheduler', {
 });
 ```
 
-Jobs nest to any depth. Omit the identity argument to declare them public, which is rarely what you want.
+Jobs nest to any depth. Because a job carries its own identity, it never appears in the contract's `auth` map.
 
-Jobs carry their own identity, so they never appear in the contract's `auth` map.
+Omitting the identity argument declares the jobs public, which leaves anyone who can reach `/jobs/run` able to trigger them. Pass an identity unless the endpoints are unreachable from outside your network.
 
 See the [Scheduled jobs guide](/docs/jobs) for handlers, triggering, and local development.
 
 ## Job fields
 
-| Field         | Type                               | Notes                                                                                                                                                       |
-| ------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schedule`    | `string \| { cron, timezone }`     | A five-field cron expression, UTC unless a `timezone` is given. Validated when the contract is built. Omit it for a job that is only ever queued from code. |
-| `retry`       | `number`                           | How many attempts a failed run deserves. Handed to the transport, which is what actually retries.                                                           |
-| `input`       | `z.ZodType`                        | Schema for the payload the job is queued with. Validated on `run` and `queue`, and again at the run endpoint.                                               |
-| `result`      | `z.ZodType`                        | Schema for what the job reports on success. Omit it and the job answers `204`.                                                                              |
-| `summary`     | `string`                           |                                                                                                                                                             |
-| `description` | `string`                           |                                                                                                                                                             |
-| `responses`   | `{ [status]: ResponseDefinition }` | Extra responses beyond the synthesized ones.                                                                                                                |
+| Field         | Type                               | Notes                                                                                                                   |
+| ------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `schedule`    | `string \| { cron, timezone }`     | A five-field cron expression, UTC unless a `timezone` is given. Omit it for a job that is only ever queued from code.   |
+| `retry`       | `number`                           | How many attempts a failed run deserves, at least `1`. Handed to the transport, which is what retries. Defaults to `1`. |
+| `input`       | `z.ZodType`                        | Schema for the payload the job is queued with. Validated on `run` and `queue`, and again at the run endpoint.           |
+| `result`      | `z.ZodType`                        | Schema for what the job reports on success. Omit it and the job answers `204`.                                          |
+| `summary`     | `string`                           |                                                                                                                         |
+| `description` | `string`                           |                                                                                                                         |
+| `responses`   | `{ [status]: ResponseDefinition }` | Extra responses beyond the synthesized ones.                                                                            |
 
 ## Synthesized responses
 
-Every job answers with the same set, because a scheduler decides whether to retry from the status code:
+Every job answers with the same set. A scheduler reads the status code to decide whether to retry.
 
 | Status                                | Meaning                         |
 | ------------------------------------- | ------------------------------- |
@@ -76,13 +76,11 @@ Exported from `@ts-kizuna/core`. Each returns a plain cron string.
 
 ## Reaching a job
 
-Every handler receives a `jobs` runner shaped like the declaration, with two methods per job:
+Every handler receives a `jobs` runner shaped like the declaration, with two methods per job. `run` resolves to what the handler returned, as `{ status, body }`; `queue` resolves once the job is in line.
 
 ```ts
-// Run it now, block, get the result.
 const result = await jobs.billing.reconcileInvoices.run({ since });
 
-// Put it in line and answer the request.
 await jobs.indexUser.queue({
     input: {
         userId,
@@ -94,14 +92,11 @@ await jobs.indexUser.queue({
 
 Input is validated against the job's `input` schema either way. Where a queued job goes is the [transport's](/docs/extend/create-job-transport) business; with none configured it runs in this process.
 
-## Validation at contract build
+## Validation
 
-`k.jobs` throws rather than letting a broken schedule reach production:
+`k.jobs` throws on:
 
 - an invalid cron expression, naming the field
 - an unknown time zone
-- a `path` with a parameter in it, since a scheduler has no value to put there
-- two jobs on the same method and path
-- `retry` that is not a whole number of attempts
+- a `retry` that is not a whole number, or is below `1`
 - a job with a `schedule` **and** an `input` its schema will not accept as empty. A scheduler sends no body, so that job could only ever fail validation
-- a job answering `GET` with an `input`, which a GET request has no body to carry

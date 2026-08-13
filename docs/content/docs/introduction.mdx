@@ -9,7 +9,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 **Why is it already 1.0 if it's in beta?** We built ts-kizuna for our own apps and have been battle-testing it in production since before we open-sourced it. It's labeled beta because the syntax for how you write contracts, routers, and clients may still change before v2.
 
-We recommend pinning your version, then upgrading whenever it suits you.
+We recommend pinning your version and upgrading when it suits you.
 
 [See the release notes](https://github.com/ts-kizuna/kizuna/releases) · [Read the FAQ](/faq)
 
@@ -18,12 +18,13 @@ We recommend pinning your version, then upgrading whenever it suits you.
 <FeatureList />
 
 <Callout type="info">
-    ts-kizuna is Zod only and will not support Standard Schema or other validation libraries. We rely heavily on Zod features.
+    ts-kizuna is Zod only. It leans on Zod 4 features directly for its inference and coercion, and committing to one validator is what keeps
+    the types this precise.
 </Callout>
 
 ## The idea
 
-One contract is the source of truth. Your server, your clients, and every generated artifact read from it.
+Your server, your clients, and every generated artifact read from one contract.
 
 <ContractExplorer />
 
@@ -35,7 +36,7 @@ Simplified for illustration. In real projects you split routes and schemas acros
 
 ## Inside a handler
 
-Whatever the contract declares, the handler gets it validated and typed.
+The handler receives whatever the contract declares, validated and typed.
 
 <HandlerExplorer />
 

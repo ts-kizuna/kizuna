@@ -3,7 +3,7 @@ title: isValidationError
 description: Type guard to distinguish kizuna validation errors from custom 400 responses on the client.
 ---
 
-Type guard to distinguish kizuna validation errors from custom 400 responses on the client.
+Distinguish a kizuna validation error from a route's own `400` body.
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -17,14 +17,6 @@ import { isValidationError } from '@ts-kizuna/core';
 ```ts
 isValidationError(body: unknown): body is ValidationError
 ```
-
-| Parameter | Type      | Description        |
-| --------- | --------- | ------------------ |
-| `body`    | `unknown` | Any value to check |
-
-## Returns
-
-`true` if `body` is a `ValidationError`, narrowing the type for TypeScript.
 
 ## `ValidationError` shape
 
@@ -73,6 +65,6 @@ if (result.status === 400) {
 }
 ```
 
-If a route does not declare a `400` response, you don't need this, because `result.status === 400` narrows the body to `ValidationError` directly.
+A route that declares no `400` of its own needs no guard: `result.status === 400` already narrows to `ValidationError`.
 
 See the [Fetch client guide](/docs/clients/fetch#validation-errors) for more details.

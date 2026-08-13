@@ -50,19 +50,31 @@ export const usersRoutes = k.routes('users', {
 
 ## Route definition fields
 
-| Field         | Required | Type                                                                                           |
-| ------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `method`      | Yes      | `'GET'` `'POST'` `'PUT'` `'PATCH'` `'DELETE'` `'HEAD'` `'OPTIONS'`                             |
-| `path`        | Yes      | URL path. Use `:name` for path parameters                                                      |
-| `pathParams`  | No       | Zod schema for the path parameters, keyed by placeholder name                                  |
-| `body`        | No       | Zod schema for the request body                                                                |
-| `query`       | No       | Zod schema for the query string                                                                |
-| `headers`     | No       | Zod schema for request headers                                                                 |
-| `responses`   | Yes      | Response schemas keyed by status code                                                          |
-| `contentType` | No       | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
-| `summary`     | No       | Short description shown in OpenAPI                                                             |
-| `tags`        | No       | OpenAPI tag keys (from the tag set), resolved to titles in the spec                            |
+| Field          | Required | Type                                                                                           |
+| -------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `method`       | Yes      | `'GET'` `'POST'` `'PUT'` `'PATCH'` `'DELETE'` `'HEAD'` `'OPTIONS'`                             |
+| `path`         | Yes      | URL path. Use `:name` for path parameters                                                      |
+| `pathParams`   | No       | Zod schema for the path parameters, keyed by placeholder name                                  |
+| `body`         | No       | Zod schema for the request body                                                                |
+| `query`        | No       | Zod schema for the query string                                                                |
+| `headers`      | No       | Zod schema for request headers                                                                 |
+| `responses`    | Yes      | Response schemas keyed by status code. A schema, or `{ body, headers?, contentType? }`         |
+| `contentType`  | No       | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
+| `summary`      | No       | Short description shown in OpenAPI                                                             |
+| `description`  | No       | Longer description shown in OpenAPI                                                            |
+| `externalDocs` | No       | `{ url, description? }`, emitted on the operation                                              |
+| `tags`         | No       | OpenAPI tag keys (from the tag set), resolved to titles in the spec                            |
 
-`pathParams` keys must be exactly the `:name` placeholders in `path`. A key the path does not have, or a placeholder the schema does not declare, is a type error on `pathParams`, and `k.routes` throws the same mismatch at runtime.
+Use the `{ body, headers?, contentType? }` form of a response to declare [typed response headers](/docs/building/contract#response-schemas) or a [binary body](/docs/reference/binary-and-file-schemas).
 
-Auth is deliberately absent from this table. A route's `security` is owned by the contract's `auth` map, and writing `security` inline in `k.routes` is a type error. This keeps the whole API's auth policy in one place instead of scattered across route files.
+A route's `security` comes from the contract's [`auth` map](/docs/reference/k-contract#the-auth-map); writing it here is a type error.
+
+## Validation
+
+`pathParams` keys must be exactly the `:name` placeholders in `path`. A mismatch is a type error on `pathParams`, and `k.routes` throws on it at runtime.
+
+`k.routes` also throws on:
+
+- an empty `z.object({})` as a `body`
+- any `z.coerce` schema, anywhere in the route
+- a structured path parameter (object, array, record, tuple, map, or set)

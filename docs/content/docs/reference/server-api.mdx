@@ -19,7 +19,9 @@ export const api = server.api({
 });
 ```
 
-`guards` is keyed by identity name and, when provided, must cover every identity the auth map uses. Mount the returned object with the adapter's mount verb:
+`guards` is keyed by identity name and must cover every identity declared on [`new Kizuna()`](/docs/reference/kizuna), whether or not the auth map references it. A contract that declares identities cannot omit it.
+
+Mount the returned object with the adapter's mount verb:
 
 | Adapter | Mount                                            |
 | ------- | ------------------------------------------------ |
@@ -48,7 +50,7 @@ export const api = server.api({
 
 ## plugins
 
-A [plugin](/docs/plugins) comes in two halves. The declaration is installed on [`new Kizuna()`](/docs/reference/kizuna), and its server half goes here under the same key:
+A [plugin](/docs/plugins) is declared on [`new Kizuna()`](/docs/reference/kizuna); its server half goes here under the same key:
 
 ```ts title="src/server/api.ts"
 import { mcpPluginServer } from '@ts-kizuna/mcp/server';

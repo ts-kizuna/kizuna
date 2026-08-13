@@ -3,7 +3,7 @@ title: Migrating from ts-rest
 description: Side-by-side comparison of ts-rest and ts-kizuna, for anyone weighing a ts-rest alternative, with notes on deliberate differences.
 ---
 
-ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered. ts-rest proved that routes-first TypeScript APIs could work beautifully, and a lot of people built real things with it, ourselves included. We truly appreciate what the team behind ts-rest built. ts-kizuna borrows several of its core concepts and keeps the public API deliberately familiar, but takes a different approach under the hood. This page maps every changed API to its ts-kizuna equivalent.
+ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered. ts-rest showed that routes-first TypeScript APIs work, and a lot of people built real things with it, ourselves included. ts-kizuna borrows several of its core concepts and keeps the public API deliberately familiar, but takes a different approach under the hood. This page maps every changed API to its ts-kizuna equivalent.
 
 ## Package mapping
 
@@ -18,7 +18,7 @@ ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneer
 
 ### `initContract` -> `new Kizuna()` + `k.routes`
 
-`initContract` does not exist in ts-kizuna. Create your surface with `new Kizuna()` once, then define groups with `k.routes`.
+There is no `initContract`. Create your surface with `new Kizuna()` once, then define groups with `k.routes`.
 
 ```ts
 // ts-rest
@@ -61,7 +61,7 @@ The tag passed to `k.routes` (a key of your `Kizuna.tags` set) sets the OpenAPI 
 
 ### `c.noBody()` → `z.void()`
 
-ts-rest uses `c.noBody()` to mark a route as having no request body or to mark a response as having no body. In ts-kizuna, use `z.void()` instead. Routes don't require a `body` field, so for request bodies you can simply remove it.
+ts-rest uses `c.noBody()` to mark a route as having no request body or to mark a response as having no body. In ts-kizuna, use `z.void()` instead. Routes don't require a `body` field, so remove it.
 
 ```ts
 // ts-rest
@@ -96,7 +96,7 @@ export const users = k.routes('users', {
 });
 ```
 
-For request bodies, just remove the `body` field. Use `z.void()` for responses that return no body (like `204`).
+Use `z.void()` for responses that return no body, such as `204`.
 
 ## Contract
 
@@ -115,8 +115,6 @@ export const contract = k.contract({
 ```
 
 ## Client
-
-The ts-rest client lives in `@ts-rest/core`. In ts-kizuna, the client is a separate package.
 
 ```ts
 // ts-rest
@@ -138,7 +136,7 @@ const client = new KizunaClient(contract, {
 
 ### `initServer` maps to `new KizunaServer()`
 
-`initServer` does not exist in ts-kizuna. Create the server with `new KizunaServer()`, use `server.router` for the implementations, and `server.api` to produce a mountable API object.
+There is no `initServer`. Create the server with `new KizunaServer()`, use `server.router` for the implementations, and `server.api` to produce a mountable API object.
 
 ```ts
 // ts-rest
@@ -194,7 +192,7 @@ createExpressEndpoints(contract, router, app);
 api.mount(app);
 ```
 
-In ts-kizuna, `api.mount(app)` is a method on the `api` object (produced by `server.api`) rather than a function taking separate routes and handler arguments.
+`api.mount(app)` is a method on the `api` object that `server.api` produces.
 
 ## Next.js adapter
 
@@ -203,7 +201,7 @@ In ts-kizuna, `api.mount(app)` is a method on the `api` object (produced by `ser
 ```ts
 // ts-rest: App Router via @ts-rest/serverless/next
 import { createNextHandler } from '@ts-rest/serverless/next';
-import { contract } from '@shared/contract';
+import { contract } from '@/contract';
 import { router } from './router';
 
 const handler = createNextHandler(contract, router, {
@@ -215,7 +213,7 @@ export { handler as GET, handler as POST, handler as PUT, handler as PATCH, hand
 
 ```ts
 // ts-kizuna: App Router catch-all
-import { api } from '../../server/api';
+import { api } from '@/server/api';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
     basePath: '/api',
@@ -236,7 +234,7 @@ If you are upgrading from ts-rest and Zod 3, migrate to Zod 4 alongside this cha
 
 ## Deprecation
 
-ts-rest supports `deprecated: true` on route definitions and `.meta({ deprecated: true })` on Zod schemas. Both are intentionally removed in ts-kizuna.
+ts-rest supports `deprecated: true` on route definitions and `.meta({ deprecated: true })` on Zod schemas. Neither exists in ts-kizuna.
 
 ```ts
 // ts-rest
@@ -268,11 +266,11 @@ deleteUser: {
 },
 ```
 
-The `/** @deprecated */` JSDoc tag drives IDE strikethrough, the OpenAPI `deprecated` flag, and the Swift `@available(*, deprecated)` attribute, all from a single annotation.
+One `/** @deprecated */` JSDoc tag drives IDE strikethrough, the OpenAPI `deprecated` flag, and the Swift `@available(*, deprecated)` attribute.
 
 ## Error responses
 
-This is a deliberate departure from ts-rest. ts-kizuna returns [RFC 9457 Problem Details](/docs/reference/problem-details-schema) (`application/problem+json`) for every error response. Error responses in a contract must use `ProblemDetailsSchema` (or `ProblemDetailsSchema.extend({...})` for extra fields), not an arbitrary shape. Validation errors are Problem Details with a `detail` string and an `errors` array (instead of ts-rest's `{ message, issues }`). If you're porting an API whose clients expect the old shape, see [Migrating an existing API](/docs/migration/existing-api) for how to keep old clients working during the transition.
+ts-kizuna returns [RFC 9457 Problem Details](/docs/reference/problem-details-schema) (`application/problem+json`) for every error response. Error responses in a contract must use `ProblemDetailsSchema` (or `ProblemDetailsSchema.extend({...})` for extra fields), not an arbitrary shape. Validation errors are Problem Details with a `detail` string and an `errors` array (instead of ts-rest's `{ message, issues }`). If you're porting an API whose clients expect the old shape, see [Migrating an existing API](/docs/migration/existing-api) for how to keep old clients working during the transition.
 
 ## Method mismatch behaviour
 

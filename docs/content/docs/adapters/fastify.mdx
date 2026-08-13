@@ -11,16 +11,9 @@ description: Mount a ts-kizuna API on a Fastify application.
 
 ## Setup
 
-The standard setup:
-
-- `new KizunaServer()` turns the contract into a `server` handle
-- `server.router` takes one typed handler per route
-- `server.api` combines the router and guards into an API object
-- `fastifyKizuna` is the Fastify plugin that mounts the API
-
 ```ts title="src/server/server.ts"
 import { KizunaServer } from '@ts-kizuna/fastify';
-import { contract } from '@shared/contract';
+import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);
 ```
@@ -107,7 +100,7 @@ getUser: async ({ params, request }) => {
 
 ## Guards
 
-One guard per identity. The credential arrives extracted and typed, alongside the native `request`/`reply`. See the [Auth guide](/docs/auth).
+A guard receives the credential extracted and typed, alongside the native `request`/`reply`. See the [Auth guide](/docs/auth).
 
 ```ts title="src/server/guards.ts"
 import { server } from './server';
@@ -129,8 +122,6 @@ For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/ref
 
 ## Options
 
-Pass options alongside `api` when registering the plugin:
-
 ```ts
 app.register(fastifyKizuna, {
     api,
@@ -145,7 +136,7 @@ app.register(fastifyKizuna, {
 
 ## Type-safe request properties
 
-Auth data doesn't need request mutation, because guards return typed context that handlers receive directly. But if non-auth middleware sets custom properties on `request`, such as a request id, use Fastify's [declaration merging](https://fastify.dev/docs/latest/Reference/TypeScript/#creating-a-typescript-fastify-plugin) to extend the `FastifyRequest` interface:
+Middleware that sets custom properties on `request`, such as a request id, needs Fastify's [declaration merging](https://fastify.dev/docs/latest/Reference/TypeScript/#creating-a-typescript-fastify-plugin) to extend the `FastifyRequest` interface. Auth data does not: guards hand handlers typed context directly.
 
 ```ts title="types/fastify.d.ts"
 declare module 'fastify' {
@@ -155,7 +146,7 @@ declare module 'fastify' {
 }
 ```
 
-With the augmentation in place, both middleware and handlers are fully typed:
+Both middleware and handlers are then typed:
 
 ```ts
 getUser: async ({ params, request }) => {
@@ -164,15 +155,13 @@ getUser: async ({ params, request }) => {
 },
 ```
 
-The adapter also sets `request.kizunaRoute` on every matched request, containing the matched `RouteDefinition`. This is available without any extra type setup.
-
-## `RouteHandler` and `Router` types
+The adapter also sets `request.kizunaRoute` on every matched request, containing the matched `RouteDefinition`. ## `RouteHandler` and `Router` types
 
 Annotate handlers individually or as a whole tree:
 
 ```ts
 import type { RouteHandler, Router } from '@ts-kizuna/fastify';
-import { contract } from '@shared/contract';
+import { contract } from '@/contract';
 
 // Single route
 const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ params }) => {

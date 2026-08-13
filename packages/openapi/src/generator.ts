@@ -422,7 +422,6 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
             };
 
             if (options.servers) document.servers = options.servers;
-            if (options.tags) document.tags = options.tags;
             if (options.externalDocs) document.externalDocs = options.externalDocs;
 
             const componentSchemas = buildComponentSchemas();
@@ -567,13 +566,7 @@ export function renderOpenApi(contract: Contract, options: GenerateOpenApiOption
     );
     const tags = tagsFromContract(contract);
     if (tags.length > 0) {
-        const originalJson = renderer('json') as OpenApiDocument;
-        const existingTags = originalJson.tags ?? [];
-        const existingNames = new Set(existingTags.map((tag) => tag.name));
-        const newTags = tags.filter((tag) => !existingNames.has(tag.name));
-        if (newTags.length > 0) {
-            originalJson.tags = [...existingTags, ...newTags];
-        }
+        (renderer('json') as OpenApiDocument).tags = tags;
     }
     return renderer;
 }

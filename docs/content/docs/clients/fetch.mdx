@@ -3,7 +3,7 @@ title: Fetch
 description: A fully typed HTTP client for consuming ts-kizuna routes in the browser, on the server, or in React Native.
 ---
 
-`@ts-kizuna/fetch` provides `new KizunaClient()`, a typed wrapper around the native `fetch` API. It runs anywhere `fetch` does, which includes the browser, Node, Deno, Bun, edge runtimes, and [React Native](#react-native).
+`@ts-kizuna/fetch` provides `new KizunaClient()`, a typed wrapper around the native `fetch` API. It runs anywhere `fetch` does, [React Native](#react-native) included.
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
@@ -11,14 +11,14 @@ description: A fully typed HTTP client for consuming ts-kizuna routes in the bro
 
 ```ts title="src/lib/api-client.ts"
 import { KizunaClient } from '@ts-kizuna/fetch';
-import { contract } from '@shared/contract';
+import { contract } from '@/contract';
 
 export const apiClient = new KizunaClient(contract, {
     baseUrl: 'http://localhost:3000',
 });
 ```
 
-The returned client mirrors the contract's route groups. Each route becomes a function that accepts the route's typed arguments and returns a Promise resolving to the typed response.
+The returned client mirrors the contract's route groups, one function per route.
 
 ## Calling routes
 
@@ -60,7 +60,7 @@ const { status, body } = await apiClient.users.getUser({
 });
 ```
 
-The `params` field is only required when the route path contains `:param` placeholders. TypeScript enforces this, so routes with no path parameters do not accept `params`.
+The `params` field is required when the route path contains `:param` placeholders, and rejected when it does not.
 
 When the route declares a `pathParams` schema, `params` is typed by that schema's output type instead of the path template, the same typing the server-side handler receives. Refinements like `.brand()` flow to the caller:
 
@@ -141,21 +141,9 @@ Each call returns a discriminated union over the route's defined status codes:
 type ListUsersResponse = { status: 200; body: { users: User[]; total: number }; headers: Record<string, string> };
 ```
 
-Narrow on `status` to access the correctly typed `body`:
-
-```ts
-const result = await apiClient.users.createUser({ body: { name: 'Alice', email: 'alice@example.com' } });
-
-if (result.status === 201) {
-    // result.body is User
-} else {
-    // result.status === 400, result.body is a Problem Details object
-}
-```
-
 ## Validation errors
 
-Routes with a `body` or `query` schema can receive a `400` validation error when the request data fails schema validation. This is automatically included in the response type, so you don't need to declare it in your routes.
+A route with a `body` or `query` schema can answer `400` when the request fails validation. It is in the response type already, without you declaring it.
 
 ```ts
 const result = await apiClient.users.createUser({
@@ -173,7 +161,7 @@ if (result.status === 400) {
 }
 ```
 
-Routes without `body` or `query` cannot trigger validation, so the `400` is not included in their response type.
+A route with neither takes no `400` in its response type.
 
 ### `isValidationError`
 
@@ -191,20 +179,18 @@ if (result.status === 400) {
 }
 ```
 
-If a route does not declare a `400`, you don't need this, because `result.status === 400` narrows the body to `ValidationError` directly.
-
 ## React Native
 
-The client works in Expo and in bare React Native with no extra setup. A mobile app imports the [same contract](/docs/project-structure) as your website, and gets the same routes and the same types out of it.
+The client works in Expo and in bare React Native, importing the [same contract](/docs/project-structure) as your website.
 
 ### Reading a token from storage
 
-`baseHeaders` is fixed when the client is constructed, so a credential that lives in storage goes in `onRequest`. It runs before every request, it can be async, and the `Headers` it receives are the ones the request is sent with:
+`baseHeaders` is fixed when the client is constructed, so a credential that lives in storage goes in `onRequest`. It runs before every request, and the `Headers` it receives are the ones sent:
 
 ```ts title="src/lib/api-client.ts"
 import { KizunaClient } from '@ts-kizuna/fetch';
 import * as SecureStore from 'expo-secure-store';
-import { contract } from '@shared/contract';
+import { contract } from '@/contract';
 
 export const apiClient = new KizunaClient(contract, {
     baseUrl: process.env.EXPO_PUBLIC_API_URL,
@@ -217,7 +203,7 @@ export const apiClient = new KizunaClient(contract, {
 
 ### Uploading a file
 
-Expo SDK 54 and later ships a `File` class, and `expo/fetch` is the implementation that knows how to put one inside a multipart body. The global `fetch` does not, so hand the client Expo's:
+Expo SDK 54 and later ships a `File` class, and `expo/fetch` is the implementation that puts one inside a multipart body. Hand the client Expo's:
 
 ```ts title="src/lib/api-client.ts"
 import { fetch } from 'expo/fetch';
@@ -228,7 +214,7 @@ export const apiClient = new KizunaClient(contract, {
 });
 ```
 
-Then build the `FormData` yourself, because the client forwards a `FormData` body untouched instead of assembling one from your fields:
+Then build the `FormData` yourself, since the client forwards a `FormData` body untouched:
 
 ```ts
 import { File } from 'expo-file-system';
@@ -242,7 +228,7 @@ const { status } = await apiClient.users.uploadAvatar({
 });
 ```
 
-The cast is there because the contract types the field as a `File`, describing what the server receives once the multipart request lands.
+The cast is there because the contract types the field as the `File` the server receives once the multipart request lands.
 
 Bare React Native has no `File` it can build from a path. Append a `{ uri, name, type }` descriptor in its place and leave `fetch` out of the client config, since that form is the one the global `fetch` understands.
 

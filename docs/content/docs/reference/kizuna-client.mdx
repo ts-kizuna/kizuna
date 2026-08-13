@@ -3,7 +3,7 @@ title: new KizunaClient()
 description: Build a fully typed HTTP client from a ts-kizuna contract using the native fetch API.
 ---
 
-Create a fully typed HTTP client from a contract. The returned client mirrors the route structure, so each route becomes a function that accepts typed arguments and returns a typed response.
+Create a fully typed HTTP client from a contract. See the [fetch client guide](/docs/clients/fetch) for usage.
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
@@ -24,14 +24,16 @@ new KizunaClient(contract: Contract, config: ClientConfig): Client
 
 ## `ClientConfig`
 
-| Option           | Type                                 | Required | Description                                                                                                             |
-| ---------------- | ------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `baseUrl`        | `string`                             | Yes      | Base URL prepended to every route path                                                                                  |
-| `baseHeaders`    | `Record<string, string>`             | No       | Headers merged into every request                                                                                       |
-| `credentials`    | `RequestCredentials`                 | No       | Passed as `credentials` to every `fetch` call                                                                           |
-| `fetch`          | `typeof fetch`                       | No       | Custom fetch implementation (e.g. for testing or a polyfill)                                                            |
-| `onRequest`      | `(context) => void \| Promise<void>` | No       | Callback before each request, receiving `{ url, method, headers, route }`. May be async.                                |
-| `requestContext` | `Record<string, string>`             | \*       | Header values for the contract's [request context](/docs/reference/kizuna-request-context), required when any header is |
+| Option           | Type                                 | Required | Description                                                                                                                                                                      |
+| ---------------- | ------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baseUrl`        | `string`                             | Yes      | Base URL prepended to every route path                                                                                                                                           |
+| `baseHeaders`    | `Record<string, string>`             | No       | Headers merged into every request                                                                                                                                                |
+| `credentials`    | `RequestCredentials`                 | No       | Passed as `credentials` to every `fetch` call                                                                                                                                    |
+| `fetch`          | `typeof fetch`                       | No       | Custom fetch implementation (e.g. for testing or a polyfill)                                                                                                                     |
+| `onRequest`      | `(context) => void \| Promise<void>` | No       | Callback before each request, receiving `{ url, method, headers, route }`. May be async.                                                                                         |
+| `requestContext` | `ContextHeaderInputs`                | \*       | Header values for the contract's [request context](/docs/reference/kizuna-request-context). Present only when the contract declares one, and required when any of its headers is |
+
+`requestContext` values are typed from the declared header schemas, so an optional header stays optional and a coerced one takes the schema's input type.
 
 ## Returns
 

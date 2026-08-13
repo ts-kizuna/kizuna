@@ -5,7 +5,7 @@ description: Build and ship your own code generator or client from a ts-kizuna c
 
 `createGenerator` from `@ts-kizuna/core/generator` lets you walk your contract and produce any output, such as a typed client for another language, documentation, or a route manifest. The OpenAPI and Swift generators are both built on it.
 
-New first-party generator PRs will be declined, because we can't maintain what we don't know well. The generator API is public so you can build your own.
+Whether a generator goes first-party comes down to demand, not age. If enough teams need a target, we will add it. What we will not take on is one a handful of people need, since we maintain everything we merge. The generator API is public, so you can build and publish your own today.
 
 ## How it works
 
@@ -61,8 +61,4 @@ Each `processRoute` call receives:
 
 ## Deprecation
 
-Deprecation data resolves automatically. When `.kizuna/deprecations.json` exists, produced by `kizuna deprecations` (see [Deprecations](/docs/deprecations)), each `processRoute` call gets `deprecated`, `deprecationMessage`, and `fieldDeprecations` filled in for the matching route. Without that file, `deprecated` is always `false` and `fieldDeprecations` is always `undefined`.
-
-## Publishing
-
-ts-kizuna does not maintain third-party generators. Build yours and publish it as its own package.
+Deprecation data resolves automatically. When `.kizuna/deprecations.json` exists, produced by `kizuna deprecations` (see [Deprecations](/docs/deprecations)), each `processRoute` call gets `deprecated`, `deprecationMessage`, and `fieldDeprecations` filled in for the matching route. With no such file, `deprecated` is `false` and `fieldDeprecations` is `undefined`.

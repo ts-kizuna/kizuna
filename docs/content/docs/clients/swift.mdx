@@ -10,7 +10,7 @@ description: Generate a native Swift client from your routes with the ts-kizuna-
 ## Generate
 
 ```sh
-ts-kizuna-swift generate --contract src/contract.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
+ts-kizuna-swift generate --contract src/contract/index.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
 ```
 
 | Flag                  | Description                                                                             |
@@ -21,11 +21,11 @@ ts-kizuna-swift generate --contract src/contract.ts --output ios/MyApp/Generated
 | `--camel-case`        | Convert wire field names to camelCase properties with CodingKeys                        |
 | `--unknown-enum-case` | Emit enums with an `unknown(String)` fallback so new server values don't break decoding |
 
-The CLI reads the contract at runtime using `jiti`, with no build step needed. Add the generated file to your Xcode project or Swift package as a regular source file.
+The CLI reads the contract at runtime using `jiti`. Add the generated file to your Xcode project or Swift package as a regular source file.
 
 ### Property naming
 
-By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. The types mirror the wire shape, so it's easy to see what came from the API.
+By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type.
 
 Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `CodingKeys`.
 
@@ -45,8 +45,6 @@ case .unknown(let raw):
 The raw value is preserved, so re-encoding writes it back unchanged. Discriminated unions still throw on an unknown discriminator.
 
 ## Usage
-
-Create the client once and share it across your app:
 
 ```swift title="APISetup.swift"
 let client = APIClient(baseURL: URL(string: "https://api.example.com")!)
@@ -85,7 +83,7 @@ try await client.sendNotification(
 
 ## Generated client
 
-The generated file exports a `Sendable` client with methods for each route and sub-clients for grouped routes. It's a plain `final class`, and everything is immutable `let` storage set at init, so it's safe to share across tasks without an actor hop per request. Each request group is a nested struct with a group-named factory:
+The generated file exports a `Sendable` client with methods for each route and sub-clients for grouped routes. It is `Sendable`, so sharing it across tasks needs no actor hop per request. Each request group is a nested struct with a group-named factory:
 
 ```swift title="APIClient.swift"
 import Foundation
@@ -130,7 +128,7 @@ You can add a script to your `package.json` to regenerate the client whenever th
 ```json title="package.json"
 {
     "scripts": {
-        "generate:swift": "ts-kizuna-swift generate --contract src/contract.ts --output ../ios/MyApp/Generated/APIClient.swift --namespace-name API"
+        "generate:swift": "ts-kizuna-swift generate --contract src/contract/index.ts --output ../ios/MyApp/Generated/APIClient.swift --namespace-name API"
     }
 }
 ```

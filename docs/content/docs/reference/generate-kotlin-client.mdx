@@ -31,10 +31,6 @@ generateKotlinClient(contract: Contract, config: KotlinConfig): string
 | `camelCaseProperties` | `boolean` | No       | Convert wire field names to camelCase properties, mapped back via `@SerialName`. Default `false`                                               |
 | `unknownEnumCase`     | `boolean` | No       | Emit enums as a `sealed interface` with an `Unknown(wireValue)` member so unrecognised wire values decode instead of throwing. Default `false` |
 
-## Returns
-
-A `string` containing the generated Kotlin source code.
-
 ## Example
 
 ```ts

@@ -9,7 +9,7 @@ description: Generate an OpenAPI 3.1.0 document from your contract, and serve it
 
 ## `openApiPlugin`
 
-`openApiPlugin` serves the document and an API reference UI for it. It generates the document from your contract, and `api.mount` serves its routes on any adapter.
+`openApiPlugin` serves the document and an API reference UI for it, on any adapter.
 
 ```ts title="src/contract/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
@@ -57,7 +57,7 @@ openApiPlugin({
 });
 ```
 
-The UI embeds the document, so `docsPath` alone is enough to browse the API. All three are [plugin routes](/docs/plugins), so they stay out of your fetch client and out of the document itself.
+The UI embeds the document, so `docsPath` alone is enough to browse the API. All three are [plugin routes](/docs/plugins#plugin-routes), so they stay out of your fetch client and out of the document itself.
 
 The routes are public. Gate them with your framework's own middleware if that is not what you want.
 
@@ -79,7 +79,7 @@ tsx scripts/generate-openapi.ts
 
 ### Serving it yourself
 
-The plugin is the batteries-included path, not the only one:
+[`generateOpenApi`](#generateopenapi) renders the document directly:
 
 ```ts title="src/index.ts"
 const spec = generateOpenApi(contract);
@@ -89,7 +89,7 @@ app.get('/openapi.yaml', (_req, res) => {
 });
 ```
 
-Leave `yamlPath` unset when you do, or two handlers claim the path and whichever registered first wins. Kizuna cannot catch that one for you: it sees collisions between the contract and a plugin, but a route you register on the app yourself is invisible to it.
+Leave `yamlPath` unset when you do, or two handlers claim the path and whichever registered first wins. Kizuna sees collisions between the contract and a plugin, but a route you register on the app yourself is invisible to it.
 
 Mixing is the useful case: set `jsonPath` and leave `docsPath` unset, and the plugin serves the document while you render your own UI.
 
@@ -106,11 +106,11 @@ Point `cdnUrl` at a self-hosted copy for air-gapped deployments or a strict CSP.
 
 ## `generateOpenApi`
 
-`generateOpenApi` returns a renderer. Call it with `'json'` for the document object or `'yaml'` for a YAML string. Everything it needs, `info` included, comes off the contract: you declare it once on [`openApiPlugin`](#openapiplugin) in `k.ts`, and nothing here can disagree with it.
+`generateOpenApi` returns a renderer. Call it with `'json'` for the document object or `'yaml'` for a YAML string. Everything it needs, `info` included, comes off the contract, declared once on [`openApiPlugin`](#openapiplugin) in `k.ts`.
 
 ```ts
 import { generateOpenApi } from '@ts-kizuna/openapi/server';
-import { contract } from '@shared/contract';
+import { contract } from '@/contract';
 
 const spec = generateOpenApi(contract);
 
@@ -152,12 +152,11 @@ openApiPlugin({
 | `info`            | required | OpenAPI `info` object                                                                   |
 | `servers`         | none     | Server URLs                                                                             |
 | `setOperationId`  | `false`  | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys. |
-| `tags`            | none     | Top-level tag definitions                                                               |
 | `operationMapper` | none     | Callback to transform each operation before it is added to the spec                     |
 
 ## Security
 
-Security comes from the contract, not from generator options. The [identities](/docs/auth) you register on `new Kizuna()` are emitted as `components.securitySchemes`, and the contract's auth map becomes each operation's `security`, with oauth2 scopes included. There is nothing to declare here, and the spec can never disagree with what the server actually enforces.
+Security comes from the contract. The [identities](/docs/auth) you register on `new Kizuna()` are emitted as `components.securitySchemes`, and the contract's auth map becomes each operation's `security`, with oauth2 scopes included. There are no generator options for it, so the spec cannot disagree with what the server enforces.
 
 ```ts
 export const user = Kizuna.identity.bearer({
@@ -181,13 +180,11 @@ paths:
                 - user: []
 ```
 
-Routes marked `false` in the auth map get no `security` entry, so they document as public, because they are. A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity also emits no `security` (OpenAPI can't describe its credential), but its routes carry an `x-kizuna-guarded` extension, so protected-out-of-band stays distinct from public.
+Routes marked `false` in the auth map get no `security` entry. A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity also emits no `security`, since OpenAPI can't describe its credential, but its routes carry an `x-kizuna-guarded` extension so they stay distinguishable from public ones.
 
 ## Validation errors
 
-Routes with a `body` or `query` schema automatically include a `400` validation error response in the generated spec. This matches the error kizuna returns when request data fails schema validation.
-
-If a route already declares a `400` response, the automatic validation error is not added, because your declaration takes precedence.
+Routes with a `body` or `query` schema automatically include a `400` validation error response, matching what kizuna returns when request data fails validation. A route that declares its own `400` keeps it; nothing is added.
 
 ## Reference
 
@@ -200,4 +197,4 @@ Use [oasdiff](https://github.com/oasdiff/oasdiff) to compare your generated spec
 
 ## Scheduled jobs
 
-[Scheduled jobs](/docs/jobs) live under `jobs` on the contract rather than `routes`, so they are not in the document. A job has no path or method of its own to describe, and the two endpoints that serve them have one legitimate caller each.
+[Scheduled jobs](/docs/jobs) live under `jobs` on the contract, not `routes`, so they are not in the document.

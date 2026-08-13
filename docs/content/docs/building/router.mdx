@@ -3,18 +3,18 @@ title: Router
 description: Implement a handler for each route, with full type inference from the contract.
 ---
 
-The handlers are your server's implementation of the contract, one function per route. Inputs arrive validated and typed, and return values are checked against the contract's declared responses. Write them with `server.router`, then [mount them](/docs/building/mounting).
+Handlers implement the contract, one function per route. Inputs arrive validated and typed, and return values are checked against the declared responses. Write them with `server.router`, then [mount them](/docs/building/mounting).
 
 ## `server.router`
 
-`server.router(router)` types the handler tree against the contract, one function per route, grouped to mirror the contract. The `server` handle comes from `new KizunaServer(contract)`.
+`server.router(router)` types the handler tree against the contract, grouped to mirror it. The `server` handle comes from `new KizunaServer(contract)`.
 
 Each group lives in its own file, typed against its group in the contract with the [`Router`](#routehandler-and-router-types) type so inputs and responses stay inferred:
 
 ```ts
 // users.router.ts
 import type { Router } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
-import type { contract } from './contract';
+import type { contract } from '@/contract';
 
 export const users: Router<typeof contract.routes.users> = {
     listUsers: async ({ query }) => {
@@ -93,7 +93,7 @@ Each handler receives an object with the validated inputs for that route:
 
 ## Identity context
 
-When the contract's [auth map](/docs/auth) secures a route, the handler receives the identity's context under `auth`, keyed by the identity's name. That context is whatever the guard returned. There is nothing to look up or cast, because the guard already ran, so the value is simply there, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/kizuna-request-context) arrive the same way, under `requestContext` on every route.
+When the contract's [auth map](/docs/auth) secures a route, the handler receives the identity's context under `auth`, keyed by the identity's name. That context is whatever the guard returned, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/kizuna-request-context) arrive the same way, under `requestContext` on every route.
 
 ```ts
 listMembers: ({ auth }) => ({
@@ -112,7 +112,7 @@ transfer: ({ body, auth }) => {
 },
 ```
 
-On routes with an [access gate](/docs/auth#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `auth.member.role` is typed `'owner'`. The runtime check and the type agree by construction:
+On routes with an [access gate](/docs/auth#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `auth.member.role` is typed `'owner'`:
 
 ```ts
 deleteWorkspace: ({ auth }) => ({
@@ -158,7 +158,7 @@ return {
 
 Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` in your routes to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/server-guard) in guards and all built-in kizuna errors.
 
-```ts title="src/contract/contract.ts"
+```ts title="src/contract/index.ts"
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { k } from './k';
 
@@ -194,7 +194,7 @@ getUser: async ({ params, throwError }) => {
 },
 ```
 
-TypeScript enforces that the status and body match the routes, same as a return value.
+TypeScript enforces the status and body the same way it does for a return value.
 
 ## Validation errors
 
@@ -235,9 +235,7 @@ Each issue includes a `code` that tells you _why_ the field failed, not just _th
 
 User-defined checks (`.refine()`) report as `custom` by default. To emit a **typed** code instead, like `invalid_phone_number` above, declare it in `validation.issueCodes` on [`new Kizuna()`](/docs/reference/kizuna) and raise it with [`k.issue`](/docs/reference/k-issue). It then shows up in `errors[].code` as a typed literal on both the server and the generated client, not a bare `string`.
 
-The `message` and `path` fields come directly from your Zod schemas. If you use custom messages (e.g. `z.string().min(1, "Name is required")`), those are what the client receives.
-
-You don't need to handle this yourself. kizuna validates against the routes and rejects invalid requests automatically.
+The `message` and `path` fields come from your Zod schemas, custom messages (`z.string().min(1, 'Name is required')`) included.
 
 This `400` response is reflected in the [fetch client](/docs/clients/fetch#validation-errors) return type and the [OpenAPI spec](/docs/openapi) for any route that declares a `body` or `query` schema.
 
@@ -249,7 +247,7 @@ Annotate a single route, one group, or the whole tree:
 
 ```ts
 import type { RouteHandler, Router } from '@ts-kizuna/express';
-import { contract } from './contract';
+import { contract } from '@/contract';
 
 // Single route
 const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ params }) => {

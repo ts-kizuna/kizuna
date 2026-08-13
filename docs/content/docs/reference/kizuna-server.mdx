@@ -3,7 +3,7 @@ title: new KizunaServer()
 description: Turn a contract into a server handle for defining guards, request context, and the router.
 ---
 
-`new KizunaServer(contract)` is a `server` handle bound to your contract. It is the server-side counterpart to `k`: define guards, request context, and the router without passing the contract again.
+`new KizunaServer(contract)` is a `server` handle bound to your contract, the server-side counterpart to `k`.
 
 <AdapterTabs functionName="KizunaServer" />
 
@@ -28,7 +28,7 @@ export const server = new KizunaServer(contract);
 
 ## Returns
 
-The handle. Keep it as `server`, the serving surface for this contract:
+The handle, the serving surface for this contract:
 
 | Method                  | Description                                                                                                        |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -46,7 +46,7 @@ export const server = new KizunaServer(contract, {
 });
 ```
 
-Without a transport, a job that fails has already outlived its request and has nowhere to report. `onJobError` is where it surfaces; without one it is logged.
+A job queued without a transport has already outlived its request, so a failure has nowhere to report. `onJobError` is where it surfaces; without one it is logged.
 
 ```ts
 export const server = new KizunaServer(contract, {
