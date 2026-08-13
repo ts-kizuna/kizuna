@@ -5,6 +5,7 @@ dist
 .DS_Store
 .turbo
 .next
+.vercel
 next-env.d.ts
 *.tsbuildinfo
 tsconfig.tsbuildinfo

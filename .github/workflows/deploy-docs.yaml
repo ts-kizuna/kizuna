@@ -1,0 +1,35 @@
+name: Deploy docs
+
+on:
+    workflow_call:
+        secrets:
+            VERCEL_TOKEN:
+                required: true
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    deploy:
+        name: Deploy docs to Vercel production
+        runs-on: ubuntu-latest
+        steps:
+            - name: Trigger Vercel production deployment
+              run: |
+                  curl -sS --fail-with-body -X POST "https://api.vercel.com/v13/deployments?teamId=${{ vars.VERCEL_TEAM_ID }}" \
+                    -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                      "name": "${{ vars.VERCEL_PROJECT_NAME }}",
+                      "gitSource": {
+                        "type": "github",
+                        "org": "ts-kizuna",
+                        "repo": "kizuna",
+                        "ref": "main"
+                      },
+                      "target": "production",
+                      "projectSettings": {
+                        "commandForIgnoringBuildStep": "exit 1"
+                      }
+                    }'

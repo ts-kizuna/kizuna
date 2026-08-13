@@ -140,3 +140,10 @@ jobs:
                           if (comments.some((comment) => comment.body.includes(marker))) continue;
                           await github.rest.issues.createComment({ owner, repo, issue_number: number, body });
                       }
+
+    deploy-docs:
+        name: Deploy docs
+        needs: release
+        uses: ./.github/workflows/deploy-docs.yaml
+        secrets:
+            VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
