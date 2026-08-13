@@ -9,6 +9,10 @@ import type {
     RequestContextSchema,
     RequestContextHeaderInputs,
     SecurityScheme,
+    Permission,
+    GateablePermissionName,
+    ContractPlugins,
+    Jobs,
 } from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
 import { buildPath, isRouteDefinition } from '@ts-kizuna/core/adapter';
@@ -81,6 +85,14 @@ type ClientFn<R extends RouteDefinition, Codes extends string> =
 export type Client<T extends Routes, Codes extends string = never> = {
     [K in keyof T]: T[K] extends RouteDefinition ? ClientFn<T[K], Codes> : T[K] extends Routes ? Client<T[K], Codes> : never;
 };
+
+/**
+ * The `permissions` accessor a client carries when the contract declares the
+ * endpoint, keyed to the permission paths its policies allow.
+ */
+export type PermissionsAccessor<Permissions_> = [GateablePermissionName<Permissions_>] extends [never]
+    ? {}
+    : { permissions: () => Promise<ResolvedPermissions<GateablePermissionName<Permissions_>>> };
 
 type UnionToIntersection<Union> = (Union extends unknown ? (distributed: Union) => void : never) extends (
     intersected: infer Intersection
@@ -229,6 +241,31 @@ const buildClientTree = (router: Routes, config: ClientConfig): Record<string, u
     return result;
 };
 
+/**
+ * The caller's permissions, as the endpoint reported them: one boolean per
+ * declared name, so a caller destructures the ones it cares about. Only the
+ * permissions applying to no particular record cross the wire, and never enough
+ * to decide about one specific record.
+ */
+export type ResolvedPermissions<Name extends string = string> = Record<Name, boolean>;
+
+const buildPermissionsFn = (contract: Contract, config: ClientConfig) => async (): Promise<ResolvedPermissions> => {
+    const path = contract.permissionsConfig?.path ?? '/permissions';
+    const fetchImpl = config.fetch ?? fetch;
+    const response = await fetchImpl(config.baseUrl + path, {
+        method: 'GET',
+        headers: {
+            ...(config.baseHeaders ?? {}),
+            accept: 'application/json',
+        },
+        credentials: config.credentials,
+    });
+    if (!response.ok) {
+        throw new Error(`ts-kizuna: the permissions endpoint at ${path} answered ${response.status}.`);
+    }
+    return (await response.json()) as ResolvedPermissions;
+};
+
 function buildClient(contract: Contract, config: ClientConfig): unknown {
     const contextHeaders = (config as { requestContext?: Record<string, string | undefined> }).requestContext;
     const resolvedConfig: ClientConfig = contextHeaders
@@ -241,7 +278,11 @@ function buildClient(contract: Contract, config: ClientConfig): unknown {
           }
         : config;
 
-    return buildClientTree(contract.routes, resolvedConfig);
+    const tree = buildClientTree(contract.routes, resolvedConfig);
+    if (contract.permissionsConfig) {
+        tree.permissions = buildPermissionsFn(contract, resolvedConfig);
+    }
+    return tree;
 }
 
 /**
@@ -269,13 +310,14 @@ export interface KizunaClientConstructor {
         Codes extends string = never,
         Schemes extends Record<string, SecurityScheme> = Record<string, never>,
         RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
+        Permissions_ extends Record<string, Permission> = Record<string, never>,
     >(
-        contract: Contract<T, Record<string, TagOptions>, Codes, Schemes, unknown, RequestContext>,
+        contract: Contract<T, Record<string, TagOptions>, Codes, Schemes, unknown, RequestContext, ContractPlugins, Jobs, Permissions_>,
         config: ClientConfig &
             ({} extends ContextHeaderInputs<RequestContext>
                 ? { requestContext?: ContextHeaderInputs<RequestContext> }
                 : { requestContext: ContextHeaderInputs<RequestContext> })
-    ): Client<T, Codes>;
+    ): Client<T, Codes> & PermissionsAccessor<Permissions_>;
 }
 
 export const KizunaClient = buildClient as unknown as KizunaClientConstructor;

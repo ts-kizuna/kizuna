@@ -90,7 +90,7 @@ describe('k.contract auth resolution', () => {
                 users,
                 workspace,
             },
-            auth: {
+            access: {
                 users: false,
                 workspace: false,
             },
@@ -106,7 +106,7 @@ describe('k.contract auth resolution', () => {
                 users,
                 workspace,
             },
-            auth: {
+            access: {
                 users: 'user',
                 workspace: false,
             },
@@ -122,7 +122,7 @@ describe('k.contract auth resolution', () => {
                 users,
                 workspace,
             },
-            auth: {
+            access: {
                 users: false,
                 workspace: {
                     member: {
@@ -150,7 +150,7 @@ describe('k.contract auth resolution', () => {
                 users,
                 workspace,
             },
-            auth: {
+            access: {
                 users: false,
                 workspace: {
                     user: ['read:workspace'],
@@ -172,7 +172,7 @@ describe('k.contract auth resolution', () => {
                 users,
                 workspace,
             },
-            auth: {
+            access: {
                 users: false,
                 workspace: {
                     '*': 'member',
@@ -208,7 +208,7 @@ describe('k.contract auth resolution', () => {
             routes: {
                 nested,
             },
-            auth: {
+            access: {
                 nested: 'user',
             },
         });
@@ -222,7 +222,7 @@ describe('k.contract auth resolution', () => {
                 users,
                 workspace,
             },
-            auth: {
+            access: {
                 users: false,
                 workspace: 'member',
             },
@@ -260,7 +260,7 @@ describe('multi-identity auth values', () => {
                 users,
                 workspace,
             },
-            auth: {
+            access: {
                 users: false,
                 workspace: {
                     user: true,
@@ -292,7 +292,7 @@ describe('cascade merging', () => {
                 users,
                 workspace,
             },
-            auth: {
+            access: {
                 users: false,
                 workspace: {
                     '*': 'member',
@@ -317,7 +317,7 @@ describe('cascade merging', () => {
                 users,
                 workspace,
             },
-            auth: {
+            access: {
                 users: false,
                 workspace: {
                     '*': 'member',
@@ -350,7 +350,7 @@ describe('cascade merging', () => {
                     users,
                     workspace,
                 },
-                auth: {
+                access: {
                     users: false,
                     workspace: {
                         '*': 'member',
@@ -368,7 +368,7 @@ describe('cascade merging', () => {
                 users,
                 workspace,
             },
-            auth: {
+            access: {
                 users: false,
                 workspace: {
                     '*': 'member',
@@ -388,7 +388,7 @@ describe('nested group auth', () => {
             routes: {
                 members,
             },
-            auth: {
+            access: {
                 members: {
                     '*': 'user',
                     invites: false,
@@ -407,7 +407,7 @@ describe('nested group auth', () => {
             routes: {
                 members,
             },
-            auth: {
+            access: {
                 members: {
                     '*': 'user',
                     session: {
@@ -434,7 +434,7 @@ describe('nested group auth', () => {
             routes: {
                 members,
             },
-            auth: {
+            access: {
                 members: {
                     '*': 'user',
                     events: {
@@ -468,7 +468,7 @@ describe('nested group auth', () => {
             routes: {
                 members,
             },
-            auth: {
+            access: {
                 members: {
                     '*': 'user',
                     events: {
@@ -500,7 +500,7 @@ describe('nested group auth', () => {
                 routes: {
                     members,
                 },
-                auth: {
+                access: {
                     members: {
                         '*': 'user',
                         list: false,
@@ -520,7 +520,7 @@ describe('nested group auth', () => {
                 routes: {
                     members,
                 },
-                auth: {
+                access: {
                     members: {
                         '*': 'user',
                         session: {

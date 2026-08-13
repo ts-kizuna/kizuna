@@ -8,6 +8,7 @@ import { Kizuna, type Contract } from '@ts-kizuna/core';
 import { contractFingerprint } from '@ts-kizuna/core/generator';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateOpenApi, renderOpenApi } from './generator.js';
+import { openApiPlugin } from './plugin.js';
 import type { GenerateOpenApiOptions } from './types.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
@@ -1443,7 +1444,7 @@ describe('security from the contract', () => {
             routes: {
                 api: routes,
             },
-            auth: {
+            access: {
                 api: {
                     '*': false,
                     getSecret: 'user',
@@ -1560,7 +1561,7 @@ describe('security from the contract', () => {
             routes: {
                 members,
             },
-            auth: {
+            access: {
                 members: {
                     '*': 'user',
                     session: {
@@ -1629,7 +1630,7 @@ describe('shared scheme names', () => {
             routes: {
                 api: routes,
             },
-            auth: {
+            access: {
                 api: {
                     '*': 'viewer',
                     updateSettings: 'admin',
@@ -1709,7 +1710,7 @@ describe('custom identities (no OpenAPI scheme)', () => {
             routes: {
                 api: routes,
             },
-            auth: {
+            access: {
                 api: {
                     '*': false,
                     getInvite: 'inviteToken',
@@ -1757,5 +1758,85 @@ describe('custom identities (no OpenAPI scheme)', () => {
         const operation = spec.paths['/open']?.get;
         expect(operation?.security).toBeUndefined();
         expect(operation?.['x-kizuna-guarded']).toBeUndefined();
+    });
+});
+
+describe('permission requirements', () => {
+    const gatedK = new Kizuna({
+        plugins: {
+            openApi: openApiPlugin({
+                info: {
+                    title: 'gated',
+                    version: '1.0.0',
+                },
+            }),
+        },
+        identities: {
+            holder: Kizuna.identity.bearer({
+                context: z.object({
+                    userId: z.string(),
+                }),
+            }),
+        },
+        permissions: {
+            deleteWorkspace: Kizuna.permission(),
+        },
+    });
+
+    const gatedRoutes = gatedK.routes({
+        getWorkspace: {
+            method: 'GET',
+            path: '/workspace',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+        deleteWorkspace: {
+            method: 'DELETE',
+            path: '/workspace',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+    });
+
+    const gatedContract = gatedK.contract({
+        routes: {
+            workspace: gatedRoutes,
+        },
+        access: {
+            workspace: {
+                '*': false,
+                deleteWorkspace: {
+                    auth: 'holder',
+                    permission: 'deleteWorkspace',
+                },
+            },
+        },
+    });
+
+    const gatedSpec = generateJson(gatedContract, {
+        info: {
+            title: 'gated',
+            version: '1.0.0',
+        },
+    }) as unknown as {
+        paths: Record<string, Record<string, { 'x-kizuna-permission'?: unknown }>>;
+    };
+
+    it('emits x-kizuna-permission on a gated operation', () => {
+        const operation = gatedSpec.paths['/workspace']!.delete!;
+        expect(operation['x-kizuna-permission']).toEqual({
+            all: ['deleteWorkspace'],
+        });
+    });
+
+    it('leaves an ungated operation without the extension', () => {
+        const operation = gatedSpec.paths['/workspace']!.get!;
+        expect(operation['x-kizuna-permission']).toBeUndefined();
     });
 });

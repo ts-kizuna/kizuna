@@ -72,6 +72,18 @@ export const ADAPTER_FEATURES = {
     'guards.multiIdentity': {
         summary: 'A route requiring two identities merges both contexts, and denies until both are present.',
     },
+    'permissions.gateDenies': {
+        summary: 'A route whose permission the caller lacks is refused with a 403 before the handler runs.',
+    },
+    'permissions.gatePasses': {
+        summary: 'A route whose permission the caller holds reaches its handler.',
+    },
+    'permissions.canInHandler': {
+        summary: '`can` reaches the handler and answers about a specific record.',
+    },
+    'permissions.resolverRunsOnce': {
+        summary: 'A permission resolves once per request, and not at all when the request never asks about it.',
+    },
     'responses.declaredContentType': {
         summary: 'A route declaring a non-JSON content type sends its body raw under it.',
     },

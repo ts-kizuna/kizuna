@@ -18,6 +18,12 @@ import {
     responseShapeContract,
     securedContract,
     securedGuards,
+    permissionsContract,
+    permissionImplementations,
+    permissionGuards,
+    permissionsAuthorization,
+    createPermissionsRouter,
+    resetResolverCalls,
     sessionAuthorization,
     subUserContract,
     userContract,
@@ -46,6 +52,7 @@ interface MountOptions {
     router: unknown;
     responseValidation?: boolean;
     guards?: Record<string, unknown>;
+    permissions?: Record<string, unknown>;
     plugins?: Record<string, unknown>;
 }
 
@@ -58,6 +65,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             {
                 router: options.router,
                 guards: options.guards,
+                permissions: options.permissions,
                 plugins: options.plugins,
             } as never
         );
@@ -92,6 +100,17 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 contract: securedContract,
                 router: createSecuredRouter(),
                 guards: securedGuards,
+            },
+            use
+        );
+
+    const usingPermissions = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                contract: permissionsContract,
+                router: createPermissionsRouter(),
+                guards: permissionGuards,
+                permissions: permissionImplementations,
             },
             use
         );
@@ -548,6 +567,87 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(complete.body).toEqual({
                     userId: '1',
                     workspaceUserId: '1',
+                });
+            });
+        },
+
+        'permissions.gateDenies': async () => {
+            await usingPermissions(async (mounted) => {
+                const denied = await mounted.request({
+                    method: 'GET',
+                    path: '/workspace/gated/no',
+                    headers: {
+                        authorization: permissionsAuthorization,
+                    },
+                });
+                expect(denied.status).toBe(403);
+                expect(denied.headers.get('content-type')).toContain('application/problem+json');
+                expect(denied.body).toMatchObject({
+                    status: 403,
+                    title: 'Forbidden',
+                    detail: 'Forbidden: exportLedger is not permitted on this route.',
+                });
+            });
+        },
+
+        'permissions.gatePasses': async () => {
+            await usingPermissions(async (mounted) => {
+                const allowed = await mounted.request({
+                    method: 'GET',
+                    path: '/workspace/gated/yes',
+                    headers: {
+                        authorization: permissionsAuthorization,
+                    },
+                });
+                expect(allowed.status).toBe(200);
+                expect(allowed.body).toEqual({
+                    ok: true,
+                });
+            });
+        },
+
+        'permissions.canInHandler': async () => {
+            await usingPermissions(async (mounted) => {
+                const yes = await mounted.request({
+                    method: 'GET',
+                    path: '/workspace/checking/9',
+                    headers: {
+                        authorization: permissionsAuthorization,
+                    },
+                });
+                expect(yes.status).toBe(200);
+                expect(yes.body).toEqual({
+                    allowed: true,
+                });
+
+                const no = await mounted.request({
+                    method: 'GET',
+                    path: '/workspace/checking/44',
+                    headers: {
+                        authorization: permissionsAuthorization,
+                    },
+                });
+                expect(no.status).toBe(200);
+                expect(no.body).toEqual({
+                    allowed: false,
+                });
+            });
+        },
+
+        'permissions.resolverRunsOnce': async () => {
+            await usingPermissions(async (mounted) => {
+                resetResolverCalls();
+                const counted = await mounted.request({
+                    method: 'GET',
+                    path: '/workspace/counting',
+                    headers: {
+                        authorization: permissionsAuthorization,
+                    },
+                });
+                expect(counted.status).toBe(200);
+                expect(counted.body).toEqual({
+                    viewInvoices: 1,
+                    promoteMember: 0,
                 });
             });
         },

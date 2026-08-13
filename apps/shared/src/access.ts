@@ -1,16 +1,21 @@
 import { k } from './k.js';
 import { routes } from './routes/index.js';
 
-export const auth = k.auth(routes, {
+export const access = k.access(routes, {
     users: false,
     health: false,
     notifications: false,
+    invites: 'inviteToken',
     members: {
         '*': 'user',
         inviteMember: {
             member: {
                 role: ['owner', 'admin'],
             },
+        },
+        removeMember: {
+            auth: 'member',
+            permission: 'manageMembers',
         },
     },
     workspace: {
@@ -26,5 +31,4 @@ export const auth = k.auth(routes, {
             },
         },
     },
-    invites: 'inviteToken',
 });

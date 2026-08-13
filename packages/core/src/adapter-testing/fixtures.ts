@@ -266,7 +266,7 @@ export const securedContract = securedK.contract({
     routes: {
         api: securedRoutes,
     },
-    auth: {
+    access: {
         api: {
             '*': false,
             whoAmI: 'user',
@@ -700,3 +700,162 @@ export const createPluginRouter = <Context>(): Router<typeof pluginRoutes, Conte
             },
         }),
     }) as unknown as Router<typeof pluginRoutes, Context>;
+
+const MemberSchema = z.object({
+    id: z.string(),
+});
+
+const permissionsHolder = Kizuna.identity.bearer({
+    context: z.object({
+        userId: z.string(),
+    }),
+});
+
+const permissionsK = new Kizuna({
+    identities: {
+        holder: permissionsHolder,
+    },
+    permissions: {
+        viewInvoices: Kizuna.permission(),
+        exportLedger: Kizuna.permission(),
+        promoteMember: Kizuna.permission({
+            appliesTo: MemberSchema,
+        }),
+    },
+});
+
+export const permissionsRoutes = permissionsK.routes({
+    open: {
+        method: 'GET',
+        path: '/workspace/open',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+    gated: {
+        method: 'GET',
+        path: '/workspace/gated/:grant',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+    checking: {
+        method: 'GET',
+        path: '/workspace/checking/:id',
+        responses: {
+            200: z.object({
+                allowed: z.boolean(),
+            }),
+        },
+    },
+    counting: {
+        method: 'GET',
+        path: '/workspace/counting',
+        responses: {
+            200: z.object({
+                viewInvoices: z.int(),
+                promoteMember: z.int(),
+            }),
+        },
+    },
+});
+
+export const permissionsContract = permissionsK.contract({
+    routes: {
+        workspace: permissionsRoutes,
+    },
+    access: {
+        workspace: {
+            '*': false,
+            gated: {
+                auth: 'holder',
+                permission: 'exportLedger',
+            },
+            counting: {
+                auth: 'holder',
+                permission: 'viewInvoices',
+            },
+        },
+    },
+});
+
+/**
+ * How many times each permission has resolved. Reset before a request to observe
+ * laziness; the `counting` route reports the counts back.
+ */
+export const resolverCalls = {
+    viewInvoices: 0,
+    promoteMember: 0,
+};
+
+export const resetResolverCalls = (): void => {
+    resolverCalls.viewInvoices = 0;
+    resolverCalls.promoteMember = 0;
+};
+
+/**
+ * The permission bodies the `permissions.*` features mount, keyed by name.
+ * `server.permission` is an identity function in all four adapters, so only the
+ * wiring differs.
+ */
+export const permissionsToken = 'tok_holder';
+export const permissionsAuthorization = `Bearer ${permissionsToken}`;
+
+export const permissionGuards = {
+    holder: ({ bearer, deny }: { bearer: { token: string } | null; deny: (status: number, detail: string) => unknown }) =>
+        bearer?.token === permissionsToken ? { userId: '1' } : deny(401, 'Unauthorized'),
+};
+
+export const permissionImplementations = {
+    viewInvoices: () => {
+        resolverCalls.viewInvoices += 1;
+        return true;
+    },
+    exportLedger: ({ params }: { params: Record<string, string> }) => params.grant === 'yes',
+    promoteMember: () => {
+        resolverCalls.promoteMember += 1;
+        return (member: { id: string }) => member.id === '9';
+    },
+};
+
+export type PermissionsRouter<Context> = Router<typeof permissionsContract.routes, Context>;
+
+export const createPermissionsRouter = <Context>(): PermissionsRouter<Context> => ({
+    workspace: {
+        open: () => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        }),
+        gated: () => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        }),
+        checking: async ({ params, permission }) => ({
+            status: 200,
+            body: {
+                allowed: await permission.promoteMember({
+                    id: params.id,
+                }),
+            },
+        }),
+        counting: async ({ permission }) => {
+            await permission.viewInvoices();
+            await permission.viewInvoices();
+            return {
+                status: 200,
+                body: {
+                    viewInvoices: resolverCalls.viewInvoices,
+                    promoteMember: resolverCalls.promoteMember,
+                },
+            };
+        },
+    },
+});

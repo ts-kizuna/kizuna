@@ -122,7 +122,7 @@ export const securedContract = securedK.contract({
     routes: {
         api: securedRoutes,
     },
-    auth: {
+    access: {
         api: {
             '*': false,
             whoAmI: 'user',
@@ -185,7 +185,7 @@ export const gateContract = gateK.contract({
     routes: {
         api: gateRoutes,
     },
-    auth: {
+    access: {
         api: {
             '*': false,
             apiOnly: 'apiConsumer',
@@ -225,7 +225,7 @@ export const requestContextContract = requestContextK.contract({
     routes: {
         api: requestContextRoutes,
     },
-    auth: {
+    access: {
         api: false,
     },
 });
@@ -275,4 +275,51 @@ export const pluginTypeContract = pluginTypeK.contract({
             }),
         },
     }),
+});
+
+const MemberSchema = z.object({
+    id: z.string(),
+    role: z.enum(['owner', 'admin']),
+});
+
+const permissionTypeHolder = Kizuna.identity.bearer({
+    context: z.object({
+        userId: z.string(),
+    }),
+});
+
+const permissionTypeK = new Kizuna({
+    identities: {
+        holder: permissionTypeHolder,
+    },
+    permissions: {
+        viewInvoices: Kizuna.permission(),
+        promoteMember: Kizuna.permission({
+            appliesTo: MemberSchema,
+        }),
+    },
+});
+
+export const permissionTypeRoutes = permissionTypeK.routes({
+    transfer: {
+        method: 'POST',
+        path: '/workspace/transfer',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+
+export const permissionTypeContract = permissionTypeK.contract({
+    routes: {
+        workspace: permissionTypeRoutes,
+    },
+    access: {
+        workspace: {
+            auth: 'holder',
+            permission: 'viewInvoices',
+        },
+    },
 });

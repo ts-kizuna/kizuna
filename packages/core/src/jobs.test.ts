@@ -271,7 +271,7 @@ describe('k.contract with jobs', () => {
         const contract = k.contract({
             routes,
             jobs,
-            auth: {
+            access: {
                 listUsers: false,
             },
         });
@@ -282,7 +282,7 @@ describe('k.contract with jobs', () => {
     it('leaves jobs undefined when none are declared', () => {
         const contract = k.contract({
             routes,
-            auth: {
+            access: {
                 listUsers: false,
             },
         });
@@ -299,7 +299,7 @@ describe('k.contract with jobs', () => {
             k.contract({
                 routes,
                 jobs,
-                auth: {
+                access: {
                     listUsers: false,
                 },
             })
@@ -330,7 +330,7 @@ describe('a job endpoint colliding with a route', () => {
             k.contract({
                 routes: routesAt(path),
                 jobs: scheduled,
-                auth: {
+                access: {
                     listJobs: false,
                 },
             })
@@ -342,7 +342,7 @@ describe('a job endpoint colliding with a route', () => {
             k.contract({
                 routes: routesAt('/jobs'),
                 jobs: scheduled,
-                auth: {
+                access: {
                     listJobs: false,
                 },
             })
@@ -354,8 +354,10 @@ describe('a job endpoint colliding with a route', () => {
             identities: {
                 scheduler,
             },
-            jobs: {
-                path: '/internal/tick',
+            settings: {
+                jobs: {
+                    path: '/internal/tick',
+                },
             },
         });
         expect(() =>
@@ -374,7 +376,7 @@ describe('a job endpoint colliding with a route', () => {
                         schedule: '0 5 * * *',
                     },
                 }),
-                auth: {
+                access: {
                     listJobs: false,
                 },
             })

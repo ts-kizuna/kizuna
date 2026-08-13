@@ -21,6 +21,8 @@ const lastSessionEvents = new Map<string, SessionEvent>([
     ['2', { kind: 'logout', at: '2026-08-03T18:42:11.000Z', reason: 'session_expired' }],
 ]);
 
+const enabledFeatures = new Set<string>(['event-log', 'member-management']);
+
 const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | 'admin' }>([
     ['wst_owner', { workspaceUserId: '1', role: 'owner' }],
     ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
@@ -74,6 +76,20 @@ export const db = {
     memberships: {
         findByApiKey: async (apiKey: string): Promise<{ workspaceUserId: string; role: 'owner' | 'admin' } | null> =>
             memberships.get(apiKey) ?? null,
+        findUserIds: async (): Promise<Set<string>> => new Set(Array.from(memberships.values()).map((entry) => entry.workspaceUserId)),
+        findRolesByUserId: async (): Promise<Map<string, 'owner' | 'admin'>> =>
+            new Map(Array.from(memberships.values()).map((entry) => [entry.workspaceUserId, entry.role])),
+        remove: async (userId: string): Promise<boolean> => {
+            for (const [apiKey, entry] of memberships) {
+                if (entry.workspaceUserId !== userId) continue;
+                memberships.delete(apiKey);
+                return true;
+            }
+            return false;
+        },
+    },
+    featureFlags: {
+        enabled: async (key: string): Promise<boolean> => enabledFeatures.has(key),
     },
     invites: {
         findByToken: async (token: string): Promise<Invite | null> => invites.get(token) ?? null,

@@ -4,6 +4,7 @@ import { openApiPlugin } from '@ts-kizuna/openapi';
 import { tags } from './tags.js';
 import { user, member, inviteToken, scheduler } from './identities.js';
 import { analytics } from './request-contexts.js';
+import { manageMembers, promoteMember, removeMember } from './permissions.js';
 
 export const k = new Kizuna({
     identities: {
@@ -11,6 +12,17 @@ export const k = new Kizuna({
         member,
         inviteToken,
         scheduler,
+    },
+    permissions: {
+        promoteMember,
+        manageMembers,
+        removeMember,
+    },
+    settings: {
+        permissions: {
+            path: '/permissions',
+            identity: 'user',
+        },
     },
     requestContext: {
         analytics,

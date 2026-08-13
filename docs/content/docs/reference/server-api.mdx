@@ -1,9 +1,9 @@
 ---
 title: server.api
-description: Assemble the router, guards and request context into the api object you mount.
+description: Assemble the router, guards, permissions and request context into the api object you mount.
 ---
 
-`server.api({ router, guards, requestContext, jobs })` puts the router and guards into the API object an adapter mounts.
+`server.api({ router, guards, permissions, requestContext, jobs })` puts the router and guards into the API object an adapter mounts.
 
 ```ts title="src/server/api.ts"
 import { server } from './server';
@@ -20,6 +20,26 @@ export const api = server.api({
 ```
 
 `guards` is keyed by identity name and must cover every identity declared on [`new Kizuna()`](/docs/reference/kizuna), whether or not the auth map references it. A contract that declares identities cannot omit it.
+
+## permissions
+
+`permissions` is keyed by permission name and must cover every permission declared on [`new Kizuna()`](/docs/reference/kizuna). A contract that declares permissions cannot omit it.
+
+```ts title="src/server/api.ts"
+export const api = server.api({
+    router,
+    guards: {
+        user: requireUser,
+        member: requireMember,
+    },
+    permissions: {
+        viewEventLog: canViewEventLog,
+        promoteMember: canPromoteMember,
+    },
+});
+```
+
+Each entry comes from [`server.permission`](/docs/reference/server-permission). Each runs at most once per request and only when a route's `permissions` entry or a handler's `permission` asks about it.
 
 Mount the returned object with the adapter's mount verb:
 

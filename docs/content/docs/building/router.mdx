@@ -82,7 +82,7 @@ Each handler receives an object with the validated inputs for that route:
 | `body`             | Route has a `body` schema                                                    |
 | `headers`          | Route has a `headers` schema                                                 |
 | `throwError`       | Always                                                                       |
-| `auth`             | Route is secured by the contract's [auth map](/docs/auth)                    |
+| `auth`             | Route is secured by the contract's [access map](/docs/access-control)        |
 | `requestContext`   | Contract declares [`requestContext`](/docs/reference/kizuna-request-context) |
 | `plugins`          | Contract declares [plugins](/docs/plugins)                                   |
 | `jobs`             | Contract declares [jobs](/docs/jobs)                                         |
@@ -93,7 +93,7 @@ Each handler receives an object with the validated inputs for that route:
 
 ## Identity context
 
-When the contract's [auth map](/docs/auth) secures a route, the handler receives the identity's context under `auth`, keyed by the identity's name. That context is whatever the guard returned, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/kizuna-request-context) arrive the same way, under `requestContext` on every route.
+When the contract's [access map](/docs/access-control) secures a route, the handler receives the identity's context under `auth`, keyed by the identity's name. That context is whatever the guard returned, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/kizuna-request-context) arrive the same way, under `requestContext` on every route.
 
 ```ts
 listMembers: ({ auth }) => ({
@@ -112,7 +112,7 @@ transfer: ({ body, auth }) => {
 },
 ```
 
-On routes with an [access gate](/docs/auth#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `auth.member.role` is typed `'owner'`:
+On routes with an [access gate](/docs/access-control#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `auth.member.role` is typed `'owner'`:
 
 ```ts
 deleteWorkspace: ({ auth }) => ({

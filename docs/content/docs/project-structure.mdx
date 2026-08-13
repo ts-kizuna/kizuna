@@ -31,7 +31,8 @@ my-repo/
 │           │   ├── events.ts
 │           │   ├── health.ts
 │           │   └── index.ts    # re-exports the groups
-│           ├── auth.ts         # k.auth, who may call what
+│           ├── access.ts       # k.access, who may call what and what they must hold
+│           ├── permissions.ts  # Kizuna.permission, what may be permitted
 │           ├── jobs.ts         # k.jobs
 │           └── contract.ts     # k.contract, the object everything reads
 ├── apps/
@@ -68,7 +69,7 @@ The split matters more as the API grows:
 - **`k.ts`** constructs the surface once. Everything else imports `k` from here.
 - **`routes/`** holds one file per group, each calling `k.routes`, with an `index.ts` re-exporting them so `contract.ts` has one import to make. See [organizing the contract](/docs/building/contract#splitting-routes-across-files).
 - **`router/`** mirrors it exactly. One file per group, each typed with the [`Router`](/docs/building/router#routehandler-and-router-types) type so inputs and responses stay inferred, and `index.ts` composes them with `server.router`.
-- **`auth.ts`** declares who may call what, once, against the whole route tree, so one file answers the question. See [auth](/docs/auth).
+- **`auth.ts`** declares who may call what, once, against the whole route tree, so one file answers the question. See [auth](/docs/authentication).
 - **`api.ts`** is where guards, jobs, plugins, and the router come together.
 
 ## Single app
@@ -87,7 +88,8 @@ my-repo/
     │   │   ├── events.ts
     │   │   ├── health.ts
     │   │   └── index.ts    # re-exports the groups
-    │   ├── auth.ts         # k.auth, who may call what
+    │   ├── access.ts       # k.access, who may call what and what they must hold
+    │   ├── permissions.ts  # Kizuna.permission, what may be permitted
     │   ├── jobs.ts         # k.jobs
     │   └── index.ts        # k.contract, the object everything reads
     ├── server/

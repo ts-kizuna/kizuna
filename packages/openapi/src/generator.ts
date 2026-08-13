@@ -256,6 +256,7 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                 const customGuards = customGuardsFor(route.security, contract);
                 if (customGuards.length > 0) operation['x-kizuna-guarded'] = customGuards;
             }
+            if (route.permissions) operation['x-kizuna-permission'] = route.permissions;
             if (route.externalDocs) operation.externalDocs = route.externalDocs;
 
             const parameters: OpenApiParameter[] = [];

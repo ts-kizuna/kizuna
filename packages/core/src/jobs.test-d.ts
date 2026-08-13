@@ -97,7 +97,7 @@ const contract = k.contract({
         },
     }),
     jobs,
-    auth: {
+    access: {
         listUsers: false,
     },
 });

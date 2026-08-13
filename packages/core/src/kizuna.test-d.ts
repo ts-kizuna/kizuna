@@ -70,7 +70,7 @@ const contract = k.contract({
         users,
         workspace,
     },
-    auth: {
+    access: {
         users: false,
         workspace: {
             '*': 'user',
@@ -137,7 +137,7 @@ test('the auth map must cover every route group', () => {
             workspace,
         },
         // @ts-expect-error workspace is missing from the auth map
-        auth: {
+        access: {
             users: false,
         },
     });
@@ -150,7 +150,7 @@ test('the auth map rejects unknown identity names', () => {
             users,
             workspace,
         },
-        auth: {
+        access: {
             users: false,
             workspace: 'admin',
         },
@@ -232,7 +232,7 @@ const nestedContract = k.contract({
     routes: {
         members,
     },
-    auth: {
+    access: {
         members: {
             '*': 'user',
             session: {
@@ -283,7 +283,7 @@ test('the auth map rejects a cascade key that does not name a route or subgroup 
         routes: {
             members,
         },
-        auth: {
+        access: {
             members: {
                 '*': 'user',
                 list: false,
@@ -298,7 +298,7 @@ test('the auth map rejects a nested cascade on a route key', () => {
         routes: {
             members,
         },
-        auth: {
+        access: {
             members: {
                 '*': 'user',
                 session: {
@@ -334,7 +334,7 @@ test('GuardParams derives param names from the routes an identity secures', () =
         routes: {
             api: paramRoutes,
         },
-        auth: {
+        access: {
             api: 'member',
         },
     });
@@ -393,7 +393,7 @@ const inviteContract = inviteK.contract({
             },
         }),
     },
-    auth: {
+    access: {
         invites: 'inviteToken',
     },
 });

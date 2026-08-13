@@ -7,6 +7,7 @@ import {
     inferenceGroupContract,
     inferenceRoutes,
     pluginTypeContract,
+    permissionTypeContract,
     requestContextContract,
     securedContract,
     type ExpectedRouteHandler,
@@ -343,6 +344,23 @@ test('conforms to the shared adapter type catalogue', () => {
             expectTypeOf<Router<typeof pluginTypeContract>['whichLabel']>().parameter(0).toMatchTypeOf<{
                 plugins: { probe: { label: () => string } };
             }>();
+        },
+        'permissions.canTyped': () => {
+            expectTypeOf<Router<typeof permissionTypeContract>['workspace']['transfer']>().parameter(0).toMatchTypeOf<{
+                permission: {
+                    viewInvoices: () => Promise<boolean>;
+                    promoteMember: (record: { id: string; role: 'owner' | 'admin' }) => Promise<boolean>;
+                };
+            }>();
+        },
+        'permissions.absentWhenNoneDeclared': () => {
+            expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).not.toHaveProperty('permission');
+        },
+        'permissions.requiredOnApi': () => {
+            // @ts-expect-error a contract declaring permissions requires one implementation each
+            new KizunaFastifyServer(permissionTypeContract).api({
+                router: {} as Router<typeof permissionTypeContract>,
+            });
         },
         'plugins.absentWhenUninstalled': () => {
             expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).not.toHaveProperty('plugins');

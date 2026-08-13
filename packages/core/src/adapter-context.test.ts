@@ -41,7 +41,7 @@ const contract = k.contract({
             },
         },
     }),
-    auth: {
+    access: {
         everything: 'user',
     },
 });
@@ -114,6 +114,9 @@ const captureHandlerArgs = async (): Promise<Record<string, unknown>> => {
             analytics: () => ({
                 sessionId: 's1',
             }),
+        },
+        permissions: {
+            probe: () => true,
         },
         pluginExports: {
             probe: {},

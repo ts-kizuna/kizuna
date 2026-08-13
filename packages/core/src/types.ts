@@ -75,6 +75,15 @@ export type SchemeNameOf<Entry> = Entry extends string ? Entry : Extract<keyof E
 export type AccessGate = Record<string, Record<string, unknown>>;
 
 /**
+ * A route's resolved permission requirement, produced by `k.contract` from the
+ * `permissions` map. `all` requires every permission listed, `oneOf` at least
+ * one. Each entry is a dotted `<policy>.<action>` key. Adapters resolve the named
+ * policies' rules after the guards pass and deny with a 403 before the handler
+ * runs.
+ */
+export type PermissionRequirement = { all: readonly string[] } | { oneOf: readonly string[] };
+
+/**
  * A path starting with `/`.
  */
 export type RoutePath = `/${string}`;
@@ -106,6 +115,11 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
      * `{ scheme: { field: value } }` constraints. See {@link AccessGate}.
      */
     accessGate?: AccessGate;
+    /**
+     * The route's resolved permission requirement, set by `k.contract` from the
+     * `permissions` map. See {@link PermissionRequirement}.
+     */
+    permissions?: PermissionRequirement;
     externalDocs?: {
         url: string;
         description?: string;
@@ -162,13 +176,17 @@ export interface Routes<TagKeys extends string = string, SchemeNames extends str
 }
 
 /**
- * A route as authored in `k.routes`: the route shape minus `security` and
- * `accessGate`, which the `auth` map owns and `k.contract` resolves. Writing
- * either on a route is a type error.
+ * A route as authored in `k.routes`: the route shape minus `security`,
+ * `accessGate`, and `permissions`, which the `auth` and `permissions` maps own
+ * and `k.contract` resolves. Writing any of them on a route is a type error.
  */
-export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<RouteDefinition<TagKeys>, 'security' | 'accessGate'> & {
+export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<
+    RouteDefinition<TagKeys>,
+    'security' | 'accessGate' | 'permissions'
+> & {
     security?: never;
     accessGate?: never;
+    permissions?: never;
 };
 
 /**

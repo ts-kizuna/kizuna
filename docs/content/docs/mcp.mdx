@@ -64,7 +64,7 @@ Handlers receive the same framework context they do over HTTP, passed through fr
 
 ## Auth
 
-Secured tools authenticate via the headers of the MCP transport request. The endpoint runs the [guards](/docs/auth) registered on `server.api`, exactly like the HTTP pipeline: the credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context.
+Secured tools authenticate via the headers of the MCP transport request. The endpoint runs the [guards](/docs/authentication) registered on `server.api`, exactly like the HTTP pipeline: the credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context.
 
 Configure the MCP client to send the credential as a header on the connection. For example, with Claude Code:
 
@@ -85,7 +85,7 @@ When a guard denies the call, or an access gate fails, the tool call returns an 
 }
 ```
 
-Public routes (`false` in the auth map) run without guards, credentials or not.
+Public routes (`false` in the access map) run without guards, credentials or not.
 
 ## Options
 

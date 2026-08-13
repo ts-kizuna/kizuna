@@ -692,7 +692,7 @@ describe('MCP server: guards', () => {
         routes: {
             api: securedRoutes,
         },
-        auth: {
+        access: {
             api: {
                 '*': false,
                 whoAmI: 'user',
@@ -812,6 +812,163 @@ describe('MCP server: guards', () => {
         expect(result.isError).toBe(true);
         expect(parsed.status).toBe(500);
         expect(parsed.body.detail).toContain('No guard registered');
+        await close();
+    });
+});
+
+describe('MCP server: permissions', () => {
+    const MemberSchema = z.object({
+        id: z.string(),
+    });
+
+    const gatedK = new Kizuna({
+        identities: {
+            holder: Kizuna.identity.bearer({
+                context: z.object({
+                    userId: z.string(),
+                }),
+            }),
+        },
+        permissions: {
+            deleteWorkspace: Kizuna.permission(),
+            promoteMember: Kizuna.permission({
+                appliesTo: MemberSchema,
+            }),
+        },
+    });
+
+    const gatedRoutes = gatedK.routes({
+        openRoute: {
+            method: 'GET',
+            path: '/open',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+        gatedRoute: {
+            method: 'GET',
+            path: '/gated',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+        checkingRoute: {
+            method: 'GET',
+            path: '/checking',
+            responses: {
+                200: z.object({
+                    allowed: z.boolean(),
+                }),
+            },
+        },
+    });
+
+    const gatedContract = gatedK.contract({
+        routes: {
+            api: gatedRoutes,
+        },
+        access: {
+            api: {
+                '*': false,
+                gatedRoute: {
+                    auth: 'holder',
+                    permission: 'deleteWorkspace',
+                },
+            },
+        },
+    });
+
+    const makeGatedApi = (mayDelete: boolean) =>
+        assembleApi(gatedContract, {
+            router: {
+                api: {
+                    openRoute: () => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    }),
+                    gatedRoute: () => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    }),
+                    checkingRoute: async (args: Record<string, unknown>) => ({
+                        status: 200,
+                        body: {
+                            allowed: await (args.permission as Record<string, (record?: unknown) => Promise<boolean>>).promoteMember!({
+                                id: '9',
+                            }),
+                        },
+                    }),
+                },
+            },
+            guards: {
+                holder: () => ({
+                    userId: '1',
+                }),
+            },
+            permissions: {
+                deleteWorkspace: () => mayDelete,
+                promoteMember: () => (member: { id: string }) => member.id === '9',
+            },
+        }) as Parameters<typeof createMcpServer>[0];
+
+    it('denies a gated tool call the caller may not make', async () => {
+        const { client, close } = await connectMcpClient(makeGatedApi(false));
+        const result = await client.callTool({
+            name: 'api.gatedRoute',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(result.isError).toBe(true);
+        expect(parsed.status).toBe(403);
+        expect(parsed.body.detail).toBe('Forbidden: deleteWorkspace is not permitted on this route.');
+        await close();
+    });
+
+    it('serves a gated tool call the caller may make', async () => {
+        const { client, close } = await connectMcpClient(makeGatedApi(true));
+        const result = await client.callTool({
+            name: 'api.gatedRoute',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(parsed.status).toBe(200);
+        await close();
+    });
+
+    it('hands `permission` to a tool handler', async () => {
+        const { client, close } = await connectMcpClient(makeGatedApi(false));
+        const result = await client.callTool({
+            name: 'api.checkingRoute',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(parsed.status).toBe(200);
+        expect(parsed.body).toEqual({
+            allowed: true,
+        });
+        await close();
+    });
+
+    it('leaves an ungated tool call alone', async () => {
+        const { client, close } = await connectMcpClient(makeGatedApi(false));
+        const result = await client.callTool({
+            name: 'api.openRoute',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(parsed.status).toBe(200);
         await close();
     });
 });

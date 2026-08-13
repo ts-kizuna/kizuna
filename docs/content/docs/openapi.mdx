@@ -156,7 +156,7 @@ openApiPlugin({
 
 ## Security
 
-Security comes from the contract. The [identities](/docs/auth) you register on `new Kizuna()` are emitted as `components.securitySchemes`, and the contract's auth map becomes each operation's `security`, with oauth2 scopes included. There are no generator options for it, so the spec cannot disagree with what the server enforces.
+Security comes from the contract. The [identities](/docs/authentication) you register on `new Kizuna()` are emitted as `components.securitySchemes`, and the contract's auth map becomes each operation's `security`, with oauth2 scopes included. There are no generator options for it, so the spec cannot disagree with what the server enforces.
 
 ```ts
 export const user = Kizuna.identity.bearer({
@@ -180,7 +180,7 @@ paths:
                 - user: []
 ```
 
-Routes marked `false` in the auth map get no `security` entry. A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity also emits no `security`, since OpenAPI can't describe its credential, but its routes carry an `x-kizuna-guarded` extension so they stay distinguishable from public ones.
+Routes marked `false` in the access map get no `security` entry. A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity also emits no `security`, since OpenAPI can't describe its credential, but its routes carry an `x-kizuna-guarded` extension so they stay distinguishable from public ones.
 
 ## Validation errors
 

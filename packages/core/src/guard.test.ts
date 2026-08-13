@@ -57,7 +57,7 @@ const makeContract = () => {
     };
     return k.contract({
         routes,
-        auth: {
+        access: {
             items: {
                 '*': false,
                 getSecret: 'user',
@@ -484,7 +484,7 @@ describe('guard params and array gates', () => {
                 },
             }),
         },
-        auth: {
+        access: {
             items: 'user',
         },
     });
@@ -551,7 +551,7 @@ describe('guard params and array gates', () => {
                 },
             }),
         },
-        auth: {
+        access: {
             users: {
                 member: {
                     permissions: 'export',
@@ -635,7 +635,7 @@ describe('custom identity guard', () => {
                 },
             }),
         },
-        auth: {
+        access: {
             invites: 'inviteToken',
         },
     });

@@ -16,6 +16,8 @@ import { Kizuna } from '@ts-kizuna/core';
 ```ts
 new Kizuna(config?: {
     identities?: Record<string, SecurityScheme>;
+    permissions?: Record<string, Permission>;
+    settings?: { permissions?: { path?: string; identity?: string }; jobs?: JobsConfig };
     requestContext?: Record<string, RequestContext>;
     tags?: TagSet;
     validation?: { issueCodes?: readonly string[] };
@@ -24,14 +26,16 @@ new Kizuna(config?: {
 }): K
 ```
 
-| Field                   | Type                             | Description                                                                                                                                                     |
-| ----------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `identities`            | `Record<string, SecurityScheme>` | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names the `auth` map and guards use. |
-| `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values every handler receives.                |
-| `tags`                  | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                  |
-| `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                |
-| `plugins`               | `Record<string, ContractPlugin>` | Optional. The plugins this API declares. Their keys become the names `server.api` and handlers use. See [Plugins](/docs/plugins).                               |
-| `jobs`                  | `JobsConfig`                     | Optional. Settings shared by every job. The jobs themselves are declared with `k.jobs`. See [Jobs](/docs/jobs).                                                 |
+| Field                   | Type                             | Description                                                                                                                                                                                            |
+| ----------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `identities`            | `Record<string, SecurityScheme>` | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names the `auth` map and guards use.                                        |
+| `permissions`           | `Record<string, Permission>`     | Optional. The API's permissions from [`Kizuna.permission`](/docs/reference/kizuna-permission). Declaring any makes `k.contract`'s `permissions` map required. See [Permissions](/docs/access-control). |
+| `permissions`           | `{ path?; identity? }`           | Optional. Serves an endpoint reporting the caller's resolved permissions, for a UI that hides what it cannot do. See [Permissions](/docs/access-control#the-client).                                   |
+| `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values every handler receives.                                                       |
+| `tags`                  | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                                                         |
+| `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                                                       |
+| `plugins`               | `Record<string, ContractPlugin>` | Optional. The plugins this API declares. Their keys become the names `server.api` and handlers use. See [Plugins](/docs/plugins).                                                                      |
+| `jobs`                  | `JobsConfig`                     | Optional. Settings shared by every job. The jobs themselves are declared with `k.jobs`. See [Jobs](/docs/jobs).                                                                                        |
 
 ### `JobsConfig`
 
@@ -49,13 +53,13 @@ Settings shared by every job. The jobs themselves are declared with [`k.jobs`](/
 
 The instance, the authoring surface for this API:
 
-| Method       | Signature                              | Description                                                  |
-| ------------ | -------------------------------------- | ------------------------------------------------------------ |
-| `k.routes`   | `(tag, defs) => Routes`                | Define a route group under one of the tag set's keys.        |
-| `k.auth`     | `(routes, map) => AuthMap`             | Build the auth map, typed against the routes and identities. |
-| `k.jobs`     | `(identity, definitions) => Jobs`      | Declare scheduled jobs and the identity they require.        |
-| `k.contract` | `({ routes, jobs, auth }) => Contract` | Assemble route groups into the contract shared everywhere.   |
-| `k.issue`    | `(ctx, issue) => void`                 | Raise a typed validation issue code inside a Zod refinement. |
+| Method       | Signature                                | Description                                                                  |
+| ------------ | ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `k.routes`   | `(tag, defs) => Routes`                  | Define a route group under one of the tag set's keys.                        |
+| `k.access`   | `(routes, map) => AccessMap`             | Build the access map, typed against the routes, identities, and permissions. |
+| `k.jobs`     | `(identity, definitions) => Jobs`        | Declare scheduled jobs and the identity they require.                        |
+| `k.contract` | `({ routes, jobs, access }) => Contract` | Assemble route groups into the contract shared everywhere.                   |
+| `k.issue`    | `(ctx, issue) => void`                   | Raise a typed validation issue code inside a Zod refinement.                 |
 
 ## Example
 

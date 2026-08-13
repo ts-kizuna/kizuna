@@ -52,6 +52,12 @@ export interface OpenApiOperation {
      * requirement, so this marks the operation as protected, not public.
      */
     'x-kizuna-guarded'?: string[];
+    /**
+     * The route's permission requirement, resolved from the contract's
+     * `permissions` map. OpenAPI has no concept for it, so it rides as an
+     * extension rather than being dropped.
+     */
+    'x-kizuna-permission'?: { all: readonly string[] } | { oneOf: readonly string[] };
     externalDocs?: OpenApiExternalDocs;
     parameters?: OpenApiParameter[];
     requestBody?: {

@@ -41,7 +41,7 @@ const jobs = k.jobs('scheduler', {
 const contract = k.contract({
     routes,
     jobs,
-    auth: {
+    access: {
         listUsers: false,
     },
 });

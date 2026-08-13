@@ -249,7 +249,7 @@ const securedContract = securedK.contract({
     routes: {
         api: securedRoutes,
     },
-    auth: {
+    access: {
         api: 'user',
     },
 });

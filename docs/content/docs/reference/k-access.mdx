@@ -1,0 +1,95 @@
+---
+title: k.access
+description: Type the access map against your routes, identities, and declared permissions.
+---
+
+<BetaNotice>
+
+Access Control is still settling. The `access` map and its value forms may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
+`k.access(routes, map)` returns the map typed against the routes, the contract's identities, and its declared permissions, so it can live in its own file rather than inside [`k.contract`](/docs/reference/k-contract). At runtime it returns the map unchanged; `k.contract` resolves it onto every route.
+
+```ts title="src/contract/access.ts"
+import { k } from './k';
+import { routes } from './routes';
+
+export const access = k.access(routes, {
+    users: false,
+    health: false,
+    members: {
+        '*': 'user',
+        removeMember: {
+            auth: 'member',
+            permission: 'manageMembers',
+        },
+    },
+    workspace: {
+        '*': 'member',
+        deleteWorkspace: {
+            member: {
+                role: 'owner',
+            },
+        },
+    },
+});
+```
+
+```ts title="src/contract/index.ts"
+export const contract = k.contract({
+    routes,
+    access,
+});
+```
+
+## Values
+
+Keyed by route group, and every group must appear, so a public group is always an explicit `false`.
+
+| Value                                             | Meaning                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------- |
+| `false`                                           | Public, no identity and no permission                         |
+| `'user'`                                          | Requires the `user` identity                                  |
+| `{ member: { role: 'owner' } }`                   | Access gate: requires `member` with `role` limited to a value |
+| `{ user: ['read:events'] }`                       | Requires `user` with these oauth2 scopes                      |
+| `{ user: true, member: { ... } }`                 | Several identities, all of which must pass                    |
+| `{ auth: 'member', permission: 'manageMembers' }` | The identity, and what that caller must be permitted          |
+| `{ '*': ..., login: false }`                      | Cascade: `'*'` is the group default, named keys override      |
+
+The `permission` half takes one name, a list requiring all of them, or `{ oneOf: [...] }` requiring at least one.
+
+## A permission requires a caller
+
+A permission asks what one caller may do, so a public route has nobody to ask about. Writing both is a compile error:
+
+```ts
+notifications: {
+    // Type error: a public route has no caller
+    listEvents: {
+        auth: false,
+        permission: 'viewEventLog',
+    },
+},
+```
+
+A cascade that turns a route public drops its permission rather than inheriting one, and a route made public underneath a permitted group throws at contract time rather than resolving something surprising.
+
+## Inheritance
+
+The two halves inherit from `'*'` differently, because they mean different things.
+
+`auth` **merges**: a route entry keeps the group's identities and refines or adds to them, since identities are orthogonal credentials that combine. `permission` **replaces**: a permission requirement is one statement about a route, and merging would make a route silently also demand the group's.
+
+A bare auth value states nothing about permissions, so it inherits the group's.
+
+## Errors
+
+`k.contract` throws rather than resolving something surprising when a permission is not declared, when one applies to a record so a route cannot demand it, when a map key matches no route group, when a cascade key matches nothing in its group, when a cascade targets a route with a nested cascade, and when an `oneOf` is empty.
+
+## Reference
+
+- [Access Control](/docs/access-control)
+- [`Kizuna.permission`](/docs/reference/kizuna-permission)
+- [`server.permission`](/docs/reference/server-permission)
+- [`k.contract`](/docs/reference/k-contract)

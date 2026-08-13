@@ -109,7 +109,7 @@ Routes without a `headers` schema accept an optional `headers?: Record<string, s
 
 ## Auth
 
-When the contract secures routes with [identities](/docs/auth), send the credential in `baseHeaders`. The server's guards read it and return the typed `401`/`403` when it's missing or insufficient:
+When the contract secures routes with [identities](/docs/authentication), send the credential in `baseHeaders`. The server's guards read it and return the typed `401`/`403` when it's missing or insufficient:
 
 ```ts
 const apiClient = new KizunaClient(contract, {

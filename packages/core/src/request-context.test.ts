@@ -45,7 +45,7 @@ const contract = k.contract({
             },
         }),
     },
-    auth: {
+    access: {
         api: {
             '*': false,
             whoAmI: 'user',

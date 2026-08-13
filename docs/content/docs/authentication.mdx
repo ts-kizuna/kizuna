@@ -1,9 +1,15 @@
 ---
-title: Auth
-description: Declare identities and per-route auth on the contract. Runtime guards, typed handler context, OpenAPI security, and client access checks all follow.
+title: Authentication
+description: Declare who can call your API. Identities describe the credential, guards verify it, and the handler receives the caller typed.
 ---
 
-Auth lives in the contract: **identities** say who can call your API, the **auth map** says which routes they can call.
+<BetaNotice>
+
+Authentication is still settling. `Kizuna.identity` and `server.guard` may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
+An **identity** describes a credential your API accepts. A **guard** verifies it and returns who the caller is. Which routes need which identity is [access control](/docs/access-control), one page over.
 
 ```ts title="src/contract/identities.ts"
 import { z } from 'zod';
@@ -122,77 +128,6 @@ export const inviteToken = Kizuna.identity.custom({
 
 All builders and their fields, including how `custom` shows up in the spec: [`Kizuna.identity`](/docs/reference/kizuna-identity).
 
-## The auth map
-
-Keyed by route group; every group must appear, so public is always an explicit `false`. Each entry is one of:
-
-| Value                             | Meaning                                                                             |
-| --------------------------------- | ----------------------------------------------------------------------------------- |
-| `false`                           | Public, no auth                                                                     |
-| `'user'`                          | Requires the `user` identity                                                        |
-| `{ member: { role: 'owner' } }`   | Access gate. Requires `member` with `role` limited to a value (or an array)         |
-| `{ user: ['read:events'] }`       | Requires `user` with these oauth2 scopes                                            |
-| `{ user: true, member: { ... } }` | Multiple identities, all must pass                                                  |
-| `{ '*': ..., login: false }`      | Cascade. `'*'` sets the group default, named keys override its routes and subgroups |
-
-```ts title="src/contract/index.ts"
-export const contract = k.contract({
-    routes,
-    auth: {
-        users: false,
-        health: false,
-        members: 'user',
-        workspace: {
-            '*': 'member',
-            deleteWorkspace: {
-                member: {
-                    role: 'owner',
-                },
-            },
-            transfer: {
-                member: {
-                    role: 'owner',
-                },
-            },
-        },
-    },
-});
-```
-
-A route entry inherits the `'*'` default and only states its delta. `deleteWorkspace` above keeps requiring `member`, tightened to `role: 'owner'`. Adding another identity (`{ user: true }`) requires both; `false` opts the route out. Identity names are type-checked, and `security` can't be written inline in `k.routes`.
-
-### Nested groups
-
-A subgroup key covers its whole subtree, or nests its own cascade to opt out deeper. A key that matches nothing in the group is an error:
-
-```ts
-members: {
-    '*': 'user',
-    session: {
-        '*': 'user',
-        login: false,
-    },
-    invites: false,
-},
-```
-
-### Access gates
-
-`{ member: { role: 'owner' } }` rejects other roles with a `403` before the handler runs, and inside the handler `auth.member.role` narrows to `'owner'`. Array fields pass when they contain the value (`{ member: { permissions: 'invoicing' } }`):
-
-```ts
-workspace: {
-    deleteWorkspace: ({ auth }) => ({
-        status: 200,
-        body: {
-            ok: auth.member.role === 'owner',
-        },
-    }),
-},
-```
-
-A route requiring several identities receives all of them under `auth`, as in `transfer: ({ body, auth }) => ...`.
-
 ## Guards
 
 A guard receives the credential extracted and typed, along with the route's path `params`. For a request to `/workspaces/ws_42/members`, `params.workspaceId` is `'ws_42'`, so the guard can check that the caller belongs to that workspace, not just that the token is valid:
@@ -213,7 +148,7 @@ The return is checked against the identity's schemas. `deny(status, detail)` res
 
 ### OpenAPI security
 
-[`generateOpenApi`](/docs/reference/generate-openapi) emits `securitySchemes` and per-route `security` from the auth map:
+[`generateOpenApi`](/docs/reference/generate-openapi) emits `securitySchemes` and per-route `security` from the identities and the access map:
 
 ```yaml
 # generated
@@ -252,7 +187,7 @@ const apiClient = new KizunaClient(contract, {
 ## Reference
 
 - [`Kizuna.identity`](/docs/reference/kizuna-identity)
-- [`k.contract`](/docs/reference/k-contract#the-auth-map) for the auth map's value forms
 - [`server.guard`](/docs/reference/server-guard)
 - [`server.api`](/docs/reference/server-api)
+- [Access Control](/docs/access-control) for which routes require which identity
 - [`new KizunaClient()`](/docs/reference/kizuna-client)
