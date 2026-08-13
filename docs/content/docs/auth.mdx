@@ -1,11 +1,11 @@
 ---
 title: Auth
-description: Declare identities and per-route auth on the contract — runtime guards, typed handler context, OpenAPI security, and client access checks all follow.
+description: Declare identities and per-route auth on the contract. Runtime guards, typed handler context, OpenAPI security, and client access checks all follow.
 ---
 
 Auth lives in the contract: **identities** say who can call your API, the **auth map** says which routes they can call. One declaration drives enforcement, handler types, the OpenAPI spec, and client access checks.
 
-```ts title="packages/contract/src/identities.ts"
+```ts title="src/contract/identities.ts"
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 
@@ -16,7 +16,7 @@ export const user = Kizuna.identity.bearer({
 });
 ```
 
-```ts title="packages/contract/src/k.ts"
+```ts title="src/contract/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 import { user } from './identities';
@@ -29,7 +29,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts title="packages/contract/src/contract.ts"
+```ts title="src/contract/contract.ts"
 import { k } from './k';
 import { routes } from './routes';
 
@@ -42,7 +42,7 @@ export const contract = k.contract({
 });
 ```
 
-```ts title="src/lib/guards.ts"
+```ts title="src/server/guards.ts"
 import { server } from './server';
 
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
@@ -56,7 +56,7 @@ export const requireUser = server.guard('user', async ({ bearer, deny }) => {
 });
 ```
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 import { server } from './server';
 import { router } from './router';
 import { requireUser } from './guards';
@@ -88,7 +88,7 @@ Split into its own file, a handler keeps the typed `auth` via [`RouteHandler`](/
 
 One builder per authentication method: `bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`, and `custom`. Each optionally takes `context` (what a guard returns and handlers receive) and `access` (fields the auth map may gate per route):
 
-```ts title="packages/contract/src/identities.ts"
+```ts title="src/contract/identities.ts"
 export const member = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
@@ -101,18 +101,18 @@ export const member = Kizuna.identity.apiKey({
 });
 ```
 
-Omit `context` for an authentication-only identity — a pure gate like an API key that only proves the caller is a known client. Its guard returns nothing on success (or `deny(...)`), and routes secured by it receive no handler arg for it:
+Omit `context` for an authentication-only identity, a pure gate like an API key that only proves the caller is a known client. Its guard returns nothing on success (or `deny(...)`), and routes secured by it receive no handler arg for it:
 
-```ts title="packages/contract/src/identities.ts"
+```ts title="src/contract/identities.ts"
 export const apiConsumer = Kizuna.identity.apiKey({
     name: 'x-api-key',
     in: 'header',
 });
 ```
 
-When the credential doesn't fit any OpenAPI scheme — a capability-URL token in a path segment, say — use `custom`. Its guard reads the credential itself, and the route stays explicitly guarded instead of falling back to `false`:
+When the credential doesn't fit any OpenAPI scheme, a capability-URL token in a path segment for instance, use `custom`. Its guard reads the credential itself, and the route stays explicitly guarded instead of falling back to `false`:
 
-```ts title="packages/contract/src/identities.ts"
+```ts title="src/contract/identities.ts"
 export const inviteToken = Kizuna.identity.custom({
     context: z.object({
         inviteId: z.string(),
@@ -126,16 +126,16 @@ All builders and their fields, including how `custom` shows up in the spec: [`Ki
 
 Keyed by route group; every group must appear, so public is always an explicit `false`. Each entry is one of:
 
-| Value                             | Meaning                                                                              |
-| --------------------------------- | ------------------------------------------------------------------------------------ |
-| `false`                           | Public — no auth                                                                     |
-| `'user'`                          | Requires the `user` identity                                                         |
-| `{ member: { role: 'owner' } }`   | Access gate — requires `member` with `role` limited to a value (or an array)         |
-| `{ user: ['read:events'] }`       | Requires `user` with these oauth2 scopes                                             |
-| `{ user: true, member: { ... } }` | Multiple identities — all must pass                                                  |
-| `{ '*': ..., login: false }`      | Cascade — `'*'` sets the group default, named keys override its routes and subgroups |
+| Value                             | Meaning                                                                             |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| `false`                           | Public, no auth                                                                     |
+| `'user'`                          | Requires the `user` identity                                                        |
+| `{ member: { role: 'owner' } }`   | Access gate. Requires `member` with `role` limited to a value (or an array)         |
+| `{ user: ['read:events'] }`       | Requires `user` with these oauth2 scopes                                            |
+| `{ user: true, member: { ... } }` | Multiple identities, all must pass                                                  |
+| `{ '*': ..., login: false }`      | Cascade. `'*'` sets the group default, named keys override its routes and subgroups |
 
-```ts title="packages/contract/src/contract.ts"
+```ts title="src/contract/contract.ts"
 export const contract = k.contract({
     routes,
     auth: {
@@ -159,7 +159,7 @@ export const contract = k.contract({
 });
 ```
 
-A route entry inherits the `'*'` default and only states its delta — `deleteWorkspace` above keeps requiring `member`, tightened to `role: 'owner'`. Adding another identity (`{ user: true }`) requires both; `false` opts the route out. Identity names are type-checked, and `security` can't be written inline in `k.routes`.
+A route entry inherits the `'*'` default and only states its delta. `deleteWorkspace` above keeps requiring `member`, tightened to `role: 'owner'`. Adding another identity (`{ user: true }`) requires both; `false` opts the route out. Identity names are type-checked, and `security` can't be written inline in `k.routes`.
 
 ### Nested groups
 
@@ -178,7 +178,7 @@ members: {
 
 ### Access gates
 
-`{ member: { role: 'owner' } }` rejects other roles with a `403` before the handler runs — and inside the handler, `auth.member.role` narrows to `'owner'`. Array fields pass when they contain the value (`{ member: { permissions: 'invoicing' } }`):
+`{ member: { role: 'owner' } }` rejects other roles with a `403` before the handler runs, and inside the handler `auth.member.role` narrows to `'owner'`. Array fields pass when they contain the value (`{ member: { permissions: 'invoicing' } }`):
 
 ```ts
 workspace: {
@@ -191,13 +191,13 @@ workspace: {
 },
 ```
 
-A route requiring several identities receives all of them under `auth` — `transfer: ({ body, auth }) => ...`.
+A route requiring several identities receives all of them under `auth`, as in `transfer: ({ body, auth }) => ...`.
 
 ## Guards
 
 One guard per identity, not per route. The credential arrives extracted and typed, along with the route's path `params`. For a request to `/workspaces/ws_42/members`, `params.workspaceId` is `'ws_42'`, so the guard can check not just that the token is valid, but that the caller belongs to that workspace:
 
-```ts title="src/lib/guards.ts"
+```ts title="src/server/guards.ts"
 export const requireMember = server.guard('member', async ({ apiKey, params, deny }) => {
     const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
     if (!membership) {
@@ -230,7 +230,7 @@ paths:
                 - member: []
 ```
 
-A `custom` identity has no scheme to emit, so its routes carry an `x-kizuna-guarded` extension instead of `security` — enough to tell a protected-out-of-band route from a public one.
+A `custom` identity has no scheme to emit, so its routes carry an `x-kizuna-guarded` extension instead of `security`. That is enough to tell a protected-out-of-band route from a public one.
 
 ### Client
 
@@ -252,7 +252,7 @@ const apiClient = new KizunaClient(contract, {
 ## Reference
 
 - [`Kizuna.identity`](/docs/reference/kizuna-identity)
-- [`k.contract`](/docs/reference/k-contract#the-auth-map) — the auth map's value forms
+- [`k.contract`](/docs/reference/k-contract#the-auth-map) for the auth map's value forms
 - [`server.guard`](/docs/reference/server-guard)
 - [`server.api`](/docs/reference/server-api)
 - [`new KizunaClient()`](/docs/reference/kizuna-client)

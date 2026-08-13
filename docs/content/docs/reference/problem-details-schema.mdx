@@ -51,7 +51,7 @@ const usersRoutes = k.routes('users', {
 
 ## Usage in handlers
 
-Handlers only need to provide `detail` — kizuna fills in `type`, `title`, and `status` automatically:
+Handlers only need to provide `detail`, and kizuna fills in `type`, `title`, and `status` automatically:
 
 ```ts
 const router = server.router({
@@ -88,7 +88,7 @@ The response sent to the client includes the full RFC 9457 envelope:
 
 ## Extension members
 
-RFC 9457 lets a problem carry extra fields — **extension members** — alongside the standard envelope. `ProblemDetailsSchema` is a plain Zod object schema, so you add domain-specific fields with Zod's native `.extend()` — there's no builder function:
+RFC 9457 lets a problem carry extra fields, called **extension members**, alongside the standard envelope. `ProblemDetailsSchema` is a plain Zod object schema, so you add domain-specific fields with Zod's native `.extend()`, and there's no builder function:
 
 ```ts
 import { z } from 'zod';
@@ -110,7 +110,7 @@ const usersRoutes = k.routes('users', {
 });
 ```
 
-To reuse the extended schema across routes — and give it a name in the generated OpenAPI spec — wrap it in [`Kizuna.model`](/docs/reference/kizuna-model):
+To reuse the extended schema across routes, and give it a name in the generated OpenAPI spec, wrap it in [`Kizuna.model`](/docs/reference/kizuna-model):
 
 ```ts
 import { z } from 'zod';
@@ -149,11 +149,11 @@ return error({
 }
 ```
 
-Extension members are also the cleanest way to preserve an existing API's error fields while moving onto kizuna — see [Migrating an existing API](/docs/migration/existing-api).
+Extension members are also the cleanest way to preserve an existing API's error fields while moving onto kizuna. See [Migrating an existing API](/docs/migration/existing-api).
 
 ## Checking for a Problem Details body
 
-`isProblemDetails` is a type guard for the shared error shape — the sibling of [`isValidationError`](/docs/reference/is-validation-error):
+`isProblemDetails` is a type guard for the shared error shape, the sibling of [`isValidationError`](/docs/reference/is-validation-error):
 
 ```ts
 import { isProblemDetails } from '@ts-kizuna/core';
@@ -165,16 +165,16 @@ if (isProblemDetails(response.body)) {
 
 ## Why Problem Details only
 
-Error responses (status `>= 400`) must be Problem Details — handlers cannot return an arbitrary error shape, and the type system enforces it. This is deliberate: a single shared error schema is what lets guards, validation, the type guards above, generated clients, and the OpenAPI spec all compose against one shape. Need extra fields? Use extension members. Need a non-JSON error (proxying, an HTML error page)? Use the adapter's `raw-response` escape hatch.
+Error responses (status `>= 400`) must be Problem Details. Handlers cannot return an arbitrary error shape, and the type system enforces it. This is deliberate: a single shared error schema is what lets guards, validation, the type guards above, generated clients, and the OpenAPI spec all compose against one shape. Need extra fields? Use extension members. Need a non-JSON error (proxying, an HTML error page)? Use the adapter's `raw-response` escape hatch.
 
 ## Migrating to a legacy wire shape
 
-The wire bytes are produced by a single, pluggable formatter. The default emits `application/problem+json`. Adapters accept a `formatError` option to reshape the bytes for clients that can't move to Problem Details yet. It receives the **request**, so during a transition you serve the legacy shape to old clients and Problem Details to new ones — branching on whatever signal your API has (a version header, `Accept`, …):
+The wire bytes are produced by a single, pluggable formatter. The default emits `application/problem+json`. Adapters accept a `formatError` option to reshape the bytes for clients that can't move to Problem Details yet. It receives the **request**, so during a transition you serve the legacy shape to old clients and Problem Details to new ones, branching on whatever signal your API has (a version header, `Accept`, and so on):
 
 ```ts
 api.mount(app, {
     formatError: (problem, { request }) => {
-        // new clients opt in via a signal you control — here, a version header
+        // new clients opt in via a signal you control, here a version header
         if (request.headers.get('x-api-version') === '2') {
             return { contentType: 'application/problem+json', body: problem };
         }
@@ -187,7 +187,7 @@ api.mount(app, {
 });
 ```
 
-The input is always the canonical problem; only the outgoing bytes change. This is a migration seam, not a way to define custom errors in the contract — the contract stays Problem Details. Most migrations don't need it at all (use extension members). See [Migrating an existing API](/docs/migration/existing-api).
+The input is always the canonical problem; only the outgoing bytes change. This is a migration seam, not a way to define custom errors in the contract, and the contract stays Problem Details. Most migrations don't need it at all (use extension members). See [Migrating an existing API](/docs/migration/existing-api).
 
 ## What produces it
 
@@ -205,4 +205,4 @@ All built-in error responses use `application/problem+json` as the content type.
 
 ## OpenAPI
 
-`ProblemDetailsSchema` is a named model — it appears as `ProblemDetails` in the generated OpenAPI spec under `components/schemas`, keeping your API documentation clean and consistent.
+`ProblemDetailsSchema` is a named model, so it appears as `ProblemDetails` in the generated OpenAPI spec under `components/schemas`, keeping your API documentation clean and consistent.

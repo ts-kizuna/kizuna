@@ -35,7 +35,7 @@ openApiPluginServer(): PluginImplementation
 | `provider`      | `'scalar'`         | Which reference UI to render, `'scalar'` or `'swagger'` |
 | `cdnUrl`        | the provider's CDN | Where to load the UI's assets from                      |
 | `pageTitle`     | the document title | The page's `<title>`                                    |
-| `configuration` | —                  | Extra config merged into the UI's initializer           |
+| `configuration` | none               | Extra config merged into the UI's initializer           |
 
 Props are pure data, because they reach the contract and the contract reaches your client. The generator lives in `openApiPluginServer()`, which takes nothing: declaring the plugin is where it is configured.
 
@@ -45,7 +45,7 @@ Each prop serves nothing until you give it a path. The document paths carry thei
 
 ## Example
 
-```ts title="src/lib/k.ts"
+```ts title="src/contract/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { openApiPlugin } from '@ts-kizuna/openapi';
 
@@ -63,7 +63,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 import { openApiPluginServer } from '@ts-kizuna/openapi/server';
 
 export const api = server.api({

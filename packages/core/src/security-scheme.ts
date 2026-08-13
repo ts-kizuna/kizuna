@@ -21,7 +21,7 @@ export interface OAuthFlows {
 }
 
 /**
- * An OpenAPI 3.1.0 Security Scheme Object — the wire definition emitted under
+ * An OpenAPI 3.1.0 Security Scheme Object, the wire definition emitted under
  * `components.securitySchemes`. One of the four standard scheme types.
  */
 export type OpenApiSecuritySchemeObject =
@@ -79,13 +79,13 @@ export interface SecurityScheme<ContextSchema extends z.ZodType | undefined = z.
      * Schema for the context a passing guard provides to the handler. Use a
      * `z.union(...)` when one scheme resolves to multiple identities (e.g. a
      * staff user or a service client). `undefined` for an authentication-only
-     * identity — a pure gate with no data to hand the handler.
+     * identity, a pure gate with no data to hand the handler.
      */
     readonly context: ContextSchema;
 }
 
 /**
- * The context type a passing guard for scheme `S` provides — the `z.output` of
+ * The context type a passing guard for scheme `S` provides, the `z.output` of
  * the scheme's `context` schema, or `{}` (contributing nothing) when the scheme
  * declares no context.
  */

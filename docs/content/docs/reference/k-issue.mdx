@@ -12,7 +12,7 @@ The code is checked against the `issueCodes` you declared on `new Kizuna()`, so 
 Zod's runtime accepts any string as an issue `code`, but its types restrict `ctx.addIssue()` to the built-in issue union. A custom code therefore fails to type-check without an awkward cast at every call site:
 
 ```ts
-// Without the helper — TS2322 unless you cast.
+// Without the helper, TS2322 unless you cast.
 ctx.addIssue({ code: 'invalid_phone_number', message: 'Invalid phone number', input: value }
     as unknown as Parameters<typeof ctx.addIssue>[0]);
 ```
@@ -73,7 +73,7 @@ A request whose body fails this refinement returns `400` with the custom code in
 
 ## Typed codes on the client
 
-By default `errors[].code` is typed as [`ValidationIssueCode`](/docs/reference/is-validation-error) — the built-in Zod codes are suggested in autocomplete and any custom string is accepted, but your `invalid_phone_number` is not _suggested_ (it lives only inside the refinement callback, where TypeScript can't see it).
+By default `errors[].code` is typed as [`ValidationIssueCode`](/docs/reference/is-validation-error), so the built-in Zod codes are suggested in autocomplete and any custom string is accepted, but your `invalid_phone_number` is not _suggested_ (it lives only inside the refinement callback, where TypeScript can't see it).
 
 To make the client suggest your custom codes, declare them on `new Kizuna()`'s `validation.issueCodes` for that API and pass the contract to [`new KizunaClient()`](/docs/reference/kizuna-client):
 

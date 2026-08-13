@@ -371,9 +371,9 @@ const isModelCall = (node: ts.CallExpression): boolean => isMemberCall(node, AUT
 const isContractExportName = (name: string): boolean => (CONTRACT_EXPORT_NAMES as readonly string[]).includes(name);
 
 const routesArgFrom = (call: ts.CallExpression): ts.Expression | undefined => {
-    // k.routes(tag, routes) | k.routes(routes) — the route map is the final argument.
+    // k.routes(tag, routes) | k.routes(routes), the route map is the final argument.
     if (isRoutesChainCall(call)) return call.arguments[call.arguments.length - 1];
-    // k.contract({ routes: X }) — unwrap the `routes` property so the walker sees the
+    // k.contract({ routes: X }), unwrap the `routes` property so the walker sees the
     // route map, not the `{ routes, validation }` wrapper.
     if (isContractChainCall(call)) {
         const arg = call.arguments[0];

@@ -18,7 +18,7 @@ export interface RequestContextSchema<
     readonly context: ContextSchema;
     /**
      * Schema for the request headers the value derives from. Clients type
-     * against it — `new KizunaClient()` takes the values once under `requestContext`,
+     * against it, `new KizunaClient()` takes the values once under `requestContext`,
      * and the generated Swift and Kotlin clients take them in their
      * initializers. Routes and the OpenAPI document are untouched.
      */
@@ -31,12 +31,12 @@ interface RequestContextConfig<ContextSchema extends z.ZodType, HeadersSchema ex
 }
 
 /**
- * Declare a request-scoped value — an analytics id, a logger, a tenant. Register
+ * Declare a request-scoped value, an analytics id, a logger, a tenant. Register
  * it on `new Kizuna()` under `requestContext`; handlers receive it typed under its
  * registered name. It never gates a request.
  *
  * Pass a schema alone for a server-derived value, or `{ context, headers }`
- * when the value comes from request headers — clients are then typed to send
+ * when the value comes from request headers, clients are then typed to send
  * them once, on the client initializer.
  *
  * @example

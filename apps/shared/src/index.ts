@@ -1,4 +1,4 @@
-export * from './routes.js';
+export * from './routes/index.js';
 export { contract } from './contract.js';
 export { user, member, inviteToken, scheduler } from './identities.js';
 export { type User } from './types.js';

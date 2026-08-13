@@ -26,7 +26,7 @@ const messageIdsFor = async (fixture: string, parserOptions: Record<string, unkn
 };
 
 // Type-aware parsing resolves via the checker; plain parsing falls back to the source resolver.
-// Both must produce identical results — that's the point: no project service needed.
+// Both must produce identical results, that's the point: no project service needed.
 describe.each([
     ['with type information', { project: ['./tsconfig.json'], tsconfigRootDir: fixturesDir }],
     ['without type information', { jsDocParsingMode: 'all' }],

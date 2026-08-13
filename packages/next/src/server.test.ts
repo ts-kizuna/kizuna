@@ -157,7 +157,7 @@ describe('Next.js handler', () => {
     });
 });
 
-describe('Next.js handler — alternate content types', () => {
+describe('Next.js handler: alternate content types', () => {
     const uploadRoutes = k.routes('api', {
         uploadAvatar: {
             method: 'POST',
@@ -259,7 +259,7 @@ describe('Next.js handler — alternate content types', () => {
     });
 });
 
-describe('Next.js handler — requestMiddleware', () => {
+describe('Next.js handler: requestMiddleware', () => {
     const middlewareContractRoutes = k.routes('api', {
         getResource: {
             method: 'GET',

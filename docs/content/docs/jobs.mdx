@@ -3,13 +3,19 @@ title: Jobs
 description: Declare background and scheduled jobs next to their handlers, run them or queue them from your own code, and connect any queue you already run.
 ---
 
+<BetaNotice>
+
+Jobs are new and still settling. The shape of `k.jobs`, the handler signature, and the job endpoints may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
 Every API grows work that should not happen inside a request: nightly digests, invoice reconciliation, re-indexing a document someone just saved. `k.jobs` puts that work in the contract.
 
 ## Declaring jobs
 
 Jobs sit alongside `routes` on the contract. The first argument is the identity every job requires.
 
-```ts title="src/jobs.ts"
+```ts title="src/contract/jobs.ts"
 import { z } from 'zod';
 import { cron } from '@ts-kizuna/core';
 import { k } from './k';
@@ -74,7 +80,7 @@ An invalid expression throws when the contract is built, naming the field.
 
 `server.jobs` mirrors the declaration, nesting included:
 
-```ts title="src/lib/jobs.ts"
+```ts title="src/server/jobs.ts"
 export const jobHandlers = server.jobs({
     sendDigests: async () => ({
         status: 200,
@@ -129,7 +135,7 @@ Return `422` for input that will never become valid, so it is not retried.
 
 Every handler receives a `jobs` runner shaped like the declaration, with two methods per job:
 
-```ts title="src/lib/router.ts"
+```ts title="src/server/router/index.ts"
 export const router = server.router({
     createUser: async ({ body, jobs }) => {
         const user = await db.users.create(body);
@@ -191,7 +197,7 @@ No queue. `startJobs` watches the clock, and a queued job runs right here.
 
 A job that fails after the response has gone has nowhere to report, so give it somewhere:
 
-```ts title="src/lib/server.ts"
+```ts title="src/server/server.ts"
 export const server = new KizunaServer(contract, {
     onJobError: (job, error) => Sentry.captureException(error, { tags: { job } }),
 });
@@ -214,7 +220,7 @@ startJobs(api);
 
 The same `startJobs`, plus a queue holding the jobs you call `queue()` on, so a restart no longer loses them.
 
-```ts title="src/lib/server.ts"
+```ts title="src/server/server.ts"
 export const server = new KizunaServer(contract, {
     jobTransport: bullmq(connection),
 });
@@ -242,7 +248,7 @@ More than one instance is fine now, as long as the queue drops repeated keys. Yo
 
 Vercel, Lambda, Cloudflare. Platform cron ticks the dispatch endpoint and that covers every schedule:
 
-```ts title="src/lib/k.ts"
+```ts title="src/contract/k.ts"
 export const k = new Kizuna({
     identities: {
         scheduler,
@@ -268,7 +274,7 @@ That entry is the only cron config you write, however many jobs you add later: t
 
 A transport is not optional for `queue` here: the function can be frozen the moment it answers, so a job queued without one has nowhere to run. Use a queue that delivers over HTTP, like QStash, Cloud Tasks, or SQS. It posts to the run endpoint, which the same identity guards.
 
-```ts title="src/lib/server.ts"
+```ts title="src/server/server.ts"
 export const server = new KizunaServer(contract, {
     jobTransport: qstash({
         token: process.env.QSTASH_TOKEN,
@@ -286,7 +292,7 @@ export const server = new KizunaServer(contract, {
 
 A transport carries a queued job out of this process to whatever runs it. Name one and the same `queue` calls become as durable as it is, with no handler change:
 
-```ts title="src/lib/server.ts"
+```ts title="src/server/server.ts"
 export const server = new KizunaServer(contract, {
     jobTransport: myQueue,
 });
@@ -332,7 +338,7 @@ Configure both on `new Kizuna()` under `jobs`:
 
 A tick runs each due job inline, in the request the scheduler made, so the function's timeout is the budget for all of them. Keep the tick short by having a scheduled job queue one job per unit of work:
 
-```ts title="src/lib/jobs.ts"
+```ts title="src/server/jobs.ts"
 export const jobHandlers = server.jobs({
     sendDigests: async ({ jobs }) => {
         const due = await db.users.needingDigest();

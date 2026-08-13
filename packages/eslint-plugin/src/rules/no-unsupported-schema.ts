@@ -135,17 +135,17 @@ export const noUnsupportedSchema = ESLintUtils.RuleCreator.withoutDocs({
                 'Disallow constructs unsupported by ts-kizuna (z.coerce, @deprecated with JSDoc tags) in contract and model schemas, including imported ones.',
         },
         messages: {
-            coerce: 'z.coerce is not supported in a ts-kizuna schema. kizuna coerces query, path, and header params automatically — use z.number(), z.date(), or z.bigint() instead.',
+            coerce: 'z.coerce is not supported in a ts-kizuna schema. kizuna coerces query, path, and header params automatically, use z.number(), z.date(), or z.bigint() instead.',
             jsdocTag:
-                'This @deprecated message uses JSDoc inline tags like {@link}. kizuna surfaces deprecation text verbatim to generated clients that cannot parse it — use plain text instead (backticks are fine).',
+                'This @deprecated message uses JSDoc inline tags like {@link}. kizuna surfaces deprecation text verbatim to generated clients that cannot parse it, use plain text instead (backticks are fine).',
             duplicateDeprecated:
-                'This field has more than one @deprecated tag. kizuna serializes only the first and silently drops the rest — collapse them into a single message.',
+                'This field has more than one @deprecated tag. kizuna serializes only the first and silently drops the rest, collapse them into a single message.',
             coerceReference:
-                'This schema uses z.coerce, which ts-kizuna does not support. kizuna coerces query, path, and header params automatically — use z.number(), z.date(), or z.bigint() instead.',
+                'This schema uses z.coerce, which ts-kizuna does not support. kizuna coerces query, path, and header params automatically, use z.number(), z.date(), or z.bigint() instead.',
             jsdocTagReference:
-                'This schema has a @deprecated message with JSDoc inline tags like {@link}. kizuna surfaces deprecation text verbatim to generated clients that cannot parse it — use plain text instead (backticks are fine).',
+                'This schema has a @deprecated message with JSDoc inline tags like {@link}. kizuna surfaces deprecation text verbatim to generated clients that cannot parse it, use plain text instead (backticks are fine).',
             duplicateDeprecatedReference:
-                'This schema has a field with more than one @deprecated tag. kizuna serializes only the first and silently drops the rest — collapse them into a single message.',
+                'This schema has a field with more than one @deprecated tag. kizuna serializes only the first and silently drops the rest, collapse them into a single message.',
         },
         schema: [],
     },

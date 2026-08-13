@@ -18,14 +18,14 @@ The standard setup:
 - `server.api` combines the router and guards into an API object
 - `api.mount(app)` mounts the API on an Express app
 
-```ts title="src/lib/server.ts"
+```ts title="src/server/server.ts"
 import { KizunaServer } from '@ts-kizuna/express';
 import { contract } from '@shared/contract';
 
 export const server = new KizunaServer(contract);
 ```
 
-```ts title="src/lib/router.ts"
+```ts title="src/server/router/index.ts"
 import { server } from './server';
 
 export const router = server.router({
@@ -69,7 +69,7 @@ export const router = server.router({
 });
 ```
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 import { server } from './server';
 import { router } from './router';
 
@@ -80,7 +80,7 @@ export const api = server.api({
 
 ```ts title="src/index.ts"
 import express from 'express';
-import { api } from './lib/api';
+import { api } from './server/api';
 
 const app = express();
 app.use(express.json());
@@ -110,7 +110,7 @@ getUser: async ({ params, req, res }) => {
 
 One guard per identity. The credential arrives extracted and typed, alongside the native `req`/`res`. See the [Auth guide](/docs/auth).
 
-```ts title="src/lib/guards.ts"
+```ts title="src/server/guards.ts"
 import { server } from './server';
 
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
@@ -126,7 +126,7 @@ export const requireUser = server.guard('user', async ({ bearer, deny }) => {
 
 ## Middleware
 
-For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context). For everything else — rate limiting, multipart parsing — use Express's own `app.use`. Authentication belongs in [guards](#guards).
+For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context). For everything else, such as rate limiting and multipart parsing, use Express's own `app.use`. Authentication belongs in [guards](#guards).
 
 ## Options
 
@@ -136,14 +136,14 @@ api.mount(app, {
 });
 ```
 
-| Option               | Default | Description                                                                                                                                                                                |
-| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `responseValidation` | `false` | Validate handler return values against response schemas — surfaces as 500 on mismatch. Enable in development.                                                                              |
-| `formatError`        | —       | Reshape error (`>= 400`) response bytes for migrating clients — most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
+| Option               | Default | Description                                                                                                                                                                               |
+| -------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `responseValidation` | `false` | Validate handler return values against response schemas, surfacing as 500 on mismatch. Enable in development.                                                                             |
+| `formatError`        | none    | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
 
 ## Type-safe request properties
 
-Auth data doesn't need request mutation — guards return typed context that handlers receive directly. But if non-auth middleware sets custom properties on `req`, such as a request id, use declaration merging to extend the Express `Request` interface:
+Auth data doesn't need request mutation, because guards return typed context that handlers receive directly. But if non-auth middleware sets custom properties on `req`, such as a request id, use declaration merging to extend the Express `Request` interface:
 
 ```ts title="types/express.d.ts"
 declare global {

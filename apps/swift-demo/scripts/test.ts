@@ -22,7 +22,7 @@ const waitForServer = async (timeoutMs: number): Promise<void> => {
 const main = async (): Promise<void> => {
     const generated = readFileSync('swift/Sources/APIClient/APIClient.swift', 'utf8');
     if (!generated.includes('@available(*, deprecated')) {
-        throw new Error('Generated APIClient.swift is missing @available(*, deprecated) — deprecation annotations were not emitted');
+        throw new Error('Generated APIClient.swift is missing @available(*, deprecated), deprecation annotations were not emitted');
     }
 
     console.log(`Starting express-demo server on port ${PORT}...`);
@@ -67,7 +67,7 @@ const main = async (): Promise<void> => {
     if (exitCode === 0) {
         console.log('\n✅ Swift e2e tests passed. The SIGTERM line above is the expected server shutdown, not a failure.');
     } else {
-        console.log('\n❌ Swift e2e tests failed — see the test output above.');
+        console.log('\n❌ Swift e2e tests failed, see the test output above.');
     }
 
     process.exit(exitCode);

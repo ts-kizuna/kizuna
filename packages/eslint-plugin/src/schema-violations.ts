@@ -7,7 +7,7 @@ import ts from 'typescript';
 export type SchemaResolver = (identifier: ts.Identifier) => ts.Expression | undefined;
 
 /**
- * A JSDoc inline tag — `{@link …}`, `{@linkcode …}`, any `{@tag}`.
+ * A JSDoc inline tag, `{@link …}`, `{@linkcode …}`, any `{@tag}`.
  */
 const JSDOC_INLINE_TAG = /\{@[a-zA-Z][\w-]*/;
 
@@ -19,7 +19,7 @@ const JSDOC_INLINE_TAG = /\{@[a-zA-Z][\w-]*/;
 export type SchemaIssue = 'coerce' | 'jsdoc-tag' | 'duplicate-deprecated';
 
 /**
- * An issue and the exact node that carries it — the `z.coerce` access or the offending
+ * An issue and the exact node that carries it, the `z.coerce` access or the offending
  * field. `viaReference` is true when it was reached by following an identifier to a named
  * schema, so the caller reports it on the reference rather than the (possibly remote) node.
  */
@@ -30,8 +30,8 @@ export interface SchemaViolation {
 }
 
 /**
- * Walks a schema expression — following `z.object` shapes, nested objects, and identifier
- * references to other schemas (across files) — and returns every issue it carries, each
+ * Walks a schema expression, following `z.object` shapes, nested objects, and identifier
+ * references to other schemas (across files), and returns every issue it carries, each
  * paired with the node it sits on. The walk is bounded by a visited set so cycles end.
  */
 export const collectSchemaIssues = (root: ts.Node, resolve: SchemaResolver): SchemaViolation[] => {

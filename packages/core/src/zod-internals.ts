@@ -216,7 +216,7 @@ export const BINARY_PROBE: Uint8Array = new Uint8Array();
 /**
  * True for `z.instanceof(Uint8Array)`-style custom schemas (the `BinarySchema`
  * helper). Probes with a real `Uint8Array` and a string so other `custom`
- * schemas — including `z.instanceof(File)` — are not matched.
+ * schemas, including `z.instanceof(File)`, are not matched.
  */
 export const isBinarySchema = (schema: z.core.$ZodType): boolean => {
     if (readDefType(schema) !== 'custom') return false;

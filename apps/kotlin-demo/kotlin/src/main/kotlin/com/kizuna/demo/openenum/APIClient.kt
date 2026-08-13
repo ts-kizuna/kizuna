@@ -1105,7 +1105,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Export users as CSV — exercises a non-JSON (text/csv) raw response body */
+    /** Export users as CSV, exercises a non-JSON (text/csv) raw response body */
     @Throws(OpenEnumAPIClient.UsersExportUsers.Failure::class)
     suspend fun exportUsers(): OpenEnumAPIClient.UsersExportUsers.Result {
         val path = "/users/export"
@@ -1132,7 +1132,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Download a user badge — exercises a binary (BinarySchema) response body */
+    /** Download a user badge, exercises a binary (BinarySchema) response body */
     @Throws(OpenEnumAPIClient.UsersUserBadge.Failure::class)
     suspend fun userBadge(build: OpenEnumAPIClient.UsersUserBadge.Scope.() -> OpenEnumAPIClient.UsersUserBadge.Args): OpenEnumAPIClient.UsersUserBadge.Result {
         val args = OpenEnumAPIClient.UsersUserBadge.Scope.build()
@@ -1168,7 +1168,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** A user's most recent login or logout — inline union variants nest under the User model in native clients */
+    /** A user's most recent login or logout, inline union variants nest under the User model in native clients */
     @Throws(OpenEnumAPIClient.UsersLastSessionEvent.Failure::class)
     suspend fun lastSessionEvent(build: OpenEnumAPIClient.UsersLastSessionEvent.Scope.() -> OpenEnumAPIClient.UsersLastSessionEvent.Args): OpenEnumAPIClient.UsersLastSessionEvent.Result {
         val args = OpenEnumAPIClient.UsersLastSessionEvent.Scope.build()
@@ -1204,7 +1204,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Search users — required coerced limit and cursor */
+    /** Search users, required coerced limit and cursor */
     @Throws(OpenEnumAPIClient.UsersSearchUsers.Failure::class)
     suspend fun searchUsers(build: OpenEnumAPIClient.UsersSearchUsers.Scope.() -> OpenEnumAPIClient.UsersSearchUsers.Args): OpenEnumAPIClient.UsersSearchUsers.Result {
         val args = OpenEnumAPIClient.UsersSearchUsers.Scope.build()
@@ -1404,7 +1404,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Archive a user — first call returns 201, subsequent calls 200 */
+    /** Archive a user, first call returns 201, subsequent calls 200 */
     @Throws(OpenEnumAPIClient.UsersArchiveUser.Failure::class)
     suspend fun archiveUser(build: OpenEnumAPIClient.UsersArchiveUser.Scope.() -> OpenEnumAPIClient.UsersArchiveUser.Args): OpenEnumAPIClient.UsersArchiveUser.Result {
         val args = OpenEnumAPIClient.UsersArchiveUser.Scope.build()
@@ -1481,7 +1481,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Ping a user — exercises z.void() body and response */
+    /** Ping a user, exercises z.void() body and response */
     @Throws(OpenEnumAPIClient.UsersPingUser.Failure::class)
     suspend fun pingUser(build: OpenEnumAPIClient.UsersPingUser.Scope.() -> OpenEnumAPIClient.UsersPingUser.Args) {
         val args = OpenEnumAPIClient.UsersPingUser.Scope.build()
@@ -1511,7 +1511,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** List work items — exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers */
+    /** List work items, exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers */
     @Throws(OpenEnumAPIClient.UsersGetMyWork.Failure::class)
     suspend fun getMyWork(): OpenEnumAPIClient.UsersGetMyWork.Result {
         val path = "/work"
@@ -1545,7 +1545,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Check user existence — exercises HEAD body stripping */
+    /** Check user existence, exercises HEAD body stripping */
     @Throws(OpenEnumAPIClient.UsersCheckUser.Failure::class)
     suspend fun checkUser(build: OpenEnumAPIClient.UsersCheckUser.Scope.() -> OpenEnumAPIClient.UsersCheckUser.Args) {
         val args = OpenEnumAPIClient.UsersCheckUser.Scope.build()
@@ -1575,7 +1575,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Describe allowed operations — exercises OPTIONS routing */
+    /** Describe allowed operations, exercises OPTIONS routing */
     @Throws(OpenEnumAPIClient.UsersDescribeUsers.Failure::class)
     suspend fun describeUsers(): OpenEnumAPIClient.UsersDescribeUsers.Result {
         val path = "/users/describe"
@@ -1605,7 +1605,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
 
 class OpenEnumAPIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
-    /** Health check — exercises nested sub-client routing */
+    /** Health check, exercises nested sub-client routing */
     @Throws(OpenEnumAPIClient.HealthCheck.Failure::class)
     suspend fun check(): OpenEnumAPIClient.HealthCheck.Result {
         val path = "/health"
@@ -1632,7 +1632,7 @@ class OpenEnumAPIHealthClient(private val client: OkHttpClient, private val base
         }
     }
 
-    /** Version — exercises second method in a sub-client group */
+    /** Version, exercises second method in a sub-client group */
     @Throws(OpenEnumAPIClient.HealthVersion.Failure::class)
     suspend fun version(): OpenEnumAPIClient.HealthVersion.Result {
         val path = "/health/version"
@@ -1659,7 +1659,7 @@ class OpenEnumAPIHealthClient(private val client: OkHttpClient, private val base
         }
     }
 
-    /** Health history — exercises array return type qualification */
+    /** Health history, exercises array return type qualification */
     @Throws(OpenEnumAPIClient.HealthHistory.Failure::class)
     suspend fun history(): OpenEnumAPIClient.HealthHistory.Result {
         val path = "/health/history"
@@ -1726,7 +1726,7 @@ class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private v
         }
     }
 
-    /** List events — exercises Date / enum / array query params */
+    /** List events, exercises Date / enum / array query params */
     @Throws(OpenEnumAPIClient.NotificationsListEvents.Failure::class)
     suspend fun listEvents(build: OpenEnumAPIClient.NotificationsListEvents.Scope.() -> OpenEnumAPIClient.NotificationsListEvents.Args = { query() }): OpenEnumAPIClient.NotificationsListEvents.Result {
         val args = OpenEnumAPIClient.NotificationsListEvents.Scope.build()
@@ -1786,7 +1786,7 @@ class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private v
         }
     }
 
-    /** Validate contract — exercises generator bug coverage */
+    /** Validate contract, exercises generator bug coverage */
     @Throws(OpenEnumAPIClient.NotificationsValidateConfig.Failure::class)
     suspend fun validateConfig(build: OpenEnumAPIClient.NotificationsValidateConfig.Scope.() -> OpenEnumAPIClient.NotificationsValidateConfig.Args): OpenEnumAPIClient.NotificationsValidateConfig.Result {
         val args = OpenEnumAPIClient.NotificationsValidateConfig.Scope.build()
@@ -1832,7 +1832,7 @@ class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private v
         }
     }
 
-    /** Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen */
+    /** Receive arbitrary webhook payload, exercises z.any() / AnyCodable codegen */
     @Throws(OpenEnumAPIClient.NotificationsWebhook.Failure::class)
     suspend fun webhook(build: OpenEnumAPIClient.NotificationsWebhook.Scope.() -> OpenEnumAPIClient.NotificationsWebhook.Args): OpenEnumAPIClient.NotificationsWebhook.Result {
         val args = OpenEnumAPIClient.NotificationsWebhook.Scope.build()
@@ -1973,7 +1973,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
         }
     }
 
-    /** Delete the workspace — owner-only via the auth map */
+    /** Delete the workspace, owner-only via the auth map */
     @Throws(OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure::class)
     suspend fun deleteWorkspace(): OpenEnumAPIClient.WorkspaceDeleteWorkspace.Result {
         val path = "/workspace"
@@ -2000,7 +2000,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
         }
     }
 
-    /** Transfer ownership — owner-only via the auth map */
+    /** Transfer ownership, owner-only via the auth map */
     @Throws(OpenEnumAPIClient.WorkspaceTransfer.Failure::class)
     suspend fun transfer(build: OpenEnumAPIClient.WorkspaceTransfer.Scope.() -> OpenEnumAPIClient.WorkspaceTransfer.Args): OpenEnumAPIClient.WorkspaceTransfer.Result {
         val args = OpenEnumAPIClient.WorkspaceTransfer.Scope.build()

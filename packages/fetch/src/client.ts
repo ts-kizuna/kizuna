@@ -26,7 +26,7 @@ type ResponseUnion<R extends RouteDefinition> = {
 }[keyof R['responses']];
 
 /**
- * The type a caller passes for a body, query, or headers argument — the schema's
+ * The type a caller passes for a body, query, or headers argument, the schema's
  * input type.
  */
 type ClientPayload<T extends z.ZodType> = z.input<T>;

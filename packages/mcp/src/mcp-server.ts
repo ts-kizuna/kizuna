@@ -164,7 +164,7 @@ const toolError = (status: number, detail: string): ToolCallResult => ({
 
 /**
  * Run the guards a secured route requires, extracting each identity's
- * credential from the MCP transport request headers — the same pipeline the
+ * credential from the MCP transport request headers, the same pipeline the
  * HTTP adapters run. Returns the scheme-keyed security context for the handler
  * args, or a {@link ToolCallResult} error when a guard denies or a gate fails.
  */

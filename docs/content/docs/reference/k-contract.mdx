@@ -3,7 +3,7 @@ title: k.contract
 description: Assemble route groups into the Contract your server, clients, and generators all read.
 ---
 
-`k.contract({ routes, auth })` bundles your route groups into the `Contract` — the one object you hand to the [client](/docs/reference/kizuna-client), [server](/docs/reference/server-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `new Kizuna()`.
+`k.contract({ routes, jobs, auth })` bundles your route groups into the `Contract`, the one object you hand to the [client](/docs/reference/kizuna-client), [server](/docs/reference/server-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `new Kizuna()`.
 
 ```ts
 // contract.ts
@@ -22,9 +22,27 @@ export const contract = k.contract({
 
 The declared `issueCodes` widen `errors[].code` on `400` responses to `ValidationIssueCode | <your codes>`, so the client suggests them in autocomplete. Emit them at runtime with [`k.issue`](/docs/reference/k-issue). Because the factory is per API, codes and tags stay scoped to their API rather than leaking across the multiple kizuna APIs a project may define.
 
+## Jobs
+
+Jobs declared with [`k.jobs`](/docs/reference/k-jobs) go under `jobs`, alongside `routes` rather than inside it:
+
+```ts
+export const contract = k.contract({
+    routes: {
+        users: usersRoutes,
+    },
+    jobs,
+    auth: {
+        users: false,
+    },
+});
+```
+
+They carry their own identity, so they never appear in the `auth` map, and they stay out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. See [Jobs](/docs/jobs).
+
 ## The auth map
 
-The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `new Kizuna()`. It is **exhaustive over groups** — every key in `routes` must appear, and public takes an explicit `false`, so a new group can't ship unsecured by omission. For the full walkthrough, see the [Auth guide](/docs/auth).
+The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `new Kizuna()`. It is **exhaustive over groups**, so every key in `routes` must appear, and public takes an explicit `false`, so a new group can't ship unsecured by omission. For the full walkthrough, see the [Auth guide](/docs/auth).
 
 ```ts
 export const contract = k.contract({
@@ -54,18 +72,18 @@ export const contract = k.contract({
 
 ### Value forms
 
-| Form                           | Example                                     | Meaning                                                                                                                           |
-| ------------------------------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `false`                        | `health: false`                             | Public — no guard runs.                                                                                                           |
-| Identity name                  | `members: 'user'`                           | Require the identity. Its guard runs; handlers receive its context.                                                               |
-| Constraint object              | `{ member: { role: 'owner' } }`             | Require the identity **and** gate its `access` fields — out-of-range values get a 403, in-range values narrow the handler's type. |
-| Constraint with allowed values | `{ member: { role: ['owner', 'admin'] } }`  | Gate a field to a set of values.                                                                                                  |
-| Scope array (`oauth2`)         | `{ user: ['users:write'] }`                 | Require the identity with these OAuth scopes.                                                                                     |
-| Multiple identities            | `{ user: true, member: { role: 'owner' } }` | Require every listed identity (AND). Handlers receive each context.                                                               |
+| Form                           | Example                                     | Meaning                                                                                                                          |
+| ------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `false`                        | `health: false`                             | Public, no guard runs.                                                                                                           |
+| Identity name                  | `members: 'user'`                           | Require the identity. Its guard runs; handlers receive its context.                                                              |
+| Constraint object              | `{ member: { role: 'owner' } }`             | Require the identity **and** gate its `access` fields. Out-of-range values get a 403, in-range values narrow the handler's type. |
+| Constraint with allowed values | `{ member: { role: ['owner', 'admin'] } }`  | Gate a field to a set of values.                                                                                                 |
+| Scope array (`oauth2`)         | `{ user: ['users:write'] }`                 | Require the identity with these OAuth scopes.                                                                                    |
+| Multiple identities            | `{ user: true, member: { role: 'owner' } }` | Require every listed identity (AND). Handlers receive each context.                                                              |
 
 ### Cascades
 
-A group's value can be a cascade — `'*'` sets the group default, and a route entry refines it: the route inherits the default's identities and states only its delta. `false` opts a route out.
+A group's value can be a cascade, where `'*'` sets the group default and a route entry refines it: the route inherits the default's identities and states only its delta. `false` opts a route out.
 
 ```ts
 workspace: {
@@ -78,7 +96,7 @@ workspace: {
 },
 ```
 
-Every route under `workspace` requires `member`; `deleteWorkspace` additionally gates on `role: 'owner'` — and inside its handler, `auth.member.role` is typed `'owner'`.
+Every route under `workspace` requires `member`; `deleteWorkspace` additionally gates on `role: 'owner'`, and inside its handler `auth.member.role` is typed `'owner'`.
 
 Cascade keys name the group's own routes and subgroups. A subgroup key takes a value for its whole subtree, or its own nested cascade; a key that matches nothing in the group is an error.
 

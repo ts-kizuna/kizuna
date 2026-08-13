@@ -277,7 +277,7 @@ describe('buildToolDefinitions', () => {
     });
 });
 
-describe('buildToolDefinitions — input schema', () => {
+describe('buildToolDefinitions: input schema', () => {
     it('puts query under a query key', () => {
         const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const listUsers = definitions.find((definition) => definition.name === 'users.listUsers')!;
@@ -654,7 +654,7 @@ describe('MCP server e2e', () => {
     });
 });
 
-describe('MCP server — guards', () => {
+describe('MCP server: guards', () => {
     const user = Kizuna.identity.bearer({
         context: z.object({
             userId: z.string(),

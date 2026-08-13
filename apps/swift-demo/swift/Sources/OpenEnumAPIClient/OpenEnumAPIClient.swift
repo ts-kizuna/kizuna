@@ -1893,7 +1893,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// Export users as CSV — exercises a non-JSON (text/csv) raw response body
+    /// Export users as CSV, exercises a non-JSON (text/csv) raw response body
     public func exportUsers() async throws(OpenEnumAPIClient.UsersExportUsers.Failure) -> OpenEnumAPIClient.UsersExportUsers.Result {
         let path = "/users/export"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersExportUsers.Failure.self)
@@ -1910,7 +1910,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// Download a user badge — exercises a binary (BinarySchema) response body
+    /// Download a user badge, exercises a binary (BinarySchema) response body
     public func userBadge(_ params: OpenEnumAPIClient.UsersUserBadge.Params) async throws(OpenEnumAPIClient.UsersUserBadge.Failure) -> OpenEnumAPIClient.UsersUserBadge.Result {
         var path = "/users/:id/badge"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -1931,7 +1931,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// A user's most recent login or logout — inline union variants nest under the User model in native clients
+    /// A user's most recent login or logout, inline union variants nest under the User model in native clients
     public func lastSessionEvent(_ params: OpenEnumAPIClient.UsersLastSessionEvent.Params) async throws(OpenEnumAPIClient.UsersLastSessionEvent.Failure) -> OpenEnumAPIClient.UsersLastSessionEvent.Result {
         var path = "/users/:id/last-session-event"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -1952,7 +1952,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// Search users — required coerced limit and cursor
+    /// Search users, required coerced limit and cursor
     public func searchUsers(_ query: OpenEnumAPIClient.UsersSearchUsers.Query) async throws(OpenEnumAPIClient.UsersSearchUsers.Failure) -> OpenEnumAPIClient.UsersSearchUsers.Result {
         let path = "/users/search"
         var queryItems: [URLQueryItem] = []
@@ -2067,7 +2067,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// Archive a user — first call returns 201, subsequent calls 200
+    /// Archive a user, first call returns 201, subsequent calls 200
     public func archiveUser(_ params: OpenEnumAPIClient.UsersArchiveUser.Params) async throws(OpenEnumAPIClient.UsersArchiveUser.Failure) -> OpenEnumAPIClient.UsersArchiveUser.Result {
         var path = "/users/:id/archive"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -2113,7 +2113,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// Ping a user — exercises z.void() body and response
+    /// Ping a user, exercises z.void() body and response
     public func pingUser(_ params: OpenEnumAPIClient.UsersPingUser.Params) async throws(OpenEnumAPIClient.UsersPingUser.Failure) {
         var path = "/users/:id/ping"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -2133,7 +2133,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// List work items — exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers
+    /// List work items, exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers
     public func getMyWork() async throws(OpenEnumAPIClient.UsersGetMyWork.Failure) -> OpenEnumAPIClient.UsersGetMyWork.Result {
         let path = "/work"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersGetMyWork.Failure.self)
@@ -2152,7 +2152,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// Check user existence — exercises HEAD body stripping
+    /// Check user existence, exercises HEAD body stripping
     public func checkUser(_ params: OpenEnumAPIClient.UsersCheckUser.Params) async throws(OpenEnumAPIClient.UsersCheckUser.Failure) {
         var path = "/users/:id/check"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -2172,7 +2172,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// Describe allowed operations — exercises OPTIONS routing
+    /// Describe allowed operations, exercises OPTIONS routing
     public func describeUsers() async throws(OpenEnumAPIClient.UsersDescribeUsers.Failure) -> OpenEnumAPIClient.UsersDescribeUsers.Result {
         let path = "/users/describe"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersDescribeUsers.Failure.self)
@@ -2197,7 +2197,7 @@ public struct OpenEnumAPIHealthClient: Sendable {
         self.client = client
     }
 
-    /// Health check — exercises nested sub-client routing
+    /// Health check, exercises nested sub-client routing
     public func check() async throws(OpenEnumAPIClient.HealthCheck.Failure) -> OpenEnumAPIClient.HealthCheck.Result {
         let path = "/health"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.HealthCheck.Failure.self)
@@ -2214,7 +2214,7 @@ public struct OpenEnumAPIHealthClient: Sendable {
         }
     }
 
-    /// Version — exercises second method in a sub-client group
+    /// Version, exercises second method in a sub-client group
     public func version() async throws(OpenEnumAPIClient.HealthVersion.Failure) -> OpenEnumAPIClient.HealthVersion.Result {
         let path = "/health/version"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.HealthVersion.Failure.self)
@@ -2231,7 +2231,7 @@ public struct OpenEnumAPIHealthClient: Sendable {
         }
     }
 
-    /// Health history — exercises array return type qualification
+    /// Health history, exercises array return type qualification
     public func history() async throws(OpenEnumAPIClient.HealthHistory.Failure) -> OpenEnumAPIClient.HealthHistory.Result {
         let path = "/health/history"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.HealthHistory.Failure.self)
@@ -2278,7 +2278,7 @@ public struct OpenEnumAPINotificationsClient: Sendable {
         }
     }
 
-    /// List events — exercises Date / enum / array query params
+    /// List events, exercises Date / enum / array query params
     public func listEvents(_ query: OpenEnumAPIClient.NotificationsListEvents.Query = .query()) async throws(OpenEnumAPIClient.NotificationsListEvents.Failure) -> OpenEnumAPIClient.NotificationsListEvents.Result {
         let path = "/events"
         var queryItems: [URLQueryItem] = []
@@ -2304,7 +2304,7 @@ public struct OpenEnumAPINotificationsClient: Sendable {
         }
     }
 
-    /// Validate contract — exercises generator bug coverage
+    /// Validate contract, exercises generator bug coverage
     public func validateConfig(_ body: OpenEnumAPIClient.NotificationsValidateConfig.Body) async throws(OpenEnumAPIClient.NotificationsValidateConfig.Failure) -> OpenEnumAPIClient.NotificationsValidateConfig.Result {
         let path = "/contract/validate"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.NotificationsValidateConfig.Failure.self)
@@ -2330,7 +2330,7 @@ public struct OpenEnumAPINotificationsClient: Sendable {
         }
     }
 
-    /// Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen
+    /// Receive arbitrary webhook payload, exercises z.any() / AnyCodable codegen
     public func webhook(_ body: OpenEnumAPIClient.NotificationsWebhook.Body) async throws(OpenEnumAPIClient.NotificationsWebhook.Failure) -> OpenEnumAPIClient.NotificationsWebhook.Result {
         let path = "/webhook"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.NotificationsWebhook.Failure.self)
@@ -2427,7 +2427,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         }
     }
 
-    /// Delete the workspace — owner-only via the auth map
+    /// Delete the workspace, owner-only via the auth map
     public func deleteWorkspace() async throws(OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure) -> OpenEnumAPIClient.WorkspaceDeleteWorkspace.Result {
         let path = "/workspace"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.self)
@@ -2444,7 +2444,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         }
     }
 
-    /// Transfer ownership — owner-only via the auth map
+    /// Transfer ownership, owner-only via the auth map
     public func transfer(_ body: OpenEnumAPIClient.WorkspaceTransfer.Body) async throws(OpenEnumAPIClient.WorkspaceTransfer.Failure) -> OpenEnumAPIClient.WorkspaceTransfer.Result {
         let path = "/workspace/transfer"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)

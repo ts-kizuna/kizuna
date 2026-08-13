@@ -820,11 +820,11 @@ const isVoidSuccessMethod = (method: RouteMethod): boolean => method.successRetu
 /**
  * Emit the per-operation result types for the throw-on-error model:
  *
- *   - `Result` — returned on success, exposing `body` (and `headers`). Omitted for
+ *   - `Result`: returned on success, exposing `body` (and `headers`). Omitted for
  *     void-success routes, which return `Unit`.
- *   - `Success` — a sealed sum of the success statuses, used as `Result.body` when a
+ *   - `Success`: a sealed sum of the success statuses, used as `Result.body` when a
  *     route has more than one success status.
- *   - `Failure` — a sealed `Exception` thrown for declared error statuses, decode
+ *   - `Failure`: a sealed `Exception` thrown for declared error statuses, decode
  *     failures, and any unexpected status.
  */
 const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, context: EmitContext): void => {
@@ -1028,11 +1028,11 @@ const resolveChannelFieldType = (field: KotlinField, method: RouteMethod, contex
 /**
  * Emit the call-shape scaffolding for a method's request channels:
  *
- *   - `Args` — the sealed result of the request-builder lambda, holding one value per channel
+ *   - `Args`: the sealed result of the request-builder lambda, holding one value per channel
  *     (nullable when the channel is all-optional).
- *   - `Scope` — the lambda receiver exposing a factory function per channel
+ *   - `Scope`: the lambda receiver exposing a factory function per channel
  *     (`params(id = "1")`), so call sites need no type names and completion lists the channels.
- *   - `After<Channel>` — typestate steps returned by each factory; later channels chain off them
+ *   - `After<Channel>`: typestate steps returned by each factory; later channels chain off them
  *     (`params(...).headers(...)`). Only steps whose remaining channels are all optional implement
  *     `Args`, so omitting a required channel is a compile error, not a runtime one.
  */
@@ -1567,8 +1567,8 @@ const emitClient = (
  *
  * @param contract - The router from `k.contract({ ... })`.
  * @param config - Override the generated names:
- *   - `namespaceName` — the object wrapping shared types.
- *   - `packageName` — optional package declaration for the generated file.
+ *   - `namespaceName`: the object wrapping shared types.
+ *   - `packageName`: optional package declaration for the generated file.
  */
 export const generateKotlinClient = (contract: Contract, config: KotlinConfig): string => {
     const { namespaceName, packageName, camelCaseProperties = false, unknownEnumCase = false } = config;

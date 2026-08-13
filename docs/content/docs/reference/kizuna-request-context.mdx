@@ -1,15 +1,15 @@
 ---
 title: Kizuna.requestContext
-description: Provide request-scoped values — analytics ids, loggers, tenants — to every handler, typed.
+description: Provide request-scoped values to every handler, typed, such as analytics ids, loggers, and tenants.
 ---
 
-Not everything that runs before a handler is auth. Analytics ids, request loggers, tenant lookups — values every handler wants, gating nothing. Declare them with `Kizuna.requestContext`, register them on `new Kizuna()`, resolve each with the adapter's `server.requestContext`, and every handler receives them typed under `requestContext`, keyed by their name.
+Not everything that runs before a handler is auth. Analytics ids, request loggers, and tenant lookups are values every handler wants, gating nothing. Declare them with `Kizuna.requestContext`, register them on `new Kizuna()`, resolve each with the adapter's `server.requestContext`, and every handler receives them typed under `requestContext`, keyed by their name.
 
 <AdapterTabs functionName="KizunaServer" />
 
-A declaration can bind to request `headers`. Those headers stay off the routes and out of the OpenAPI document, but the clients type them: the fetch client takes them on `new KizunaClient()`, and the generated Swift and Kotlin clients take them in their initializers — so a caller sets them once, and the resolver reads them validated.
+A declaration can bind to request `headers`. Those headers stay off the routes and out of the OpenAPI document, but the clients type them: the fetch client takes them on `new KizunaClient()`, and the generated Swift and Kotlin clients take them in their initializers, so a caller sets them once and the resolver reads them validated.
 
-```ts title="packages/contract/src/request-contexts.ts"
+```ts title="src/contract/request-contexts.ts"
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 
@@ -23,7 +23,7 @@ export const analytics = Kizuna.requestContext({
 });
 ```
 
-```ts title="packages/contract/src/k.ts"
+```ts title="src/contract/k.ts"
 import { analytics } from './request-contexts';
 
 export const k = new Kizuna({
@@ -33,7 +33,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts title="src/lib/request-context.ts"
+```ts title="src/server/request-context.ts"
 import { server } from './server';
 
 export const captureAnalytics = server.requestContext('analytics', ({ headers }) => ({
@@ -41,7 +41,7 @@ export const captureAnalytics = server.requestContext('analytics', ({ headers })
 }));
 ```
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 export const api = server.api({
     router,
     requestContext: {
@@ -59,7 +59,7 @@ listUsers: ({ query, requestContext }) => {
 
 ## Sending values from a client
 
-The fetch client takes the declared headers under `requestContext` and sends them with every request — required when a header is, optional otherwise:
+The fetch client takes the declared headers under `requestContext` and sends them with every request, required when a header is required and optional otherwise:
 
 ```ts
 const apiClient = new KizunaClient(contract, {
@@ -80,4 +80,4 @@ let client = APIClient(baseURL: url, requestContext: .init(xPosthogSessionId: se
 val client = APIClient(baseUrl = baseUrl, requestContext = APIClient.RequestContext(xPosthogSessionId = sessionId))
 ```
 
-Resolvers run on every route — public ones included — before the guards, and never deny a request. They receive the adapter's native request objects, the route's `params`, and the declared `headers` (validated). The return is checked against the `context` schema, and `server.api` requires a resolver for every declared key. Request context never appears in the OpenAPI document.
+Resolvers run on every route, public ones included, before the guards, and never deny a request. They receive the adapter's native request objects, the route's `params`, and the declared `headers` (validated). The return is checked against the `context` schema, and `server.api` requires a resolver for every declared key. Request context never appears in the OpenAPI document.

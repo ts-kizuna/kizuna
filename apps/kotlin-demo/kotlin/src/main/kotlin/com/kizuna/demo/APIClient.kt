@@ -983,7 +983,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** Export users as CSV — exercises a non-JSON (text/csv) raw response body */
+    /** Export users as CSV, exercises a non-JSON (text/csv) raw response body */
     @Throws(APIClient.UsersExportUsers.Failure::class)
     suspend fun exportUsers(): APIClient.UsersExportUsers.Result {
         val path = "/users/export"
@@ -1010,7 +1010,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** Download a user badge — exercises a binary (BinarySchema) response body */
+    /** Download a user badge, exercises a binary (BinarySchema) response body */
     @Throws(APIClient.UsersUserBadge.Failure::class)
     suspend fun userBadge(build: APIClient.UsersUserBadge.Scope.() -> APIClient.UsersUserBadge.Args): APIClient.UsersUserBadge.Result {
         val args = APIClient.UsersUserBadge.Scope.build()
@@ -1046,7 +1046,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** A user's most recent login or logout — inline union variants nest under the User model in native clients */
+    /** A user's most recent login or logout, inline union variants nest under the User model in native clients */
     @Throws(APIClient.UsersLastSessionEvent.Failure::class)
     suspend fun lastSessionEvent(build: APIClient.UsersLastSessionEvent.Scope.() -> APIClient.UsersLastSessionEvent.Args): APIClient.UsersLastSessionEvent.Result {
         val args = APIClient.UsersLastSessionEvent.Scope.build()
@@ -1082,7 +1082,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** Search users — required coerced limit and cursor */
+    /** Search users, required coerced limit and cursor */
     @Throws(APIClient.UsersSearchUsers.Failure::class)
     suspend fun searchUsers(build: APIClient.UsersSearchUsers.Scope.() -> APIClient.UsersSearchUsers.Args): APIClient.UsersSearchUsers.Result {
         val args = APIClient.UsersSearchUsers.Scope.build()
@@ -1282,7 +1282,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** Archive a user — first call returns 201, subsequent calls 200 */
+    /** Archive a user, first call returns 201, subsequent calls 200 */
     @Throws(APIClient.UsersArchiveUser.Failure::class)
     suspend fun archiveUser(build: APIClient.UsersArchiveUser.Scope.() -> APIClient.UsersArchiveUser.Args): APIClient.UsersArchiveUser.Result {
         val args = APIClient.UsersArchiveUser.Scope.build()
@@ -1359,7 +1359,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** Ping a user — exercises z.void() body and response */
+    /** Ping a user, exercises z.void() body and response */
     @Throws(APIClient.UsersPingUser.Failure::class)
     suspend fun pingUser(build: APIClient.UsersPingUser.Scope.() -> APIClient.UsersPingUser.Args) {
         val args = APIClient.UsersPingUser.Scope.build()
@@ -1389,7 +1389,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** List work items — exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers */
+    /** List work items, exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers */
     @Throws(APIClient.UsersGetMyWork.Failure::class)
     suspend fun getMyWork(): APIClient.UsersGetMyWork.Result {
         val path = "/work"
@@ -1423,7 +1423,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** Check user existence — exercises HEAD body stripping */
+    /** Check user existence, exercises HEAD body stripping */
     @Throws(APIClient.UsersCheckUser.Failure::class)
     suspend fun checkUser(build: APIClient.UsersCheckUser.Scope.() -> APIClient.UsersCheckUser.Args) {
         val args = APIClient.UsersCheckUser.Scope.build()
@@ -1453,7 +1453,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** Describe allowed operations — exercises OPTIONS routing */
+    /** Describe allowed operations, exercises OPTIONS routing */
     @Throws(APIClient.UsersDescribeUsers.Failure::class)
     suspend fun describeUsers(): APIClient.UsersDescribeUsers.Result {
         val path = "/users/describe"
@@ -1483,7 +1483,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
 
 class APIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
-    /** Health check — exercises nested sub-client routing */
+    /** Health check, exercises nested sub-client routing */
     @Throws(APIClient.HealthCheck.Failure::class)
     suspend fun check(): APIClient.HealthCheck.Result {
         val path = "/health"
@@ -1510,7 +1510,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
         }
     }
 
-    /** Version — exercises second method in a sub-client group */
+    /** Version, exercises second method in a sub-client group */
     @Throws(APIClient.HealthVersion.Failure::class)
     suspend fun version(): APIClient.HealthVersion.Result {
         val path = "/health/version"
@@ -1537,7 +1537,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
         }
     }
 
-    /** Health history — exercises array return type qualification */
+    /** Health history, exercises array return type qualification */
     @Throws(APIClient.HealthHistory.Failure::class)
     suspend fun history(): APIClient.HealthHistory.Result {
         val path = "/health/history"
@@ -1604,7 +1604,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** List events — exercises Date / enum / array query params */
+    /** List events, exercises Date / enum / array query params */
     @Throws(APIClient.NotificationsListEvents.Failure::class)
     suspend fun listEvents(build: APIClient.NotificationsListEvents.Scope.() -> APIClient.NotificationsListEvents.Args = { query() }): APIClient.NotificationsListEvents.Result {
         val args = APIClient.NotificationsListEvents.Scope.build()
@@ -1664,7 +1664,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Validate contract — exercises generator bug coverage */
+    /** Validate contract, exercises generator bug coverage */
     @Throws(APIClient.NotificationsValidateConfig.Failure::class)
     suspend fun validateConfig(build: APIClient.NotificationsValidateConfig.Scope.() -> APIClient.NotificationsValidateConfig.Args): APIClient.NotificationsValidateConfig.Result {
         val args = APIClient.NotificationsValidateConfig.Scope.build()
@@ -1710,7 +1710,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Receive arbitrary webhook payload — exercises z.any() / AnyCodable codegen */
+    /** Receive arbitrary webhook payload, exercises z.any() / AnyCodable codegen */
     @Throws(APIClient.NotificationsWebhook.Failure::class)
     suspend fun webhook(build: APIClient.NotificationsWebhook.Scope.() -> APIClient.NotificationsWebhook.Args): APIClient.NotificationsWebhook.Result {
         val args = APIClient.NotificationsWebhook.Scope.build()
@@ -1851,7 +1851,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
         }
     }
 
-    /** Delete the workspace — owner-only via the auth map */
+    /** Delete the workspace, owner-only via the auth map */
     @Throws(APIClient.WorkspaceDeleteWorkspace.Failure::class)
     suspend fun deleteWorkspace(): APIClient.WorkspaceDeleteWorkspace.Result {
         val path = "/workspace"
@@ -1878,7 +1878,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
         }
     }
 
-    /** Transfer ownership — owner-only via the auth map */
+    /** Transfer ownership, owner-only via the auth map */
     @Throws(APIClient.WorkspaceTransfer.Failure::class)
     suspend fun transfer(build: APIClient.WorkspaceTransfer.Scope.() -> APIClient.WorkspaceTransfer.Args): APIClient.WorkspaceTransfer.Result {
         val args = APIClient.WorkspaceTransfer.Scope.build()

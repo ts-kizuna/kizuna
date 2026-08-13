@@ -8,8 +8,8 @@ import { buildFileScope, collectFieldDocs, makeResolverWithCache, resolveImportP
  * block on each of its fields, keyed by the exported const name (and, for
  * aliased re-exports, by the original declared name too).
  *
- * Walks the whole reachable graph — both the entry's re-exports and every file
- * it imports — so a schema defined in its own module and used via `import`
+ * Walks the whole reachable graph, both the entry's re-exports and every file
+ * it imports, so a schema defined in its own module and used via `import`
  * (rather than re-exported from the contract entry) is still collected.
  *
  * Used to patch emitted `.d.ts` files, where a `z.ZodObject<{...}>` shape is
@@ -52,7 +52,7 @@ export const collectExportedSchemaDocs = (entryPath: string): Map<string, Map<st
 
             const exportClause = statement.exportClause;
             if (!exportClause) {
-                // export * from './other.js' — names are re-exported verbatim.
+                // export * from './other.js', names are re-exported verbatim.
                 collectFromFile(target);
                 continue;
             }

@@ -90,13 +90,13 @@ The callback also receives `api`, for plugins that read the contract's routes. M
 
 ## What the app writes
 
-```ts title="src/lib/k.ts"
+```ts title="src/contract/k.ts"
 plugins: {
     audit: auditPlugin({ path: '/internal/audit' }),
 }
 ```
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 export const api = server.api({
     router,
     plugins: {

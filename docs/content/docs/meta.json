@@ -1,23 +1,25 @@
 {
     "pages": [
         "index",
-        "quickstart",
+        "project-structure",
         "---Documentation---",
         "building",
-        "auth",
         "adapters",
         "clients",
-        "openapi",
-        "deprecations",
+        "auth",
         "jobs",
-        "plugins",
+        "---Plugins---",
+        "[Overview](/docs/plugins)",
+        "openapi",
         "mcp",
+        "---Tooling---",
         "eslint",
+        "deprecations",
         "breaking-changes",
-        "reference",
-        "---Extras---",
+        "---Build your own---",
         "extend",
-        "migration",
-        "faq"
+        "---Reference---",
+        "reference",
+        "migration"
     ]
 }

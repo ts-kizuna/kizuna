@@ -3,6 +3,12 @@ title: MCP
 description: Install the MCP plugin so AI assistants can call your API as tools, on any adapter.
 ---
 
+<BetaNotice>
+
+MCP support is new and still settling. The plugin options and the generated tool surface may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
 `@ts-kizuna/mcp` adds an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint to your API. Each route becomes an MCP tool that AI assistants can discover and call.
 
 <InstallTabs packageName="@ts-kizuna/mcp" />
@@ -11,7 +17,7 @@ description: Install the MCP plugin so AI assistants can call your API as tools,
 
 MCP is a [plugin](/docs/extend/create-plugin). You install it where the rest of your API's vocabulary is declared, and `api.mount` serves it:
 
-```ts title="src/lib/k.ts"
+```ts title="src/contract/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 
@@ -28,7 +34,7 @@ export const k = new Kizuna({
 
 Then pass its server half to `server.api`, where the MCP SDK and the transport live:
 
-```ts title="src/lib/api.ts"
+```ts title="src/server/api.ts"
 import { mcpPluginServer } from '@ts-kizuna/mcp/server';
 
 export const api = server.api({
@@ -49,10 +55,10 @@ The MCP endpoint is a plugin route, so it lives outside `contract.routes`. Your 
 
 Each route becomes an MCP tool:
 
-- **Tool name** — the dotted route key from the routes (e.g. `users.getUser`)
-- **Tool description** — from the route's `summary` and `description`, falling back to `METHOD /path`
-- **Tool input** — structured as `{ params, query, body }` matching the route's schemas
-- **Tool execution** — invokes the corresponding handler directly and returns `{ status, body }`
+- **Tool name**: the dotted route key from the routes (e.g. `users.getUser`)
+- **Tool description**: from the route's `summary` and `description`, falling back to `METHOD /path`
+- **Tool input**: structured as `{ params, query, body }` matching the route's schemas
+- **Tool execution**: invokes the corresponding handler directly and returns `{ status, body }`
 
 Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-urlencoded'` are excluded by default since MCP tools receive JSON.
 

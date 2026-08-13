@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 
-import { api } from './lib/api';
+import { api } from './server/api';
 
 const app = Fastify();
 
@@ -21,10 +21,10 @@ app.get('/', async (_request, reply) => {
         <h1>ts-kizuna Fastify demo</h1>
         <p>This demo shares the same routes from <code>@ts-kizuna-demo/shared</code>.</p>
         <ul>
-            <li><a href="http://localhost:8002/users">Fastify API</a> — <code>:8002/users</code></li>
-            <li><a href="http://localhost:8002/docs">Fastify API docs (Scalar)</a> — <code>:8002/docs</code></li>
-            <li><a href="http://localhost:8002/openapi.json">OpenAPI spec (JSON)</a> — <code>:8002/openapi.json</code></li>
-            <li><a href="http://localhost:8002/openapi.yaml">OpenAPI spec (YAML)</a> — <code>:8002/openapi.yaml</code></li>
+            <li><a href="http://localhost:8002/users">Fastify API</a>, <code>:8002/users</code></li>
+            <li><a href="http://localhost:8002/docs">Fastify API docs (Scalar)</a>, <code>:8002/docs</code></li>
+            <li><a href="http://localhost:8002/openapi.json">OpenAPI spec (JSON)</a>, <code>:8002/openapi.json</code></li>
+            <li><a href="http://localhost:8002/openapi.yaml">OpenAPI spec (YAML)</a>, <code>:8002/openapi.yaml</code></li>
         </ul>
     </body>
 </html>`);

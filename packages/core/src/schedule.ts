@@ -96,7 +96,7 @@ export interface ParsedCron {
     daysOfWeek: ReadonlySet<number>;
     /**
      * Whether the day-of-month field was narrowed from `*`. When both day fields
-     * are narrowed, a run happens on a day matching *either* of them — the Vixie
+     * are narrowed, a run happens on a day matching *either* of them, the Vixie
      * cron rule.
      */
     dayOfMonthRestricted: boolean;
@@ -279,7 +279,7 @@ const zoneOffsetAt = (instant: number, timezone: string): number => instantToWal
  * A wall time can be ambiguous (clocks going back) or non-existent (clocks going
  * forward). The offset is sampled at a first guess and then re-sampled once at
  * the corrected instant, which resolves an overlap to the first of the two
- * candidates and pushes a gap to just after it — the same choice cron
+ * candidates and pushes a gap to just after it, the same choice cron
  * implementations make.
  */
 const wallClockToInstant = (wall: WallClock, timezone: string | undefined): Date => {
@@ -317,7 +317,7 @@ const startOfNextHour = (wall: WallClock): WallClock => {
 };
 
 /**
- * A cron expression can name a date that never occurs — `0 0 30 2 *`, February
+ * A cron expression can name a date that never occurs, `0 0 30 2 *`, February
  * 30th. Searching forever would hang, so the walk gives up once it has looked
  * five years ahead, which covers every reachable leap-year combination.
  */
@@ -435,7 +435,7 @@ const readTimeOfDay = (time: string, caller: string): { hour: number; minute: nu
  *
  * Cron's finest granularity is one minute, so seconds are rejected. An interval
  * that does not divide its unit evenly is still valid cron, but it restarts at
- * the top of the unit rather than spacing evenly across the boundary — `'7h'`
+ * the top of the unit rather than spacing evenly across the boundary, `'7h'`
  * fires at 00:00, 07:00, 14:00, 21:00, then 00:00 again.
  *
  * @example
@@ -507,7 +507,7 @@ const weekly = (day: keyof typeof DAY_NAMES, time: string): string => {
 /**
  * A cron expression for once a month, on `dayOfMonth` at a 24-hour `HH:MM` time.
  *
- * Days 29 to 31 are accepted but skip the months that are too short — a job on
+ * Days 29 to 31 are accepted but skip the months that are too short, a job on
  * the 31st fires seven times a year, not twelve.
  *
  * @example

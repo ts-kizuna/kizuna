@@ -3,6 +3,22 @@
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-twoslash/twoslash.css';
 
+@theme inline {
+    --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+}
+
+.prose strong {
+    font-weight: 600;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+#nd-page h1 {
+    font-weight: 600;
+}
+
 .kz-handler .kz-type-token {
     border-bottom: 1px dashed color-mix(in oklab, currentColor 55%, transparent);
 }

@@ -1063,7 +1063,7 @@ describe('contract-level tag grouping', () => {
     });
 });
 
-describe('OpenAPI generator — HEAD method', () => {
+describe('OpenAPI generator: HEAD method', () => {
     it('omits response content for HEAD routes', () => {
         const contractRoutes = k.routes('api', {
             checkUser: {

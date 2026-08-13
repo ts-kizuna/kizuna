@@ -2,7 +2,7 @@ import express from 'express';
 import { startJobsDevRunner } from '@ts-kizuna/core/jobs';
 import { contract } from '@ts-kizuna-demo/shared';
 
-import { api } from './lib/api';
+import { api } from './server/api';
 
 const app = express();
 app.use(express.json());
@@ -24,17 +24,17 @@ app.get('/', (_req, res) => {
         <h1>ts-kizuna demos</h1>
         <p>Both demos share the same routes from <code>@ts-kizuna-demo/shared</code>.</p>
         <ul>
-            <li><a href="http://localhost:8000/users">Express API</a> — <code>:8000/users</code> (this server)</li>
-            <li><a href="http://localhost:8000/docs">Express API docs (Scalar)</a> — <code>:8000/docs</code></li>
-            <li><a href="http://localhost:8000/openapi.json">Express OpenAPI spec (JSON)</a> — <code>:8000/openapi.json</code></li>
-            <li><a href="http://localhost:8000/openapi.yaml">Express OpenAPI spec (YAML)</a> — <code>:8000/openapi.yaml</code></li>
-            <li><a href="http://localhost:8001/users">Hono API</a> — <code>:8001/users</code></li>
-            <li><a href="http://localhost:8001/docs">Hono API docs (Scalar)</a> — <code>:8001/docs</code></li>
-            <li><a href="http://localhost:8002/users">Fastify API</a> — <code>:8002/users</code></li>
-            <li><a href="http://localhost:8002/docs">Fastify API docs (Scalar)</a> — <code>:8002/docs</code></li>
-            <li><a href="http://localhost:3030/api/users">Next.js API</a> — <code>:3030/api/users</code></li>
-            <li><a href="http://localhost:3030/docs">Next.js API docs (Scalar)</a> — <code>:3030/docs</code></li>
-            <li><a href="http://localhost:3030/">Next.js demo page</a> — <code>:3030</code></li>
+            <li><a href="http://localhost:8000/users">Express API</a>, <code>:8000/users</code> (this server)</li>
+            <li><a href="http://localhost:8000/docs">Express API docs (Scalar)</a>, <code>:8000/docs</code></li>
+            <li><a href="http://localhost:8000/openapi.json">Express OpenAPI spec (JSON)</a>, <code>:8000/openapi.json</code></li>
+            <li><a href="http://localhost:8000/openapi.yaml">Express OpenAPI spec (YAML)</a>, <code>:8000/openapi.yaml</code></li>
+            <li><a href="http://localhost:8001/users">Hono API</a>, <code>:8001/users</code></li>
+            <li><a href="http://localhost:8001/docs">Hono API docs (Scalar)</a>, <code>:8001/docs</code></li>
+            <li><a href="http://localhost:8002/users">Fastify API</a>, <code>:8002/users</code></li>
+            <li><a href="http://localhost:8002/docs">Fastify API docs (Scalar)</a>, <code>:8002/docs</code></li>
+            <li><a href="http://localhost:3030/api/users">Next.js API</a>, <code>:3030/api/users</code></li>
+            <li><a href="http://localhost:3030/docs">Next.js API docs (Scalar)</a>, <code>:3030/docs</code></li>
+            <li><a href="http://localhost:3030/">Next.js demo page</a>, <code>:3030</code></li>
         </ul>
     </body>
 </html>`);

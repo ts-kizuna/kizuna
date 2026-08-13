@@ -201,7 +201,7 @@ final class APIClientTests: XCTestCase {
 
     func testGetUserPathParamWithSlashIsEncoded() async throws {
         // Without percent-encoding, /users/a/b would not match the :id route and Express
-        // returns its generic HTML 404 — surfacing as decoding/unexpectedStatus, not a typed error.
+        // returns its generic HTML 404, surfacing as decoding/unexpectedStatus, not a typed error.
         // With encoding, the handler runs and returns the contract-shaped 404.
         do {
             _ = try await client.users.getUser(
@@ -222,16 +222,16 @@ final class APIClientTests: XCTestCase {
             .query(since: date)
         )
         guard let echoed = response.body.echo.since else {
-            XCTFail("server did not echo `since` — query param missing")
+            XCTFail("server did not echo `since`, query param missing")
             return
         }
-        // echo.since is now Date (z.iso.datetime() → Date) — no manual parsing needed
+        // echo.since is now Date (z.iso.datetime() → Date), no manual parsing needed
         XCTAssertEqual(echoed.timeIntervalSince1970, date.timeIntervalSince1970, accuracy: 1.0)
     }
 
     func testDatetimeFieldDecodesAsDate() async throws {
         // occurredAt: z.iso.datetime() must arrive as Date, not String.
-        // Server sends "2026-04-01T10:00:00.000Z" — fractional seconds path.
+        // Server sends "2026-04-01T10:00:00.000Z", fractional seconds path.
         let response = try await client.notifications.listEvents()
         guard let event = response.body.events.first else {
             XCTFail("expected at least one seeded event")
@@ -277,7 +277,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testListEventsTransformQueryParam() async throws {
-        // label uses z.string().transform() — the Swift client must accept String, not AnyCodable.
+        // label uses z.string().transform(), the Swift client must accept String, not AnyCodable.
         let response = try await client.notifications.listEvents(
             .query(label: "hello")
         )
@@ -285,7 +285,7 @@ final class APIClientTests: XCTestCase {
     }
 
     func testListEventsUnionQueryParam() async throws {
-        // tagIds uses z.union([z.array(z.string()), z.string().transform(...)]) — Swift client must
+        // tagIds uses z.union([z.array(z.string()), z.string().transform(...)]), Swift client must
         // accept [String], not AnyCodable. Pass an array and verify the server echoes it back.
         let response = try await client.notifications.listEvents(
             .query(tagIds: ["tag-a", "tag-b"])
@@ -324,7 +324,7 @@ final class APIClientTests: XCTestCase {
 
     func testPingUserVoidBodyAndResponse() async throws {
         // pingUser has body: z.void() and responses: { 204: z.void() }.
-        // The generated method takes no body param and returns Void — this test
+        // The generated method takes no body param and returns Void, this test
         // confirms the client compiles and the server handles the request.
         let created = try await client.users.createUser(
             .body(
@@ -380,7 +380,7 @@ final class APIClientTests: XCTestCase {
                 email: "head@example.com"
             )
         )
-        // checkUser is a HEAD route — the generated method returns Void, no body to decode.
+        // checkUser is a HEAD route, the generated method returns Void, no body to decode.
         try await client.users.checkUser(
             .params(id: created.body.id)
         )
@@ -441,7 +441,7 @@ final class APIClientTests: XCTestCase {
     func testUploadAvatarMultipartEncoding() async throws {
         // The express demo ships a stub for multipart (see CLAUDE.md). The contract validator
         // rejects with 400 because parsed form fields don't satisfy `z.instanceof(File)`. We
-        // verify the client serialized and sent the request — not the server-side round-trip.
+        // verify the client serialized and sent the request, not the server-side round-trip.
         let bytes = Data(repeating: 0xAB, count: 16)
         let file = APIClient.MultipartFile(data: bytes, filename: "avatar.bin", mimeType: "application/octet-stream")
         do {

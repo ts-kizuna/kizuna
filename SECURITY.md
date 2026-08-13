@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-ts-kizuna is on the 1.x line (beta, heading to v2). Only the latest release gets security fixes — older versions aren't backported.
+ts-kizuna is on the 1.x line (beta, heading to v2). Only the latest release gets security fixes, and older versions aren't backported.
 
 | Version        | Supported |
 | -------------- | --------- |

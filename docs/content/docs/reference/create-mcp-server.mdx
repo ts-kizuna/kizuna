@@ -3,7 +3,7 @@ title: createMcpServer
 description: Create a raw MCP server from a ts-kizuna API for use with any transport (stdio, SSE, etc.).
 ---
 
-Create a raw [MCP](https://modelcontextprotocol.io) server from a ts-kizuna API. Use this when you want full control over the transport — for example, stdio for CLI tools or SSE for custom setups.
+Create a raw [MCP](https://modelcontextprotocol.io) server from a ts-kizuna API. Use this when you want full control over the transport, for example stdio for CLI tools or SSE for custom setups.
 
 To serve it from your app, install [`mcpPlugin`](/docs/reference/mcp-plugin) instead.
 
@@ -31,14 +31,14 @@ createMcpServer(api: Api, options?: McpServerOptions): McpServer
 | `name`              | `'MCP Server'`     | Human-readable name shown to AI assistants                                |
 | `version`           | `'1.0.0'`          | Semantic version string                                                   |
 | `routeFilter`       | excludes multipart | Predicate to filter which routes become tools                             |
-| `handlerContext`    | —                  | Extra context spread into every handler call                              |
-| `credentialHeaders` | —                  | Headers of the MCP transport request, used to run guards on secured tools |
+| `handlerContext`    | none               | Extra context spread into every handler call                              |
+| `credentialHeaders` | none               | Headers of the MCP transport request, used to run guards on secured tools |
 
 ## Secured routes
 
 Each call to a secured tool runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request: the identity's credential is extracted from `credentialHeaders`, the guard resolves it to context (passed to the handler under the identity's name), access gates are checked, and a `deny(...)` becomes a tool error result.
 
-The [`mcpPlugin`](/docs/reference/mcp-plugin) endpoint populates `credentialHeaders` automatically from the incoming request. When you drive the transport yourself, pass the headers along — for stdio there is no HTTP request, so supply whatever credential headers the environment provides:
+The [`mcpPlugin`](/docs/reference/mcp-plugin) endpoint populates `credentialHeaders` automatically from the incoming request. When you drive the transport yourself, pass the headers along. For stdio there is no HTTP request, so supply whatever credential headers the environment provides:
 
 ```ts
 const server = createMcpServer(api, {

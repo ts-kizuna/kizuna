@@ -124,7 +124,7 @@ export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
 const GUARD_DENY: unique symbol = Symbol('ts-kizuna.guard.deny');
 
 /**
- * The result of `deny(status, detail)` inside a guard — short-circuits the
+ * The result of `deny(status, detail)` inside a guard, short-circuits the
  * request with an RFC 9457 problem details response of the given status.
  */
 export interface GuardDenial {
@@ -495,8 +495,8 @@ export interface AdapterRequest<NativeRequest> {
     request: NativeRequest;
     method: string;
     /**
-     * - `core-match` — core matches the path against the routes (Next-style catch-all routing).
-     * - `pre-resolved` — adapter has already routed the request and tells core which route was matched (Express-style per-route registration).
+     * - `core-match`: core matches the path against the routes (Next-style catch-all routing).
+     * - `pre-resolved`: adapter has already routed the request and tells core which route was matched (Express-style per-route registration).
      */
     resolution:
         | {
@@ -517,7 +517,7 @@ export interface AdapterRequest<NativeRequest> {
 /**
  * Outcome of `runPipeline`. The adapter's `respond` translates this to a native response.
  *
- * Note: `raw-response` is an escape hatch for `onError` overrides — its `response` is
+ * Note: `raw-response` is an escape hatch for `onError` overrides, its `response` is
  * cast back to the adapter's `NativeResponse` by `respond`.
  */
 export type AdapterResult =
@@ -971,7 +971,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 // Error responses (status >= 400) auto-fill the Problem Details envelope
                 // (`type`/`title`/`status`) at render time, so the handler only supplies
                 // `detail` plus extensions. Validate the final wire shape, not the partial
-                // body — otherwise every valid error handler would fail validation.
+                // body, otherwise every valid error handler would fail validation.
                 const bodyToValidate =
                     handlerResult.status >= 400 && handlerResult.body !== null && typeof handlerResult.body === 'object'
                         ? {
@@ -1094,7 +1094,7 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
  * **Reach for it only when** an older client needs a different content type (plain
  * `application/json`) or a structurally different body. It receives the request, so if you
  * can tell clients apart (a version header, `Accept`, …) you can serve the legacy shape to
- * old clients and Problem Details to new ones during a transition — then delete it.
+ * old clients and Problem Details to new ones during a transition, then delete it.
  */
 export type ErrorFormatter<NativeRequest = unknown> = (
     problem: ProblemDetails & Record<string, unknown>,
@@ -1125,10 +1125,10 @@ const describeBodyType = (body: unknown): string => {
  * instead of writing the switch by hand.
  *
  * Every error (status >= 400) is an RFC 9457 Problem Details object run through
- * `formatError` — there is no custom-error-shape passthrough. Pass an `ErrorFormatter`
+ * `formatError`, there is no custom-error-shape passthrough. Pass an `ErrorFormatter`
  * to reshape the wire bytes for migration; the canonical problem is unchanged.
  *
- * `raw-response` is excluded — it carries a framework-specific `NativeResponse`
+ * `raw-response` is excluded, it carries a framework-specific `NativeResponse`
  * the adapter must return directly, so handle that case before calling this.
  */
 export const renderJsonResult = (

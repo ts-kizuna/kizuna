@@ -1,0 +1,13 @@
+.navLogo {
+    width: 88px;
+    min-width: 88px;
+    height: auto;
+    flex-shrink: 0;
+    transform: translateY(-3px);
+}
+
+@media (max-width: 767px) {
+    .navLogo {
+        transform: none;
+    }
+}

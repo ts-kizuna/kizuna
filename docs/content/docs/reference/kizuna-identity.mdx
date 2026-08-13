@@ -1,9 +1,9 @@
 ---
 title: Kizuna.identity
-description: Define who can call your API — an OpenAPI security scheme, the context a passing guard provides, and the access fields routes may constrain.
+description: Define who can call your API with an OpenAPI security scheme, the context a passing guard provides, and the access fields routes may constrain.
 ---
 
-An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/server-guard) provides to handlers), and an optional `access` schema (the fields the [`auth` map](/docs/reference/k-contract#the-auth-map) may constrain per route). Omit `context` for an authentication-only identity — a pure gate with no data to hand the handler. For the full walkthrough, see the [Auth guide](/docs/auth).
+An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/server-guard) provides to handlers), and an optional `access` schema (the fields the [`auth` map](/docs/reference/k-contract#the-auth-map) may constrain per route). Omit `context` for an authentication-only identity, a pure gate with no data to hand the handler. For the full walkthrough, see the [Auth guide](/docs/auth).
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -22,9 +22,9 @@ One builder per authentication method, matching the OpenAPI security scheme type
 | `Kizuna.identity.basic`         | `Authorization: Basic <base64>`, decoded     | `{ type: 'http', scheme: 'basic' }`  |
 | `Kizuna.identity.oauth2`        | `Authorization: Bearer <token>`, with scopes | `{ type: 'oauth2', flows }`          |
 | `Kizuna.identity.openIdConnect` | `Authorization: Bearer <token>`              | `{ type: 'openIdConnect', ... }`     |
-| `Kizuna.identity.custom`        | Read by the guard (e.g. a path segment)      | none — emits `x-kizuna-guarded`      |
+| `Kizuna.identity.custom`        | Read by the guard (e.g. a path segment)      | none, emits `x-kizuna-guarded`       |
 
-Every builder takes `context` (optional), `access` (optional), `description` (optional), and `scheme` (optional — identities sharing one credential set the same `scheme` name and emit a single OpenAPI scheme). Method-specific fields:
+Every builder takes `context` (optional), `access` (optional), `description` (optional), and `scheme` (optional, where identities sharing one credential set the same `scheme` name and emit a single OpenAPI scheme). Method-specific fields:
 
 | Builder                         | Extra fields                                  |
 | ------------------------------- | --------------------------------------------- |
@@ -35,7 +35,7 @@ Every builder takes `context` (optional), `access` (optional), `description` (op
 
 ## Example
 
-```ts title="src/identities.ts"
+```ts title="src/contract/identities.ts"
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 
@@ -61,23 +61,23 @@ export const member = Kizuna.identity.apiKey({
 
 Both describe what the guard returns and the handler reads:
 
-- **`context`** — who the caller is. A guard must return it; handlers of secured routes receive it under `auth`, keyed by the identity's name (`auth.user`, `auth.member`).
-- **`access`** — the fields the `auth` map may gate per route. Gating on `{ member: { role: 'owner' } }` enforces a 403 at runtime and narrows the handler's type — `auth.member.role` is `'owner'`, not `'owner' | 'admin'`.
+- **`context`** is who the caller is. A guard must return it, and handlers of secured routes receive it under `auth`, keyed by the identity's name (`auth.user`, `auth.member`).
+- **`access`** is the fields the `auth` map may gate per route. Gating on `{ member: { role: 'owner' } }` enforces a 403 at runtime and narrows the handler's type, so `auth.member.role` is `'owner'`, not `'owner' | 'admin'`.
 
 Skip `access` for identities that never gate on fields; the auth map can still require them (`'user'`), it just can't constrain them.
 
 ## Authentication-only identities
 
-Some identities are pure gates — an API key that only proves the caller is a known client, or a bearer token where "authenticated" is all the handler needs. These have no data to hand the handler, so omit `context` (and `access`) entirely:
+Some identities are pure gates, such as an API key that only proves the caller is a known client, or a bearer token where "authenticated" is all the handler needs. These have no data to hand the handler, so omit `context` (and `access`) entirely:
 
-```ts title="src/identities.ts"
+```ts title="src/contract/identities.ts"
 export const apiConsumer = Kizuna.identity.apiKey({
     name: 'x-api-key',
     in: 'header',
 });
 ```
 
-Its [guard](/docs/reference/server-guard) returns nothing on success (or `deny(...)` to reject) — no `return {}` boilerplate:
+Its [guard](/docs/reference/server-guard) returns nothing on success (or `deny(...)` to reject), with no `return {}` boilerplate:
 
 ```ts
 export const requireApiKey = server.guard('apiConsumer', ({ apiKey, deny }) => {
@@ -85,15 +85,15 @@ export const requireApiKey = server.guard('apiConsumer', ({ apiKey, deny }) => {
 });
 ```
 
-A route secured only by a context-less identity gets no arg for it — the identity contributes nothing to the handler args.
+A route secured only by a context-less identity gets no arg for it, because the identity contributes nothing to the handler args.
 
 ## Custom identities
 
-Some credentials don't fit any OpenAPI security scheme. A capability URL is the common case: you email or SMS a link like `/invites/:token`, and the path token _is_ the credential. OpenAPI's `apiKey` can't describe it — its `in` allows only `header`, `query`, and `cookie`, and there is no `path` option — so declaring one would emit a scheme a generated client would act on incorrectly.
+Some credentials don't fit any OpenAPI security scheme. A capability URL is the common case: you email or SMS a link like `/invites/:token`, and the path token _is_ the credential. OpenAPI's `apiKey` can't describe it, since its `in` allows only `header`, `query`, and `cookie` with no `path` option, so declaring one would emit a scheme a generated client would act on incorrectly.
 
 `Kizuna.identity.custom` is the escape hatch. It has no OpenAPI scheme; its guard reads the credential itself from wherever it lives:
 
-```ts title="src/identities.ts"
+```ts title="src/contract/identities.ts"
 export const inviteToken = Kizuna.identity.custom({
     context: z.object({
         inviteId: z.string(),
@@ -113,15 +113,15 @@ export const requireInviteToken = server.guard('inviteToken', ({ params, deny })
 
 The guard receives the usual `{ params, deny, scopes }` (plus your framework's handler context) with no credential key, since there is nothing for the runtime to pre-extract. Everything else is ordinary typed auth: the identity registers under `identities`, the `auth` map references it, handlers read `auth.inviteToken.inviteId`, and `access` gates work as usual.
 
-Because it emits no `security`, a custom-guarded route would otherwise look public in the spec. To keep the distinction honest, [`generateOpenApi`](/docs/reference/generate-openapi) marks the operation with an `x-kizuna-guarded` extension listing the custom identities — so a genuinely public route (no `security`, no extension) stays distinguishable from one protected out-of-band.
+Because it emits no `security`, a custom-guarded route would otherwise look public in the spec. To keep the distinction honest, [`generateOpenApi`](/docs/reference/generate-openapi) marks the operation with an `x-kizuna-guarded` extension listing the custom identities, so a genuinely public route (no `security`, no extension) stays distinguishable from one protected out-of-band.
 
 Reach for `custom` only when the credential is truly inexpressible. A token belongs in `bearer`, a signature header in `apiKey`; mutual TLS has its own OpenAPI type.
 
 ## Registering identities
 
-Pass identities to [`new Kizuna()`](/docs/reference/kizuna) under `identities`. Their keys become the names everything else uses — auth map values, guard registrations, and handler context keys:
+Pass identities to [`new Kizuna()`](/docs/reference/kizuna) under `identities`. Their keys become the names everything else uses: auth map values, guard registrations, and handler context keys:
 
-```ts title="src/k.ts"
+```ts title="src/contract/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 import { user, member } from './identities';
@@ -137,9 +137,9 @@ export const k = new Kizuna({
 
 ## Securing routes
 
-Routes never mention identities directly — the contract's `auth` map assigns them per group (or per route via a `'*'` cascade), keyed by the names above:
+Routes never mention identities directly. The contract's `auth` map assigns them per group (or per route via a `'*'` cascade), keyed by the names above:
 
-```ts title="src/contract.ts"
+```ts title="src/contract/contract.ts"
 export const contract = k.contract({
     routes,
     auth: {
@@ -162,4 +162,4 @@ See the [`auth` map reference](/docs/reference/k-contract#the-auth-map) for ever
 
 ## OpenAPI emission
 
-[`generateOpenApi`](/docs/reference/generate-openapi) emits identities under `components.securitySchemes`, and each secured route references them in its `security` — with any OAuth scopes the auth map declares.
+[`generateOpenApi`](/docs/reference/generate-openapi) emits identities under `components.securitySchemes`, and each secured route references them in its `security`, with any OAuth scopes the auth map declares.

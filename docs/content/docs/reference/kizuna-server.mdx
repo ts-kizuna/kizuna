@@ -19,12 +19,24 @@ new KizunaServer(contract: Contract, options?: ServerOptions): Server
 | `options.jobTransport` | `JobTransport`                          | Where a queued job goes. See [Jobs](/docs/jobs#transports).  |
 | `options.onJobError`   | `(job: string, error: unknown) => void` | Called when a job queued without a transport rejects.        |
 
-```ts title="src/lib/server.ts"
+```ts title="src/server/server.ts"
 import { KizunaServer } from '@ts-kizuna/express';
 import { contract } from './contract';
 
 export const server = new KizunaServer(contract);
 ```
+
+## Returns
+
+The handle. Keep it as `server`, the serving surface for this contract:
+
+| Method                  | Description                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `server.guard`          | Define the guard for one identity. See [`server.guard`](/docs/reference/server-guard).                             |
+| `server.requestContext` | Resolve one declared request-context value. See [`server.requestContext`](/docs/reference/server-request-context). |
+| `server.router`         | Bind typed handlers to the contract or one group. See [`server.router`](/docs/reference/server-router).            |
+| `server.jobs`           | Bind a handler to each declared job. See [`server.jobs`](/docs/reference/server-jobs).                             |
+| `server.api`            | Assemble it all into the object you mount. See [`server.api`](/docs/reference/server-api).                         |
 
 With jobs that you queue from your own code, name a transport here. Without one, `queue` runs the job in this process and it is lost on a crash:
 
