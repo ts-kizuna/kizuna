@@ -11,11 +11,11 @@ A ts-kizuna project has three parts:
 
 ## Installation
 
-Install `@ts-kizuna/core`, the package that defines routes and contracts.
+Install `@ts-kizuna/core`, which defines routes and contracts, together with Zod 4 for the schemas.
 
 <InstallTabs packageName="@ts-kizuna/core zod" />
 
-ts-kizuna requires Zod 4 and `strict` in your `tsconfig.json`, which its inference depends on.
+Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
 ```json title="tsconfig.json"
 {

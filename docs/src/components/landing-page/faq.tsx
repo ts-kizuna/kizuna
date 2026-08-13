@@ -61,9 +61,9 @@ export const questions: Question[] = [
                     when you upgrade.
                 </p>
                 <p className={styles.body}>
-                    <strong className={styles.strong}>Why is it already 1.0 if it&rsquo;s in beta?</strong> It was an internal tool for
-                    years before we open-sourced it, and we kept the version history rather than resetting the number. The beta label is
-                    about the API surface, not about stability.
+                    <strong className={styles.strong}>Why is it already 1.0 if it&rsquo;s in beta?</strong> We used it internally for a
+                    while before open-sourcing it, and we kept the version history rather than resetting the number. The beta label is about
+                    the API surface, not about stability.
                 </p>
             </>
         ),

@@ -1,3 +1,4 @@
+import { Info } from 'lucide-react';
 import styles from './adapters.module.css';
 
 const adapters = [
@@ -30,10 +31,16 @@ export function Adapters() {
                     </div>
                 ))}
             </div>
-            <p className={styles.note}>
-                Every handler gets params, query, body, and headers validated the same way, and each adapter hands you its own primitives on
-                top. Through Hono the same API runs on Cloudflare Workers, Deno, and Bun.
-            </p>
+            <div className={styles.notes}>
+                <p className={styles.note}>
+                    Every handler gets params, query, body, and headers validated the same way, and each adapter hands you its own
+                    primitives on top.
+                </p>
+                <p className={styles.subnote}>
+                    <Info className={styles.subnoteIcon} aria-hidden />
+                    For Cloudflare Workers, Deno, or Bun, use the Hono adapter.
+                </p>
+            </div>
         </div>
     );
 }
