@@ -33,7 +33,7 @@ Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
 ## Define the routes
 
-Bind your API surface once with `new Kizuna()` and export `k`, then group your routes with `k.routes`. Keep each piece in its own file (a package both your server and client import).
+Declare your API surface once with `new Kizuna()` and export `k`, then group your routes with `k.routes`. Keep each piece in its own file (a package both your server and client import).
 
 ```ts title="src/contract/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
@@ -119,7 +119,7 @@ export const contract = k.contract({
 
 ## Implement the server
 
-Pick an adapter, here Next.js. `new KizunaServer()` binds the contract to a `server` handle.
+Pick an adapter, here Next.js. `new KizunaServer()` turns the contract into a `server` handle.
 
 <InstallTabs packageName="@ts-kizuna/next" />
 
@@ -185,7 +185,7 @@ export const router = server.router({
 });
 ```
 
-`server.api` binds the router into the API object the adapter mounts.
+`server.api` puts the router into the API object the adapter mounts.
 
 ```ts title="src/server/api.ts"
 import { server } from './server';

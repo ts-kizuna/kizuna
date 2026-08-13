@@ -1,0 +1,16 @@
+.icon {
+    width: auto;
+    height: 1.25rem;
+}
+
+.dark {
+    display: none;
+}
+
+:global(.dark) .light {
+    display: none;
+}
+
+:global(.dark) .dark {
+    display: initial;
+}

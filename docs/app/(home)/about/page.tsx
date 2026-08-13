@@ -1,11 +1,15 @@
 import type { Metadata } from 'next';
-import { About } from '../components/about';
-import { Maintainers } from '../components/maintainers';
-import { Section } from '../components/section';
+import { About } from '@/components/landing-page/about';
+import { Maintainers } from '@/components/landing-page/maintainers';
+import { Section } from '@/components/landing-page/section';
 
 export const metadata: Metadata = {
     title: 'About',
-    description: 'The idea behind ts-kizuna, and who builds it.',
+    description: 'The idea behind ts-kizuna.',
+    robots: {
+        index: false,
+        follow: false,
+    },
 };
 
 export default function AboutPage() {

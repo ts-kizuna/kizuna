@@ -1,7 +1,7 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { Logo } from './components/logo';
-import logoStyles from './components/logo.module.css';
-import { NavTitle } from './components/nav-title';
+import { Logo } from '@/components/shared/logo';
+import logoStyles from '@/components/shared/logo.module.css';
+import { NavTitle } from '@/components/shared/nav-title';
 
 type NavTitleVariant = 'logo' | 'iconWithText';
 

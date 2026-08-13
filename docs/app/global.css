@@ -19,6 +19,6 @@
     font-weight: 600;
 }
 
-.kz-handler .kz-type-token {
+.kizuna-handler .kizuna-type-token {
     border-bottom: 1px dashed color-mix(in oklab, currentColor 55%, transparent);
 }

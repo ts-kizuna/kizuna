@@ -41,7 +41,7 @@ my-repo/
 │   │       │   ├── server.ts   # new KizunaServer(contract)
 │   │       │   ├── guards.ts   # server.guard per identity
 │   │       │   ├── router/
-│   │       │   │   ├── users.ts    # Router<typeof contract>['users']
+│   │       │   │   ├── users.ts    # Router<typeof contract.routes.users>
 │   │       │   │   ├── events.ts
 │   │       │   │   ├── health.ts
 │   │       │   │   └── index.ts    # server.router, composes the groups

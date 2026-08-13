@@ -327,6 +327,20 @@ test('conforms to the shared adapter type catalogue', () => {
                 }),
             });
         },
+        'standalone.routeGroupContractArgs': () => {
+            type GroupArgs = Parameters<Router<typeof pluginTypeContract.routes>['whichLabel']>[0];
+            type ContractArgs = Parameters<Router<typeof pluginTypeContract>['whichLabel']>[0];
+
+            expectTypeOf<GroupArgs['plugins']>().toEqualTypeOf<ContractArgs['plugins']>();
+            expectTypeOf<GroupArgs['jobs']>().toEqualTypeOf<ContractArgs['jobs']>();
+        },
+        'standalone.routeHandlerContractArgs': () => {
+            type RouteArgs = Parameters<RouteHandler<typeof pluginTypeContract.routes.whichLabel>>[0];
+            type ContractArgs = Parameters<Router<typeof pluginTypeContract>['whichLabel']>[0];
+
+            expectTypeOf<RouteArgs['plugins']>().toEqualTypeOf<ContractArgs['plugins']>();
+            expectTypeOf<RouteArgs['jobs']>().toEqualTypeOf<ContractArgs['jobs']>();
+        },
         'plugins.exportsTyped': () => {
             expectTypeOf<Router<typeof pluginTypeContract>['whichLabel']>().parameter(0).toMatchTypeOf<{
                 plugins: { probe: { label: () => string } };

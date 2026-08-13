@@ -1,0 +1,90 @@
+.root {
+    --explorer-surface: var(--kizuna-surface, #f4f4f4);
+    --explorer-line: #e0e0e0;
+    --explorer-toolbar-line: #d8d8d8;
+    --explorer-muted: var(--color-fd-muted-foreground);
+}
+
+:global(.dark) .root {
+    --explorer-surface: var(--kizuna-surface, #1c1c1c);
+    --explorer-line: #2e2e2e;
+    --explorer-toolbar-line: #3a3a3a;
+}
+
+.card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.cardHead {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 0 12px;
+}
+
+.icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.icon[aria-label='Model Context Protocol'] {
+    width: 24px;
+    height: 24px;
+    stroke-width: 12;
+}
+
+.brandIcon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background-color: var(--explorer-surface);
+    color: var(--color-fd-foreground);
+}
+
+.nodeLabel {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.nodeDesc {
+    font-size: 0.75rem;
+    color: var(--explorer-muted);
+}
+
+.connector {
+    display: flex;
+    justify-content: center;
+    padding-block: 40px;
+}
+
+.connectorIcon {
+    width: 26px;
+    height: 52px;
+    color: var(--color-fd-foreground);
+}
+
+.grid {
+    display: grid;
+    column-gap: 16px;
+    row-gap: 20px;
+}
+
+@media (min-width: 640px) {
+    .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

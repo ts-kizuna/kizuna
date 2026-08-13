@@ -1,6 +1,6 @@
 ---
 title: new KizunaServer()
-description: Bind a contract to a server handle for defining guards, request context, and the router.
+description: Turn a contract into a server handle for defining guards, request context, and the router.
 ---
 
 `new KizunaServer(contract)` is a `server` handle bound to your contract. It is the server-side counterpart to `k`: define guards, request context, and the router without passing the contract again.
@@ -34,8 +34,8 @@ The handle. Keep it as `server`, the serving surface for this contract:
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `server.guard`          | Define the guard for one identity. See [`server.guard`](/docs/reference/server-guard).                             |
 | `server.requestContext` | Resolve one declared request-context value. See [`server.requestContext`](/docs/reference/server-request-context). |
-| `server.router`         | Bind typed handlers to the contract or one group. See [`server.router`](/docs/reference/server-router).            |
-| `server.jobs`           | Bind a handler to each declared job. See [`server.jobs`](/docs/reference/server-jobs).                             |
+| `server.router`         | Write typed handlers for the contract or one group. See [`server.router`](/docs/reference/server-router).          |
+| `server.jobs`           | Write a handler for each declared job. See [`server.jobs`](/docs/reference/server-jobs).                           |
 | `server.api`            | Assemble it all into the object you mount. See [`server.api`](/docs/reference/server-api).                         |
 
 With jobs that you queue from your own code, name a transport here. Without one, `queue` runs the job in this process and it is lost on a crash:

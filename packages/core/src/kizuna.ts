@@ -1,10 +1,18 @@
 import type { z } from 'zod';
 import { tagRoutes } from './routes.js';
 import { assembleContract, type Contract } from './contract.js';
-import type { ContractPlugins } from './plugin.js';
+import type { ContractPlugins, PluginArgs } from './plugin.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { flattenRoutes, isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
-import { assertNoJobEndpointCollision, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, type JobsConfig } from './jobs.js';
+import {
+    assertNoJobEndpointCollision,
+    buildJobs,
+    type AuthoredJobs,
+    type CompiledJobs,
+    type Jobs,
+    type JobsArg,
+    type JobsConfig,
+} from './jobs.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
 import { createIdentity } from './identity.js';
 import { createRequestContext } from './request-context.js';
@@ -188,7 +196,7 @@ const applyGroupAuth = (group: Routes, groupAuth: GroupAuth, path: string): void
 };
 
 /**
- * What a {@link Kizuna} instance binds.
+ * What a {@link Kizuna} instance declares.
  */
 export interface KizunaSpec {
     tags: Record<string, TagOptions>;
@@ -277,7 +285,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         jobs?: J;
         auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
     }): Contract<
-        RoutesWithHandlerContext<R, Spec['identities'], A, Spec['requestContext']>,
+        RoutesWithHandlerContext<R, Spec['identities'], A, Spec['requestContext'], PluginArgs<PluginsOf<Spec>> & JobsArg<J>>,
         Spec['tags'],
         Spec['codes'],
         Spec['identities'],
@@ -290,7 +298,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         routes: R;
         jobs?: J;
     }): Contract<
-        RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext']>,
+        RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext'], PluginArgs<PluginsOf<Spec>> & JobsArg<J>>,
         Spec['tags'],
         Spec['codes'],
         Spec['identities'],
@@ -436,11 +444,11 @@ const createSurface = <
 };
 
 /**
- * Bind one API surface: its tags, identities, request contexts and custom
+ * Declare one API surface: its tags, identities, request contexts and custom
  * validation issue codes. Keep the instance and use `k.routes` to define route
  * groups, `k.auth` to type the auth map, and `k.contract` to assemble them.
  *
- * The authoring helpers that need no binding stay static: `Kizuna.tags`,
+ * The authoring helpers that need no instance stay static: `Kizuna.tags`,
  * `Kizuna.identity`, `Kizuna.requestContext` and `Kizuna.model`.
  *
  * @example

@@ -7,7 +7,7 @@ Not everything that runs before a handler is auth. Analytics ids, request logger
 
 <AdapterTabs functionName="KizunaServer" />
 
-A declaration can bind to request `headers`. Those headers stay off the routes and out of the OpenAPI document, but the clients type them: the fetch client takes them on `new KizunaClient()`, and the generated Swift and Kotlin clients take them in their initializers, so a caller sets them once and the resolver reads them validated.
+A declaration can read request `headers`. Those headers stay off the routes and out of the OpenAPI document, but the clients type them: the fetch client takes them on `new KizunaClient()`, and the generated Swift and Kotlin clients take them in their initializers, so a caller sets them once and the resolver reads them validated.
 
 ```ts title="src/contract/request-contexts.ts"
 import { z } from 'zod';

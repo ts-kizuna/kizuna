@@ -1,0 +1,33 @@
+.switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    border: var(--kizuna-hairline) solid var(--kizuna-line);
+    border-radius: var(--kizuna-radius-pill);
+    padding: 3px;
+}
+
+.option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: var(--kizuna-radius-pill);
+    background: none;
+    padding: 0;
+    color: var(--kizuna-muted);
+    cursor: pointer;
+}
+
+.optionActive {
+    background-color: var(--kizuna-ink);
+    color: var(--kizuna-canvas);
+}
+
+.icon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.25;
+}

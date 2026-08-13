@@ -18,7 +18,7 @@ ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneer
 
 ### `initContract` -> `new Kizuna()` + `k.routes`
 
-`initContract` does not exist in ts-kizuna. Bind your surface with `new Kizuna()` once, then define groups with `k.routes`.
+`initContract` does not exist in ts-kizuna. Create your surface with `new Kizuna()` once, then define groups with `k.routes`.
 
 ```ts
 // ts-rest
@@ -136,9 +136,9 @@ const client = new KizunaClient(contract, {
 
 ## Server
 
-### `initServer` maps to `createServer`
+### `initServer` maps to `new KizunaServer()`
 
-`initServer` does not exist in ts-kizuna. Bind the contract with `createServer`, use `server.router` to bind implementations, and `server.api` to produce a mountable API object.
+`initServer` does not exist in ts-kizuna. Create the server with `new KizunaServer()`, use `server.router` for the implementations, and `server.api` to produce a mountable API object.
 
 ```ts
 // ts-rest

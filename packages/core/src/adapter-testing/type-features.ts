@@ -73,6 +73,12 @@ export const ADAPTER_TYPE_FEATURES = {
     'standalone.routeHandlerContext': {
         summary: 'A standalone `RouteHandler` carries the contract’s request context.',
     },
+    'standalone.routeGroupContractArgs': {
+        summary: 'A router typed from a route group carries the contract’s plugins and jobs.',
+    },
+    'standalone.routeHandlerContractArgs': {
+        summary: 'A standalone `RouteHandler` carries the contract’s plugins and jobs.',
+    },
     'plugins.exportsTyped': {
         summary: 'A handler’s `plugins` carries each installed plugin’s exports, typed and keyed by install name.',
     },

@@ -367,7 +367,7 @@ export interface Server<
         run: RequestResolverFns<RequestContext>[Name]
     ): RequestContextRun<FastifyHandlerContext>;
     /**
-     * Bind typed handlers to the contract or one of its route groups.
+     * Write typed handlers for the contract or one of its route groups.
      */
     router: {
         <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>, string> | Routes>(
@@ -379,7 +379,7 @@ export interface Server<
         ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
     };
     /**
-     * Bind a handler to each of the contract's jobs.
+     * Write a handler for each of the contract's jobs.
      *
      * Pass a `transport` to say where a queued job goes. Without one, `queue`
      * runs the job in this process and it is lost on a crash.
@@ -461,9 +461,9 @@ const createServerSurface = <
 };
 
 /**
- * Bind a contract to a server handle: the serving counterpart to `Kizuna`. Keep
- * the instance and use `server.guard` to define guards, `server.router` to bind
- * typed handlers, and `server.api` to assemble them.
+ * Turn a contract into a server handle: the serving counterpart to `Kizuna`.
+ * Keep the instance and use `server.guard` to define guards, `server.router`
+ * to write typed handlers, and `server.api` to assemble them.
  *
  * @example
  * const server = new KizunaServer(contract);

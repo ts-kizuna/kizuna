@@ -3,7 +3,7 @@ import { db } from '@ts-kizuna-demo/shared';
 import type { Router } from '@ts-kizuna/next';
 import type { contract } from '@ts-kizuna-demo/shared';
 
-export const members: Router<typeof contract>['members'] = {
+export const members: Router<typeof contract.routes.members> = {
     listMembers: async ({ auth }) => {
         const allMembers = await db.users.findMany();
         return {

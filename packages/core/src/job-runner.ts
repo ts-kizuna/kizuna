@@ -129,7 +129,7 @@ const handlerAt = (handlers: unknown, jobKey: string): unknown => {
 };
 
 /**
- * Bind a contract's jobs to their handlers so they can be run from anywhere.
+ * Pair a contract's jobs with their handlers so they can be run from anywhere.
  *
  * Every handler already receives this as `jobs`, so reach for it directly only
  * outside a request: in a script, a seed, or a test.

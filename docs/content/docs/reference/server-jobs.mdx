@@ -1,9 +1,9 @@
 ---
 title: server.jobs
-description: Bind a handler to each of the contract's jobs.
+description: Write a handler for each of the contract's jobs.
 ---
 
-`server.jobs(handlers)` binds a handler to each of the contract's [jobs](/docs/jobs), mirroring the declaration including its nesting.
+`server.jobs(handlers)` takes a handler for each of the contract's [jobs](/docs/jobs), mirroring the declaration including its nesting.
 
 ```ts title="src/server/jobs.ts"
 import { server } from './server';

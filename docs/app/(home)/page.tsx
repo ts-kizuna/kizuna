@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
-import { ContractExplorer } from '@/lib/ContractExplorer';
-import { HandlerExplorer } from '@/lib/HandlerExplorer';
-import { Adapters } from './components/adapters';
-import { Beta } from './components/beta';
-import { ClosingCta } from './components/closing-cta';
-import { FeatureCards } from './components/feature-cards';
-import { Hero } from './components/hero';
-import { LinkCards } from './components/link-cards';
-import { Section } from './components/section';
+import { ContractExplorer } from '@/components/code/contract-explorer';
+import { HandlerExplorer } from '@/components/code/handler-explorer';
+import { Adapters } from '@/components/landing-page/adapters';
+import { Beta } from '@/components/landing-page/beta';
+import { ClosingCta } from '@/components/landing-page/closing-cta';
+import { FeatureCards } from '@/components/landing-page/feature-cards';
+import { Hero } from '@/components/landing-page/hero';
+import { LinkCards } from '@/components/landing-page/link-cards';
+import { Section } from '@/components/landing-page/section';
+import styles from './page.module.css';
 
 export const metadata: Metadata = {
     title: {
@@ -19,38 +20,40 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
     return (
-        <>
-            <Hero />
+        <div className={styles.page}>
+            <Hero className={styles.hero} />
 
-            <Beta />
+            <Beta className={styles.beta} />
 
-            <Section tight>
+            <Section className={styles.cards}>
                 <FeatureCards />
             </Section>
 
-            <Section
-                title="The idea"
-                description="One contract is the source of truth. Your server, your clients, and every generated artifact read from it.">
-                <ContractExplorer />
-            </Section>
+            <div className={styles.sections}>
+                <Section
+                    title="The idea"
+                    description="One contract is the source of truth. Your server, your clients, and every generated artifact read from it.">
+                    <ContractExplorer />
+                </Section>
 
-            <Section title="Inside a handler" description="Whatever the contract declares, the handler gets it validated and typed.">
-                <HandlerExplorer />
-            </Section>
+                <Section title="Inside a handler" description="Whatever the contract declares, the handler gets it validated and typed.">
+                    <HandlerExplorer />
+                </Section>
 
-            <Section
-                title="Runs anywhere"
-                description="The same contract and router move between adapters, and the framework underneath stays available to you.">
-                <Adapters />
-            </Section>
+                <Section
+                    title="Runs anywhere"
+                    description="The same contract and router move between adapters, and the framework underneath stays available to you.">
+                    <Adapters />
+                </Section>
 
-            <Section title="Start here">
-                <LinkCards />
-            </Section>
+                <Section title="Start here">
+                    <LinkCards />
+                </Section>
+            </div>
 
-            <Section tight>
+            <Section className={styles.cta}>
                 <ClosingCta />
             </Section>
-        </>
+        </div>
     );
 }
