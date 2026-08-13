@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import Link from 'next/link';
 import { GithubIcon } from './github-icon';
+import { InstallCommand } from './install-command';
 import styles from './hero.module.css';
 
 export function Hero({ className }: { className?: string }) {
@@ -19,6 +20,7 @@ export function Hero({ className }: { className?: string }) {
                     View on GitHub
                 </a>
             </div>
+            <InstallCommand />
         </section>
     );
 }

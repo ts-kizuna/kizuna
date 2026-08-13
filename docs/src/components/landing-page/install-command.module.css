@@ -1,0 +1,58 @@
+.install {
+    /**
+     * The icon keeps its space while hidden, so the same width on the left
+     * keeps the command optically centred under the buttons.
+     */
+    --install-icon-column: 23px;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 28px;
+    border: 0;
+    padding-inline: var(--install-icon-column) 0;
+    background-color: transparent;
+    color: var(--kizuna-muted);
+    cursor: pointer;
+}
+
+.command {
+    font-family: var(--kizuna-font-mono);
+    font-size: 0.9rem;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+}
+
+.icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    opacity: 0;
+}
+
+.install:hover {
+    color: var(--kizuna-ink);
+}
+
+.install:hover .icon,
+.install:focus-visible .icon,
+.copied .icon {
+    opacity: 1;
+}
+
+@media (max-width: 767px) {
+    .install {
+        --install-icon-column: 21px;
+
+        margin-top: 20px;
+        gap: 7px;
+    }
+
+    .command {
+        font-size: 0.8125rem;
+    }
+
+    .icon {
+        opacity: 1;
+    }
+}
