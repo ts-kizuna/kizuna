@@ -3,7 +3,7 @@ title: openApiPlugin
 description: Serve your OpenAPI document and an API reference UI for it, on any adapter.
 ---
 
-Serve a reference UI for the OpenAPI document generated from your contract, and the document itself if you want it public. Declare it on [`new Kizuna()`](/docs/reference/kizuna), pass `openApiPluginServer()` to [`server.api`](/docs/reference/server-api), and `api.mount` serves the routes.
+Serve a reference UI for the OpenAPI document generated from your contract, and the document itself if you want it public. Declare it on [`new Kizuna()`](/docs/reference/kizuna), pass `openApiPluginServer()` to [`server.api`](/docs/reference/server-api), and `api.mount` serves the routes. See the [OpenAPI guide](/docs/openapi).
 
 <InstallTabs packageName="@ts-kizuna/openapi" />
 
@@ -37,11 +37,11 @@ openApiPluginServer(): PluginImplementation
 | `pageTitle`     | the document title | The page's `<title>`                                    |
 | `configuration` | none               | Extra config merged into the UI's initializer           |
 
-Props are pure data, because they reach the contract and the contract reaches your client. The generator lives in `openApiPluginServer()`, which takes nothing: declaring the plugin is where it is configured.
+Props are pure data. `openApiPluginServer()` takes nothing: declaring the plugin is where it is configured.
 
 They are also the options [`generateOpenApi`](/docs/reference/generate-openapi) uses when you call it without any, so a build step and the served document cannot disagree.
 
-Each prop serves nothing until you give it a path. The document paths carry their extension in the type, so `jsonPath: '/docs'` does not compile.
+Each path prop is off until you give it a path. The document paths carry their extension in the type, so `jsonPath: '/docs'` does not compile.
 
 ## Example
 
@@ -57,6 +57,7 @@ export const k = new Kizuna({
                 title: 'My API',
                 version: '1.0.0',
             },
+            docsPath: '/docs',
             setOperationId: true,
         }),
     },
@@ -78,13 +79,11 @@ export const api = server.api({
 api.mount(app);
 ```
 
-## Two halves
+Miss `openApiPluginServer()` and `server.api` throws, naming the module to import.
 
-`@ts-kizuna/openapi` declares the paths it serves and the options the document is built from, as data on your contract. `@ts-kizuna/openapi/server` holds the generator that renders it. Miss the second half and `server.api` throws, naming the module to import. See [Plugins](/docs/plugins#why-two-halves).
+## Plugin routes
 
-## Not in your client
-
-Its routes are plugin routes, so they live outside `contract.routes`. Your fetch client and generated Swift and Kotlin clients never see them, and neither does the document itself.
+These are [plugin routes](/docs/plugins#plugin-routes): they live outside `contract.routes`, so your fetch client, the generated Swift and Kotlin clients, and the document itself never list them.
 
 ## Public by default
 
@@ -96,10 +95,4 @@ Nothing guards these routes. Gate them with your framework's own middleware if y
 
 ## Serving it yourself
 
-[`generateOpenApi`](/docs/reference/generate-openapi) is unchanged and exported, so you can skip the plugin and serve the document from your own route. Mixing works too: `docsPath: false` lets the plugin serve the document while you render your own UI, and leaving `jsonPath` unset keeps the plugin off a path you serve yourself.
-
-## See also
-
-- [OpenAPI guide](/docs/openapi)
-- [`generateOpenApi`](/docs/reference/generate-openapi) to write the document to disk instead
-- [Plugins](/docs/plugins)
+[`generateOpenApi`](/docs/reference/generate-openapi) is exported, so you can skip the plugin and serve the document from your own route. Mixing works: leave a path unset and the plugin stays off it. Set `jsonPath` but not `docsPath` to serve the document while rendering your own UI.

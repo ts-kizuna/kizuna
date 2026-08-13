@@ -55,55 +55,72 @@ my-repo/
 
 ## Why the contract is its own package
 
-Your server imports the contract. So does your website, and so does anything else that talks to the API. If it lives inside the API app, every consumer has to reach into that app to get it.
+Your server, your website, and anything else that talks to the API all import the contract. Inside the API app, every consumer has to reach into that app to get it.
 
-The contract is also plain data, with no server code in it, which is what makes it safe to bundle for a browser. Keeping it in its own package is what preserves that property, because it cannot accidentally pick up a database driver or a Node built-in.
+Its own package also keeps it browser-safe. The contract is plain data, and a separate package cannot accidentally pick up a database driver or a Node built-in.
 
-Once it is a package, publishing it is a small step. Teams with API consumers outside the repo push the contract to npm, public or private, so anyone integrating installs one package and gets the routes, the types, and a client that already knows both. It is the same thing your own website imports, handed to someone else.
+Publishing it is then a small step. Teams with API consumers outside the repo push the contract to npm, public or private, so anyone integrating installs one package and gets the routes, the types, and a client that knows both.
 
 ## Splitting the pieces
 
-Each file above does one thing, and the split matters more as the API grows:
+The split matters more as the API grows:
 
-- **`k.ts`** constructs the surface once. Everything else imports `k` from here rather than constructing its own.
+- **`k.ts`** constructs the surface once. Everything else imports `k` from here.
 - **`routes/`** holds one file per group, each calling `k.routes`, with an `index.ts` re-exporting them so `contract.ts` has one import to make. See [organizing the contract](/docs/building/contract#splitting-routes-across-files).
 - **`router/`** mirrors it exactly. One file per group, each typed with the [`Router`](/docs/building/router#routehandler-and-router-types) type so inputs and responses stay inferred, and `index.ts` composes them with `server.router`.
-- **`auth.ts`** declares who may call what, once, against the whole route tree. It sits beside the routes rather than inside them so a single file answers the question. See [auth](/docs/auth).
-- **`api.ts`** stays small. It is the one place guards, jobs, plugins, and the router come together.
+- **`auth.ts`** declares who may call what, once, against the whole route tree, so one file answers the question. See [auth](/docs/auth).
+- **`api.ts`** is where guards, jobs, plugins, and the router come together.
 
 ## Single app
 
-Not every project needs a monorepo. With Next.js the API and the website are the same app, so the contract can be a folder rather than a package:
+With Next.js the API and the website are the same app, so the contract can be a folder instead of a package:
 
 ```
 my-repo/
 └── src/
     ├── contract/
-    │   ├── k.ts
-    │   ├── identities.ts
+    │   ├── k.ts            # new Kizuna(), exports k
+    │   ├── tags.ts         # Kizuna.tags
+    │   ├── identities.ts   # Kizuna.identity builders
     │   ├── routes/
-    │   │   ├── users.ts
+    │   │   ├── users.ts    # k.routes('users', { ... })
     │   │   ├── events.ts
     │   │   ├── health.ts
-    │   │   └── index.ts
-    │   ├── auth.ts
-    │   └── contract.ts
+    │   │   └── index.ts    # re-exports the groups
+    │   ├── auth.ts         # k.auth, who may call what
+    │   ├── jobs.ts         # k.jobs
+    │   └── index.ts        # k.contract, the object everything reads
     ├── server/
-    │   ├── server.ts
-    │   ├── guards.ts
+    │   ├── server.ts       # new KizunaServer(contract)
+    │   ├── guards.ts       # server.guard per identity
     │   ├── router/
-    │   │   ├── users.ts
+    │   │   ├── users.ts    # Router<typeof contract.routes.users>
     │   │   ├── events.ts
     │   │   ├── health.ts
-    │   │   └── index.ts
-    │   └── api.ts
+    │   │   └── index.ts    # server.router, composes the groups
+    │   ├── jobs.ts         # server.jobs
+    │   └── api.ts          # server.api, what you mount
     ├── lib/
-    │   └── api-client.ts
+    │   └── api-client.ts   # new KizunaClient(contract)
     └── app/
-        └── api/[...ts-kizuna]/route.ts
+        └── api/[...ts-kizuna]/route.ts   # api.mount(), re-exports the handlers
 ```
 
 The rule is the same at any size: one contract, imported by both sides, with no server-only code in it.
+
+### The `@/` alias
+
+Examples throughout these docs import from `@/contract` and `@/server/api`. That is `@/` pointing at `src/`, which `create-next-app` sets up for you. Anywhere else, declare it yourself:
+
+```json title="tsconfig.json"
+{
+    "compilerOptions": {
+        "paths": {
+            "@/*": ["./src/*"]
+        }
+    }
+}
+```
 
 ## Next steps
 

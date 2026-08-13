@@ -3,7 +3,7 @@ title: ProblemDetailsSchema
 description: RFC 9457 Problem Details error response schema (ProblemDetailsSchema) used across kizuna.
 ---
 
-The standard [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) error response shape used by kizuna. Matches the format produced by [`deny()`](/docs/reference/server-guard#deny-and-problemdetailsschema) in guards and all built-in error responses (404, 405, 415, etc.).
+The standard [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) error response shape used by kizuna. Matches the format produced by [`deny()`](/docs/reference/server-guard) in guards and all built-in error responses (404, 405, 415, etc.).
 
 ```ts
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
@@ -51,7 +51,7 @@ const usersRoutes = k.routes('users', {
 
 ## Usage in handlers
 
-Handlers only need to provide `detail`, and kizuna fills in `type`, `title`, and `status` automatically:
+Handlers supply `detail`; `type`, `title`, and `status` are filled in:
 
 ```ts
 const router = server.router({
@@ -75,20 +75,11 @@ const router = server.router({
 });
 ```
 
-The response sent to the client includes the full RFC 9457 envelope:
-
-```json
-{
-    "type": "about:blank",
-    "title": "Not Found",
-    "status": 404,
-    "detail": "User not found"
-}
-```
+The client receives the full envelope shown under [Shape](#shape).
 
 ## Extension members
 
-RFC 9457 lets a problem carry extra fields, called **extension members**, alongside the standard envelope. `ProblemDetailsSchema` is a plain Zod object schema, so you add domain-specific fields with Zod's native `.extend()`, and there's no builder function:
+RFC 9457 lets a problem carry extra fields, called **extension members**, alongside the standard envelope. `ProblemDetailsSchema` is a plain Zod object schema, so add them with `.extend()`:
 
 ```ts
 import { z } from 'zod';
@@ -127,10 +118,10 @@ const ConflictError = Kizuna.model({
 // responses: { 409: ConflictError }
 ```
 
-The handler supplies `detail` plus the declared extensions; `type`, `title`, and `status` are still auto-filled:
+The handler supplies `detail` plus the declared extensions:
 
 ```ts
-return error({
+return throwError({
     status: 409,
     body: {
         detail: 'A user with that email already exists',
@@ -149,7 +140,7 @@ return error({
 }
 ```
 
-Extension members are also the cleanest way to preserve an existing API's error fields while moving onto kizuna. See [Migrating an existing API](/docs/migration/existing-api).
+Extension members are how you preserve an existing API's error fields when moving onto kizuna. See [Migrating an existing API](/docs/migration/existing-api).
 
 ## Checking for a Problem Details body
 
@@ -163,13 +154,13 @@ if (isProblemDetails(response.body)) {
 }
 ```
 
-## Why Problem Details only
+## The rule
 
-Error responses (status `>= 400`) must be Problem Details. Handlers cannot return an arbitrary error shape, and the type system enforces it. This is deliberate: a single shared error schema is what lets guards, validation, the type guards above, generated clients, and the OpenAPI spec all compose against one shape. Need extra fields? Use extension members. Need a non-JSON error (proxying, an HTML error page)? Use the adapter's `raw-response` escape hatch.
+Every response with status `>= 400` must be Problem Details, and the type system enforces it. For extra fields, use extension members. For an error that isn't JSON, such as proxying an upstream body or an HTML error page, use the adapter's `raw-response` escape hatch.
 
 ## Migrating to a legacy wire shape
 
-The wire bytes are produced by a single, pluggable formatter. The default emits `application/problem+json`. Adapters accept a `formatError` option to reshape the bytes for clients that can't move to Problem Details yet. It receives the **request**, so during a transition you serve the legacy shape to old clients and Problem Details to new ones, branching on whatever signal your API has (a version header, `Accept`, and so on):
+Adapters accept a `formatError` option to reshape the outgoing bytes for clients that can't move to Problem Details yet. It receives the request, so during a transition you serve the legacy shape to old clients and Problem Details to new ones, branching on whatever signal your API has:
 
 ```ts
 api.mount(app, {
@@ -187,11 +178,9 @@ api.mount(app, {
 });
 ```
 
-The input is always the canonical problem; only the outgoing bytes change. This is a migration seam, not a way to define custom errors in the contract, and the contract stays Problem Details. Most migrations don't need it at all (use extension members). See [Migrating an existing API](/docs/migration/existing-api).
+The input is always the canonical problem; only the outgoing bytes change, so the contract stays Problem Details. Reach for it when extension members can't reproduce the old body. See [Migrating an existing API](/docs/migration/existing-api).
 
 ## What produces it
-
-Everything in kizuna that returns a non-success response uses this shape:
 
 | Source                 | Example                      |
 | ---------------------- | ---------------------------- |

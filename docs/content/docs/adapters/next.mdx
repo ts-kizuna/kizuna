@@ -28,7 +28,7 @@ Then create a catch-all route at `src/app/api/[...ts-kizuna]/route.ts`. The adap
 
 ```ts title="src/server/server.ts"
 import { KizunaServer } from '@ts-kizuna/next';
-import { contract } from '@shared/contract';
+import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);
 ```
@@ -87,14 +87,12 @@ export const api = server.api({
 ```
 
 ```ts title="src/app/api/[...ts-kizuna]/route.ts"
-import { api } from '../../../server/api';
+import { api } from '@/server/api';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
     basePath: '/api',
 });
 ```
-
-The `basePath` option tells the adapter to strip the prefix when matching requests against the declared paths.
 
 ## Handler context
 
@@ -113,7 +111,7 @@ getUser: async ({ params, request }) => {
 
 ## Guards
 
-One guard per identity. The credential arrives extracted and typed, alongside the native `request`. See the [Auth guide](/docs/auth).
+A guard receives the credential extracted and typed, alongside the native `request`. See the [Auth guide](/docs/auth).
 
 ```ts title="src/server/guards.ts"
 import { server } from './server';
@@ -135,8 +133,6 @@ For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/ref
 
 ## Options
 
-Pass options to `api.mount`:
-
 ```ts
 api.mount({
     basePath: '/api',
@@ -153,7 +149,7 @@ api.mount({
 
 ## `onError`
 
-Set `onError` on `server.api` (or pass it to `api.mount`) to send a custom response instead of the default 500:
+Set `onError` on `server.api`, or pass it to `api.mount`, to send your own response:
 
 ```ts title="src/server/api.ts"
 import { server } from './server';
@@ -182,15 +178,13 @@ export const api = server.api({
 });
 ```
 
-Returning `undefined` lets the default 500 flow run.
-
 ## `requestMiddleware`
 
 `requestMiddleware` applies a flat array of middleware to every matched route, after route matching and before the handler. Each middleware receives `(request, route)`, where `route` is the matched route's `path` and `method`, and may return a `Response` to short-circuit.
 
 ## Type-safe request properties
 
-Auth data doesn't need request mutation, because guards return typed context that handlers receive directly. But if non-auth middleware sets custom properties on the request, such as a request id, use module augmentation to extend `NextRequest` so handlers can access them without casts:
+Middleware that sets custom properties on the request, such as a request id, needs module augmentation to extend `NextRequest` so handlers reach them without casts. Auth data does not: guards hand handlers typed context directly.
 
 ```ts title="types/next.d.ts"
 import 'next/server';
@@ -202,7 +196,7 @@ declare module 'next/server' {
 }
 ```
 
-With the augmentation in place, both middleware and handlers are fully typed:
+Both middleware and handlers are then typed:
 
 ```ts
 getUser: async ({ params, request }) => {
@@ -213,7 +207,7 @@ getUser: async ({ params, request }) => {
 
 ## Multipart / file uploads
 
-Routes with `contentType: 'multipart/form-data'` work natively. The adapter calls `request.formData()` internally, with no additional middleware needed.
+Routes with `contentType: 'multipart/form-data'` work natively. The adapter calls `request.formData()` internally.
 
 ```ts
 uploadAvatar: async ({ body }) => {

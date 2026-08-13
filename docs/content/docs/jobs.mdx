@@ -9,7 +9,7 @@ Jobs are new and still settling. The shape of `k.jobs`, the handler signature, a
 
 </BetaNotice>
 
-Every API grows work that should not happen inside a request: nightly digests, invoice reconciliation, re-indexing a document someone just saved. `k.jobs` puts that work in the contract.
+`k.jobs` puts background work in the contract, beside the routes.
 
 ## Declaring jobs
 
@@ -36,7 +36,7 @@ export const jobs = k.jobs('scheduler', {
 });
 ```
 
-`sendDigests` runs on a clock. `indexUser` has no `schedule`; it gets queued when a user changes. A job can have both.
+A job with a `schedule` runs on a clock; one without is only ever queued. A job can have both.
 
 They nest like routes:
 
@@ -63,7 +63,7 @@ schedule: {
 }
 ```
 
-Helpers build the expression, and return plain cron strings:
+Helpers return plain cron strings:
 
 | Helper                        | Expression     |
 | ----------------------------- | -------------- |
@@ -104,7 +104,7 @@ export const jobHandlers = server.jobs({
 });
 ```
 
-A handler receives `input`, `throwError`, and `jobs`, and no request, response, or `auth`. A job with no declared `result` can return nothing.
+A handler receives `input`, `throwError`, and `jobs`. A job with no declared `result` can return nothing.
 
 Pass the handlers to `server.api` next to the router:
 
@@ -118,7 +118,7 @@ export const api = server.api({
 });
 ```
 
-### The status you return is the retry contract
+### Return status and retries
 
 | Return              | Status                           | Read as                    |
 | ------------------- | -------------------------------- | -------------------------- |
@@ -126,8 +126,6 @@ export const api = server.api({
 | transient failure   | `503`                            | retry me                   |
 | permanent failure   | `422`                            | do not retry; page a human |
 | an unexpected throw | `500`                            | retry me                   |
-
-Return `422` for input that will never become valid, so it is not retried.
 
 <Callout type="warn">Job handlers must be idempotent. Delivery is at least once everywhere, so a retry runs your handler again.</Callout>
 
@@ -195,7 +193,7 @@ await jobs.sendDigests.run();
 
 No queue. `startJobs` watches the clock, and a queued job runs right here.
 
-A job that fails after the response has gone has nowhere to report, so give it somewhere:
+A job that fails after the response has gone needs somewhere to report:
 
 ```ts title="src/server/server.ts"
 export const server = new KizunaServer(contract, {
@@ -218,7 +216,7 @@ startJobs(api);
 
 <Tab value="Long running server and transport">
 
-The same `startJobs`, plus a queue holding the jobs you call `queue()` on, so a restart no longer loses them.
+The same `startJobs`, plus a queue holding the jobs you call `queue()` on, so a restart does not lose them.
 
 ```ts title="src/server/server.ts"
 export const server = new KizunaServer(contract, {
@@ -240,7 +238,7 @@ const worker = await startJobWorker(api);
 process.on('SIGTERM', () => void worker?.stop());
 ```
 
-More than one instance is fine now, as long as the queue drops repeated keys. You can also drop `startJobs` and hand the schedules to the queue's own scheduler with [`register`](/docs/extend/create-job-transport#register).
+More than one instance is fine, as long as the queue drops repeated keys. You can also drop `startJobs` and hand the schedules to the queue's own scheduler with [`register`](/docs/extend/create-job-transport#register).
 
 </Tab>
 
@@ -270,9 +268,9 @@ export const k = new Kizuna({
 }
 ```
 
-That entry is the only cron config you write, however many jobs you add later: the endpoint works out which are due. `method: 'GET'` is there because Vercel Cron issues `GET` and nothing else.
+One entry covers every job you ever add: the endpoint works out which are due. `method: 'GET'` is there because Vercel Cron issues `GET`.
 
-A transport is not optional for `queue` here: the function can be frozen the moment it answers, so a job queued without one has nowhere to run. Use a queue that delivers over HTTP, like QStash, Cloud Tasks, or SQS. It posts to the run endpoint, which the same identity guards.
+`queue` needs a transport here, because the function can be frozen the moment it answers. Use a queue that delivers over HTTP, like QStash, Cloud Tasks, or SQS. It posts to the run endpoint, which the same identity guards.
 
 ```ts title="src/server/server.ts"
 export const server = new KizunaServer(contract, {
@@ -290,7 +288,7 @@ export const server = new KizunaServer(contract, {
 
 ## Transports
 
-A transport carries a queued job out of this process to whatever runs it. Name one and the same `queue` calls become as durable as it is, with no handler change:
+A transport carries a queued job out of this process to whatever runs it. Name one and your existing `queue` calls become as durable as it is:
 
 ```ts title="src/server/server.ts"
 export const server = new KizunaServer(contract, {
@@ -300,29 +298,29 @@ export const server = new KizunaServer(contract, {
 
 kizuna ships no transports. QStash, BullMQ, pg-boss, Cloud Tasks, SQS, or a table in your own database all fit the same interface: see [Create a job transport](/docs/extend/create-job-transport).
 
-A job is addressed by its dotted key, so a transport carries the name and the input, never a URL per job. Queues come in two shapes, and it decides whether you run anything extra:
+A job is addressed by its dotted key, so a transport carries the name and the input. Queues come in two shapes, and the shape decides whether you run anything extra:
 
 | Shape               | Examples                           | You run                                    |
 | ------------------- | ---------------------------------- | ------------------------------------------ |
 | Delivers over HTTP  | QStash, Cloud Tasks, SQS to Lambda | nothing, the run endpoint is already there |
 | Hands the work back | BullMQ, pg-boss, your own table    | `startJobWorker(api)`                      |
 
-`startJobWorker` returns `undefined` against a queue that needs no worker, so it is safe either way. Run it in the same process as the API or its own.
+`startJobWorker` returns `undefined` against a queue that needs no worker. Run it in the API's process or its own.
 
 `retry: 3` on a job says how many attempts a failure deserves; your transport does the retrying. kizuna warns when a job asks for something its transport will drop, at startup for `retry` and at the `queue` call for `runAt` and `dedupeKey`.
 
 ## The two job endpoints
 
-`api.mount` serves two endpoints, and no job has one of its own. Both mount as ordinary routes, so the jobs' identity guards them and failures render as Problem Details.
+`api.mount` serves two endpoints for every job. Both mount as ordinary routes, so the jobs' identity guards them and failures render as Problem Details.
 
 | Endpoint              | Called by      | Body             | Answers                                                      |
 | --------------------- | -------------- | ---------------- | ------------------------------------------------------------ |
 | `POST /jobs/dispatch` | platform cron  | none             | `200`, or `503` with the names that failed                   |
 | `POST /jobs/run`      | your transport | `{ job, input }` | whatever the job answered, `404` for a name it does not know |
 
-`POST /jobs/dispatch` runs whichever jobs the elapsed window belonged to. Point platform cron at it and there is nothing else to wire.
+`POST /jobs/dispatch` runs whichever jobs the elapsed window belonged to. Point platform cron at it.
 
-`POST /jobs/run` runs the one job the body names, validating `input` against that job's schema and answering `422` when it does not fit. The status it answers with is the job's own, so a queue reads the [retry contract](#the-status-you-return-is-the-retry-contract) straight off it.
+`POST /jobs/run` runs the one job the body names, validating `input` against that job's schema and answering `422` when it does not fit. It answers with the job's own status, which a queue reads as the [retry signal](#return-status-and-retries).
 
 Configure both on `new Kizuna()` under `jobs`:
 
@@ -334,7 +332,7 @@ Configure both on `new Kizuna()` under `jobs`:
 | `only`     | none    | Dispatch only these jobs                           |
 | `exclude`  | none    | Never dispatch these                               |
 
-`method` moves `/jobs/dispatch` only: `/jobs/run` takes a body, so it is always `POST`. Nothing is served on `/jobs` itself, and every adapter serves both the same way.
+`method` moves `/jobs/dispatch` only: `/jobs/run` takes a body, so it is always `POST`. Nothing is served on `/jobs` itself.
 
 A tick runs each due job inline, in the request the scheduler made, so the function's timeout is the budget for all of them. Keep the tick short by having a scheduled job queue one job per unit of work:
 
@@ -364,11 +362,9 @@ export const jobHandlers = server.jobs({
 });
 ```
 
-`sendOneDigest` declares no `schedule`, so nothing ticks it: it exists only to be queued.
-
 ## Local development
 
-`startJobs` is the same line locally as in production. When you deploy to platform cron and want `pnpm dev` to exercise the real HTTP path, `startJobsDevRunner` ticks the dispatch endpoint over the network on an interval, the way your platform cron will:
+When you deploy to platform cron and want `pnpm dev` to exercise the real HTTP path, `startJobsDevRunner` ticks the dispatch endpoint over the network on an interval, the way your platform cron will:
 
 ```ts title="src/index.ts"
 import { startJobsDevRunner } from '@ts-kizuna/core/jobs';

@@ -3,7 +3,7 @@ title: Kizuna.model
 description: Give a Zod schema a name so OpenAPI and Swift generators produce named types instead of inline definitions.
 ---
 
-Give a Zod schema a name so generators produce named types instead of inline definitions.
+Give a Zod schema a name, so OpenAPI and the Swift and Kotlin generators emit a named type for it.
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -12,8 +12,6 @@ import { Kizuna } from '@ts-kizuna/core';
 ```
 
 ## Parameters
-
-`Kizuna.model` accepts a single options object:
 
 ```ts
 Kizuna.model(options: ModelOptions): ZodType
@@ -27,7 +25,7 @@ Kizuna.model(options: ModelOptions): ZodType
 
 ## Returns
 
-The Zod schema with metadata attached. Use it exactly like any other Zod schema in your routes.
+The Zod schema with metadata attached, usable anywhere a Zod schema is.
 
 ## Example
 
@@ -48,7 +46,7 @@ export const UserSchema = Kizuna.model({
 
 ## Effect on generators
 
-Without a title, generators inline the schema everywhere it appears. With `Kizuna.model`:
+With `Kizuna.model`:
 
 - **OpenAPI**: the schema is extracted into `components.schemas.User` and every usage becomes a `$ref` reference
 - **Swift**: the schema becomes a named `public struct User` in the generated client, shared across all routes that reference it
@@ -61,4 +59,4 @@ Export a type alongside the schema with `z.infer`:
 export type User = z.infer<typeof UserSchema>;
 ```
 
-See the [Contract guide](/docs/building/contract#models) for more details.
+See the [Contract guide](/docs/building/contract#naming-schemas-with-models) for more details.

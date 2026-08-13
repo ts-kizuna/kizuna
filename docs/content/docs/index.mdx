@@ -15,9 +15,7 @@ Install `@ts-kizuna/core`, the package that defines routes and contracts.
 
 <InstallTabs packageName="@ts-kizuna/core zod" />
 
-ts-kizuna requires Zod 4. It leans on Zod 4 features directly, so older versions won't work.
-
-Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
+ts-kizuna requires Zod 4 and `strict` in your `tsconfig.json`, which its inference depends on.
 
 ```json title="tsconfig.json"
 {
@@ -100,9 +98,7 @@ export const usersRoutes = k.routes({
 
 ## Bundle them into a contract
 
-The contract is the one object you hand to both the server and the client.
-
-```ts title="src/contract/contract.ts"
+```ts title="src/contract/index.ts"
 import { k } from './k';
 import { usersRoutes } from './routes';
 
@@ -123,11 +119,11 @@ Pick an adapter, here Next.js. `new KizunaServer()` turns the contract into a `s
 
 <InstallTabs packageName="@ts-kizuna/next" />
 
-`server.router` takes one function per route. Inputs arrive validated and typed, and return values are checked against the contract's declared responses.
+`server.router` takes one function per route, with inputs validated and typed.
 
 ```ts title="src/server/server.ts"
 import { KizunaServer } from '@ts-kizuna/next';
-import { contract } from '@shared/contract';
+import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);
 ```
@@ -212,13 +208,13 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
 
 ## Call it from a typed client
 
-The client is built from the same contract, so every route, input, and response is already typed.
+The client is built from the same contract, so every route, input, and response is typed.
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
 ```ts title="src/lib/api-client.ts"
 import { KizunaClient } from '@ts-kizuna/fetch';
-import { contract } from '@shared/contract';
+import { contract } from '@/contract';
 
 export const apiClient = new KizunaClient(contract, {
     baseUrl: 'http://localhost:3000/api',
@@ -247,7 +243,7 @@ export default async function UsersPage() {
 }
 ```
 
-Writing is the same, and the status tells you which body you got:
+Writing is the same:
 
 ```tsx title="src/app/users/actions.ts"
 'use server';
@@ -270,8 +266,6 @@ export async function createUser(name: string, email: string) {
     throw new Error(result.body.detail);
 }
 ```
-
-Every field is typed straight from the contract with no extra work, including `query.page`, `body.name`, and the response shape.
 
 </Step>
 

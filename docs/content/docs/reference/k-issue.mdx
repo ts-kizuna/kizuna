@@ -5,19 +5,9 @@ description: Emit a validation issue with a machine-readable code, checked again
 
 Emit a single Zod validation issue carrying a custom machine-readable `code`. The code is surfaced verbatim in the `errors[].code` field of kizuna's [`ValidationErrorSchema`](/docs/reference/is-validation-error).
 
-The code is checked against the `issueCodes` you declared on `new Kizuna()`, so a typo is a compile error rather than a silently accepted string.
+The code is checked against the `issueCodes` you declared on `new Kizuna()`, so a typo is a compile error.
 
-## Why it exists
-
-Zod's runtime accepts any string as an issue `code`, but its types restrict `ctx.addIssue()` to the built-in issue union. A custom code therefore fails to type-check without an awkward cast at every call site:
-
-```ts
-// Without the helper, TS2322 unless you cast.
-ctx.addIssue({ code: 'invalid_phone_number', message: 'Invalid phone number', input: value }
-    as unknown as Parameters<typeof ctx.addIssue>[0]);
-```
-
-`k.issue` owns that cast internally so call sites stay clean.
+Zod's types restrict `ctx.addIssue()` to its built-in issue union, so a custom code needs a cast at every call site. `k.issue` holds that cast.
 
 ## Parameters
 
@@ -28,12 +18,12 @@ k.issue<Input>(
 ): void
 ```
 
-| Parameter       | Type                           | Description                                               |
-| --------------- | ------------------------------ | --------------------------------------------------------- |
-| `ctx`           | `z.core.$RefinementCtx<Input>` | The refinement context from `.superRefine()`.             |
-| `issue.code`    | `ValidationIssueCode`          | Custom machine-readable code surfaced in `errors[].code`. |
-| `issue.message` | `string`                       | Human-readable description of the failure.                |
-| `issue.input`   | `Input`                        | The value that failed validation.                         |
+| Parameter       | Type                           | Description                                                                                              |
+| --------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `ctx`           | `z.core.$RefinementCtx<Input>` | The refinement context from `.superRefine()`.                                                            |
+| `issue.code`    | `Codes \| BuiltinIssueCode`    | One of the `issueCodes` declared on `new Kizuna()`, or a built-in Zod code. Surfaced in `errors[].code`. |
+| `issue.message` | `string`                       | Human-readable description of the failure.                                                               |
+| `issue.input`   | `Input`                        | The value that failed validation.                                                                        |
 
 ## Example
 
@@ -113,6 +103,6 @@ if (result.status === 400 && isValidationError(result.body)) {
 }
 ```
 
-Each API has its own `new Kizuna()` call, so codes stay scoped per API rather than leaking across them.
+Each API has its own `new Kizuna()` call, so codes stay scoped to it.
 
 See [`isValidationError`](/docs/reference/is-validation-error) for how clients consume these codes.

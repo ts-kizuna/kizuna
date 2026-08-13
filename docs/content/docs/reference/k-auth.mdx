@@ -1,9 +1,9 @@
 ---
 title: k.auth
-description: Type the auth map against your routes and identities, beside the routes instead of inline.
+description: Type the auth map against your routes and identities, beside the routes.
 ---
 
-`k.auth(routes, map)` returns the map typed against the routes and identities, for when you'd rather define it beside the routes than inline in `k.contract`:
+`k.auth(routes, map)` returns the map typed against the routes and identities, for defining it beside the routes rather than inside `k.contract`:
 
 ```ts
 export const auth = k.auth(routes, {

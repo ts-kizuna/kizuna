@@ -25,14 +25,16 @@ mcpPluginServer(): PluginImplementation
 
 ## Props
 
-| Option        | Default            | Description                                   |
-| ------------- | ------------------ | --------------------------------------------- |
-| `path`        | `'/mcp'`           | Path the endpoint is served from              |
-| `name`        | `'MCP Server'`     | Human-readable name shown to AI assistants    |
-| `version`     | `'1.0.0'`          | Semantic version string                       |
-| `routeFilter` | excludes multipart | Predicate to filter which routes become tools |
+| Option        | Default          | Description                                   |
+| ------------- | ---------------- | --------------------------------------------- |
+| `path`        | `'/mcp'`         | Path the endpoint is served from              |
+| `name`        | `'MCP Server'`   | Human-readable name shown to AI assistants    |
+| `version`     | `'1.0.0'`        | Semantic version string                       |
+| `routeFilter` | JSON routes only | Predicate to filter which routes become tools |
 
-Props are pure data, because they reach the contract and the contract reaches your client. The MCP SDK lives in `mcpPluginServer()`, which takes nothing: declaring the plugin is where it is configured.
+The default `routeFilter` keeps routes whose `contentType` is `application/json` or unset, so multipart and form-urlencoded routes are left out.
+
+Props are pure data. `mcpPluginServer()` takes nothing: declaring the plugin is where it is configured.
 
 ## Example
 
@@ -66,9 +68,7 @@ export const api = server.api({
 api.mount(app);
 ```
 
-## Two halves
-
-`@ts-kizuna/mcp` declares the path and the tool settings, as data on your contract. `@ts-kizuna/mcp/server` holds the endpoint and the MCP SDK. Miss the second half and `server.api` throws, naming the module to import. See [Plugins](/docs/plugins#why-two-halves).
+Miss `mcpPluginServer()` and `server.api` throws, naming the module to import.
 
 ## Next.js
 
@@ -86,12 +86,10 @@ With the default `path`, the endpoint is at `/api/mcp`.
 
 Each tool call runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request, reading credentials from the MCP transport request's headers. A `deny(...)` becomes a tool error result. See the [MCP guide](/docs/mcp) for configuring clients to send credentials.
 
-## Not in your client
+## Plugin route
 
-The endpoint is a plugin route, so it lives outside `contract.routes`. Your fetch client, OpenAPI document and generated Swift and Kotlin clients never see it.
+The endpoint is a [plugin route](/docs/plugins#plugin-routes): it lives outside `contract.routes`, so your fetch client, the OpenAPI document, and the generated Swift and Kotlin clients never list it.
 
 ## See also
 
-- [MCP guide](/docs/mcp)
 - [`createMcpServer`](/docs/reference/create-mcp-server) to drive the transport yourself
-- [Create a Plugin](/docs/extend/create-plugin)

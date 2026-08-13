@@ -3,7 +3,7 @@ title: Auth
 description: Declare identities and per-route auth on the contract. Runtime guards, typed handler context, OpenAPI security, and client access checks all follow.
 ---
 
-Auth lives in the contract: **identities** say who can call your API, the **auth map** says which routes they can call. One declaration drives enforcement, handler types, the OpenAPI spec, and client access checks.
+Auth lives in the contract: **identities** say who can call your API, the **auth map** says which routes they can call.
 
 ```ts title="src/contract/identities.ts"
 import { z } from 'zod';
@@ -29,7 +29,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts title="src/contract/contract.ts"
+```ts title="src/contract/index.ts"
 import { k } from './k';
 import { routes } from './routes';
 
@@ -110,7 +110,7 @@ export const apiConsumer = Kizuna.identity.apiKey({
 });
 ```
 
-When the credential doesn't fit any OpenAPI scheme, a capability-URL token in a path segment for instance, use `custom`. Its guard reads the credential itself, and the route stays explicitly guarded instead of falling back to `false`:
+When the credential doesn't fit any OpenAPI scheme, a capability-URL token in a path segment for instance, use `custom`. Its guard reads the credential itself, and the route stays explicitly guarded:
 
 ```ts title="src/contract/identities.ts"
 export const inviteToken = Kizuna.identity.custom({
@@ -135,7 +135,7 @@ Keyed by route group; every group must appear, so public is always an explicit `
 | `{ user: true, member: { ... } }` | Multiple identities, all must pass                                                  |
 | `{ '*': ..., login: false }`      | Cascade. `'*'` sets the group default, named keys override its routes and subgroups |
 
-```ts title="src/contract/contract.ts"
+```ts title="src/contract/index.ts"
 export const contract = k.contract({
     routes,
     auth: {
@@ -195,7 +195,7 @@ A route requiring several identities receives all of them under `auth`, as in `t
 
 ## Guards
 
-One guard per identity, not per route. The credential arrives extracted and typed, along with the route's path `params`. For a request to `/workspaces/ws_42/members`, `params.workspaceId` is `'ws_42'`, so the guard can check not just that the token is valid, but that the caller belongs to that workspace:
+A guard receives the credential extracted and typed, along with the route's path `params`. For a request to `/workspaces/ws_42/members`, `params.workspaceId` is `'ws_42'`, so the guard can check that the caller belongs to that workspace, not just that the token is valid:
 
 ```ts title="src/server/guards.ts"
 export const requireMember = server.guard('member', async ({ apiKey, params, deny }) => {
@@ -209,7 +209,7 @@ export const requireMember = server.guard('member', async ({ apiKey, params, den
 
 The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) instead.
 
-## What falls out for free
+## What the declaration drives
 
 ### OpenAPI security
 
@@ -230,11 +230,11 @@ paths:
                 - member: []
 ```
 
-A `custom` identity has no scheme to emit, so its routes carry an `x-kizuna-guarded` extension instead of `security`. That is enough to tell a protected-out-of-band route from a public one.
+A `custom` identity has no scheme to emit, so its routes carry an `x-kizuna-guarded` extension instead of `security`, which keeps them distinguishable from public ones.
 
 ### Client
 
-The [`new KizunaClient()`](/docs/reference/kizuna-client) client sends the credential in `baseHeaders`; the server's guards enforce the contract's auth and return the typed `401`/`403`:
+The [`new KizunaClient()`](/docs/reference/kizuna-client) client sends the credential in `baseHeaders`, and the typed `401`/`403` come back on the response union:
 
 ```ts
 const apiClient = new KizunaClient(contract, {
@@ -247,7 +247,7 @@ const apiClient = new KizunaClient(contract, {
 
 ### MCP
 
-[MCP endpoints](/docs/mcp) run the same guards per tool call, reading credentials from the transport request's headers.
+[MCP endpoints](/docs/mcp) run the same guards per tool call.
 
 ## Reference
 

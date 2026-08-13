@@ -83,7 +83,6 @@ export interface GenerateOpenApiOptions {
     openApiVersion?: OpenApiVersion;
     info: OpenApiInfo;
     servers?: OpenApiServer[];
-    tags?: OpenApiTag[];
     externalDocs?: OpenApiExternalDocs;
     setOperationId?: boolean | 'concatenated-path';
     operationMapper?: (operation: OpenApiOperation, route: RouteDefinition, operationId: string) => OpenApiOperation;

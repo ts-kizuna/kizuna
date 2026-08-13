@@ -50,3 +50,16 @@
     height: 14px;
     flex-shrink: 0;
 }
+
+@media (max-width: 767px) {
+    .tabs {
+        margin-inline: calc(var(--kizuna-gutter) * -1);
+        padding-inline: var(--kizuna-gutter);
+        scroll-padding-inline: var(--kizuna-gutter);
+        scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar {
+        display: none;
+    }
+}

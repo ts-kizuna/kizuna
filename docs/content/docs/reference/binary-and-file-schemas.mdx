@@ -9,12 +9,14 @@ Two helper schemas for non-JSON bodies, both from `@ts-kizuna/core/schemas`.
 import { BinarySchema, FileSchema } from '@ts-kizuna/core/schemas';
 ```
 
+**Sending or returning a blob of bytes, use `BinarySchema`. Taking a file uploaded through a form, use `FileSchema`.**
+
 | Helper         | Is                         | Use                                                       | Swift type      |
 | -------------- | -------------------------- | --------------------------------------------------------- | --------------- |
 | `BinarySchema` | `z.instanceof(Uint8Array)` | Binary response bodies (PDF, images) and raw binary input | `Data`          |
 | `FileSchema`   | `z.instanceof(File)`       | `multipart/form-data` upload fields                       | `MultipartFile` |
 
-Rule of thumb: **returning/sending a blob of bytes → `BinarySchema`; uploading a file in a form → `FileSchema`.** A `File` carries a filename and MIME type (needed to build a multipart part); a `Uint8Array` is just bytes (a Node `Buffer` satisfies it).
+The split follows what each type carries. A `File` has a filename and MIME type, which is what a multipart part needs. A `Uint8Array` is bytes alone, and a Node `Buffer` satisfies it.
 
 ## BinarySchema
 
@@ -38,7 +40,7 @@ export const reportsRoutes = k.routes('reports', {
 });
 ```
 
-The handler returns the bytes (a `Buffer` or `Uint8Array`); set `Content-Disposition` as a normal response header if you want a download:
+The handler returns the bytes, as a `Buffer` or `Uint8Array`. Set `Content-Disposition` as a normal response header if you want a download:
 
 ```ts
 downloadReport: async ({ params }) => {

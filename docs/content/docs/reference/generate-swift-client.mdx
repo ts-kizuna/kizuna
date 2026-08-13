@@ -3,7 +3,7 @@ title: generateSwiftClient
 description: Generate a native Swift client from a ts-kizuna contract with URLSession and Codable.
 ---
 
-Generate a native Swift client from a contract. The generated client uses `URLSession` and `Codable`, with no third-party Swift dependencies required.
+Generate a native Swift client from a contract, built on `URLSession` and `Codable`.
 
 <InstallTabs packageName="@ts-kizuna/swift" />
 
@@ -29,10 +29,6 @@ generateSwiftClient(contract: Contract, config: SwiftConfig): string
 | `namespaceName`       | `string`  | Yes      | Name for the generated Swift enum and client type (e.g. `'API'`)                                                      |
 | `camelCaseProperties` | `boolean` | No       | Convert wire field names to camelCase properties, mapped back via `CodingKeys`. Default `false`                       |
 | `unknownEnumCase`     | `boolean` | No       | Emit enums with an `unknown(String)` fallback so unrecognised wire values decode instead of throwing. Default `false` |
-
-## Returns
-
-A `string` containing the generated Swift source code.
 
 ## Example
 

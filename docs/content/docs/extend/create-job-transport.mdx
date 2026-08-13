@@ -9,9 +9,9 @@ The transport API is new and still settling. The message shape and the dispatch 
 
 </BetaNotice>
 
-When you call `jobs.indexUser.queue(...)`, something has to carry that job to the process that runs it. That something is a transport.
+A transport carries a job from `jobs.indexUser.queue(...)` to the process that runs it.
 
-kizuna ships none. A transport is small, and yours should be written against the version of the queue you actually run.
+kizuna ships none, so you write one against the queue you run.
 
 ```ts
 import { createJobTransport } from '@ts-kizuna/core';
@@ -38,7 +38,7 @@ export const server = new KizunaServer(contract, {
 
 ## Two shapes
 
-**Push** systems deliver by calling a URL: QStash, Cloud Tasks, SQS to Lambda. Point them at the run endpoint, `POST /jobs/run`, with `{ job, input }` as the body. kizuna already guards and validates it, so these need `dispatch` and nothing else.
+**Push** systems deliver by calling a URL: QStash, Cloud Tasks, SQS to Lambda. Point them at the run endpoint, `POST /jobs/run`, with `{ job, input }` as the body. kizuna already guards and validates it, so these need only `dispatch`.
 
 **Pull** systems store work and a worker drains it: BullMQ, pg-boss, a table in your own database. These also implement `start`.
 
@@ -56,7 +56,7 @@ dispatch: (message: JobMessage) => Promise<void> | void;
 | `dedupeKey` | Deliver at most one message with this key. Needs `supports.dedupe`. |
 | `retry`     | Attempts the job declared. Backoff is yours.                        |
 
-Resolve once the message is handed over, not once the job has run. Reject when it could not be handed over at all. That surfaces at the `queue` call site, wrapped in a `JobDispatchError` naming your transport and the job.
+Resolve once the queue has accepted the message, which is before the job runs. Reject when it could not be handed over at all. That surfaces at the `queue` call site, wrapped in a `JobDispatchError` naming your transport and the job.
 
 ## `start`
 
@@ -82,7 +82,7 @@ start: async ({ jobs, run }) => {
 };
 ```
 
-Call `run` once per message, and let its rejection propagate, which is how your queue learns to retry. Swallowing it turns every failure into a silent success.
+Call `run` once per message, and let its rejection propagate, which is how your queue learns to retry. A swallowed rejection reads as a successful queue.
 
 ## `register`
 
@@ -104,7 +104,7 @@ register: async (schedules) => {
 
 ## `supports`
 
-`runAt`, `dedupeKey`, and `retry` are requests, not guarantees. Say which you honour and kizuna warns at startup when a job asks for one you drop.
+`runAt`, `dedupeKey`, and `retry` are honoured only where the transport declares support. Say which you honour and kizuna warns at startup when a job asks for one you drop.
 
 `dedupe` is what makes `startJobs` safe on more than one instance: every replica ticking 05:00 produces the same `dedupeKey`.
 
@@ -276,7 +276,7 @@ export const bullmq = (connection: ConnectionOptions, queueName = 'jobs') => {
 };
 ```
 
-Nothing calls `start` on its own. `startJobWorker` does, wherever you want the work done, whether that is the same process as the API or its own:
+`start` is called by `startJobWorker`, not on its own. `startJobWorker` does, wherever you want the work done, whether that is the same process as the API or its own:
 
 ```ts title="src/worker.ts"
 import { startJobWorker } from '@ts-kizuna/core/jobs';

@@ -35,14 +35,11 @@ export const questions: Question[] = [
                 </p>
                 <p className={styles.body}>
                     Change the API and your editor shows you everything that breaks, right then. Deprecate a field and every caller sees it
-                    before it&rsquo;s gone. Frontend, backend, and mobile stay in step because they all come from one source, so the bug
-                    where a client quietly drifts from the server just stops happening.
+                    before it&rsquo;s gone. Frontend, backend, and mobile all come from one source, so a client cannot quietly drift from
+                    the server.
                 </p>
                 <p className={styles.body}>
-                    And it&rsquo;s real HTTP underneath: proper REST routes, correct status codes, RFC 9457 errors.
-                </p>
-                <p className={styles.body}>
-                    The goal is simple: define your API once, and keep every client in sync with it. More on the{' '}
+                    And it&rsquo;s real HTTP underneath: proper REST routes, correct status codes, RFC 9457 errors. More on the{' '}
                     <Link className={styles.link} href="/about">
                         about page
                     </Link>
@@ -56,18 +53,17 @@ export const questions: Question[] = [
         answer: (
             <>
                 <p className={styles.body}>
-                    It runs in production in our own apps, so it&rsquo;s battle-tested. The way you define and call your API is still
-                    settling, so ts-kizuna is in beta and moving toward a stable v2. Pin a version for production and follow the{' '}
+                    It runs in production in our own apps. What is still settling is the way you define and call your API, which is why
+                    ts-kizuna is in beta and moving toward a stable v2. Pin a version for production and follow the{' '}
                     <a className={styles.link} href="https://github.com/ts-kizuna/kizuna/releases" target="_blank" rel="noreferrer">
                         release notes
                     </a>{' '}
                     when you upgrade.
                 </p>
                 <p className={styles.body}>
-                    <strong className={styles.strong}>Why is it already 1.0 if it&rsquo;s in beta?</strong> ts-kizuna began as an internal
-                    tool. We built it for our own apps and shipped it for a long time before we open-sourced it, so by the time it became
-                    public it had already been through many versions. We kept that history rather than resetting the number, which is why a
-                    beta carries a 1.x version. The label is about the API surface still settling, not about stability.
+                    <strong className={styles.strong}>Why is it already 1.0 if it&rsquo;s in beta?</strong> It was an internal tool for
+                    years before we open-sourced it, and we kept the version history rather than resetting the number. The beta label is
+                    about the API surface, not about stability.
                 </p>
             </>
         ),
@@ -76,10 +72,12 @@ export const questions: Question[] = [
         question: "What's on the roadmap?",
         answer: (
             <>
-                <p className={styles.body}>We&rsquo;re just getting started. Here&rsquo;s where ts-kizuna is headed:</p>
+                <p className={styles.body}>Where ts-kizuna is headed:</p>
                 <ul className={styles.bullets}>
                     <li>A stable v2 syntax, with the way you define and call your API locked in</li>
                     <li>SSE and streaming responses</li>
+                    <li>Webhooks, declared in the contract like routes</li>
+                    <li>OpenAPI 3.2.0 output</li>
                     <li>A TanStack Query client, built from the same contract</li>
                     <li>Whatever the future brings</li>
                 </ul>
@@ -128,8 +126,8 @@ export const questions: Question[] = [
                     <a className={styles.link} href="https://trpc.io" target="_blank" rel="noreferrer">
                         tRPC
                     </a>{' '}
-                    is a great choice for a pure TypeScript stack, and you don&rsquo;t give up the RPC-like client by choosing ts-kizuna.
-                    You still call your endpoints like functions and get fully typed results back:
+                    is a great choice for a pure TypeScript stack, and ts-kizuna does not ask you to give up the RPC-like client. You still
+                    call your endpoints like functions and get fully typed results back:
                 </p>
                 <div className={styles.code}>
                     <CodeWindow
@@ -141,12 +139,9 @@ export const questions: Question[] = [
                     />
                 </div>
                 <p className={styles.body}>
-                    The difference is that ts-kizuna is the better fit when your API also has consumers outside that client, like another
-                    language, a public integration, or anything reading the OpenAPI spec.
-                </p>
-                <p className={styles.body}>
-                    With ts-kizuna, you also get native Swift and Kotlin clients from that same contract, so your iOS and Android apps are
-                    typed against the API too.
+                    ts-kizuna fits better when your API has consumers outside that client: another language, a public integration, or
+                    anything reading the OpenAPI spec. The same contract also generates native Swift and Kotlin clients, so your iOS and
+                    Android apps are typed against the API too.
                 </p>
             </>
         ),
@@ -160,14 +155,14 @@ export const questions: Question[] = [
                     any of those is a great place to start.
                 </p>
                 <p className={styles.body}>
-                    Everything we merge into the core is something we commit to maintaining for the long haul, so we don&rsquo;t take
-                    additions lightly. We keep it small and stick to the packages we actually use, which is why new first-party adapters and
-                    clients won&rsquo;t be merged. The better news: the adapter and client APIs are public, so you can build exactly what
-                    you need (see the{' '}
+                    Anything we merge into the core, we maintain, so we keep it to the packages we actually use. Whether an adapter or
+                    client goes first-party comes down to adoption, not age: if a framework picks up real usage, we will very likely add it.
+                    What we will not take on is a framework a handful of people use. The adapter, plugin, client, and generator APIs are all
+                    public, so you can build and publish exactly what you need today: see the{' '}
                     <Link className={styles.link} href="/docs/extend/create-adapter">
-                        extend guide
+                        extend guides
                     </Link>
-                    ).
+                    .
                 </p>
                 <p className={styles.body}>
                     For anything beyond a bug fix or docs, like a new feature or an API change,{' '}
@@ -184,16 +179,16 @@ export const questions: Question[] = [
         answer: (
             <>
                 <p className={styles.body}>
-                    ts-kizuna is open source and provided as-is. The docs are thorough and the source is open, so most answers are within
-                    reach. For anything else, open an issue on{' '}
+                    ts-kizuna is open source and provided as-is. Most answers are in the docs or the source. For anything else, open an
+                    issue on{' '}
                     <a className={styles.link} href="https://github.com/ts-kizuna/kizuna/issues" target="_blank" rel="noreferrer">
                         GitHub
                     </a>
                     .
                 </p>
                 <p className={styles.body}>
-                    It is built and maintained in free time, so issues get answered when there is time for them. A report with a small
-                    reproduction is the quickest thing to act on.
+                    It is actively maintained alongside the products we ship on it, so issues get read. One with a small reproduction is the
+                    quickest to act on.
                 </p>
             </>
         ),

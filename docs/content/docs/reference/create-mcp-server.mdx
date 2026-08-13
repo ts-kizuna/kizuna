@@ -26,19 +26,21 @@ createMcpServer(api: Api, options?: McpServerOptions): McpServer
 
 ## Options
 
-| Option              | Default            | Description                                                               |
-| ------------------- | ------------------ | ------------------------------------------------------------------------- |
-| `name`              | `'MCP Server'`     | Human-readable name shown to AI assistants                                |
-| `version`           | `'1.0.0'`          | Semantic version string                                                   |
-| `routeFilter`       | excludes multipart | Predicate to filter which routes become tools                             |
-| `handlerContext`    | none               | Extra context spread into every handler call                              |
-| `credentialHeaders` | none               | Headers of the MCP transport request, used to run guards on secured tools |
+| Option              | Default          | Description                                                               |
+| ------------------- | ---------------- | ------------------------------------------------------------------------- |
+| `name`              | `'MCP Server'`   | Human-readable name shown to AI assistants                                |
+| `version`           | `'1.0.0'`        | Semantic version string                                                   |
+| `routeFilter`       | JSON routes only | Predicate to filter which routes become tools                             |
+| `handlerContext`    | none             | Extra context spread into every handler call                              |
+| `credentialHeaders` | none             | Headers of the MCP transport request, used to run guards on secured tools |
+
+The default `routeFilter` keeps routes whose `contentType` is `application/json` or unset, so multipart and form-urlencoded routes are left out.
 
 ## Secured routes
 
-Each call to a secured tool runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request: the identity's credential is extracted from `credentialHeaders`, the guard resolves it to context (passed to the handler under the identity's name), access gates are checked, and a `deny(...)` becomes a tool error result.
+Each call to a secured tool runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request, extracting the credential from `credentialHeaders`.
 
-The [`mcpPlugin`](/docs/reference/mcp-plugin) endpoint populates `credentialHeaders` automatically from the incoming request. When you drive the transport yourself, pass the headers along. For stdio there is no HTTP request, so supply whatever credential headers the environment provides:
+Driving the transport yourself means passing those headers along. For stdio there is no HTTP request, so supply whatever the environment provides:
 
 ```ts
 const server = createMcpServer(api, {

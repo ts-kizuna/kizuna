@@ -15,7 +15,7 @@ MCP support is new and still settling. The plugin options and the generated tool
 
 ## Install it
 
-MCP is a [plugin](/docs/extend/create-plugin). You install it where the rest of your API's vocabulary is declared, and `api.mount` serves it:
+MCP is a [plugin](/docs/plugins), declared on `new Kizuna()` and served by `api.mount`:
 
 ```ts title="src/contract/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
@@ -47,9 +47,7 @@ export const api = server.api({
 
 The endpoint answers at `/mcp` by default. On Next.js it is served by the catch-all route file that already serves your contract, so with `basePath: '/api'` it lands at `/api/mcp`.
 
-## It is not in your client
-
-The MCP endpoint is a plugin route, so it lives outside `contract.routes`. Your fetch client, OpenAPI document and generated Swift and Kotlin clients never see it, which is what you want: it is a protocol endpoint, not part of your API's surface.
+The endpoint is a [plugin route](/docs/plugins#plugin-routes), so your fetch client, OpenAPI document, and generated Swift and Kotlin clients never list it.
 
 ## How it works
 
@@ -62,11 +60,11 @@ Each route becomes an MCP tool:
 
 Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-urlencoded'` are excluded by default since MCP tools receive JSON.
 
-Handlers receive the same framework context they do over HTTP, passed through from the transport request, so a handler reading `req` or `c` keeps working when it is called as a tool.
+Handlers receive the same framework context they do over HTTP, passed through from the transport request, so one reading `req` or `c` keeps working as a tool.
 
 ## Auth
 
-Secured tools authenticate via the headers of the MCP transport request. When an assistant calls one, the endpoint runs the [guards](/docs/auth) registered on `server.api`, exactly like the HTTP pipeline: each identity's credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context as usual. Installing the plugin on a secured API gives you a secured MCP endpoint.
+Secured tools authenticate via the headers of the MCP transport request. The endpoint runs the [guards](/docs/auth) registered on `server.api`, exactly like the HTTP pipeline: the credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context.
 
 Configure the MCP client to send the credential as a header on the connection. For example, with Claude Code:
 
@@ -144,7 +142,7 @@ Tool inputs use structured keys that mirror the kizuna handler args:
 }
 ```
 
-Only the keys relevant to the route are present. A `GET /users/:id` route has `params` only. A `POST /users` with a body has `body` only.
+Only the keys the route declares are present.
 
 ## Tool responses
 

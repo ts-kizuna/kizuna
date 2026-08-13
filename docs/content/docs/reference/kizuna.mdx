@@ -3,7 +3,7 @@ title: new Kizuna()
 description: Declare one API surface, with its tags, identities, request contexts, and validation codes, and keep it as `k`.
 ---
 
-`new Kizuna()` creates one API surface. Keep the instance as `k`, then use `k.routes` to define route groups and `k.contract` to assemble them. Construct it once and import `k` wherever you define routes.
+`new Kizuna()` creates one API surface. Keep the instance as `k`, then use `k.routes` to define route groups and `k.contract` to assemble them.
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -15,7 +15,7 @@ import { Kizuna } from '@ts-kizuna/core';
 
 ```ts
 new Kizuna(config?: {
-    identities?: Record<string, Identity>;
+    identities?: Record<string, SecurityScheme>;
     requestContext?: Record<string, RequestContext>;
     tags?: TagSet;
     validation?: { issueCodes?: readonly string[] };
@@ -26,16 +26,28 @@ new Kizuna(config?: {
 
 | Field                   | Type                             | Description                                                                                                                                                     |
 | ----------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `identities`            | `Record<string, Identity>`       | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names the `auth` map and guards use. |
+| `identities`            | `Record<string, SecurityScheme>` | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names the `auth` map and guards use. |
 | `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values every handler receives.                |
 | `tags`                  | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                  |
 | `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                |
 | `plugins`               | `Record<string, ContractPlugin>` | Optional. The plugins this API declares. Their keys become the names `server.api` and handlers use. See [Plugins](/docs/plugins).                               |
 | `jobs`                  | `JobsConfig`                     | Optional. Settings shared by every job. The jobs themselves are declared with `k.jobs`. See [Jobs](/docs/jobs).                                                 |
 
+### `JobsConfig`
+
+Settings shared by every job. The jobs themselves are declared with [`k.jobs`](/docs/reference/k-jobs).
+
+| Field      | Default   | Description                                                                        |
+| ---------- | --------- | ---------------------------------------------------------------------------------- |
+| `path`     | `'/jobs'` | The namespace both job endpoints are mounted under. Nothing is served on it itself |
+| `method`   | `'POST'`  | `'GET'` instead, for schedulers that only send `GET`, such as Vercel Cron          |
+| `windowMs` | `60000`   | How far back a tick looks for due jobs. Widen it when the scheduler delivers late  |
+| `only`     | none      | Dispatch only these jobs                                                           |
+| `exclude`  | none      | Never dispatch these                                                               |
+
 ## Returns
 
-The instance. Keep it as `k`, the authoring surface for this API:
+The instance, the authoring surface for this API:
 
 | Method       | Signature                              | Description                                                  |
 | ------------ | -------------------------------------- | ------------------------------------------------------------ |
@@ -47,7 +59,7 @@ The instance. Keep it as `k`, the authoring surface for this API:
 
 ## Example
 
-Set the factory up once, usually in a `k.ts` file, then import `k` wherever you define routes.
+Construct it once, usually in a `k.ts` file, then import `k` wherever you define routes.
 
 ```ts
 // k.ts

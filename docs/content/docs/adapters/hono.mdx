@@ -3,7 +3,7 @@ title: Hono
 description: Mount a ts-kizuna API on a Hono application.
 ---
 
-`@ts-kizuna/hono` connects a ts-kizuna API to a [Hono](https://hono.dev) application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes, and the adapter works the same everywhere.
+`@ts-kizuna/hono` connects a ts-kizuna API to a [Hono](https://hono.dev) application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes.
 
 **Requires Hono >= 4.**
 
@@ -11,16 +11,9 @@ description: Mount a ts-kizuna API on a Hono application.
 
 ## Setup
 
-The standard setup:
-
-- `new KizunaServer()` turns the contract into a `server` handle
-- `server.router` takes one typed handler per route
-- `server.api` combines the router and guards into an API object
-- `api.mount(app)` mounts the API on a Hono app
-
 ```ts title="src/server/server.ts"
 import { KizunaServer } from '@ts-kizuna/hono';
-import { contract } from '@shared/contract';
+import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);
 ```
@@ -125,7 +118,7 @@ export const router = server.router({
 
 ## Guards
 
-One guard per identity. The credential arrives extracted and typed, alongside the native context `c`. See the [Auth guide](/docs/auth).
+A guard receives the credential extracted and typed, alongside the native context `c`. See the [Auth guide](/docs/auth).
 
 ```ts title="src/server/guards.ts"
 import { server } from './server';
@@ -164,7 +157,7 @@ Annotate handlers individually or as a whole tree:
 
 ```ts
 import type { RouteHandler, Router } from '@ts-kizuna/hono';
-import { contract } from '@shared/contract';
+import { contract } from '@/contract';
 
 // Single route
 const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ params }) => {

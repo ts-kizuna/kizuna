@@ -20,11 +20,11 @@ export const contract = k.contract({
 });
 ```
 
-The declared `issueCodes` widen `errors[].code` on `400` responses to `ValidationIssueCode | <your codes>`, so the client suggests them in autocomplete. Emit them at runtime with [`k.issue`](/docs/reference/k-issue). Because the factory is per API, codes and tags stay scoped to their API rather than leaking across the multiple kizuna APIs a project may define.
+The declared `issueCodes` widen `errors[].code` on `400` responses to `ValidationIssueCode | <your codes>`, so the client suggests them in autocomplete. Emit them at runtime with [`k.issue`](/docs/reference/k-issue). The factory is per API, so codes and tags stay scoped to it.
 
 ## Jobs
 
-Jobs declared with [`k.jobs`](/docs/reference/k-jobs) go under `jobs`, alongside `routes` rather than inside it:
+Jobs declared with [`k.jobs`](/docs/reference/k-jobs) go under `jobs`, beside `routes`:
 
 ```ts
 export const contract = k.contract({
@@ -38,11 +38,11 @@ export const contract = k.contract({
 });
 ```
 
-They carry their own identity, so they never appear in the `auth` map, and they stay out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. See [Jobs](/docs/jobs).
+A job carries its own identity, so it takes no entry in the `auth` map, and it stays out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. See [Jobs](/docs/jobs).
 
 ## The auth map
 
-The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `new Kizuna()`. It is **exhaustive over groups**, so every key in `routes` must appear, and public takes an explicit `false`, so a new group can't ship unsecured by omission. For the full walkthrough, see the [Auth guide](/docs/auth).
+The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `new Kizuna()`. It is **exhaustive over groups**: every key in `routes` must appear, and public takes an explicit `false`. See the [Auth guide](/docs/auth) for the full walkthrough.
 
 ```ts
 export const contract = k.contract({
@@ -96,7 +96,7 @@ workspace: {
 },
 ```
 
-Every route under `workspace` requires `member`; `deleteWorkspace` additionally gates on `role: 'owner'`, and inside its handler `auth.member.role` is typed `'owner'`.
+Inside `deleteWorkspace`, `auth.member.role` is typed `'owner'`.
 
 Cascade keys name the group's own routes and subgroups. A subgroup key takes a value for its whole subtree, or its own nested cascade; a key that matches nothing in the group is an error.
 

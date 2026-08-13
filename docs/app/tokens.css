@@ -1,4 +1,4 @@
-.kizuna-landing-page {
+:root {
     --kizuna-canvas: #ffffff;
     --kizuna-surface: #f3f3f3;
     --kizuna-ink: #0b0b0b;
@@ -30,13 +30,9 @@
     --kizuna-button-padding-inline: 20px;
     --kizuna-logo-width: 137px;
     --kizuna-gap-actions: 12px;
-
-    background-color: var(--kizuna-canvas);
-    color: var(--kizuna-ink);
-    font-family: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
-.dark .kizuna-landing-page {
+.dark {
     --kizuna-canvas: #131313;
     --kizuna-surface: #212121;
     --kizuna-ink: #ffffff;
@@ -46,8 +42,20 @@
     --kizuna-field: #2b2b2b;
 }
 
+html:has(.kizuna-landing-page),
+body:has(.kizuna-landing-page) {
+    background-color: var(--kizuna-canvas);
+}
+
+.kizuna-landing-page {
+    flex: 1;
+    background-color: var(--kizuna-canvas);
+    color: var(--kizuna-ink);
+    font-family: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+}
+
 @media (max-width: 767px) {
-    .kizuna-landing-page {
+    :root {
         --kizuna-section-gap: 40px;
         --kizuna-text-nav: 0.95rem;
         --kizuna-text-button: 0.95rem;

@@ -3,7 +3,7 @@ title: Mounting
 description: Connect your router to the contract and serve it with an adapter.
 ---
 
-The last step: `server.api` puts your [router](/docs/building/router) into the API object your framework adapter mounts. After this, your routes are live. The `server` handle comes from `new KizunaServer(contract)` (see [Router](/docs/building/router)).
+`server.api` puts your [router](/docs/building/router) into the API object your framework adapter mounts. The `server` handle comes from `new KizunaServer(contract)`.
 
 ## `server.api`
 
@@ -23,7 +23,7 @@ export const api = server.api({
 
 ## Guards
 
-If the contract declares identities, pass one guard per identity under `guards`. Created with `server.guard`, a guard verifies the extracted credential and returns the identity's context or a denial. The contract's auth map decides which routes each guard protects, so `server.api` attaches them automatically. See the [Auth guide](/docs/auth) for the whole pipeline and the adapter pages for each framework's guard context.
+If the contract declares identities, pass one guard per identity under `guards`. A guard verifies the extracted credential and returns the identity's context or a denial. The contract's auth map decides which routes it protects. See the [Auth guide](/docs/auth).
 
 ## Request context
 
@@ -47,7 +47,7 @@ export const api = server.api({
 
 ## Plugins
 
-If the contract declares [plugins](/docs/plugins), pass their server implementations under `plugins`. A plugin is declared on the contract and implemented on the server, so the server half is imported separately:
+If the contract declares [plugins](/docs/plugins), pass their server halves under `plugins`:
 
 ```ts title="src/server/api.ts"
 import { mcpPluginServer } from '@ts-kizuna/mcp/server';
@@ -66,7 +66,7 @@ Whatever a plugin exports then arrives on every handler under `plugins`, keyed b
 
 ## Middleware
 
-For everything else (rate limiting, multipart parsing) use your framework's own middleware (`app.use`, Fastify hooks). Authentication belongs in guards, request-scoped values in `requestContext`.
+Rate limiting, multipart parsing, and the rest go in your framework's own middleware (`app.use`, Fastify hooks). Authentication belongs in guards, request-scoped values in `requestContext`.
 
 ## Mounting
 
@@ -112,7 +112,7 @@ export default app;
 **Next.js:**
 
 ```ts title="src/app/api/[...ts-kizuna]/route.ts"
-import { api } from '../../../server/api';
+import { api } from '@/server/api';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
     basePath: '/api',
@@ -127,9 +127,4 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
 
 ## Next steps
 
-For adapter-specific options (error handling, middleware, `onError`, etc.) see the adapter pages:
-
-- [Express](/docs/adapters/express)
-- [Fastify](/docs/adapters/fastify)
-- [Hono](/docs/adapters/hono)
-- [Next.js](/docs/adapters/next)
+Each adapter page covers its own options, error handling, and middleware: [Express](/docs/adapters/express), [Fastify](/docs/adapters/fastify), [Hono](/docs/adapters/hono), [Next.js](/docs/adapters/next).

@@ -16,7 +16,7 @@ The Kotlin client is new and still settling. The generated API surface may chang
 ## Generate
 
 ```sh
-ts-kizuna-kotlin generate --contract src/contract.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
+ts-kizuna-kotlin generate --contract src/contract/index.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
 ```
 
 | Flag                  | Description                                                                                         |
@@ -29,13 +29,13 @@ ts-kizuna-kotlin generate --contract src/contract.ts --out android/app/src/main/
 | `--unknown-enum-case` | Emit enums as a sealed interface with an `Unknown` member so new server values don't break decoding |
 | `--export`            | Export name to read when none is suffixed on `--contract`. Default: `contract`                      |
 
-The CLI reads the contract at runtime, with no build step needed. Add the generated file to your Kotlin project as a regular source file. Pass `--package` so the file declares a package matching its directory (Android/JVM projects expect this).
+The CLI reads the contract at runtime. Add the generated file to your Kotlin project as a regular source file. Pass `--package` so the file declares a package matching its directory (Android/JVM projects expect this).
 
 ### Property naming
 
-By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. The types mirror the wire shape, so it's easy to see what came from the API. A `@file:Suppress(...)` header keeps the IDE green: the snake_case naming inspections (`PropertyName`, `LocalVariableName`, `ConstructorParameterNaming`) for the verbatim names, plus a few that always apply: `SpellCheckingInspection` for brand terms, `unused` for methods only your own code calls, and the `Redundant*` style inspections.
+By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. A `@file:Suppress(...)` header keeps the IDE green over the generated file.
 
-Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `@SerialName`. The naming inspections drop out of the header then, since there are no underscores left to flag, while the rest stay.
+Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `@SerialName`.
 
 ### Unknown enum case (open enums)
 
@@ -52,7 +52,7 @@ The raw value is preserved as `wireValue`, so re-encoding writes it back unchang
 
 ## Usage
 
-Request inputs are built inside a lambda: `params` (path), `query`, `headers`, and `body`. No type names, autocomplete guides you, and missing a required field is a compile error:
+Request inputs are built inside a lambda: `params` (path), `query`, `headers`, and `body`. You name no types, and missing a required field is a compile error:
 
 ```kotlin
 val client = APIClient(baseUrl = "https://api.example.com")
@@ -84,7 +84,7 @@ val created = client.users.createUser {
 }
 ```
 
-Each method returns a `Result` holding the decoded `body` (no unwrapping, no casting) and **throws** a typed `Failure` for any error status. The happy path just reads `response.body`:
+Each method returns a `Result` holding the decoded `body`, and **throws** a typed `Failure` for any error status. The happy path reads `response.body`:
 
 ```kotlin
 println(page.body.users)
@@ -194,7 +194,7 @@ try {
 }
 ```
 
-Prefer a functional style? Methods throw, so `runCatching` just works:
+Methods throw, so `runCatching` works for a functional style:
 
 ```kotlin
 val result = runCatching {
@@ -238,7 +238,7 @@ You can add a script to your `package.json` to regenerate the client whenever th
 ```json
 {
     "scripts": {
-        "generate:kotlin": "ts-kizuna-kotlin generate --contract src/contract.ts --out ../android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example"
+        "generate:kotlin": "ts-kizuna-kotlin generate --contract src/contract/index.ts --out ../android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example"
     }
 }
 ```

@@ -3,7 +3,7 @@ title: Kizuna.identity
 description: Define who can call your API with an OpenAPI security scheme, the context a passing guard provides, and the access fields routes may constrain.
 ---
 
-An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/server-guard) provides to handlers), and an optional `access` schema (the fields the [`auth` map](/docs/reference/k-contract#the-auth-map) may constrain per route). Omit `context` for an authentication-only identity, a pure gate with no data to hand the handler. For the full walkthrough, see the [Auth guide](/docs/auth).
+An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/server-guard) provides to handlers), and an optional `access` schema (the fields the [`auth` map](/docs/reference/k-contract#the-auth-map) may constrain per route). See the [Auth guide](/docs/auth) for the full walkthrough.
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -12,8 +12,6 @@ import { Kizuna } from '@ts-kizuna/core';
 ```
 
 ## Builders
-
-One builder per authentication method, matching the OpenAPI security scheme types:
 
 | Builder                         | Credential source                            | OpenAPI scheme                       |
 | ------------------------------- | -------------------------------------------- | ------------------------------------ |
@@ -59,16 +57,14 @@ export const member = Kizuna.identity.apiKey({
 
 ## `context` vs `access`
 
-Both describe what the guard returns and the handler reads:
-
 - **`context`** is who the caller is. A guard must return it, and handlers of secured routes receive it under `auth`, keyed by the identity's name (`auth.user`, `auth.member`).
 - **`access`** is the fields the `auth` map may gate per route. Gating on `{ member: { role: 'owner' } }` enforces a 403 at runtime and narrows the handler's type, so `auth.member.role` is `'owner'`, not `'owner' | 'admin'`.
 
-Skip `access` for identities that never gate on fields; the auth map can still require them (`'user'`), it just can't constrain them.
+An identity with no `access` can still be required by the auth map (`'user'`), just not constrained.
 
 ## Authentication-only identities
 
-Some identities are pure gates, such as an API key that only proves the caller is a known client, or a bearer token where "authenticated" is all the handler needs. These have no data to hand the handler, so omit `context` (and `access`) entirely:
+An identity that only proves the caller is known, such as an API key, has nothing to hand the handler. Omit `context` and `access`:
 
 ```ts title="src/contract/identities.ts"
 export const apiConsumer = Kizuna.identity.apiKey({
@@ -77,15 +73,15 @@ export const apiConsumer = Kizuna.identity.apiKey({
 });
 ```
 
-Its [guard](/docs/reference/server-guard) returns nothing on success (or `deny(...)` to reject), with no `return {}` boilerplate:
+Its [guard](/docs/reference/server-guard) returns nothing on success, or `deny(...)` to reject:
 
 ```ts
-export const requireApiKey = server.guard('apiConsumer', ({ apiKey, deny }) => {
+export const requireApiKey = server.guard('apiConsumer', async ({ apiKey, deny }) => {
     if (!apiKey || !(await isKnownKey(apiKey.value))) return deny(401, 'Unauthorized');
 });
 ```
 
-A route secured only by a context-less identity gets no arg for it, because the identity contributes nothing to the handler args.
+A route secured only by such an identity gets no `auth` entry for it.
 
 ## Custom identities
 
@@ -102,7 +98,7 @@ export const inviteToken = Kizuna.identity.custom({
 ```
 
 ```ts
-export const requireInviteToken = server.guard('inviteToken', ({ params, deny }) => {
+export const requireInviteToken = server.guard('inviteToken', async ({ params, deny }) => {
     const inviteId = await resolveInvite(params.token);
     if (!inviteId) return deny(404, 'Not found');
     return {
@@ -139,7 +135,7 @@ export const k = new Kizuna({
 
 Routes never mention identities directly. The contract's `auth` map assigns them per group (or per route via a `'*'` cascade), keyed by the names above:
 
-```ts title="src/contract/contract.ts"
+```ts title="src/contract/index.ts"
 export const contract = k.contract({
     routes,
     auth: {

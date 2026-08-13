@@ -3,7 +3,7 @@ title: Kizuna.tags
 description: Declare the set of tags used to group routes across nested route trees and the OpenAPI spec.
 ---
 
-Declare the set of tags used to group routes across nested route trees and the OpenAPI spec. Pass the result to [`new Kizuna()`](/docs/reference/kizuna) so `k.routes` completes the group tag.
+Declare the tags routes are grouped under. Pass the result to [`new Kizuna()`](/docs/reference/kizuna).
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -17,7 +17,7 @@ import { Kizuna } from '@ts-kizuna/core';
 Kizuna.tags(tags: Record<string, TagOptions | string>): TagSet
 ```
 
-Each entry is keyed by an id you choose; routes reference tags by these keys. A value may be a `TagOptions` object or a plain title string:
+Each entry is keyed by an id you choose, and routes reference tags by these keys. A value is either a `TagOptions` object or a plain title string:
 
 | Option         | Type     | Required | Description                                        |
 | -------------- | -------- | -------- | -------------------------------------------------- |
@@ -27,7 +27,7 @@ Each entry is keyed by an id you choose; routes reference tags by these keys. A 
 
 ## Returns
 
-A `TagSet`. Pass it to [`new Kizuna()`](/docs/reference/kizuna) so `k.routes` completes the group tag and route-level `tags`. `k.contract` carries the set onto the contract, so the generated OpenAPI document lists each tag with its title and description without you passing it again.
+A `TagSet`. On `new Kizuna()`, it gives `k.routes` completion for the group tag and route-level `tags`. `k.contract` carries it onto the contract, and the generated OpenAPI document lists each tag with its title and description.
 
 ## Example
 
@@ -84,4 +84,4 @@ cancelAccount: {
 },
 ```
 
-See the [Contract guide](/docs/building/contract#nested-routes) for the full nesting pattern.
+See the [Contract guide](/docs/building/contract#splitting-routes-across-files) for the full nesting pattern.

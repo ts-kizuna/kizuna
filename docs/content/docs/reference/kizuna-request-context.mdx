@@ -3,11 +3,17 @@ title: Kizuna.requestContext
 description: Provide request-scoped values to every handler, typed, such as analytics ids, loggers, and tenants.
 ---
 
-Not everything that runs before a handler is auth. Analytics ids, request loggers, and tenant lookups are values every handler wants, gating nothing. Declare them with `Kizuna.requestContext`, register them on `new Kizuna()`, resolve each with the adapter's `server.requestContext`, and every handler receives them typed under `requestContext`, keyed by their name.
+Request-scoped values every handler receives, typed, such as analytics ids, loggers, and tenant lookups. Declare them with `Kizuna.requestContext`, register them on `new Kizuna()`, and resolve each with the adapter's `server.requestContext`. Handlers read them under `requestContext`, keyed by name.
 
 <AdapterTabs functionName="KizunaServer" />
 
-A declaration can read request `headers`. Those headers stay off the routes and out of the OpenAPI document, but the clients type them: the fetch client takes them on `new KizunaClient()`, and the generated Swift and Kotlin clients take them in their initializers, so a caller sets them once and the resolver reads them validated.
+A declaration that reads no headers takes the context schema on its own:
+
+```ts
+export const logger = Kizuna.requestContext(z.object({ requestId: z.string() }));
+```
+
+A declaration can also read request `headers`. They stay off the routes and out of the OpenAPI document, and the clients type them, so a caller sets them once and the resolver reads them validated.
 
 ```ts title="src/contract/request-contexts.ts"
 import { z } from 'zod';
@@ -59,7 +65,7 @@ listUsers: ({ query, requestContext }) => {
 
 ## Sending values from a client
 
-The fetch client takes the declared headers under `requestContext` and sends them with every request, required when a header is required and optional otherwise:
+The fetch client takes the declared headers under `requestContext` and sends them with every request:
 
 ```ts
 const apiClient = new KizunaClient(contract, {

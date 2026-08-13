@@ -9,16 +9,16 @@ The plugin API is new and still settling. `createPlugin`, `implementPlugin`, and
 
 </BetaNotice>
 
-A plugin declares routes and hands back handlers. The adapter mounts them exactly as it mounts yours, so a plugin needs no `express`, `hono`, `fastify` or `next` import anywhere in it.
+A plugin declares routes and hands back handlers. The adapter mounts them exactly as it mounts yours, so a plugin imports no framework.
 
-A plugin ships in two halves, in two modules:
+A plugin ships as two modules:
 
 | half            | module                    | imported by                | may import                 |
 | --------------- | ------------------------- | -------------------------- | -------------------------- |
 | the declaration | your package's main entry | the contract, so everybody | whatever a browser bundles |
 | the server      | `your-package/server`     | the server app only        | anything                   |
 
-A plugin is declared on `new Kizuna()`, so whatever its declaration module imports lands in your contract's import graph, browser bundles included. Keep `node:fs`, a database driver or a heavy SDK in the server half.
+A plugin is declared on `new Kizuna()`, so whatever its declaration module imports lands in the contract's import graph, browser bundles included. Keep `node:fs`, a database driver, or a heavy SDK in the server half.
 
 ## The declaration
 
@@ -90,9 +90,9 @@ export const auditPluginServer = (config: { store: AuditStore }) =>
 
 `implementPlugin` reads its first argument for the type only, never calling it: that types `router` against the declared routes and `exports` against what the declaration promised.
 
-`props` arrives from the contract. Anything live is your factory's own argument, which is why `auditPluginServer` takes `store` and the declaration does not.
+`props` arrives from the contract; anything live is your factory's own argument, which is why `auditPluginServer` takes `store`.
 
-The callback also receives `api`, for plugins that read the contract's routes. MCP uses it to build its tool list; most plugins ignore it.
+The callback also receives `api`, for plugins that read the contract's routes. MCP builds its tool list from it.
 
 ## What the app writes
 
@@ -111,7 +111,7 @@ export const api = server.api({
 });
 ```
 
-Same key both times. Leave the second one out and `server.api` throws, naming your `serverModule`. See [Plugins](/docs/plugins) for the caller's side.
+Use the same key both times. Leave the second one out and `server.api` throws, naming your `serverModule`. See [Plugins](/docs/plugins) for the caller's side.
 
 ## Answering with something that is not JSON
 
@@ -124,12 +124,6 @@ endpoint: async ({ body, headers }) => rawResponse(await transport.handleRequest
 ```
 
 Kizuna skips validation and rendering, and each adapter writes the response out in its own terms. Ordinary route handlers cannot reach `rawResponse`.
-
-## Staying adapter-agnostic
-
-A plugin's handlers receive the same arguments yours do: `params`, `query`, `body`, `headers`, plus the adapter's own context. Build from the parsed inputs and the plugin runs everywhere.
-
-If a plugin genuinely needs framework specifics, narrow its `HandlerContext` and it will compile only on the adapters that match.
 
 ## Packaging
 
@@ -144,7 +138,7 @@ Two export subpaths, one per half:
 }
 ```
 
-Bundle the main entry for a browser target in CI and the boundary holds itself. Kizuna does that for core and every first-party plugin.
+Bundle the main entry for a browser target in CI to catch a server-only import crossing into the declaration half. Kizuna does that for core and every first-party plugin.
 
 ## Reference
 
