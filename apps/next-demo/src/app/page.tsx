@@ -1,5 +1,5 @@
-import { apiClient } from '../lib/api-client';
-import { createUserAction, deleteUserAction } from './actions';
+import { apiClient, memberClient } from '../lib/api-client';
+import { createUserAction, deleteUserAction, removeMemberAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +11,10 @@ export default async function Home() {
         },
     });
     const users = result.status === 200 ? result.body.users : [];
+
+    const { manageMembers } = await memberClient.permissions();
+    const membersResult = await memberClient.members.listMembers();
+    const members = membersResult.status === 200 ? membersResult.body.members : [];
 
     return (
         <main
@@ -75,6 +79,42 @@ export default async function Home() {
                 ))}
                 {users.length === 0 && <li>No users yet.</li>}
             </ul>
+
+            <h2>Workspace members</h2>
+            <p>
+                Signed in as Ada. Whether the Remove button renders is the same question the route asks before its handler runs, read once
+                from the permissions endpoint rather than guessed at in the component.
+            </p>
+
+            <ul>
+                {members.map((member) => (
+                    <li
+                        key={member.id}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            marginBottom: '0.25rem',
+                        }}>
+                        <span>
+                            {member.name} ({member.email})
+                        </span>
+                        {manageMembers && (
+                            <form action={removeMemberAction}>
+                                <input type="hidden" name="id" value={member.id} />
+                                <button type="submit">Remove</button>
+                            </form>
+                        )}
+                    </li>
+                ))}
+                {members.length === 0 && <li>No other members.</li>}
+            </ul>
+
+            <p>
+                The button is a convenience, never the decision. Whether one particular member may go still depends on that member, since
+                the owner cannot be removed, and that answer needs the record. It stays on the server as{' '}
+                <code>can.removeMember(target)</code>, which answers 403 with a reason.
+            </p>
         </main>
     );
 }

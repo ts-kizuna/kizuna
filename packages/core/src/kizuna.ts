@@ -3,7 +3,7 @@ import { tagRoutes } from './routes.js';
 import { assembleContract, type Contract } from './contract.js';
 import type { ContractPlugins, PluginArgs } from './plugin.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
-import { flattenRoutes, isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
+import { flattenRoutes, isRouteDefinition, type CanArg, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import {
     assertNoJobEndpointCollision,
     buildJobs,
@@ -17,6 +17,9 @@ import { createTags, type TagSet, type TagOptions } from './tags.js';
 import { createIdentity } from './identity.js';
 import { createRequestContext } from './request-context.js';
 import { createModel } from './model.js';
+import { createPermission, type GateablePermissionName, type Permission } from './permission.js';
+import { applyPermissionsMap, type GroupPermissions, type PermissionsMap, type ValidPermissionsMap } from './permissions.js';
+import { assertNoPermissionsEndpointCollision, type PermissionsConfig } from './permissions-endpoint.js';
 import type { Routes, RouteDefinition, SecurityRequirement, AccessGate, AuthoredRoutes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
@@ -202,6 +205,7 @@ export interface KizunaSpec {
     tags: Record<string, TagOptions>;
     codes: string;
     identities: Record<string, SecurityScheme>;
+    permissions: Record<string, Permission>;
     requestContext: Record<string, RequestContextSchema>;
     plugins: ContractPlugins;
 }
@@ -215,6 +219,12 @@ export type TagNamesOf<Spec extends KizunaSpec> = Extract<keyof Spec['tags'], st
  * The identity names declared on a spec, e.g. `'user' | 'member'`.
  */
 export type IdentityNamesOf<Spec extends KizunaSpec> = Extract<keyof Spec['identities'], string>;
+
+/**
+ * The permission names a route may demand: the spec's declared permissions that
+ * apply to no particular record.
+ */
+export type GateableNamesOf<Spec extends KizunaSpec> = GateablePermissionName<Spec['permissions']>;
 
 /**
  * The plugins declared on a spec, e.g. `{ mcp: McpPlugin }`.
@@ -246,6 +256,27 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         map: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>
     ): A;
     /**
+     * The `permissions` map, typed against the routes and the actions the
+     * declared policies allow. Define it wherever you like, then pass it to
+     * `k.contract` under `permissions`.
+     *
+     * Unlike the auth map, a route override replaces the group's `'*'` default
+     * rather than merging into it.
+     *
+     * @example
+     * export const permissions = k.permissions(routes, {
+     *     users: false,
+     *     members: {
+     *         '*': 'membership.list',
+     *         inviteMember: 'membership.invite',
+     *     },
+     * });
+     */
+    permissions<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>, const P extends PermissionsMap<GateableNamesOf<Spec>, R>>(
+        routes: R,
+        map: P & ValidPermissionsMap<P, R, GateableNamesOf<Spec>>
+    ): P;
+    /**
      * Declare scheduled jobs. Pass the identity every job requires, the one
      * credential your scheduler sends, then the jobs themselves.
      *
@@ -272,6 +303,9 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      * (and optionally each route, via a `'*'` cascade) the identity it requires;
      * `k.contract` resolves it onto every route's `security` and `accessGate`.
      *
+     * When the instance declares policies, the `permissions` map is required and
+     * resolves onto every route's `permissions` the same way.
+     *
      * Jobs declared with `k.jobs` go under `jobs`, alongside `routes` rather than
      * inside it. They carry their own identity, so they never appear in the
      * `auth` map.
@@ -280,32 +314,57 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
         const A extends AuthMap<IdentityNamesOf<Spec>, R>,
         const J extends Jobs = Record<string, never>,
-    >(definition: {
-        routes: R;
-        jobs?: J;
-        auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
-    }): Contract<
-        RoutesWithHandlerContext<R, Spec['identities'], A, Spec['requestContext'], PluginArgs<PluginsOf<Spec>> & JobsArg<J>>,
+        const P extends PermissionsMap<GateableNamesOf<Spec>, R> = never,
+    >(
+        definition: {
+            routes: R;
+            jobs?: J;
+            auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
+        } & PermissionsRequirement<Spec, R, P>
+    ): Contract<
+        RoutesWithHandlerContext<
+            R,
+            Spec['identities'],
+            A,
+            Spec['requestContext'],
+            PluginArgs<PluginsOf<Spec>> & JobsArg<J> & CanArg<Spec['permissions']>
+        >,
         Spec['tags'],
         Spec['codes'],
         Spec['identities'],
         A,
         Spec['requestContext'],
         PluginsOf<Spec>,
-        J
+        J,
+        Spec['permissions'],
+        P
     >;
-    contract<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>, const J extends Jobs = Record<string, never>>(definition: {
-        routes: R;
-        jobs?: J;
-    }): Contract<
-        RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext'], PluginArgs<PluginsOf<Spec>> & JobsArg<J>>,
+    contract<
+        const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
+        const J extends Jobs = Record<string, never>,
+        const P extends PermissionsMap<GateableNamesOf<Spec>, R> = never,
+    >(
+        definition: {
+            routes: R;
+            jobs?: J;
+        } & PermissionsRequirement<Spec, R, P>
+    ): Contract<
+        RoutesWithHandlerContext<
+            R,
+            Spec['identities'],
+            unknown,
+            Spec['requestContext'],
+            PluginArgs<PluginsOf<Spec>> & JobsArg<J> & CanArg<Spec['permissions']>
+        >,
         Spec['tags'],
         Spec['codes'],
         Spec['identities'],
         unknown,
         Spec['requestContext'],
         PluginsOf<Spec>,
-        J
+        J,
+        Spec['permissions'],
+        P
     >;
     /**
      * Emit a validation issue with a machine-readable `code`, checked against the
@@ -325,6 +384,15 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
 }
 
 /**
+ * The `permissions` field on `k.contract`'s definition: required once the
+ * instance declares policies, and absent when it declares none, so a contract
+ * without policies never has to mention it.
+ */
+type PermissionsRequirement<Spec extends KizunaSpec, R, P> = [GateableNamesOf<Spec>] extends [never]
+    ? { permissions?: never }
+    : { permissions: P & ValidPermissionsMap<P, R, GateableNamesOf<Spec>> };
+
+/**
  * The spec a {@link Kizuna} instance's type parameters assemble into.
  */
 type SpecOf<
@@ -333,10 +401,12 @@ type SpecOf<
     Identities extends Record<string, SecurityScheme>,
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
+    Permissions_ extends Record<string, Permission> = Record<string, never>,
 > = {
     tags: Tags;
     codes: Codes;
     identities: Identities;
+    permissions: Permissions_;
     requestContext: RequestContext;
     plugins: Plugins;
 };
@@ -351,8 +421,15 @@ export interface KizunaConfig<
     Identities extends Record<string, SecurityScheme> = Record<string, never>,
     RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
     Plugins extends ContractPlugins = Record<string, never>,
+    Permissions_ extends Record<string, Permission> = Record<string, never>,
 > {
     identities?: Identities;
+    /**
+     * Permissions to declare, keyed by name. `k.contract`'s `permissions` map
+     * references those names, and `server.api` requires one implementation each.
+     * Declaring any makes the map required.
+     */
+    permissions?: Permissions_;
     requestContext?: RequestContext;
     tags?: TagSet<Tags>;
     validation?: {
@@ -364,9 +441,20 @@ export interface KizunaConfig<
      */
     plugins?: Plugins;
     /**
-     * Settings shared by every job. The jobs themselves are declared with `k.jobs`.
+     * How the declared features behave, as opposed to what is declared. Keyed by
+     * the feature it settles.
      */
-    jobs?: JobsConfig;
+    settings?: {
+        /**
+         * The endpoint that reports the caller's permissions, for a UI that hides
+         * what it cannot do. Omit it to serve nothing.
+         */
+        permissions?: PermissionsConfig;
+        /**
+         * Shared by every job. The jobs themselves are declared with `k.jobs`.
+         */
+        jobs?: JobsConfig;
+    };
 }
 
 const createSurface = <
@@ -375,10 +463,11 @@ const createSurface = <
     Identities extends Record<string, SecurityScheme>,
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
+    Permissions_ extends Record<string, Permission>,
 >(
-    config?: KizunaConfig<Tags, Codes, Identities, RequestContext, Plugins>
-): K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>> => {
-    type Spec = SpecOf<Tags, Codes, Identities, RequestContext, Plugins>;
+    config?: KizunaConfig<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>
+): K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>> => {
+    type Spec = SpecOf<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>;
 
     const tagSet: TagSet<Tags> = config?.tags ?? { __brand: 'TagSet', tags: {} as Tags };
 
@@ -394,14 +483,19 @@ const createSurface = <
             ? buildJobs(undefined, identityOrDefinitions as AuthoredJobs)
             : buildJobs(identityOrDefinitions as string, definitions)) as K<Spec>['jobs'];
 
-    const contract = (definition: { routes: Routes; jobs?: Jobs; auth?: Record<string, GroupAuth> }) => {
-        const { routes: contractRoutes, jobs: contractJobs, auth } = definition;
+    const contract = (definition: {
+        routes: Routes;
+        jobs?: Jobs;
+        auth?: Record<string, GroupAuth>;
+        permissions?: Record<string, GroupPermissions>;
+    }) => {
+        const { routes: contractRoutes, jobs: contractJobs, auth, permissions } = definition;
         if (contractJobs) {
             const routePaths = new Map<string, string>();
             for (const { routeKey, route } of flattenRoutes(contractRoutes)) {
                 routePaths.set(`${route.method}:${route.path}`, routeKey);
             }
-            assertNoJobEndpointCollision(contractJobs, config?.jobs, routePaths);
+            assertNoJobEndpointCollision(contractJobs, config?.settings?.jobs, routePaths);
         }
         if (auth) {
             for (const groupKey of Object.keys(auth)) {
@@ -419,16 +513,29 @@ const createSurface = <
                 }
             }
         }
+        if (permissions) {
+            applyPermissionsMap(contractRoutes, permissions, config?.permissions);
+        }
+        if (config?.settings?.permissions && config?.permissions) {
+            const routePaths = new Map<string, string>();
+            for (const { routeKey, route } of flattenRoutes(contractRoutes)) {
+                routePaths.set(`${route.method}:${route.path}`, routeKey);
+            }
+            assertNoPermissionsEndpointCollision({ ...config.settings.permissions, declared: config.permissions }, routePaths);
+        }
         return assembleContract({
             routes: contractRoutes as Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
             jobs: contractJobs,
             auth,
+            permissions,
             tags: config?.tags,
             securitySchemes: config?.identities,
+            declaredPermissions: config?.permissions,
+            permissionsConfig: config?.settings?.permissions,
             requestContext: config?.requestContext,
             validation: config?.validation,
             plugins: config?.plugins,
-            jobsConfig: config?.jobs,
+            jobsConfig: config?.settings?.jobs,
         });
     };
 
@@ -436,6 +543,7 @@ const createSurface = <
         routes,
         jobs,
         auth: (_routes, map) => map,
+        permissions: (_routes, map) => map,
         contract: contract as K<Spec>['contract'],
         issue: addCodedIssue,
     };
@@ -468,19 +576,22 @@ export class Kizuna<
     const Identities extends Record<string, SecurityScheme> = Record<string, never>,
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
     const Plugins extends ContractPlugins = Record<string, never>,
-> implements K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>> {
+    const Permissions_ extends Record<string, Permission> = Record<string, never>,
+> implements K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>> {
     static readonly tags = createTags;
     static readonly identity = createIdentity;
+    static readonly permission = createPermission;
     static readonly requestContext = createRequestContext;
     static readonly model = createModel;
 
-    declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['routes'];
-    declare readonly auth: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['auth'];
-    declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['jobs'];
-    declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['contract'];
-    declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['issue'];
+    declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>>['routes'];
+    declare readonly auth: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>>['auth'];
+    declare readonly permissions: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>>['permissions'];
+    declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>>['jobs'];
+    declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>>['contract'];
+    declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>>['issue'];
 
-    constructor(config?: KizunaConfig<Tags, Codes, Identities, RequestContext, Plugins>) {
-        Object.assign(this, createSurface<Tags, Codes, Identities, RequestContext, Plugins>(config));
+    constructor(config?: KizunaConfig<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>) {
+        Object.assign(this, createSurface<Tags, Codes, Identities, RequestContext, Plugins, Permissions_>(config));
     }
 }

@@ -3,6 +3,12 @@ title: Auth
 description: Declare identities and per-route auth on the contract. Runtime guards, typed handler context, OpenAPI security, and client access checks all follow.
 ---
 
+<BetaNotice>
+
+Auth is still settling. `Kizuna.identity`, the `auth` map, and `server.guard` may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
 Auth lives in the contract: **identities** say who can call your API, the **auth map** says which routes they can call.
 
 ```ts title="src/contract/identities.ts"
@@ -192,6 +198,8 @@ workspace: {
 ```
 
 A route requiring several identities receives all of them under `auth`, as in `transfer: ({ body, auth }) => ...`.
+
+An access gate compares one field against a literal, and that is all it can do. When the decision depends on the record being acted on, or on a lookup, reach for [permissions](/docs/permissions) instead. Keep role gates here: the guard already fetched the role, so the gate costs nothing and narrows the field in the handler.
 
 ## Guards
 

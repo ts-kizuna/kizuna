@@ -17,6 +17,11 @@ import {
     type ApiParts,
     ROUTER_META,
     GUARDS_META,
+    PERMISSIONS_META,
+    PERMISSIONS_ENDPOINT_META,
+    permissionsEndpointRoutes,
+    permissionsEndpointRouter,
+    type PermissionsMeta,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
@@ -51,10 +56,23 @@ import type {
     RequestContextSchema,
     RequestContextHeaderValues,
 } from '@ts-kizuna/core';
-import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
+import type {
+    HandlersFromAuth,
+    GuardParams,
+    RequestContextValues,
+    CanArg,
+    PermissionResult,
+    PermissionAuth,
+    PermissionAppliesTo,
+    Permission,
+    PermissionMap,
+    PermissionRun,
+} from '@ts-kizuna/core/adapter';
 
 export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;
+    readonly [PERMISSIONS_META]?: unknown;
+    readonly [PERMISSIONS_ENDPOINT_META]?: unknown;
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
@@ -80,10 +98,20 @@ export type RouteHandler<R extends RouteDefinition, E extends Env = Env> = CoreR
  * in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C, E extends Env = Env> =
-    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins, infer J>
+    C extends Contract<
+        infer R,
+        infer _Tags,
+        infer _Codes,
+        infer Schemes,
+        infer Auth,
+        infer RequestContext,
+        infer Plugins,
+        infer J,
+        infer Permissions_
+    >
         ? HandlersFromAuth<
               R,
-              HonoHandlerContext<E> & RequestContextValues<RequestContext> & PluginArgs<Plugins> & JobsArg<J>,
+              HonoHandlerContext<E> & RequestContextValues<RequestContext> & PluginArgs<Plugins> & JobsArg<J> & CanArg<Permissions_>,
               Schemes,
               Auth
           >
@@ -155,6 +183,27 @@ type GuardsForSchemes<Schemes extends Record<string, SecurityScheme>, E extends 
 };
 
 /**
+ * The implementation for each permission declared on the contract, keyed by name.
+ * A permission applying to no record returns a boolean; one applying to a record
+ * returns a predicate over it.
+ */
+type PermissionFns<Permissions_ extends Record<string, Permission>, Schemes extends Record<string, SecurityScheme>, E extends Env> = {
+    [Name in keyof Permissions_]: (
+        args: HonoHandlerContext<E> & {
+            params: Record<string, string>;
+            auth: PermissionAuth<Schemes>;
+        }
+    ) => PermissionResult<PermissionAppliesTo<Permissions_[Name]>> | Promise<PermissionResult<PermissionAppliesTo<Permissions_[Name]>>>;
+};
+
+/**
+ * One implementation per permission declared on the contract.
+ */
+type PermissionsForContract<Permissions_ extends Record<string, Permission>, E extends Env> = {
+    [Name in keyof Permissions_]: PermissionRun<HonoHandlerContext<E>>;
+};
+
+/**
  * The resolver functions for the request context schemas declared on `kizuna`,
  * keyed by name. Each runs on every route and returns its schema's value.
  */
@@ -198,6 +247,7 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
 export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, options?: HonoOptions): void {
     const guards = api[GUARDS_META] as GuardMap<HonoHandlerContext<Env>> | undefined;
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
+    const permissionRuns = api[PERMISSIONS_META] as PermissionMap<HonoHandlerContext<Env>> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<HonoHandlerContext<Env>> | undefined;
 
     const pluginExports = pluginExportsOf(api);
@@ -237,6 +287,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                     formatError: options?.formatError,
                 },
                 guards,
+                permissions: permissionRuns,
                 schemes,
                 requestContext,
                 pluginExports,
@@ -267,6 +318,15 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
             mountRoute(routeKey, route as RouteDefinition, routes, router);
         }
     }
+
+    const permissionsMeta = api[PERMISSIONS_ENDPOINT_META] as PermissionsMeta | undefined;
+    if (permissionsMeta) {
+        const routes = permissionsEndpointRoutes(permissionsMeta);
+        const router = permissionsEndpointRouter<HonoHandlerContext<Env>>(permissionsMeta);
+        for (const [routeKey, route] of Object.entries(routes)) {
+            mountRoute(routeKey, route as RouteDefinition, routes, router);
+        }
+    }
 }
 
 type ServerContract<
@@ -276,7 +336,8 @@ type ServerContract<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J>;
+    Permissions_ extends Record<string, Permission> = Record<string, Permission>,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J, Permissions_>;
 
 export interface Server<
     R extends Routes,
@@ -286,6 +347,7 @@ export interface Server<
     Plugins extends ContractPlugins,
     E extends Env = Env,
     J extends Jobs = Jobs,
+    Permissions_ extends Record<string, Permission> = Record<string, Permission>,
 > {
     /**
      * Define a guard for one of the contract's identities. It runs before the
@@ -298,6 +360,17 @@ export interface Server<
         name: Name,
         run: GuardFns<Schemes, GuardParams<R, Auth, Name>, E>[Name]
     ): GuardRun<HonoHandlerContext<E>>;
+    /**
+     * Implement one of the contract's permissions. It runs at most once per
+     * request, on first use, and only when a route's `permissions` entry or a
+     * handler's `can` asks about it. Return a boolean, or a predicate for a
+     * permission that applies to a record; load the caller's grants in the body so
+     * the predicate is a cheap test rather than a query per record.
+     */
+    permission<const Name extends Extract<keyof Permissions_, string>>(
+        name: Name,
+        run: PermissionFns<Permissions_, Schemes, E>[Name]
+    ): PermissionRun<HonoHandlerContext<E>>;
     /**
      * Define a request context resolver declared on the contract. It runs on
      * every route, public ones included, and never denies.
@@ -312,15 +385,15 @@ export interface Server<
     router: {
         <
             const GroupOrRoutes extends
-                | Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>, string>
+                | Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Permissions_>, E>, string>
                 | Routes,
         >(
             group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes, E>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes, E>;
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Permissions_>, GroupOrRoutes, E>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Permissions_>, GroupOrRoutes, E>;
         (
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>
-        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Permissions_>, E>
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Permissions_>, E>;
     };
     /**
      * Write a handler for each of the contract's jobs.
@@ -339,22 +412,25 @@ export interface Server<
      * });
      */
     jobs(
-        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
-    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Permissions_>>
+    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Permissions_>>;
     /**
      * Assemble the router, guards, and job handlers into the api object.
      */
     api(
         options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Permissions_>, E>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes, E>> }) &
             (string extends keyof J
                 ? { jobs?: undefined }
-                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>> }) &
+                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Permissions_>>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
                 : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<HonoHandlerContext<E>> }> }) &
-            (string extends keyof Plugins ? { plugins?: undefined } : { plugins: PluginImplementations<Plugins, HonoHandlerContext<E>> })
+            (string extends keyof Plugins ? { plugins?: undefined } : { plugins: PluginImplementations<Plugins, HonoHandlerContext<E>> }) &
+            (string extends keyof Permissions_
+                ? { permissions?: undefined }
+                : { permissions: NoInfer<PermissionsForContract<Permissions_, E>> })
     ): HonoApi<R>;
 }
 
@@ -366,18 +442,27 @@ const createServerSurface = <
     Plugins extends ContractPlugins,
     E extends Env = Env,
     J extends Jobs = Jobs,
+    Permissions_ extends Record<string, Permission> = Record<string, Permission>,
 >(
-    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>,
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Permissions_>,
     options?: ServerOptions
-): Server<R, Schemes, Auth, RequestContext, Plugins, E, J> => {
+): Server<R, Schemes, Auth, RequestContext, Plugins, E, J, Permissions_> => {
     warnUnsupportedJobOptions(contract.jobs, options?.jobTransport);
     const server = {
         guard: (_name: string, run: unknown) => run,
+        permission: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
         jobs: (handlers: unknown) => handlers,
         api: ({ jobs, ...parts }: ApiParts & { jobs?: Record<string, unknown> }) => {
             const api = Object.assign(assembleApi(contract, parts), {
+                [PERMISSIONS_ENDPOINT_META]:
+                    contract.permissionsConfig && contract.declaredPermissions
+                        ? {
+                              ...contract.permissionsConfig,
+                              declared: contract.declaredPermissions,
+                          }
+                        : undefined,
                 [JOBS_META]: contract.jobs
                     ? {
                           jobs: contract.jobs,
@@ -393,7 +478,7 @@ const createServerSurface = <
             });
         },
     };
-    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, E, J>;
+    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, E, J, Permissions_>;
 };
 
 /**
@@ -424,14 +509,16 @@ export class KizunaServer<
     Plugins extends ContractPlugins,
     E extends Env = Env,
     J extends Jobs = Jobs,
-> implements Server<R, Schemes, Auth, RequestContext, Plugins, E, J> {
-    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['guard'];
-    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['requestContext'];
-    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['router'];
-    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['jobs'];
-    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['api'];
+    Permissions_ extends Record<string, Permission> = Record<string, Permission>,
+> implements Server<R, Schemes, Auth, RequestContext, Plugins, E, J, Permissions_> {
+    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, E, J, Permissions_>['guard'];
+    declare readonly permission: Server<R, Schemes, Auth, RequestContext, Plugins, E, J, Permissions_>['permission'];
+    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, E, J, Permissions_>['requestContext'];
+    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, E, J, Permissions_>['router'];
+    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, E, J, Permissions_>['jobs'];
+    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, E, J, Permissions_>['api'];
 
-    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, options?: ServerOptions) {
+    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Permissions_>, options?: ServerOptions) {
         Object.assign(this, createServerSurface(contract, options));
     }
 }

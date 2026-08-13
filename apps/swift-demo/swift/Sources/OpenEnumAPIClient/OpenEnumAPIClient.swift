@@ -1644,6 +1644,48 @@ public final class OpenEnumAPIClient: Sendable {
         }
     }
 
+    public enum MembersRemoveMember {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let ok: Bool
+
+            public init(ok: Bool) {
+                self.ok = ok
+            }
+        }
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case forbidden(OpenEnumAPI.ProblemDetails)
+            case notFound(OpenEnumAPI.ProblemDetails)
+        }
+    }
+
     public enum WorkspaceGetWorkspace {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -1750,6 +1792,7 @@ public final class OpenEnumAPIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case forbidden(OpenEnumAPI.ProblemDetails)
             case badRequest(OpenEnumAPIClient.ValidationError)
         }
     }
@@ -2401,6 +2444,30 @@ public struct OpenEnumAPIMembersClient: Sendable {
             throw OpenEnumAPIClient.MembersInviteMember.Failure.unexpectedStatus(statusCode, data)
         }
     }
+
+    /// Remove a member from the workspace
+    public func removeMember(_ params: OpenEnumAPIClient.MembersRemoveMember.Params) async throws(OpenEnumAPIClient.MembersRemoveMember.Failure) -> OpenEnumAPIClient.MembersRemoveMember.Result {
+        var path = "/workspace/members/:id"
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.MembersRemoveMember.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "DELETE"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.MembersRemoveMember.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(OpenEnumAPIClient.MembersRemoveMember.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersRemoveMember.Failure.self)
+            return OpenEnumAPIClient.MembersRemoveMember.Result(body: body)
+        case 403:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersRemoveMember.Failure.self)
+            throw OpenEnumAPIClient.MembersRemoveMember.Failure.forbidden(payload)
+        case 404:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersRemoveMember.Failure.self)
+            throw OpenEnumAPIClient.MembersRemoveMember.Failure.notFound(payload)
+        default:
+            throw OpenEnumAPIClient.MembersRemoveMember.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
 }
 
 public struct OpenEnumAPIWorkspaceClient: Sendable {
@@ -2444,7 +2511,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         }
     }
 
-    /// Transfer ownership, owner-only via the auth map
+    /// Transfer ownership, owner-only via the auth map and gated on `membership.promote`
     public func transfer(_ body: OpenEnumAPIClient.WorkspaceTransfer.Body) async throws(OpenEnumAPIClient.WorkspaceTransfer.Failure) -> OpenEnumAPIClient.WorkspaceTransfer.Result {
         let path = "/workspace/transfer"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
@@ -2458,6 +2525,9 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceTransfer.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
             return OpenEnumAPIClient.WorkspaceTransfer.Result(body: body)
+        case 403:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceTransfer.Failure.forbidden(payload)
         case 400:
             let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
             throw OpenEnumAPIClient.WorkspaceTransfer.Failure.badRequest(payload)

@@ -1,0 +1,68 @@
+---
+title: k.permissions
+description: Type the permissions map against the routes and the declared permission names.
+---
+
+<BetaNotice>
+
+Permissions are new and still settling. The `permissions` map and its value forms may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
+`k.permissions(routes, map)` types the permissions map so you can define it in its own file, then pass it to [`k.contract`](/docs/reference/k-contract) under `permissions`. At runtime it returns the map unchanged; `k.contract` resolves it onto every route.
+
+```ts title="src/contract/permissions.ts"
+import { k } from './k';
+import { routes } from './routes';
+
+export const routePermissions = k.permissions(routes, {
+    users: false,
+    health: false,
+    workspace: false,
+    notifications: {
+        '*': false,
+        listEvents: 'viewEventLog',
+    },
+});
+```
+
+Declaring permissions on `new Kizuna()` makes the map required, and every route group must appear, so an ungated group is always an explicit `false`.
+
+## Values
+
+| Value                              | Meaning                  |
+| ---------------------------------- | ------------------------ |
+| `false`                            | No permission required   |
+| `'viewEventLog'`                   | Requires that permission |
+| `['viewEventLog', 'exportLedger']` | Requires all of them     |
+| `{ oneOf: [...] }`                 | Requires at least one    |
+| `{ '*': ..., listEvents: false }`  | Cascade over the group   |
+
+## The cascade replaces, it does not merge
+
+`'*'` sets the group default and a named key overrides its routes and subgroups. Unlike the [auth map](/docs/reference/k-auth), an override **replaces** the default rather than merging into it: identities are orthogonal credentials that combine, while a permission requirement is one statement about a route.
+
+```ts
+workspace: {
+    '*': 'viewWorkspace',
+    // requires deleteWorkspace alone, not both
+    deleteWorkspace: 'deleteWorkspace',
+},
+```
+
+## Errors at assembly
+
+`k.contract` throws, rather than resolving something surprising, when:
+
+- a permission is not declared, naming the route it sits on;
+- a permission applies to a record, so a route cannot demand it;
+- a map key matches no route group;
+- a cascade key matches nothing directly under its group;
+- a nested cascade targets a route rather than a group;
+- an `oneOf` is empty, which no caller could satisfy.
+
+## Reference
+
+- [Permissions](/docs/permissions)
+- [`Kizuna.permission`](/docs/reference/kizuna-permission)
+- [`server.permission`](/docs/reference/server-permission)

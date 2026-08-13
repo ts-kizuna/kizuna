@@ -276,3 +276,38 @@ export const pluginTypeContract = pluginTypeK.contract({
         },
     }),
 });
+
+const MemberSchema = z.object({
+    id: z.string(),
+    role: z.enum(['owner', 'admin']),
+});
+
+const permissionTypeK = new Kizuna({
+    permissions: {
+        viewInvoices: Kizuna.permission(),
+        promoteMember: Kizuna.permission({
+            appliesTo: MemberSchema,
+        }),
+    },
+});
+
+export const permissionTypeRoutes = permissionTypeK.routes({
+    transfer: {
+        method: 'POST',
+        path: '/workspace/transfer',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+
+export const permissionTypeContract = permissionTypeK.contract({
+    routes: {
+        workspace: permissionTypeRoutes,
+    },
+    permissions: {
+        workspace: 'viewInvoices',
+    },
+});

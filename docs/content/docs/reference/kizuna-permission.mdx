@@ -1,0 +1,65 @@
+---
+title: Kizuna.permission
+description: Declare something a caller may be permitted, and optionally the record it applies to.
+---
+
+<BetaNotice>
+
+Permissions are new and still settling. `Kizuna.permission` and its options may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
+`Kizuna.permission({ appliesTo?, description? })` declares a permission. Register them on the `kizuna` factory under `permissions`; the contract's [`permissions` map](/docs/reference/k-permissions) says which routes demand them, and [`server.permission`](/docs/reference/server-permission) decides whether this caller holds them.
+
+```ts title="src/contract/permissions.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { UserSchema } from './models';
+
+export const viewEventLog = Kizuna.permission({
+    description: 'Read the session event log',
+});
+
+export const promoteMember = Kizuna.permission({
+    appliesTo: UserSchema,
+});
+```
+
+A permission is the name, not the decision. It says `viewEventLog` exists; an implementation says whether this caller has it.
+
+## Options
+
+| Option        | Description                                                                                     |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| `appliesTo`   | Schema for the record this permission is about, when the answer depends on which one. Optional. |
+| `description` | Shown beside the permission wherever it is reported.                                            |
+
+## What `appliesTo` buys
+
+Two typed call sites, and nothing else:
+
+```ts
+// the predicate's parameter is typed
+return (user) => memberIds.has(user.id);
+
+// the argument at the check is constrained
+await can.promoteMember(targetUser);
+await can.promoteMember(theWorkspace); // compile error
+```
+
+Nothing parses against it at runtime. The record reaches `can` from the handler that loaded it and goes into your own predicate, so there is no trust boundary to check and parsing it would cost a request. It is a Zod schema rather than a type parameter because that is how kizuna declares every shape, and because the schema is already in your contract.
+
+## Its presence is load-bearing
+
+A permission with `appliesTo` **cannot gate a route**: the route has not loaded the record yet, so the question is unanswerable there, and `k.contract` refuses it. It also never reaches the client, because a predicate cannot cross a wire.
+
+Omit it and the permission is a plain yes or no, which is the common case, the only kind a route can demand, and the only kind the client can read.
+
+## Where a permission earns its place
+
+A decision comparing one field of a guard's return against a literal belongs in the [auth map's access gate](/docs/auth#access-gates), which costs nothing and narrows the field in the handler. Permissions are for decisions that need a lookup, or that depend on the record. See [Permissions](/docs/permissions#when-to-reach-for-this).
+
+## Reference
+
+- [Permissions](/docs/permissions)
+- [`k.permissions`](/docs/reference/k-permissions)
+- [`server.permission`](/docs/reference/server-permission)

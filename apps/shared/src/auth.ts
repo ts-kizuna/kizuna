@@ -12,6 +12,7 @@ export const auth = k.auth(routes, {
                 role: ['owner', 'admin'],
             },
         },
+        removeMember: 'member',
     },
     workspace: {
         '*': 'member',

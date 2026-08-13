@@ -37,7 +37,28 @@ import { ProblemDetailsSchema } from './schemas.js';
 import type { Contract } from './contract.js';
 import type { JobTransport } from './job-transport.js';
 
-export type { RouteDefinition, RoutePath, Routes, Method } from './types.js';
+export type { RouteDefinition, RoutePath, Routes, Method, PermissionRequirement } from './types.js';
+export { isPermission, type Permission, type PermissionAppliesTo, type GateablePermissionName } from './permission.js';
+export {
+    DEFAULT_PERMISSIONS_PATH,
+    PERMISSIONS_ROUTE_KEY,
+    permissionsEndpointPath,
+    permissionsEndpointRoute,
+    permissionsEndpointRoutes,
+    permissionsEndpointRouter,
+    assertNoPermissionsEndpointCollision,
+    type PermissionsConfig,
+    type PermissionsMeta,
+} from './permissions-endpoint.js';
+export {
+    gateableNames,
+    permissionsReport,
+    type ReportedRoute,
+    type PermissionValue,
+    type GroupPermissions,
+    type PermissionsMap,
+    type ValidPermissionsMap,
+} from './permissions.js';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
 export {
     createPlugin,
@@ -104,6 +125,8 @@ export const ROUTER_META: unique symbol = Symbol('ts-kizuna.router');
 export const GUARDS_META: unique symbol = Symbol('ts-kizuna.guards');
 export const SCHEMES_META: unique symbol = Symbol('ts-kizuna.schemes');
 export const REQUEST_CONTEXT_META: unique symbol = Symbol('ts-kizuna.request-context');
+export const PERMISSIONS_META: unique symbol = Symbol('ts-kizuna.permissions');
+export const PERMISSIONS_ENDPOINT_META: unique symbol = Symbol('ts-kizuna.permissions-endpoint');
 const CONTRACT_META: unique symbol = Symbol.for('ts-kizuna.contract');
 export const JOBS_META: unique symbol = Symbol('ts-kizuna.jobs');
 
@@ -169,6 +192,38 @@ export type GuardRun<HandlerContext = unknown> = (
 export type GuardMap<HandlerContext = unknown> = Record<string, GuardRun<HandlerContext>>;
 
 /**
+ * The runtime behavior of a permission implementation. It receives the adapter's
+ * handler context, the matched route's path `params`, and the scheme-keyed `auth`
+ * the guards produced.
+ *
+ * It returns a boolean, or a predicate for a permission that applies to a record.
+ * It runs at most once per request, on first use, and only when a route's
+ * `permissions` or a handler's `can` asks. Load the caller's grants in its body so
+ * the predicate is a cheap test rather than a query per record.
+ */
+export type PermissionRun<HandlerContext = unknown> = (
+    args: HandlerContext & {
+        params: Record<string, string>;
+        auth: Record<string, unknown>;
+    }
+) => Promise<PermissionOutcome> | PermissionOutcome;
+
+/**
+ * What a permission implementation resolves to.
+ */
+export type PermissionOutcome = boolean | ((record: never) => boolean | Promise<boolean>);
+
+/**
+ * Permission implementations keyed by the permission name they answer for.
+ */
+export type PermissionMap<HandlerContext = unknown> = Record<string, PermissionRun<HandlerContext>>;
+
+/**
+ * One method per declared permission, reaching every handler as `can`.
+ */
+export type Can = Record<string, (record?: unknown) => Promise<boolean>>;
+
+/**
  * The runtime behavior of a request context resolver. It runs on every route
  * before the guards, receives the handler context plus the matched route's
  * `params`, and returns the value handlers read under the context's name. It
@@ -187,9 +242,16 @@ export type RequestContextRun<HandlerContext = unknown> = (
 export const contractOf = <C = unknown>(api: unknown): C => (api as Record<symbol, unknown>)[CONTRACT_META] as C;
 
 /**
+ * The rule resolvers stamped on an api object, for an adapter to pass into
+ * `handle`.
+ */
+export const permissionsOf = <HandlerContext = unknown>(api: unknown): PermissionMap<HandlerContext> | undefined =>
+    (api as Record<symbol, unknown>)[PERMISSIONS_META] as PermissionMap<HandlerContext> | undefined;
+
+/**
  * What kizuna puts in handler args. Must agree with the spread in `runPipeline`.
  */
-export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'throwError', 'auth', 'requestContext', 'plugins'] as const;
+export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'throwError', 'auth', 'requestContext', 'plugins', 'can'] as const;
 
 /**
  * The adapter's own context, with kizuna's arguments removed.
@@ -221,6 +283,7 @@ const assertNoDuplicateRoutes = (routes: Routes, pluginRoutes: Routes = {}): voi
 export interface ApiParts {
     router: unknown;
     guards?: unknown;
+    permissions?: unknown;
     requestContext?: unknown;
     /**
      * Each plugin's server half, keyed by install name.
@@ -249,6 +312,7 @@ export const assembleApi = <const R extends Routes>(
         [API_META]: true,
         [ROUTER_META]: parts.router,
         [GUARDS_META]: parts.guards,
+        [PERMISSIONS_META]: parts.permissions,
         [SCHEMES_META]: contract.securitySchemes,
         [REQUEST_CONTEXT_META]: parts.requestContext,
         [PLUGIN_ROUTES_META_KEY]: pluginRoutes,
@@ -478,6 +542,9 @@ export type {
     BrandedHandlerContext,
     RouteAuthValue,
     ContextFromAuthValue,
+    CanArg,
+    PermissionResult,
+    PermissionAuth,
 } from './handler-pipeline.js';
 export { buildPath, parsePath, type PathSegment } from './path-params.js';
 export { sortFlattenedRoutes } from './route-matcher.js';
@@ -553,6 +620,10 @@ export type AdapterResult =
           detail: string;
       }
     | {
+          kind: 'permission-denied';
+          detail: string;
+      }
+    | {
           kind: 'handler-error';
           routeKey: string;
           route: RouteDefinition;
@@ -595,6 +666,12 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
      * merged into the handler args.
      */
     guards?: GuardMap<HandlerContext>;
+    /**
+     * Permission implementations keyed by name. The matched route's resolved
+     * `permissions` selects which resolve before its handler; every handler
+     * receives `can` over them.
+     */
+    permissions?: PermissionMap<HandlerContext>;
     /**
      * The contract's identities keyed by name. The runtime extracts each required
      * scheme's credential from the request (per its declared location) and passes
@@ -815,6 +892,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     definition: AdapterDefinition<NativeRequest, unknown, HandlerContext, ResponseContext>,
     responseContext: ResponseContext,
     guards: GuardMap<HandlerContext> | undefined,
+    permissionRuns: PermissionMap<HandlerContext> | undefined,
     schemes: Record<string, SecurityScheme> | undefined,
     contextResolvers: RequestContextMap<HandlerContext> | undefined,
     pluginExports: Record<string, unknown> | undefined,
@@ -941,6 +1019,54 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             }
         }
 
+        const resolvedPermissions = new Map<string, PermissionOutcome>();
+        const resolvePermission = async (name: string): Promise<PermissionOutcome> => {
+            const cached = resolvedPermissions.get(name);
+            if (cached !== undefined) return cached;
+            const run = permissionRuns?.[name];
+            if (!run) {
+                throw new Error(`No implementation registered for permission "${name}" required by route "${routeKey}".`);
+            }
+            const outcome = await run({
+                ...(handlerContext as Record<string, unknown>),
+                params,
+                auth: securityContext,
+            } as Parameters<typeof run>[0]);
+            resolvedPermissions.set(name, outcome);
+            return outcome;
+        };
+
+        const can: Can = {};
+        for (const name of Object.keys(permissionRuns ?? {})) {
+            can[name] = async (record?: unknown) => {
+                const outcome = await resolvePermission(name);
+                if (typeof outcome === 'boolean') return outcome;
+                if (record === undefined) {
+                    throw new Error(
+                        `Permission "${name}" resolved to a predicate, so it needs the record it applies to. ` +
+                            `Call it as \`can.${name}(record)\`, or return a boolean if it applies to none.`
+                    );
+                }
+                return await (outcome as (value: unknown) => boolean | Promise<boolean>)(record);
+            };
+        }
+
+        if (route.permissions) {
+            const requirement = route.permissions;
+            const required = 'all' in requirement ? requirement.all : requirement.oneOf;
+            const verdicts = await Promise.all(required.map(async (name) => (await resolvePermission(name)) === true));
+            const permitted = 'all' in requirement ? verdicts.every(Boolean) : verdicts.some(Boolean);
+            if (!permitted) {
+                return {
+                    kind: 'permission-denied',
+                    detail:
+                        'all' in requirement
+                            ? `Forbidden: ${required.join(', ')} is not permitted on this route.`
+                            : `Forbidden: none of ${required.join(', ')} is permitted on this route.`,
+                };
+            }
+        }
+
         const throwError = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
             throw new ResponseError(response);
         };
@@ -956,6 +1082,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             ...(jobRunner ? { jobs: jobRunner } : {}),
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
+            ...(permissionRuns ? { can } : {}),
             ...(pluginExports && Object.keys(pluginExports).length > 0 ? { plugins: pluginExports } : {}),
         });
         if (isRawResponse(handlerResult)) {
@@ -1039,6 +1166,7 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
         request,
         responseContext,
         guards,
+        permissions,
         schemes,
         requestContext,
         pluginExports,
@@ -1053,6 +1181,7 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
             definition as AdapterDefinition<NativeRequest, unknown, HandlerContext, ResponseContext>,
             responseContext,
             guards,
+            permissions,
             schemes,
             requestContext,
             pluginExports,
@@ -1217,6 +1346,8 @@ export const renderJsonResult = (
             return renderError(500, `Handler not implemented: ${result.routeKey}`);
         case 'guard-denied':
             return renderError(result.status, result.detail);
+        case 'permission-denied':
+            return renderError(403, result.detail);
         case 'unsupported-media-type':
             return renderError(415, `Unsupported Media Type: expected ${result.expected}, received ${result.received}`);
         case 'not-acceptable':

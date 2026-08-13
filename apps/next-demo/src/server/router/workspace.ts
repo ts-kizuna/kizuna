@@ -16,7 +16,7 @@ export const workspace: Router<typeof contract.routes.workspace> = {
             ok: auth.member.role === 'owner',
         },
     }),
-    transfer: async ({ body, auth }) => {
+    transfer: async ({ body, auth, can, throwError }) => {
         if (body.toUserId === auth.member.workspaceUserId) {
             return {
                 status: 200,
@@ -25,7 +25,15 @@ export const workspace: Router<typeof contract.routes.workspace> = {
                 },
             };
         }
-        await db.users.delete(body.toUserId);
+        const targetUser = await db.users.findById(body.toUserId);
+        if (!targetUser || !(await can.promoteMember(targetUser))) {
+            throwError({
+                status: 403,
+                body: {
+                    detail: 'Ownership can only be transferred to a workspace member',
+                },
+            });
+        }
         return {
             status: 200,
             body: {

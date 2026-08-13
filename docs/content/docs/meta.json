@@ -7,6 +7,7 @@
         "adapters",
         "clients",
         "auth",
+        "permissions",
         "jobs",
         "---Plugins---",
         "[Overview](/docs/plugins)",

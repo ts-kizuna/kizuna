@@ -88,3 +88,17 @@ const { body } = await client.users.listUsers({
 ```
 
 See the [Fetch client guide](/docs/clients/fetch) for per-request headers, validation errors, and response type narrowing.
+
+## permissions
+
+When the contract declares a [permissions endpoint](/docs/permissions#the-client), the client carries a `permissions()` accessor. It fetches the caller's coarse rules once and hands back one boolean per permission:
+
+```ts
+const { viewEventLog } = await apiClient.permissions();
+
+if (viewEventLog) {
+    // show the event log tab
+}
+```
+
+Only permissions applying to no record cross the wire, so this is enough to hide an action the caller cannot perform and never enough to decide about one specific record. Those stay on the server, behind `can` in a handler.

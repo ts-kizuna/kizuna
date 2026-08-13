@@ -6,10 +6,14 @@ import {
     type ApiWithRouter,
     type GuardMap,
     type RequestContextMap,
+    type Can,
+    type PermissionOutcome,
+    type PermissionMap,
     ROUTER_META,
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
+    PERMISSIONS_META,
     extractCredential,
     gatePermits,
     resolveSecurityRequirements,
@@ -230,6 +234,68 @@ const runGuards = async (
     };
 };
 
+/**
+ * The permission stage, mirroring `runPipeline`'s. Kept in step with core: a new
+ * per-route authorization rule has to land in both places or MCP tool calls walk
+ * past it.
+ */
+const buildCan = (
+    routeKey: string,
+    params: Record<string, string>,
+    securityContext: Record<string, unknown>,
+    permissions?: PermissionMap,
+    handlerContext?: Record<string, unknown>
+): { can: Can; resolve: (name: string) => Promise<PermissionOutcome> } => {
+    const resolved = new Map<string, PermissionOutcome>();
+    const resolve = async (name: string): Promise<PermissionOutcome> => {
+        const cached = resolved.get(name);
+        if (cached !== undefined) return cached;
+        const run = permissions?.[name];
+        if (!run) {
+            throw new Error(`No implementation registered for permission "${name}" required by route "${routeKey}".`);
+        }
+        const outcome = await run({
+            ...(handlerContext ?? {}),
+            params,
+            auth: securityContext,
+        } as Parameters<typeof run>[0]);
+        resolved.set(name, outcome);
+        return outcome;
+    };
+
+    const can: Can = {};
+    for (const name of Object.keys(permissions ?? {})) {
+        can[name] = async (record?: unknown) => {
+            const outcome = await resolve(name);
+            if (typeof outcome === 'boolean') return outcome;
+            if (record === undefined) {
+                throw new Error(`Permission "${name}" resolved to a predicate, so it needs the record it applies to.`);
+            }
+            return await (outcome as (value: unknown) => boolean | Promise<boolean>)(record);
+        };
+    }
+
+    return { can, resolve };
+};
+
+const checkPermissions = async (
+    route: RouteDefinition,
+    resolve: (name: string) => Promise<PermissionOutcome>
+): Promise<ToolCallResult | undefined> => {
+    if (!route.permissions) return undefined;
+    const requirement = route.permissions;
+    const required = 'all' in requirement ? requirement.all : requirement.oneOf;
+    const verdicts = await Promise.all(required.map(async (name) => (await resolve(name)) === true));
+    const permitted = 'all' in requirement ? verdicts.every(Boolean) : verdicts.some(Boolean);
+    if (permitted) return undefined;
+    return toolError(
+        403,
+        'all' in requirement
+            ? `Forbidden: ${required.join(', ')} is not permitted on this route.`
+            : `Forbidden: none of ${required.join(', ')} is permitted on this route.`
+    );
+};
+
 const executeToolCall = async (
     route: RouteDefinition,
     routeKey: string,
@@ -239,7 +305,8 @@ const executeToolCall = async (
     guards?: GuardMap,
     schemes?: Record<string, SecurityScheme>,
     credentialHeaders?: Record<string, string | string[] | undefined>,
-    contextResolvers?: RequestContextMap
+    contextResolvers?: RequestContextMap,
+    permissions?: PermissionMap
 ): Promise<ToolCallResult> => {
     const params = (args.params ?? {}) as Record<string, string>;
     const query = (args.query ?? {}) as Record<string, unknown>;
@@ -312,7 +379,12 @@ const executeToolCall = async (
         return guardOutcome.result;
     }
 
+    const { can, resolve } = buildCan(routeKey, params, guardOutcome.securityContext, permissions, handlerContext);
+
     try {
+        const denial = await checkPermissions(route, resolve);
+        if (denial) return denial;
+
         const throwError = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
             throw new ResponseError(response);
         };
@@ -326,6 +398,7 @@ const executeToolCall = async (
             ...handlerContext,
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(guardOutcome.securityContext).length > 0 ? { auth: guardOutcome.securityContext } : {}),
+            ...(permissions ? { can } : {}),
         });
 
         const isError = result.status >= 400;
@@ -405,6 +478,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
     const guards = (api as unknown as Record<typeof GUARDS_META, GuardMap | undefined>)[GUARDS_META];
     const schemes = (api as unknown as Record<typeof SCHEMES_META, Record<string, SecurityScheme> | undefined>)[SCHEMES_META];
     const contextResolvers = (api as unknown as Record<typeof REQUEST_CONTEXT_META, RequestContextMap | undefined>)[REQUEST_CONTEXT_META];
+    const permissions = (api as unknown as Record<typeof PERMISSIONS_META, PermissionMap | undefined>)[PERMISSIONS_META];
 
     const server = new McpServer({
         name: options?.name ?? 'MCP Server',
@@ -431,7 +505,8 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     guards,
                     schemes,
                     options?.credentialHeaders,
-                    contextResolvers
+                    contextResolvers,
+                    permissions
                 )
         );
     }

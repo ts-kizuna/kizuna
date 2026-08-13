@@ -3,7 +3,7 @@ title: k.contract
 description: Assemble route groups into the Contract your server, clients, and generators all read.
 ---
 
-`k.contract({ routes, jobs, auth })` bundles your route groups into the `Contract`, the one object you hand to the [client](/docs/reference/kizuna-client), [server](/docs/reference/server-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `new Kizuna()`.
+`k.contract({ routes, jobs, auth, permissions })` bundles your route groups into the `Contract`, the one object you hand to the [client](/docs/reference/kizuna-client), [server](/docs/reference/server-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `new Kizuna()`.
 
 ```ts
 // contract.ts
@@ -39,6 +39,24 @@ export const contract = k.contract({
 ```
 
 A job carries its own identity, so it takes no entry in the `auth` map, and it stays out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. See [Jobs](/docs/jobs).
+
+## The permissions map
+
+When `new Kizuna()` declares permissions, the `permissions` map is required and every route group must appear. It resolves onto each route's `permissions`, the way the auth map resolves onto `security` and `accessGate`. Its values and cascade rules are in [`k.permissions`](/docs/reference/k-permissions); the shape and the reason it exists are in [Permissions](/docs/permissions).
+
+```ts
+export const contract = k.contract({
+    routes,
+    auth,
+    permissions: {
+        users: false,
+        notifications: {
+            '*': false,
+            listEvents: 'viewEventLog',
+        },
+    },
+});
+```
 
 ## The auth map
 

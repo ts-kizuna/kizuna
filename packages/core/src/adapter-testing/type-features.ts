@@ -85,6 +85,15 @@ export const ADAPTER_TYPE_FEATURES = {
     'plugins.absentWhenUninstalled': {
         summary: 'A contract with no plugins gives handlers no `plugins` key at all.',
     },
+    'permissions.canTyped': {
+        summary: '`can` carries one method per declared permission, typed by what it applies to.',
+    },
+    'permissions.absentWhenNoneDeclared': {
+        summary: 'A contract with no permissions gives handlers no `can` key at all.',
+    },
+    'permissions.requiredOnApi': {
+        summary: '`server.api` requires one implementation per permission when the contract declares any.',
+    },
 } as const satisfies Record<string, AdapterFeatureMeta>;
 
 export type AdapterTypeFeature = keyof typeof ADAPTER_TYPE_FEATURES;

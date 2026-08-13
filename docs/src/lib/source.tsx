@@ -8,6 +8,14 @@ import { Badge } from '@/components/shared/badge';
  */
 const badges: Record<string, string> = {
     '/docs/jobs': 'Beta',
+    '/docs/auth': 'Beta',
+    '/docs/reference/kizuna-identity': 'Beta',
+    '/docs/reference/k-auth': 'Beta',
+    '/docs/reference/server-guard': 'Beta',
+    '/docs/permissions': 'Beta',
+    '/docs/reference/kizuna-permission': 'Beta',
+    '/docs/reference/k-permissions': 'Beta',
+    '/docs/reference/server-permission': 'Beta',
     '/docs/mcp': 'Beta',
     '/docs/extend/create-plugin': 'Beta',
     '/docs/extend/create-job-transport': 'Beta',

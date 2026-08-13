@@ -1,0 +1,312 @@
+---
+title: Permissions
+description: Declare what a caller may do on the contract. Route gates, per-record checks in handlers, and an endpoint the UI can read all follow.
+---
+
+<BetaNotice>
+
+Permissions are new and still settling. `Kizuna.permission`, the `permissions` map, and `server.permission` may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
+Three questions stand between a request and its handler, and each is answered somewhere different.
+
+| Question                         | Answered by                               | When                      |
+| -------------------------------- | ----------------------------------------- | ------------------------- |
+| Who is calling?                  | [identities and the auth map](/docs/auth) | before the guard returns  |
+| May they do this at all?         | the `permissions` map                     | before the handler runs   |
+| May they do it to _this_ record? | `can` in the handler                      | once the record is loaded |
+
+Auth answers the first. Permissions answers the other two, and they are separate because the third one needs something the route does not have yet: the record.
+
+## One route, all three
+
+Removing a workspace member needs all three answers, so it makes the whole feature fit on one page.
+
+### Who is calling
+
+The auth map says the route needs a workspace membership.
+
+```ts title="src/contract/auth.ts"
+members: {
+    '*': 'user',
+    removeMember: 'member',
+},
+```
+
+### May they do this at all
+
+Name the permission, say which routes demand it, and write the one implementation that decides it.
+
+```ts title="src/contract/permissions.ts"
+export const manageMembers = Kizuna.permission({
+    description: 'Administer the workspace member list',
+});
+```
+
+```ts title="src/contract/route-permissions.ts"
+export const routePermissions = k.permissions(routes, {
+    members: {
+        '*': false,
+        removeMember: 'manageMembers',
+    },
+    users: false,
+    health: false,
+    workspace: false,
+    notifications: false,
+});
+```
+
+```ts title="src/server/permissions.ts"
+export const canManageMembers = server.permission('manageMembers', async ({ auth }) => {
+    const roles = await db.memberships.findRolesByUserId();
+    const role = roles.get(auth.user.userId);
+    return role === 'owner' || role === 'admin';
+});
+```
+
+A caller without it gets a 403 before the handler runs. The map is exhaustive, so every group answers, and a route with no permission says `false` out loud rather than by omission.
+
+### May they do it to this record
+
+Whether one particular member may go depends on that member: the owner cannot be removed. Declare what the permission applies to, and the implementation returns a predicate instead of a boolean.
+
+```ts title="src/contract/permissions.ts"
+export const removeMember = Kizuna.permission({
+    appliesTo: UserSchema,
+});
+```
+
+```ts title="src/server/permissions.ts"
+export const canRemoveMember = server.permission('removeMember', async () => {
+    const roles = await db.memberships.findRolesByUserId();
+    return (member) => roles.get(member.id) !== 'owner';
+});
+```
+
+The lookup runs once per request, then the predicate is just a lookup, so checking twenty members costs one query rather than twenty.
+
+Now the handler can ask about the record it loaded:
+
+```ts title="src/server/router/members.ts"
+removeMember: async ({ params, can, throwError }) => {
+    const member = await db.users.findById(params.id);
+    if (!member) {
+        return throwError({
+            status: 404,
+            body: {
+                detail: 'No such member',
+            },
+        });
+    }
+    if (!(await can.removeMember(member))) {
+        return throwError({
+            status: 403,
+            body: {
+                detail: 'The workspace owner cannot be removed',
+            },
+        });
+    }
+    return {
+        status: 200,
+        body: {
+            ok: await db.memberships.remove(member.id),
+        },
+    };
+},
+```
+
+Finally, register the implementations, the way guards are registered:
+
+```ts title="src/server/api.ts"
+export const api = server.api({
+    router,
+    guards: {
+        user: requireUser,
+        member: requireMember,
+    },
+    permissions: {
+        manageMembers: canManageMembers,
+        removeMember: canRemoveMember,
+    },
+});
+```
+
+## When to reach for this
+
+Keep a decision in the [auth map](/docs/auth) when it is one field against a literal. `inviteMember` is gated there and should stay there:
+
+```ts title="src/contract/auth.ts"
+members: {
+    '*': 'user',
+    inviteMember: {
+        member: {
+            role: ['owner', 'admin'],
+        },
+    },
+},
+```
+
+The guard already fetched that role, so the gate costs nothing and `auth.member.role` narrows inside the handler. Re-expressing it as a permission would be a second way to do the same thing, and would lose the narrowing.
+
+Reach for a permission when the answer is not on the caller:
+
+| The decision                                    | Where it belongs |
+| ----------------------------------------------- | ---------------- |
+| This caller is an owner                         | The auth map     |
+| This caller holds one of these roles            | The auth map     |
+| This caller may act on _this_ record            | A permission     |
+| This caller holds a grant stored in a table     | A permission     |
+| This caller's workspace has a feature turned on | A permission     |
+
+## Permissions
+
+A permission is a name. Most are a plain yes or no, which is what both real kizuna apps are almost entirely made of:
+
+```ts title="src/contract/permissions.ts"
+export const viewEventLog = Kizuna.permission({
+    description: 'Read the session event log',
+});
+```
+
+Add `appliesTo` when the answer depends on _which_ record:
+
+```ts title="src/contract/permissions.ts"
+export const promoteMember = Kizuna.permission({
+    appliesTo: UserSchema,
+});
+```
+
+`appliesTo` buys two typed call sites and nothing else. It types the predicate's parameter, so `user.idd` fails to compile, and it constrains the argument of `can`, so passing a workspace is a compile error. Nothing parses against it at runtime: the record reaches `can` from the handler that loaded it and goes into your own predicate, so there is no trust boundary to check.
+
+Its presence is load-bearing. **A permission that applies to a record cannot gate a route**, because the route has not loaded the record yet, and the type says so. It also never reaches the client, because a predicate cannot cross a wire.
+
+## The permissions map
+
+Keyed by route group, with the same `'*'` cascade as the auth map. Declaring permissions makes it required, and every group must appear, so an ungated group is always an explicit `false`.
+
+| Value                              | Meaning                     |
+| ---------------------------------- | --------------------------- |
+| `false`                            | No permission required      |
+| `'viewEventLog'`                   | Requires that permission    |
+| `['viewEventLog', 'exportLedger']` | Requires all of them        |
+| `{ oneOf: [...] }`                 | Requires at least one       |
+| `{ '*': ..., listEvents: false }`  | Cascade, as in the auth map |
+
+<Callout type="warn">
+    Unlike the auth map, a route override **replaces** the group's `'*'` default rather than merging into it. Identities are orthogonal
+    credentials that combine; a permission requirement is one statement about a route, and merging would make `deleteWorkspace:
+    'deleteWorkspace'` silently also demand the group's default.
+</Callout>
+
+`k.contract` throws rather than resolving something surprising when a permission is not declared, when one applies to a record so a route cannot demand it, when a map key matches no group, when a cascade key matches nothing, and when an `oneOf` is empty.
+
+## Implementations
+
+One per permission, the way there is one guard per identity. A permission applying to no record returns a boolean; one applying to a record returns a predicate over it, which may be async.
+
+```ts title="src/server/permissions.ts"
+export const canPromoteMember = server.permission('promoteMember', async () => {
+    const memberIds = await db.memberships.findUserIds();
+    return (target) => memberIds.has(target.id);
+});
+```
+
+**Each runs at most once per request, on first use, and only when something asks about it.** A route gated on `viewEventLog` never runs the `promoteMember` implementation, and two `can.promoteMember(...)` calls in one handler resolve it once. That is why the grant set belongs in the body: load it there and the predicate is a set test, so checking fifty records costs one query.
+
+An implementation receives the adapter's handler context, `params`, and `auth`. Because one serves every route its permission gates, each identity in `auth` is optional, the same compromise [`server.guard`](/docs/reference/server-guard) makes for path params.
+
+## Denials
+
+A route gate answers `403` with RFC 9457 Problem Details, worded the way the auth map's access gate words its own:
+
+```json
+{
+    "type": "about:blank",
+    "title": "Forbidden",
+    "status": 403,
+    "detail": "Forbidden: viewEventLog is not permitted on this route."
+}
+```
+
+Like the access gate's `403`, this is framework-generated and sits outside the route's declared responses. A handler that wants its own wording declares `403` and uses `can` plus `throwError`, as `transfer` does above.
+
+An implementation returns an answer, not a response. There is no `deny` and no `onForbidden`.
+
+## What the declaration drives
+
+### The client
+
+Give the endpoint a path and an identity and the caller's permissions become readable, enough for a UI to hide an action it cannot perform:
+
+```ts title="src/contract/k.ts"
+export const k = new Kizuna({
+    identities: {
+        user,
+    },
+    permissions: {
+        viewEventLog,
+        promoteMember,
+    },
+    settings: {
+        permissions: {
+            path: '/permissions',
+            identity: 'user',
+        },
+    },
+});
+```
+
+```ts
+const { viewEventLog } = await apiClient.permissions();
+
+if (viewEventLog) {
+    // show the event log tab
+}
+```
+
+Only permissions applying to no record cross the wire. A predicate cannot, so a decision about one specific record stays on the server. The endpoint lives outside `contract.routes`, like the job endpoints, so it never reaches the generators.
+
+### OpenAPI
+
+Each gated operation carries an `x-kizuna-permission` extension. OpenAPI has no concept for this, so an extension is the honest emission:
+
+```yaml
+# generated
+paths:
+    /events:
+        get:
+            security:
+                - member: []
+            x-kizuna-permission:
+                all:
+                    - viewEventLog
+```
+
+### A report
+
+`permissionsReport(contract.routes)` lists every route with what it demands, and separately the ones demanding nothing. Review that second list rather than maintaining one by hand.
+
+```ts
+const report = permissionsReport(contract.routes);
+console.table(report.ungated);
+```
+
+### MCP
+
+[MCP endpoints](/docs/mcp) resolve the same rules per tool call, so a tool is gated exactly as its route is.
+
+## Deliberate omissions
+
+- **No permission storage.** Roles, memberships and grants are yours. kizuna computes rules from what a resolver returns, as it computes sessions from what a guard returns.
+- **No list scoping and no query building.** `can` answers about one entity. It appends no `where` clause and cannot catch a read that forgot its tenant predicate. For a list, load the grant set in the resolver and filter or decorate in your own query; `can` inside a `.map` is the wrong reach.
+- **No wildcards.** `['a', 'b']` and `{ oneOf: [...] }` say it without new sigils.
+- **No client-side predicates.** See the client above.
+
+## Reference
+
+- [`Kizuna.permission`](/docs/reference/kizuna-permission)
+- [`k.permissions`](/docs/reference/k-permissions)
+- [`server.permission`](/docs/reference/server-permission)
+- [`k.contract`](/docs/reference/k-contract)
+- [`server.api`](/docs/reference/server-api)

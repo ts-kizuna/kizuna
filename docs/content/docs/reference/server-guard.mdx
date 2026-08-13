@@ -3,6 +3,12 @@ title: server.guard
 description: Implement one identity by turning the extracted credential into typed handler context, or denying the request.
 ---
 
+<BetaNotice>
+
+Auth is still settling. `server.guard` and its arguments may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
 `server.guard(identity, run)` implements one [identity](/docs/reference/kizuna-identity): it turns the extracted credential into the typed context handlers receive, or denies the request. The [auth map](/docs/reference/k-contract#the-auth-map) decides which routes it protects.
 
 ```ts title="src/server/guards.ts"

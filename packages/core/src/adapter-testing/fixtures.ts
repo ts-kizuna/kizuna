@@ -700,3 +700,139 @@ export const createPluginRouter = <Context>(): Router<typeof pluginRoutes, Conte
             },
         }),
     }) as unknown as Router<typeof pluginRoutes, Context>;
+
+const MemberSchema = z.object({
+    id: z.string(),
+});
+
+const permissionsK = new Kizuna({
+    permissions: {
+        viewInvoices: Kizuna.permission(),
+        exportLedger: Kizuna.permission(),
+        promoteMember: Kizuna.permission({
+            appliesTo: MemberSchema,
+        }),
+    },
+});
+
+export const permissionsRoutes = permissionsK.routes({
+    open: {
+        method: 'GET',
+        path: '/workspace/open',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+    gated: {
+        method: 'GET',
+        path: '/workspace/gated/:grant',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+    checking: {
+        method: 'GET',
+        path: '/workspace/checking/:id',
+        responses: {
+            200: z.object({
+                allowed: z.boolean(),
+            }),
+        },
+    },
+    counting: {
+        method: 'GET',
+        path: '/workspace/counting',
+        responses: {
+            200: z.object({
+                viewInvoices: z.int(),
+                promoteMember: z.int(),
+            }),
+        },
+    },
+});
+
+export const permissionsContract = permissionsK.contract({
+    routes: {
+        workspace: permissionsRoutes,
+    },
+    permissions: {
+        workspace: {
+            '*': false,
+            gated: 'exportLedger',
+            counting: 'viewInvoices',
+        },
+    },
+});
+
+/**
+ * How many times each permission has resolved. Reset before a request to observe
+ * laziness; the `counting` route reports the counts back.
+ */
+export const resolverCalls = {
+    viewInvoices: 0,
+    promoteMember: 0,
+};
+
+export const resetResolverCalls = (): void => {
+    resolverCalls.viewInvoices = 0;
+    resolverCalls.promoteMember = 0;
+};
+
+/**
+ * The permission bodies the `permissions.*` features mount, keyed by name.
+ * `server.permission` is an identity function in all four adapters, so only the
+ * wiring differs.
+ */
+export const permissionImplementations = {
+    viewInvoices: () => {
+        resolverCalls.viewInvoices += 1;
+        return true;
+    },
+    exportLedger: ({ params }: { params: Record<string, string> }) => params.grant === 'yes',
+    promoteMember: () => {
+        resolverCalls.promoteMember += 1;
+        return (member: { id: string }) => member.id === '9';
+    },
+};
+
+export type PermissionsRouter<Context> = Router<typeof permissionsContract.routes, Context>;
+
+export const createPermissionsRouter = <Context>(): PermissionsRouter<Context> => ({
+    workspace: {
+        open: () => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        }),
+        gated: () => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        }),
+        checking: async ({ params, can }) => ({
+            status: 200,
+            body: {
+                allowed: await can.promoteMember({
+                    id: params.id,
+                }),
+            },
+        }),
+        counting: async ({ can }) => {
+            await can.viewInvoices();
+            await can.viewInvoices();
+            return {
+                status: 200,
+                body: {
+                    viewInvoices: resolverCalls.viewInvoices,
+                    promoteMember: resolverCalls.promoteMember,
+                },
+            };
+        },
+    },
+});

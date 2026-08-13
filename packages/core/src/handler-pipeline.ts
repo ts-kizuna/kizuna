@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand, type RouteDefinition, type Routes, type Method } from './types.js';
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
+import type { PermissionAppliesTo } from './permission.js';
 import type { IdentityAccess } from './identity.js';
 import { applyCoercion, coercionPlanFor } from './coercion.js';
 
@@ -173,6 +174,37 @@ type SubgroupAuth<GroupAuth, GroupKey extends string> = GroupAuth extends { '*':
             : MergeAuthValues<Default, GroupAuth[GroupKey]>
         : Default
     : GroupAuth;
+
+/**
+ * What an app's permission implementation returns: a boolean for a permission
+ * applying to no particular record, or a predicate over the record it applies to.
+ */
+export type PermissionResult<AppliesTo> = [AppliesTo] extends [never] ? boolean : (record: AppliesTo) => boolean | Promise<boolean>;
+
+/**
+ * The `auth` a permission implementation receives. Every identity is optional,
+ * since one implementation serves every route the permission gates, the same
+ * compromise {@link GuardParams} makes for path params.
+ */
+export type PermissionAuth<Schemes> = {
+    [Name in keyof Schemes]?: GuardSuccess<Schemes[Name]>;
+};
+
+/**
+ * The `can` argument a handler receives, one method per declared permission.
+ * A permission applying to a record takes it; one applying to none takes nothing.
+ */
+export type CanArg<Permissions> = string extends keyof Permissions
+    ? {}
+    : [keyof Permissions] extends [never]
+      ? {}
+      : {
+            can: {
+                [Name in keyof Permissions]: [PermissionAppliesTo<Permissions[Name]>] extends [never]
+                    ? () => Promise<boolean>
+                    : (record: PermissionAppliesTo<Permissions[Name]>) => Promise<boolean>;
+            };
+        };
 
 /**
  * The `requestContext` argument a handler receives.

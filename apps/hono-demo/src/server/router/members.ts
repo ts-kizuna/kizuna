@@ -33,4 +33,37 @@ export const members: Router<typeof contract.routes.members> = {
             body: invited,
         };
     },
+    removeMember: async ({ params, auth, can, throwError }) => {
+        const member = await db.users.findById(params.id);
+        if (!member) {
+            return throwError({
+                status: 404,
+                body: {
+                    detail: 'No such member',
+                },
+            });
+        }
+        if (member.id === auth.member.workspaceUserId) {
+            return throwError({
+                status: 403,
+                body: {
+                    detail: 'You cannot remove yourself',
+                },
+            });
+        }
+        if (!(await can.removeMember(member))) {
+            return throwError({
+                status: 403,
+                body: {
+                    detail: 'The workspace owner cannot be removed',
+                },
+            });
+        }
+        return {
+            status: 200,
+            body: {
+                ok: await db.memberships.remove(member.id),
+            },
+        };
+    },
 };

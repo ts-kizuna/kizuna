@@ -4,6 +4,8 @@ import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { Jobs, JobsConfig } from './jobs.js';
 import type { ContractPlugins } from './plugin.js';
+import type { Permission } from './permission.js';
+import type { PermissionsConfig } from './permissions-endpoint.js';
 
 /**
  * A kizuna API definition: its routes plus tags, identities, and validation
@@ -19,6 +21,8 @@ export interface Contract<
     RequestContext extends Record<string, RequestContextSchema> = Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins = ContractPlugins,
     Jobs_ extends Jobs = Jobs,
+    Permissions_ extends Record<string, Permission> = Record<string, Permission>,
+    Permissions = unknown,
 > {
     /**
      * The API's route groups.
@@ -44,6 +48,22 @@ export interface Contract<
      * access constraints into the handler's scheme-keyed context.
      */
     auth?: Auth;
+    /**
+     * The `permissions` map passed to `k.contract`, keyed by route group. Carried
+     * on the contract so the adapters can resolve each route's requirement, and so
+     * a report can list what every route demands.
+     */
+    permissions?: Permissions;
+    /**
+     * The permissions passed to `new Kizuna()`. The `permissions` map references
+     * them by name, and `server.api` requires one implementation each.
+     */
+    declaredPermissions?: Permissions_;
+    /**
+     * The permissions-endpoint settings passed to `new Kizuna()` under
+     * `permissions`.
+     */
+    permissionsConfig?: PermissionsConfig;
     /**
      * The tag set declared with `Kizuna.tags`. Routes reference its keys; the
      * OpenAPI generator resolves each key to its title and description.
@@ -89,11 +109,16 @@ export function assembleContract<
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
     const Plugins extends ContractPlugins = Record<string, never>,
     const Jobs_ extends Jobs = Record<string, never>,
+    const Permissions_ extends Record<string, Permission> = Record<string, never>,
+    const Permissions = unknown,
 >(config: {
     routes: R;
     jobs?: Jobs_;
     jobsConfig?: JobsConfig;
     auth?: Auth;
+    permissions?: Permissions;
+    declaredPermissions?: Permissions_;
+    permissionsConfig?: PermissionsConfig;
     tags?: TagSet<Tags>;
     securitySchemes?: Schemes;
     requestContext?: RequestContext;
@@ -101,13 +126,16 @@ export function assembleContract<
         issueCodes?: readonly Codes[];
     };
     plugins?: Plugins;
-}): Contract<R, Tags, Codes, Schemes, Auth, RequestContext, Plugins, Jobs_> {
+}): Contract<R, Tags, Codes, Schemes, Auth, RequestContext, Plugins, Jobs_, Permissions_, Permissions> {
     return {
         routes: config.routes,
         plugins: config.plugins,
         jobs: config.jobs,
         jobsConfig: config.jobsConfig,
         auth: config.auth,
+        permissions: config.permissions,
+        declaredPermissions: config.declaredPermissions,
+        permissionsConfig: config.permissionsConfig,
         tags: config.tags,
         securitySchemes: config.securitySchemes,
         requestContext: config.requestContext,

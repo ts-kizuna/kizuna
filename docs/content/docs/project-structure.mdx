@@ -32,6 +32,8 @@ my-repo/
 │           │   ├── health.ts
 │           │   └── index.ts    # re-exports the groups
 │           ├── auth.ts         # k.auth, who may call what
+│           ├── permissions.ts  # Kizuna.permission, what may be permitted
+│           ├── route-permissions.ts # k.permissions, what each route demands
 │           ├── jobs.ts         # k.jobs
 │           └── contract.ts     # k.contract, the object everything reads
 ├── apps/
@@ -69,6 +71,7 @@ The split matters more as the API grows:
 - **`routes/`** holds one file per group, each calling `k.routes`, with an `index.ts` re-exporting them so `contract.ts` has one import to make. See [organizing the contract](/docs/building/contract#splitting-routes-across-files).
 - **`router/`** mirrors it exactly. One file per group, each typed with the [`Router`](/docs/building/router#routehandler-and-router-types) type so inputs and responses stay inferred, and `index.ts` composes them with `server.router`.
 - **`auth.ts`** declares who may call what, once, against the whole route tree, so one file answers the question. See [auth](/docs/auth).
+- **`permissions.ts`** and **`route-permissions.ts`** are the same split for what a caller may _do_, where the answer needs a lookup or the record being acted on. See [permissions](/docs/permissions).
 - **`api.ts`** is where guards, jobs, plugins, and the router come together.
 
 ## Single app
@@ -88,6 +91,8 @@ my-repo/
     │   │   ├── health.ts
     │   │   └── index.ts    # re-exports the groups
     │   ├── auth.ts         # k.auth, who may call what
+    │   ├── permissions.ts  # Kizuna.permission, what may be permitted
+    │   ├── route-permissions.ts # k.permissions, what each route demands
     │   ├── jobs.ts         # k.jobs
     │   └── index.ts        # k.contract, the object everything reads
     ├── server/

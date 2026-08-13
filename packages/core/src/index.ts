@@ -5,6 +5,7 @@ export {
     type KizunaSpec,
     type TagNamesOf,
     type IdentityNamesOf,
+    type GateableNamesOf,
     type AuthMap,
     type GroupAuth,
     type AuthValue,
@@ -36,6 +37,24 @@ export {
     type BasicCredential,
     type ApiKeyCredential,
 } from './identity.js';
+export {
+    isPermission,
+    type Permission,
+    type PermissionConfig,
+    type CreatePermission,
+    type PermissionAppliesTo,
+    type GateablePermissionName,
+} from './permission.js';
+export {
+    type PermissionValue,
+    type GroupPermissions,
+    type GroupPermissionsCascade,
+    type PermissionsMap,
+    type ValidPermissionsMap,
+    gateableNames,
+    permissionsReport,
+    type ReportedRoute,
+} from './permissions.js';
 export { type RequestContextSchema, type RequestContextHeaderInputs, type RequestContextHeaderValues } from './request-context.js';
 export {
     isSecurityScheme,
@@ -133,6 +152,7 @@ export {
     type ResponseContentType,
     type ResponseDefinition,
     type SecurityRequirement,
+    type PermissionRequirement,
     type SchemeNameOf,
     type AccessGate,
     type RouteDefinition,
@@ -148,6 +168,7 @@ export {
     type GuardSuccess,
     type RoutesWithHandlerContext,
     type BrandedHandlerContext,
+    type CanArg,
 } from './handler-pipeline.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
 export { type DeprecationMap, type SerializedDeprecationMap } from './deprecation.js';

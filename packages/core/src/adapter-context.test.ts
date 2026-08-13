@@ -115,6 +115,9 @@ const captureHandlerArgs = async (): Promise<Record<string, unknown>> => {
                 sessionId: 's1',
             }),
         },
+        permissions: {
+            probe: () => true,
+        },
         pluginExports: {
             probe: {},
         },
