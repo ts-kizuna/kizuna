@@ -1,7 +1,33 @@
 {
   "name": "@ts-kizuna/hono",
   "version": "1.49.4",
+  "description": "Hono adapter for ts-kizuna",
+  "keywords": [
+    "ts-kizuna",
+    "typescript",
+    "zod",
+    "openapi",
+    "contract-first",
+    "type-safe",
+    "rest",
+    "api",
+    "hono",
+    "adapter",
+    "server"
+  ],
+  "license": "MIT",
+  "homepage": "https://ts-kizuna.com/docs/adapters/hono",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "directory": "packages/hono"
+  },
+  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
   "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -26,7 +52,7 @@
     "dist"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external hono --external zod",

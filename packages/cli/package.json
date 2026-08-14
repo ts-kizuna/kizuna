@@ -1,7 +1,33 @@
 {
   "name": "@ts-kizuna/cli",
   "version": "1.49.4",
+  "description": "The kizuna CLI, plus the contract loading its client generators share",
+  "keywords": [
+    "ts-kizuna",
+    "typescript",
+    "zod",
+    "openapi",
+    "contract-first",
+    "type-safe",
+    "rest",
+    "api",
+    "cli",
+    "codegen",
+    "deprecations"
+  ],
+  "license": "MIT",
+  "homepage": "https://ts-kizuna.com/docs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "directory": "packages/cli"
+  },
+  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
   "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -17,19 +43,19 @@
       }
     }
   },
+  "bin": {
+    "kizuna": "./dist/cli.mjs"
+  },
   "kizuna": {
     "entries": {
       ".": "server"
     }
   },
-  "bin": {
-    "kizuna": "./dist/cli.mjs"
-  },
   "files": [
     "dist"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external typescript --external jiti",

@@ -1,7 +1,33 @@
 {
   "name": "@ts-kizuna/core",
   "version": "1.49.4",
+  "description": "Contract and route definition, validation, and the adapter API for ts-kizuna",
+  "keywords": [
+    "ts-kizuna",
+    "typescript",
+    "zod",
+    "openapi",
+    "contract-first",
+    "type-safe",
+    "rest",
+    "api",
+    "routes",
+    "validation",
+    "http"
+  ],
+  "license": "MIT",
+  "homepage": "https://ts-kizuna.com/docs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "directory": "packages/core"
+  },
+  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
   "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -108,7 +134,7 @@
     "!src/adapter-testing"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown src/index.ts src/adapter.ts src/jobs-entry.ts src/plugin.ts src/generator.ts src/schemas.ts src/authoring-names.ts src/load-deprecations.ts --format esm,cjs --dts --clean",

@@ -1,7 +1,33 @@
 {
   "name": "@ts-kizuna/fastify",
   "version": "1.49.4",
+  "description": "Fastify adapter for ts-kizuna",
+  "keywords": [
+    "ts-kizuna",
+    "typescript",
+    "zod",
+    "openapi",
+    "contract-first",
+    "type-safe",
+    "rest",
+    "api",
+    "fastify",
+    "adapter",
+    "server"
+  ],
+  "license": "MIT",
+  "homepage": "https://ts-kizuna.com/docs/adapters/fastify",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "directory": "packages/fastify"
+  },
+  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
   "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -26,11 +52,14 @@
     "dist"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external fastify --external fastify-plugin --external zod",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fastify-plugin": "^5.1.0"
   },
   "peerDependencies": {
     "@ts-kizuna/core": "workspace:*",
@@ -43,8 +72,5 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"
-  },
-  "dependencies": {
-    "fastify-plugin": "^5.1.0"
   }
 }
