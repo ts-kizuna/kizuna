@@ -108,7 +108,28 @@ Every export subpath of every package under `packages/` declares its reach under
 
 Nothing else needs to know a plugin exists: its routes never join `contract.routes`, so the client and the generators do not see them.
 
-# Documentation
+# Publishing
+
+Every package under `packages/` publishes to npmjs as `@ts-kizuna/*`. The release workflow authenticates with GitHub's OIDC token, not a stored secret: each package has a trusted publisher on npm naming this repository and `release.yaml`. There is no `NPM_TOKEN`, and nothing needs one.
+
+`private: true` is what keeps a workspace package unpublished, which is why nothing in `apps/` or `docs` reaches the registry.
+
+## Adding a package
+
+A package needs everything the published twelve carry, or its npm page is the poorer for it. Copy an existing sibling's `package.json` and keep every field: `description`, `keywords` (the shared base plus a few specific), `license`, `homepage` pointing at that package's own docs page, `repository` with its `directory`, `bugs`, `sideEffects`, `engines`, and `publishConfig.access` set to `public`. A scoped package publishes **restricted** without that last one.
+
+Also add a `README.md`, because npm renders the package's own file and nothing else. Four parts: the description, an install line, the smallest snippet that works, and a link to its docs page. Take the snippet from the docs rather than writing a fresh one. Add the package to the table in the root `README.md` too, which is where its `description` comes from.
+
+## The first publish of a new package
+
+npm cannot configure a trusted publisher for a package that does not exist yet, and the release workflow holds no token to fall back on. So a new package cannot publish itself, and the bootstrap is manual:
+
+1. Ship it with `private: true` so `pnpm -r publish` skips it and a release cannot half-fail on it.
+2. Publish it once by hand, from a clean checkout: `pnpm --filter @ts-kizuna/<name> publish --access public`, answering the 2FA prompt. This has to be interactive, as the registry asks for a one-time password.
+3. Add the trusted publisher at `https://www.npmjs.com/package/@ts-kizuna/<name>/access`: GitHub Actions, `ts-kizuna`, `kizuna`, workflow `release.yaml`, no environment, both `publish` and `stage publish` allowed.
+4. Remove `private: true`.
+
+Every release after that publishes it with the rest, and the one hand-published version is the only one without a provenance attestation.
 
 When changing any exported function, type, or option in `packages/*/src/`, check if README.md, JSDoc examples, guide pages in `docs/content/docs/`, or API reference pages in `docs/content/docs/reference/` reference the old API. If so, update them in the same change. When in doubt, grep the `docs/` directory for the function or type name.
 
