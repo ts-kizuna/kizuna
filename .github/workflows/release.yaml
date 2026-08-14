@@ -37,11 +37,6 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
 
-            - name: Authenticate with the registry
-              env:
-                  REGISTRY_TOKEN: ${{ secrets.NPM_TOKEN }}
-              run: pnpm config set "//registry.npmjs.org/:_authToken" "$REGISTRY_TOKEN"
-
             - name: Create release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
