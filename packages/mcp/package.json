@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/mcp",
-  "version": "1.49.5",
+  "version": "1.49.6",
   "description": "MCP server generation for ts-kizuna contracts",
   "keywords": [
     "ts-kizuna",
