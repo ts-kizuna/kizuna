@@ -4,7 +4,7 @@
 
 Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typed server, an OpenAPI spec, Swift and Kotlin clients, and more.
 
-![npm](https://img.shields.io/npm/v/@ts-kizuna/core?color=blue&label=npm)
+[![npm](https://img.shields.io/npm/v/@ts-kizuna/core?color=blue&label=npm)](https://www.npmjs.com/package/@ts-kizuna/core)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
 [Documentation](https://ts-kizuna.com)
