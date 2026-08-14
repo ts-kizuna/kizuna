@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/cli",
-  "version": "1.49.4",
+  "version": "1.49.5",
   "description": "The kizuna CLI, plus the contract loading its client generators share",
   "keywords": [
     "ts-kizuna",

@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/kotlin",
-  "version": "1.49.4",
+  "version": "1.49.5",
   "description": "Kotlin client generation for ts-kizuna contracts",
   "keywords": [
     "ts-kizuna",
