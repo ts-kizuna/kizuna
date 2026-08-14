@@ -4,41 +4,49 @@
     align-items: center;
     justify-content: center;
     gap: 12px;
+    border: var(--kizuna-hairline) solid var(--kizuna-line);
+    border-radius: var(--kizuna-radius-pill);
+    padding: 10px 20px;
+    margin-inline: auto;
+    width: fit-content;
 }
 
 .pill {
-    border: var(--kizuna-border-button) solid var(--kizuna-ink);
     border-radius: var(--kizuna-radius-pill);
-    padding: 2px 12px;
+    background-color: var(--kizuna-accent);
+    padding: 3px 12px;
     font-size: 0.75rem;
     font-weight: var(--font-weight-600);
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--kizuna-ink);
+    color: var(--kizuna-accent-ink);
 }
 
 .body {
     margin: 0;
-    font-size: 1rem;
+    font-size: 0.9375rem;
     color: var(--kizuna-muted);
     text-wrap: balance;
 }
 
 .link {
-    font-size: 1rem;
+    font-size: 0.9375rem;
     color: var(--kizuna-ink);
     font-weight: var(--font-weight-600);
     text-decoration: underline;
-    text-decoration-thickness: 2px;
+    text-decoration-thickness: 1.5px;
     text-underline-offset: 0.2em;
+}
+
+.link:hover {
+    color: var(--kizuna-accent-text);
 }
 
 @media (max-width: 767px) {
     .beta {
         flex-direction: column;
         border-radius: var(--kizuna-radius-card);
-        background-color: var(--kizuna-surface);
-        padding: 24px 20px;
+        padding: 20px;
         text-align: center;
     }
 }

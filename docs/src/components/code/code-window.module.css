@@ -1,19 +1,22 @@
 .window {
     --window-surface: var(--kizuna-surface, #f4f4f4);
-    --window-line: #d8d8d8;
+    --window-line: var(--kizuna-line-strong, #d8d8d8);
 
     display: flex;
     flex: 1;
     min-width: 0;
     flex-direction: column;
     overflow: hidden;
-    border-radius: 10px;
+    border: var(--kizuna-hairline) solid var(--kizuna-line);
+    border-radius: 12px;
     background-color: var(--window-surface);
+    box-shadow: 0 24px 48px -32px rgb(0 0 0 / 0.35);
 }
 
 :global(.dark) .window {
     --window-surface: var(--kizuna-surface, #1c1c1c);
-    --window-line: #3a3a3a;
+    --window-line: var(--kizuna-line, #3a3a3a);
+    box-shadow: 0 24px 48px -28px rgb(0 0 0 / 0.7);
 }
 
 .dots {

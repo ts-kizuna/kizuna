@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { ContractExplorer } from '@/components/code/contract-explorer';
+import { ContractSource, ContractSurfaces } from '@/components/code/contract-explorer';
 import { HandlerExplorer } from '@/components/code/handler-explorer';
 import { Adapters } from '@/components/landing-page/adapters';
 import { Beta } from '@/components/landing-page/beta';
@@ -8,6 +8,7 @@ import { FeatureCards } from '@/components/landing-page/feature-cards';
 import { Hero } from '@/components/landing-page/hero';
 import { LinkCards } from '@/components/landing-page/link-cards';
 import { Section } from '@/components/landing-page/section';
+import { StatBand } from '@/components/landing-page/stat-band';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -21,20 +22,22 @@ export const metadata: Metadata = {
 export default function HomePage() {
     return (
         <div className={styles.page}>
-            <Hero className={styles.hero} />
-
-            <Beta className={styles.beta} />
-
-            <Section className={styles.cards}>
-                <FeatureCards />
-            </Section>
+            <div className={styles.top}>
+                <Hero className={styles.hero} />
+                <Beta />
+            </div>
 
             <div className={styles.sections}>
                 <Section
-                    title="The idea"
-                    description="One contract is the source of truth. Your server, your clients, and every generated artifact read from it.">
-                    <ContractExplorer />
+                    layout="split"
+                    title="One file is the source of truth"
+                    description="Declare your routes, their schemas, and their statuses once. Everything else is read from it.">
+                    <ContractSource />
                 </Section>
+
+                <StatBand />
+
+                <ContractSurfaces />
 
                 <Section title="Inside a handler" description="Whatever the contract declares, the handler gets it validated and typed.">
                     <HandlerExplorer />
@@ -42,8 +45,12 @@ export default function HomePage() {
 
                 <Section
                     title="Runs anywhere"
-                    description="The same contract and router move between adapters, and the framework underneath stays available to you.">
+                    description="The same contract and router move between adapters. Mounting is the only line that changes.">
                     <Adapters />
+                </Section>
+
+                <Section title="Everything in the box" description="One dependency, and the tooling around your API comes with it.">
+                    <FeatureCards />
                 </Section>
 
                 <Section title="Start here">
@@ -51,9 +58,7 @@ export default function HomePage() {
                 </Section>
             </div>
 
-            <Section className={styles.cta}>
-                <ClosingCta />
-            </Section>
+            <ClosingCta className={styles.cta} />
         </div>
     );
 }

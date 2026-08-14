@@ -2,8 +2,8 @@
     display: none;
     align-items: center;
     gap: 10px;
-    min-width: 256px;
-    height: var(--kizuna-button-height);
+    min-width: 240px;
+    height: 44px;
     border: none;
     border-radius: var(--kizuna-radius-pill);
     background-color: var(--kizuna-field);
@@ -28,7 +28,7 @@
     align-items: center;
     gap: 1px;
     margin-inline-start: auto;
-    border: var(--kizuna-border-button) solid var(--kizuna-ink);
+    border: var(--kizuna-hairline) solid var(--kizuna-line-strong);
     border-radius: var(--kizuna-radius-pill);
     padding: 3px 8px;
     font: inherit;

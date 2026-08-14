@@ -6,21 +6,43 @@
 
 .card {
     display: block;
+    border: var(--kizuna-hairline) solid var(--kizuna-line);
     border-radius: var(--kizuna-radius-card);
-    background-color: var(--kizuna-surface);
-    padding: 24px;
+    padding: 28px;
     text-decoration: none;
+    transition:
+        border-color 180ms ease,
+        background-color 180ms ease;
+}
+
+.card:hover {
+    border-color: var(--kizuna-accent);
+    background-color: var(--kizuna-surface);
 }
 
 .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin: 0;
-    font-size: var(--kizuna-text-ui);
+    font-size: 1.25rem;
     font-weight: var(--font-weight-600);
+    letter-spacing: -0.01em;
     color: var(--kizuna-ink);
 }
 
+.title::after {
+    content: '→';
+    color: var(--kizuna-accent-text);
+    transition: transform 180ms ease;
+}
+
+.card:hover .title::after {
+    transform: translateX(4px);
+}
+
 .description {
-    margin: 8px 0 0;
+    margin: 10px 0 0;
     font-size: 0.9375rem;
     line-height: 1.55;
     color: var(--kizuna-muted);

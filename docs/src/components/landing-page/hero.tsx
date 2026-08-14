@@ -6,7 +6,9 @@ import styles from './hero.module.css';
 export function Hero({ className }: { className?: string }) {
     return (
         <section className={clsx(styles.hero, className)}>
-            <h1 className={styles.headline}>Build fully typed REST APIs with TypeScript</h1>
+            <h1 className={styles.headline}>
+                Build fully typed <span className={styles.accent}>REST APIs</span> with TypeScript
+            </h1>
             <p className={styles.tagline}>
                 Write one contract. Get a fully typed server, an OpenAPI spec, Swift and Kotlin clients, and more.
             </p>

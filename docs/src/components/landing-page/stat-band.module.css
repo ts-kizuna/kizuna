@@ -1,0 +1,49 @@
+.band {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.headline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0 0.28em;
+    margin: 0;
+    max-width: 20ch;
+    font-size: clamp(2rem, 5.4vw, 3.75rem);
+    font-weight: var(--font-weight-700);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    color: var(--kizuna-ink);
+    text-wrap: balance;
+}
+
+.number {
+    font-size: clamp(3.5rem, 11vw, 8.5rem);
+    font-weight: var(--font-weight-700);
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    background-image: var(--kizuna-accent-gradient-text);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+}
+
+.caption {
+    max-width: 62ch;
+    margin: 28px 0 0;
+    font-size: 1.125rem;
+    line-height: 1.6;
+    color: var(--kizuna-muted);
+    text-wrap: balance;
+}
+
+@media (max-width: 767px) {
+    .caption {
+        margin-top: 18px;
+        font-size: 1rem;
+    }
+}

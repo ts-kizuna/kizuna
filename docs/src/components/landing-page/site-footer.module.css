@@ -1,65 +1,115 @@
 .footer {
     border-top: var(--kizuna-hairline) solid var(--kizuna-line);
-    margin-top: var(--kizuna-footer-gap);
+    background-color: var(--kizuna-canvas);
 }
 
 .inner {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 24px;
     max-width: var(--kizuna-max-width);
     margin: 0 auto;
-    padding: 24px var(--kizuna-gutter);
+    padding: 72px var(--kizuna-gutter) 40px;
 }
 
-.logo {
-    width: calc(var(--kizuna-logo-width) - 20px);
-    height: auto;
+.columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 40px 24px;
+}
+
+.columnTitle {
+    margin: 0 0 16px;
+    font-size: 1rem;
+    font-weight: var(--font-weight-600);
+    letter-spacing: -0.01em;
     color: var(--kizuna-ink);
-    margin-top: -4px;
 }
 
-.links {
+.list {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 24px;
+    flex-direction: column;
+    gap: 12px;
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
 .link {
-    font-size: var(--kizuna-text-ui);
+    font-size: 0.9375rem;
     color: var(--kizuna-muted);
     text-decoration: none;
+    transition: color 160ms ease;
+}
+
+.link:hover {
+    color: var(--kizuna-ink);
+}
+
+.bottom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 64px;
+    border-top: var(--kizuna-hairline) solid var(--kizuna-line);
+    padding-top: 28px;
+}
+
+.logoLink {
+    display: inline-flex;
+    color: var(--kizuna-ink);
+}
+
+.logo {
+    width: calc(var(--kizuna-logo-width) - 20px);
+    height: auto;
 }
 
 .end {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 16px;
+    gap: 20px;
+}
+
+.social {
+    display: inline-flex;
+    color: var(--kizuna-muted);
+    transition: color 160ms ease;
+}
+
+.social:hover {
+    color: var(--kizuna-ink);
+}
+
+.socialIcon {
+    width: 22px;
+    height: 22px;
+}
+
+.npmIcon {
+    width: 34px;
+    height: auto;
 }
 
 .meta {
+    margin: 0;
     font-size: 0.9375rem;
     color: var(--kizuna-muted);
-    margin: 0;
+    text-decoration: none;
 }
 
-@media (min-width: 768px) {
-    .inner {
-        display: grid;
-        grid-template-columns: 1fr auto 1fr;
-        align-items: center;
-    }
+a.meta:hover {
+    color: var(--kizuna-ink);
+}
 
-    .links {
-        justify-content: center;
+@media (min-width: 640px) {
+    .columns {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+}
 
-    .end {
-        justify-self: end;
+@media (min-width: 1024px) {
+    .columns {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
     }
 }
