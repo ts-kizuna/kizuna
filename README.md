@@ -1,6 +1,6 @@
 # ts-kizuna
 
-![ts-kizuna](docs/public/readme-beta.png)
+![ts-kizuna](https://raw.githubusercontent.com/ts-kizuna/kizuna/main/docs/public/readme-beta.png)
 
 Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typed server, an OpenAPI spec, Swift and Kotlin clients, and more.
 
