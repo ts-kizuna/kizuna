@@ -3,6 +3,10 @@ packages:
     - 'apps/*'
     - 'docs'
 
+allowBuilds:
+    esbuild: false
+    sharp: false
+
 catalog:
     '@hono/node-server': ^1.14.0
     '@types/express': ^5.0.0
