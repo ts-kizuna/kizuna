@@ -1,7 +1,34 @@
 {
   "name": "@ts-kizuna/fetch",
   "version": "1.49.4",
+  "description": "Typed fetch client for ts-kizuna contracts",
+  "keywords": [
+    "ts-kizuna",
+    "typescript",
+    "zod",
+    "openapi",
+    "contract-first",
+    "type-safe",
+    "rest",
+    "api",
+    "client",
+    "fetch",
+    "rpc",
+    "typed-client"
+  ],
+  "license": "MIT",
+  "homepage": "https://ts-kizuna.com/docs/clients/fetch",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "directory": "packages/fetch"
+  },
+  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
   "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -26,7 +53,7 @@
     "dist"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod",

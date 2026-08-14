@@ -12,7 +12,6 @@ jobs:
         runs-on: ubuntu-latest
         permissions:
             contents: write
-            packages: write
             pull-requests: write
             issues: write
             id-token: write
@@ -40,8 +39,8 @@ jobs:
 
             - name: Authenticate with the registry
               env:
-                  REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: pnpm config set "//npm.pkg.github.com/:_authToken" "$REGISTRY_TOKEN"
+                  REGISTRY_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: pnpm config set "//registry.npmjs.org/:_authToken" "$REGISTRY_TOKEN"
 
             - name: Create release
               env:

@@ -1,7 +1,35 @@
 {
   "name": "@ts-kizuna/mcp",
   "version": "1.49.4",
+  "description": "MCP server generation for ts-kizuna contracts",
+  "keywords": [
+    "ts-kizuna",
+    "typescript",
+    "zod",
+    "openapi",
+    "contract-first",
+    "type-safe",
+    "rest",
+    "api",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "llm",
+    "tools"
+  ],
+  "license": "MIT",
+  "homepage": "https://ts-kizuna.com/docs/mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "directory": "packages/mcp"
+  },
+  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
   "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -36,16 +64,19 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown src/index.ts src/server.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external @modelcontextprotocol/sdk",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0"
+  },
   "peerDependencies": {
     "@ts-kizuna/core": "workspace:*",
     "zod": "^4.0.0"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.0.0",
