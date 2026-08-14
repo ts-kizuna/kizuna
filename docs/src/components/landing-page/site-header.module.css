@@ -2,6 +2,7 @@
     position: sticky;
     top: 0;
     z-index: 40;
+    border-bottom: var(--kizuna-hairline) solid var(--kizuna-line);
     background-color: color-mix(in srgb, var(--kizuna-canvas) 80%, transparent);
     backdrop-filter: blur(12px);
 }
@@ -68,23 +69,23 @@
 
 .divider {
     display: none;
-    width: var(--kizuna-border-button);
+    width: var(--kizuna-hairline);
     height: 28px;
     margin-inline: 8px;
-    background-color: var(--kizuna-ink);
+    background-color: var(--kizuna-line-strong);
 }
 
 .cta {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: var(--kizuna-button-height);
-    border: var(--kizuna-border-button) solid var(--kizuna-ink);
+    height: 44px;
     border-radius: var(--kizuna-radius-pill);
     padding-inline: var(--kizuna-button-padding-inline);
     font-size: var(--kizuna-text-nav);
     font-weight: var(--font-weight-600);
-    color: var(--kizuna-ink);
+    background-color: var(--kizuna-ink);
+    color: var(--kizuna-canvas);
     text-decoration: none;
     white-space: nowrap;
 }

@@ -9,21 +9,27 @@
 .headline {
     max-width: 18ch;
     margin: 0;
-    font-size: clamp(2.125rem, 6vw, 4.125rem);
+    font-size: clamp(2.125rem, 6.4vw, 4.5rem);
     font-weight: var(--font-weight-700);
-    line-height: 1.05;
-    letter-spacing: -0.03em;
+    line-height: 1.03;
+    letter-spacing: -0.035em;
     text-wrap: balance;
     color: var(--kizuna-ink);
 }
 
+.accent {
+    background-image: var(--kizuna-headline-gradient);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+}
+
 .tagline {
     max-width: 46ch;
-    margin: 24px 0 0;
+    margin: 26px 0 0;
     font-size: 1.35rem;
     line-height: 1.5;
-    color: var(--kizuna-ink);
-    opacity: 0.7;
+    color: var(--kizuna-muted);
     text-wrap: balance;
 }
 
@@ -33,7 +39,7 @@
     align-items: center;
     justify-content: center;
     gap: var(--kizuna-gap-actions);
-    margin-top: 32px;
+    margin-top: 36px;
 }
 
 .primary,
@@ -43,7 +49,7 @@
     justify-content: center;
     gap: 8px;
     height: var(--kizuna-button-height);
-    border: var(--kizuna-border-button) solid var(--kizuna-ink);
+    border: var(--kizuna-border-button) solid transparent;
     border-radius: var(--kizuna-radius-pill);
     padding-inline: var(--kizuna-button-padding-inline);
     font-size: var(--kizuna-text-button);
@@ -58,6 +64,7 @@
 }
 
 .secondary {
+    border-color: var(--kizuna-ink);
     color: var(--kizuna-ink);
 }
 
@@ -70,8 +77,8 @@
 @media (max-width: 767px) {
     .headline {
         max-width: 14ch;
-        font-size: 2rem;
-        letter-spacing: -0.02em;
+        font-size: 2.125rem;
+        letter-spacing: -0.025em;
         text-wrap: pretty;
     }
 
@@ -81,6 +88,6 @@
     }
 
     .actions {
-        margin-top: 20px;
+        margin-top: 24px;
     }
 }

@@ -6,20 +6,25 @@ interface SectionProps {
     id?: string;
     title?: string;
     description?: string;
+    /**
+     * `split` puts the heading beside the content on wide screens, stacked
+     * everywhere else.
+     */
+    layout?: 'stacked' | 'split';
     className?: string;
     children: ReactNode;
 }
 
-export function Section({ id, title, description, className, children }: SectionProps) {
+export function Section({ id, title, description, layout = 'stacked', className, children }: SectionProps) {
     return (
-        <section id={id} className={clsx(styles.section, className)}>
+        <section id={id} className={clsx(styles.section, layout === 'split' && styles.split, className)}>
             {title ? (
                 <div className={styles.head}>
                     <h2 className={styles.title}>{title}</h2>
                     {description ? <p className={styles.description}>{description}</p> : null}
                 </div>
             ) : null}
-            {children}
+            <div className={styles.body}>{children}</div>
         </section>
     );
 }

@@ -1,208 +1,16 @@
 import clsx from 'clsx';
-import type { ReactNode } from 'react';
-import { FileText, Globe, Server, TriangleAlert } from 'lucide-react';
+import { FileText, Globe, Server } from 'lucide-react';
+import { ScrollRail } from '@/components/landing-page/scroll-rail';
+import type { ScrollRailItem } from '@/components/landing-page/scroll-rail';
 import { CodeWindow } from './code-window';
 import { KotlinLogo, McpLogo, SwiftLogo, TsLogo } from './brand-icons';
 import styles from './contract-explorer.module.css';
-
-const icons = {
-    server: <Server className={styles.icon} />,
-    file: <FileText className={styles.icon} />,
-    alert: <TriangleAlert className={styles.icon} />,
-    globe: <Globe className={styles.icon} />,
-};
 
 const brandIcons = {
     typescript: <TsLogo key="ts" className={styles.brandIcon} />,
     swift: <SwiftLogo key="swift" className={styles.brandIcon} />,
     kotlin: <KotlinLogo key="kotlin" className={styles.brandIcon} />,
 };
-
-interface OutputNode {
-    icon: ReactNode;
-    label: string;
-    desc: string;
-    file: string;
-    fileIcon?: ReactNode;
-    lang: string;
-    code: string;
-}
-
-const NODES: OutputNode[] = [
-    {
-        icon: icons.server,
-        label: 'Server',
-        desc: 'Validated inputs, type-checked responses',
-        file: 'router.ts',
-        fileIcon: brandIcons.typescript,
-        lang: 'ts',
-        code: `server.router({
-  users: {
-    getUser: async ({ params, throwError }) => {
-      const user = await db.users.findById(params.id);
-
-      if (!user) throwError({
-        status: 404,
-        body: {
-          detail: 'Not found',
-        },
-      });
-
-      return {
-        status: 200,
-        body: user,
-      };
-    },
-  },
-});`,
-    },
-    {
-        icon: icons.file,
-        label: 'OpenAPI',
-        desc: 'Generated from the contract',
-        file: 'openapi.yaml',
-        lang: 'yaml',
-        code: `/users/{id}:
-  get:
-    operationId: getUser
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-    responses:
-      '200':
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/User'
-      '404':
-        content:
-          application/problem+json:
-            schema:
-              $ref: '#/components/schemas/ProblemDetails'`,
-    },
-    {
-        icon: icons.globe,
-        label: 'REST',
-        desc: 'Every route is a real REST endpoint',
-        file: 'localhost:3000/users/1',
-        lang: 'http',
-        code: `HTTP/1.1 200 OK
-Content-Type: application/json
-
-{
-  "id": "1",
-  "name": "Ada"
-}
-
-HTTP/1.1 404 Not Found
-Content-Type: application/problem+json
-
-{
-  "type": "about:blank",
-  "status": 404,
-  "detail": "Not found"
-}`,
-    },
-    {
-        icon: <TsLogo className={styles.icon} />,
-        label: 'TS client',
-        desc: 'RPC-like, call routes like functions',
-        file: 'api-client.ts',
-        fileIcon: brandIcons.typescript,
-        lang: 'ts',
-        code: `const client = new KizunaClient(contract, {
-  baseUrl: 'http://localhost:3000',
-});
-
-const res = await client.users.getUser({
-  params: {
-    id: '1',
-  },
-});
-
-if (res.status === 200) {
-  res.body; // User, fully typed
-} else {
-  throw new Error(res.body.detail);
-}`,
-    },
-    {
-        icon: <SwiftLogo className={styles.icon} />,
-        label: 'Swift client',
-        desc: 'Native generated client for iOS & macOS',
-        file: 'UserService.swift',
-        fileIcon: brandIcons.swift,
-        lang: 'swift',
-        code: `let client = APIClient(
-  baseURL: URL(string: "http://localhost:3000")!
-)
-
-do {
-  let res = try await client.users.getUser(
-    .params(
-      id: "1"
-    )
-  )
-  res.body // User, Codable
-} catch {
-  error // typed failure (e.g. .notFound)
-}`,
-    },
-    {
-        icon: <KotlinLogo className={styles.icon} />,
-        label: 'Kotlin client',
-        desc: 'Native generated client for Android & JVM',
-        file: 'APIClient.kt',
-        fileIcon: brandIcons.kotlin,
-        lang: 'kotlin',
-        code: `val client = APIClient(
-  baseUrl = "http://localhost:3000"
-)
-
-try {
-  val res = client.users.getUser {
-    params(
-      id = "1"
-    )
-  }
-  res.body // User, @Serializable
-} catch (error: APIClient.UsersGetUser.Failure.NotFound) {
-  error.body.detail // typed failure
-}`,
-    },
-    {
-        icon: <McpLogo className={styles.icon} />,
-        label: 'MCP server',
-        desc: 'Routes become tools for AI agents',
-        file: 'k.ts',
-        fileIcon: brandIcons.typescript,
-        lang: 'ts',
-        code: `plugins: {
-  mcp: mcpPlugin()
-}
-
-// each route → a typed MCP tool:
-// GET → read-only · DELETE → destructive
-// PUT → idempotent`,
-    },
-    {
-        icon: icons.alert,
-        label: 'Deprecation',
-        desc: 'Mark once, it propagates everywhere',
-        file: 'routes.ts',
-        fileIcon: brandIcons.typescript,
-        lang: 'ts',
-        code: `/** @deprecated */
-deleteUser: { ... }
-
-// → editor strikethrough
-// → OpenAPI deprecated: true
-// → Swift @available · Kotlin @Deprecated`,
-    },
-];
 
 const CONTRACT_CODE = `export const k = new Kizuna();
 
@@ -231,40 +39,231 @@ export const contract = k.contract({
   },
 });`;
 
-export function ContractExplorer({ className }: { className?: string }) {
+const SURFACES: ScrollRailItem[] = [
+    {
+        id: 'server',
+        icon: <Server />,
+        label: 'Server',
+        title: 'Handlers that already know the shape',
+        description:
+            'Params, query, body, and headers arrive validated and typed. Responses are checked against the statuses the contract declares.',
+        visual: (
+            <CodeWindow
+                lang="ts"
+                title="router.ts"
+                icon={brandIcons.typescript}
+                dots
+                code={`server.router({
+  users: {
+    getUser: async ({ params, throwError }) => {
+      const user = await db.users.findById(params.id);
+
+      if (!user) throwError({
+        status: 404,
+        body: {
+          detail: 'Not found',
+        },
+      });
+
+      return {
+        status: 200,
+        body: user,
+      };
+    },
+  },
+});`}
+            />
+        ),
+    },
+    {
+        id: 'rest',
+        icon: <Globe />,
+        label: 'REST',
+        title: 'A real HTTP API underneath',
+        description:
+            'Every route is a plain endpoint anything can call. Failures come back as Problem Details, the format RFC 9457 describes.',
+        visual: (
+            <CodeWindow
+                lang="http"
+                title="localhost:3000/users/1"
+                dots
+                code={`HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id": "1",
+  "name": "Ada"
+}
+
+HTTP/1.1 404 Not Found
+Content-Type: application/problem+json
+
+{
+  "type": "about:blank",
+  "status": 404,
+  "detail": "Not found"
+}`}
+            />
+        ),
+    },
+    {
+        id: 'openapi',
+        icon: <FileText />,
+        label: 'OpenAPI',
+        title: 'A spec you never hand-write',
+        description: 'The generator reads the contract. No annotations to sprinkle, no second document to keep in sync.',
+        visual: (
+            <CodeWindow
+                lang="yaml"
+                title="openapi.yaml"
+                dots
+                code={`/users/{id}:
+  get:
+    operationId: getUser
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      '404':
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/schemas/ProblemDetails'`}
+            />
+        ),
+    },
+    {
+        id: 'ts-client',
+        icon: <TsLogo />,
+        label: 'TypeScript client',
+        title: 'Call your API like a function',
+        description: 'The client reads the same contract, so the response narrows to one body per status code.',
+        visual: (
+            <CodeWindow
+                lang="ts"
+                title="api-client.ts"
+                icon={brandIcons.typescript}
+                dots
+                code={`const client = new KizunaClient(contract, {
+  baseUrl: 'http://localhost:3000',
+});
+
+const res = await client.users.getUser({
+  params: {
+    id: '1',
+  },
+});
+
+if (res.status === 200) {
+  res.body; // User, fully typed
+} else {
+  throw new Error(res.body.detail);
+}`}
+            />
+        ),
+    },
+    {
+        id: 'swift-client',
+        icon: <SwiftLogo />,
+        label: 'Swift client',
+        title: 'A native client for iOS and macOS',
+        description: 'Generated Codable models and typed failures, ready to drop into an Xcode project.',
+        visual: (
+            <CodeWindow
+                lang="swift"
+                title="UserService.swift"
+                icon={brandIcons.swift}
+                dots
+                code={`let client = APIClient(
+  baseURL: URL(string: "http://localhost:3000")!
+)
+
+do {
+  let res = try await client.users.getUser(
+    .params(
+      id: "1"
+    )
+  )
+  res.body // User, Codable
+} catch {
+  error // typed failure (e.g. .notFound)
+}`}
+            />
+        ),
+    },
+    {
+        id: 'kotlin-client',
+        icon: <KotlinLogo />,
+        label: 'Kotlin client',
+        title: 'A native client for Android and the JVM',
+        description: 'Generated @Serializable models, and a failure type per error status the contract declares.',
+        visual: (
+            <CodeWindow
+                lang="kotlin"
+                title="APIClient.kt"
+                icon={brandIcons.kotlin}
+                dots
+                code={`val client = APIClient(
+  baseUrl = "http://localhost:3000"
+)
+
+try {
+  val res = client.users.getUser {
+    params(
+      id = "1"
+    )
+  }
+  res.body // User, @Serializable
+} catch (error: APIClient.UsersGetUser.Failure.NotFound) {
+  error.body.detail // typed failure
+}`}
+            />
+        ),
+    },
+    {
+        id: 'mcp',
+        icon: <McpLogo />,
+        label: 'MCP server',
+        title: 'Your routes as tools for AI agents',
+        description: 'Install the plugin and every route becomes a typed MCP tool, with the safety hints its method implies.',
+        visual: (
+            <CodeWindow
+                lang="ts"
+                title="k.ts"
+                icon={brandIcons.typescript}
+                dots
+                code={`plugins: {
+  mcp: mcpPlugin()
+}
+
+// each route → a typed MCP tool:
+// GET → read-only · DELETE → destructive
+// PUT → idempotent`}
+            />
+        ),
+    },
+];
+
+export function ContractSource({ className }: { className?: string }) {
     return (
-        <div className={clsx(styles.root, className)}>
-            <div className={styles.card}>
-                <CodeWindow lang="ts" code={CONTRACT_CODE} title="contract.ts" icon={brandIcons.typescript} dots />
-            </div>
-            <div className={styles.connector}>
-                <svg
-                    className={styles.connectorIcon}
-                    viewBox="0 0 24 48"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden>
-                    <path d="M12 3v38" />
-                    <path d="m2 32 10 9 10-9" />
-                </svg>
-            </div>
-            <div className={styles.grid}>
-                {NODES.map((node) => (
-                    <div key={node.label} className={styles.card}>
-                        <div className={styles.cardHead}>
-                            <span className={styles.chip}>{node.icon}</span>
-                            <div>
-                                <div className={styles.nodeLabel}>{node.label}</div>
-                                <div className={styles.nodeDesc}>{node.desc}</div>
-                            </div>
-                        </div>
-                        <CodeWindow lang={node.lang} code={node.code} title={node.file} icon={node.fileIcon} dots />
-                    </div>
-                ))}
-            </div>
+        <div className={clsx(styles.source, className)}>
+            <CodeWindow lang="ts" code={CONTRACT_CODE} title="contract.ts" icon={brandIcons.typescript} dots />
+        </div>
+    );
+}
+
+export function ContractSurfaces({ className }: { className?: string }) {
+    return (
+        <div className={clsx(styles.surfaces, className)}>
+            <ScrollRail items={SURFACES} />
         </div>
     );
 }

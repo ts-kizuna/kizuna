@@ -2,19 +2,15 @@
     max-width: var(--kizuna-max-width);
     margin-inline: auto;
     padding-inline: var(--kizuna-gutter);
-    padding-top: 80px;
+    padding-top: 96px;
+}
+
+.top {
+    margin-bottom: 140px;
 }
 
 .hero {
-    margin-bottom: 112px;
-}
-
-.beta {
-    margin-bottom: 32px;
-}
-
-.cards {
-    margin-bottom: var(--kizuna-section-gap);
+    margin-bottom: 40px;
 }
 
 .sections {
@@ -24,25 +20,25 @@
 }
 
 .cta {
-    margin-top: 120px;
-    padding-bottom: calc(130px - var(--kizuna-footer-gap));
+    margin-top: 152px;
+    padding-bottom: 140px;
 }
 
 @media (max-width: 767px) {
     .page {
-        padding-top: 30px;
+        padding-top: 40px;
+    }
+
+    .top {
+        margin-bottom: 64px;
     }
 
     .hero {
-        margin-bottom: 56px;
-    }
-
-    .beta {
-        margin-bottom: 16px;
+        margin-bottom: 24px;
     }
 
     .cta {
-        margin-top: 66px;
-        padding-bottom: calc(66px - var(--kizuna-footer-gap));
+        margin-top: 80px;
+        padding-bottom: 80px;
     }
 }

@@ -1,0 +1,158 @@
+.rail {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 40px;
+}
+
+.track {
+    min-width: 0;
+}
+
+.block {
+    position: relative;
+    padding-block: 28px;
+}
+
+.label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: var(--font-weight-600);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--kizuna-muted);
+}
+
+.labelIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background-color: var(--kizuna-surface);
+    color: var(--kizuna-ink);
+}
+
+.labelIcon svg {
+    width: 15px;
+    height: 15px;
+}
+
+.labelIcon svg[aria-label='Model Context Protocol'] {
+    width: 18px;
+    height: 18px;
+    stroke-width: 12;
+}
+
+.title {
+    margin: 12px 0 0;
+    font-size: clamp(1.625rem, 3vw, 2.25rem);
+    font-weight: var(--font-weight-600);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--kizuna-ink);
+}
+
+.description {
+    margin: 12px 0 0;
+    max-width: 40ch;
+    font-size: 1.0625rem;
+    line-height: 1.6;
+    color: var(--kizuna-muted);
+}
+
+.inlineVisual {
+    margin-top: 24px;
+}
+
+.stage {
+    display: none;
+}
+
+@media (min-width: 1024px) {
+    .rail {
+        grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
+        gap: 64px;
+        align-items: start;
+    }
+
+    .block {
+        padding-block: clamp(64px, 13vh, 132px);
+        padding-left: 40px;
+    }
+
+    .block:first-child {
+        padding-top: 24px;
+    }
+
+    .block::before,
+    .block::after {
+        content: '';
+        position: absolute;
+        inset-block: 0;
+        left: 0;
+        width: var(--kizuna-rail-width);
+        border-radius: var(--kizuna-radius-pill);
+    }
+
+    .block::before {
+        background-color: var(--kizuna-rail-track);
+    }
+
+    .block::after {
+        background-color: var(--kizuna-ink);
+        opacity: 0;
+        transition: opacity 300ms ease;
+    }
+
+    .blockActive::after {
+        opacity: 1;
+    }
+
+    .inlineVisual {
+        display: none;
+    }
+
+    .stage {
+        display: block;
+        position: sticky;
+        top: 108px;
+        align-self: start;
+    }
+
+    .stack {
+        display: grid;
+    }
+
+    .frame {
+        grid-area: 1 / 1;
+        align-self: center;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(10px);
+        transition:
+            opacity 320ms ease,
+            transform 320ms ease,
+            visibility 320ms;
+    }
+
+    .frameActive {
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .frame {
+        transition: none;
+        transform: none;
+    }
+
+    .block::after {
+        transition: none;
+    }
+}

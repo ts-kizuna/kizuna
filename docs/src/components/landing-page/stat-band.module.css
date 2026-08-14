@@ -1,0 +1,38 @@
+.band {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.headline {
+    margin: 0;
+    max-width: 20ch;
+    font-size: clamp(2rem, 5.4vw, 3.75rem);
+    font-weight: var(--font-weight-700);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+    color: var(--kizuna-ink);
+}
+
+.number {
+    font-size: clamp(3.25rem, 9vw, 7rem);
+    letter-spacing: -0.05em;
+}
+
+.caption {
+    max-width: 62ch;
+    margin: 28px 0 0;
+    font-size: 1.125rem;
+    line-height: 1.6;
+    color: var(--kizuna-muted);
+    text-wrap: balance;
+}
+
+@media (max-width: 767px) {
+    .caption {
+        margin-top: 18px;
+        font-size: 1rem;
+    }
+}

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 import styles from './link-cards.module.css';
 
 const destinations = [
@@ -29,7 +30,10 @@ export function LinkCards() {
         <div className={styles.grid}>
             {destinations.map((destination) => (
                 <Link key={destination.title} href={destination.href} className={styles.card}>
-                    <h3 className={styles.title}>{destination.title}</h3>
+                    <h3 className={styles.title}>
+                        {destination.title}
+                        <ArrowRight className={styles.arrow} aria-hidden />
+                    </h3>
                     <p className={styles.description}>{destination.description}</p>
                 </Link>
             ))}

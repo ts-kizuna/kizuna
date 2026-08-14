@@ -1,17 +1,20 @@
 :root {
     --kizuna-canvas: #ffffff;
     --kizuna-surface: #f3f3f3;
+    --kizuna-surface-raised: #ffffff;
     --kizuna-ink: #0b0b0b;
     --kizuna-muted: #5c5c5c;
     --kizuna-line: #e4e4e4;
     --kizuna-line-strong: #cfcfcf;
     --kizuna-field: #f0f0f0;
 
-    --kizuna-max-width: 1152px;
+    --kizuna-headline-gradient: linear-gradient(110deg, #0b0b0b 0%, #6f6f6f 100%);
+    --kizuna-rail-track: #e4e4e4;
+
+    --kizuna-max-width: 1240px;
     --kizuna-gutter: 20px;
-    --kizuna-section-gap: 96px;
+    --kizuna-section-gap: 128px;
     --kizuna-head-gap: 22px;
-    --kizuna-footer-gap: 32px;
 
     --kizuna-text-ui: 1.0625rem;
     --kizuna-text-button: 1rem;
@@ -27,19 +30,24 @@
     --kizuna-radius-pill: 999px;
     --kizuna-radius-card: 14px;
     --kizuna-button-height: 51px;
-    --kizuna-button-padding-inline: 20px;
+    --kizuna-button-padding-inline: 22px;
     --kizuna-logo-width: 137px;
     --kizuna-gap-actions: 12px;
+    --kizuna-rail-width: 3px;
 }
 
 .dark {
-    --kizuna-canvas: #131313;
-    --kizuna-surface: #212121;
+    --kizuna-canvas: #0f0f0f;
+    --kizuna-surface: #1a1a1a;
+    --kizuna-surface-raised: #202020;
     --kizuna-ink: #ffffff;
-    --kizuna-muted: #a0a0a0;
-    --kizuna-line: #2a2a2a;
+    --kizuna-muted: #a1a1a1;
+    --kizuna-line: #272727;
     --kizuna-line-strong: #3d3d3d;
-    --kizuna-field: #2b2b2b;
+    --kizuna-field: #212121;
+
+    --kizuna-headline-gradient: linear-gradient(110deg, #ffffff 0%, #7e7e7e 100%);
+    --kizuna-rail-track: #2c2c2c;
 }
 
 html:has(.kizuna-landing-page),
@@ -56,7 +64,7 @@ body:has(.kizuna-landing-page) {
 
 @media (max-width: 767px) {
     :root {
-        --kizuna-section-gap: 40px;
+        --kizuna-section-gap: 64px;
         --kizuna-text-nav: 0.95rem;
         --kizuna-text-button: 0.95rem;
         --kizuna-button-height: 44px;

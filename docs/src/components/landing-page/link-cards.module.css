@@ -6,21 +6,33 @@
 
 .card {
     display: block;
+    border: var(--kizuna-hairline) solid var(--kizuna-line);
     border-radius: var(--kizuna-radius-card);
-    background-color: var(--kizuna-surface);
-    padding: 24px;
+    padding: 28px;
     text-decoration: none;
 }
 
 .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin: 0;
-    font-size: var(--kizuna-text-ui);
+    font-size: 1.25rem;
     font-weight: var(--font-weight-600);
+    letter-spacing: -0.01em;
     color: var(--kizuna-ink);
 }
 
+.arrow {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    stroke-width: 2.25;
+    color: var(--kizuna-muted);
+}
+
 .description {
-    margin: 8px 0 0;
+    margin: 10px 0 0;
     font-size: 0.9375rem;
     line-height: 1.55;
     color: var(--kizuna-muted);
