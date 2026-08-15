@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/eslint-plugin",
-  "version": "1.49.6",
+  "version": "1.49.7",
   "description": "ESLint rules for ts-kizuna",
   "keywords": [
     "ts-kizuna",
