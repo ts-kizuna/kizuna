@@ -42,7 +42,7 @@ export default function HomePage() {
 
                 <Section
                     title="Runs anywhere"
-                    description="The same contract and router move between adapters, and the framework underneath stays available to you.">
+                    description="Mount your API on the framework you already run, and it stays available to you inside every handler.">
                     <Adapters />
                 </Section>
 

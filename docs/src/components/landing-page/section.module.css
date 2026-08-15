@@ -9,7 +9,7 @@
 }
 
 .head {
-    max-width: 704px;
+    max-width: var(--kizuna-text-width);
     margin-bottom: var(--kizuna-head-gap);
 }
 

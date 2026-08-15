@@ -2,7 +2,7 @@
     display: grid;
     grid-template-columns: 1fr;
     gap: 16px;
-    max-width: 704px;
+    max-width: var(--kizuna-text-width);
     margin: 32px 0 0;
     padding: 0;
     list-style: none;

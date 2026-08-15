@@ -3,6 +3,7 @@
 import clsx from 'clsx';
 import { useState } from 'react';
 import type { ShikiTransformer } from 'shiki';
+import { CodeTabs } from './code-tabs';
 import { CodeWindow } from './code-window';
 import styles from './handler-explorer.module.css';
 
@@ -327,18 +328,16 @@ export function HandlerExplorer({ className }: { className?: string }) {
 
     return (
         <div className={clsx('not-prose kizuna-handler', styles.root, className)}>
-            <div className={styles.tabs}>
-                {FEATURES.map((candidate) => (
-                    <button
-                        key={candidate.id}
-                        type="button"
-                        aria-pressed={active === candidate.id}
-                        onClick={() => setActive(candidate.id)}
-                        className={active === candidate.id ? `${styles.tab} ${styles.tabActive}` : styles.tab}>
-                        {candidate.id}
-                    </button>
-                ))}
-            </div>
+            <CodeTabs
+                className={styles.tabs}
+                tabs={FEATURES.map((candidate) => ({
+                    id: candidate.id,
+                    label: candidate.id,
+                }))}
+                activeId={active}
+                onSelect={setActive}
+                label="Handler arguments"
+            />
 
             <CodeWindow
                 lang="ts"

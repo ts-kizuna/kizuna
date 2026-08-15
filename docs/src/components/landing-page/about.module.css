@@ -1,5 +1,5 @@
 .about {
-    max-width: 704px;
+    max-width: var(--kizuna-text-width);
 }
 
 .lead {
