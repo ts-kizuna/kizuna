@@ -20,14 +20,14 @@ ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneer
 
 There is no `initContract`. Create your surface with `new Kizuna()` once, then define groups with `k.routes`.
 
-```ts
+```ts title="ts-rest"
 // ts-rest
 import { initContract } from '@ts-rest/core';
 const c = initContract();
 export const contract = c.router({ ... });
 ```
 
-```ts
+```ts title="ts-kizuna"
 // ts-kizuna
 import { Kizuna } from '@ts-kizuna/core';
 
@@ -44,14 +44,14 @@ export const users = k.routes('users', { ... });
 
 ### Nested routes
 
-```ts
+```ts title="ts-rest"
 // ts-rest
 export const contract = c.router({
     users: c.router({ ... }),
 });
 ```
 
-```ts
+```ts title="ts-kizuna"
 // ts-kizuna: one group per tag, assembled in the contract
 export const users = k.routes('users', { ... });
 export const health = k.routes('health', { ... });
@@ -63,7 +63,7 @@ The tag passed to `k.routes` (a key of your `Kizuna.tags` set) sets the OpenAPI 
 
 ts-rest uses `c.noBody()` to mark a route as having no request body or to mark a response as having no body. In ts-kizuna, use `z.void()` instead. Routes don't require a `body` field, so remove it.
 
-```ts
+```ts title="ts-rest"
 // ts-rest
 import { initContract } from '@ts-rest/core';
 const c = initContract();
@@ -80,7 +80,7 @@ export const contract = c.router({
 });
 ```
 
-```ts
+```ts title="ts-kizuna"
 // ts-kizuna: remove `body`, use z.void() for empty responses
 import { z } from 'zod';
 import { k } from './k';
@@ -102,7 +102,7 @@ Use `z.void()` for responses that return no body, such as `204`.
 
 ts-rest passes its router straight to the client and server. ts-kizuna adds one step: assemble your route groups into a contract with `k.contract`, then pass that everywhere (`client`, `createServer`).
 
-```ts
+```ts title="ts-kizuna"
 // ts-kizuna
 import { k } from './k';
 import { users } from './routes';
@@ -116,7 +116,7 @@ export const contract = k.contract({
 
 ## Client
 
-```ts
+```ts title="ts-rest"
 // ts-rest
 import { initClient } from '@ts-rest/core';
 const client = initClient(contract, {
@@ -124,7 +124,7 @@ const client = initClient(contract, {
 });
 ```
 
-```ts
+```ts title="ts-kizuna"
 // ts-kizuna
 import { KizunaClient } from '@ts-kizuna/fetch';
 const client = new KizunaClient(contract, {
@@ -138,14 +138,14 @@ const client = new KizunaClient(contract, {
 
 There is no `initServer`. Create the server with `new KizunaServer()`, use `server.router` for the implementations, and `server.api` to produce a mountable API object.
 
-```ts
+```ts title="ts-rest"
 // ts-rest
 import { initServer } from '@ts-rest/express';
 const s = initServer();
 const router = s.router(contract, { ... });
 ```
 
-```ts
+```ts title="ts-kizuna"
 // ts-kizuna
 import { KizunaServer } from '@ts-kizuna/express';
 
@@ -160,13 +160,13 @@ export const api = server.api({
 
 ### `RouterImpl` → `Router`, `Handler` → `RouteHandler`
 
-```ts
+```ts title="ts-rest"
 // ts-rest
 import type { RouterImpl } from '@ts-rest/express';
 const router: RouterImpl<typeof contract> = { ... };
 ```
 
-```ts
+```ts title="ts-kizuna"
 // ts-kizuna
 import type { Router, RouteHandler } from '@ts-kizuna/express';
 import { contract } from './contract';
@@ -182,12 +182,12 @@ const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ par
 
 ### `createExpressEndpoints` → `api.mount`
 
-```ts
+```ts title="ts-rest"
 // ts-rest
 createExpressEndpoints(contract, router, app);
 ```
 
-```ts
+```ts title="ts-kizuna"
 // ts-kizuna
 api.mount(app);
 ```
@@ -198,7 +198,7 @@ api.mount(app);
 
 ### Route file setup
 
-```ts
+```ts title="ts-rest"
 // ts-rest: App Router via @ts-rest/serverless/next
 import { createNextHandler } from '@ts-rest/serverless/next';
 import { contract } from '@/contract';
@@ -211,7 +211,7 @@ const handler = createNextHandler(contract, router, {
 export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE, handler as OPTIONS };
 ```
 
-```ts
+```ts title="ts-kizuna"
 // ts-kizuna: App Router catch-all
 import { api } from '@/server/api';
 
@@ -236,7 +236,7 @@ If you are upgrading from ts-rest and Zod 3, migrate to Zod 4 alongside this cha
 
 ts-rest supports `deprecated: true` on route definitions and `.meta({ deprecated: true })` on Zod schemas. Neither exists in ts-kizuna.
 
-```ts
+```ts title="ts-rest"
 // ts-rest
 deleteUser: {
     method: 'DELETE',
@@ -250,7 +250,7 @@ deleteUser: {
 },
 ```
 
-```ts
+```ts title="ts-kizuna"
 // ts-kizuna: JSDoc only
 /**
  * @deprecated

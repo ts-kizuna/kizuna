@@ -11,7 +11,7 @@ Deprecations are new and still settling. What the CLI reads and how deprecations
 
 A `/** @deprecated */` JSDoc tag on a route or field produces a strikethrough in editors, `deprecated: true` in the OpenAPI spec, and `@available(*, deprecated)` in the Swift client. Text after `@deprecated` becomes the Swift `@available` message.
 
-```ts title="src/contract/index.ts"
+```ts title="contract/index.ts"
 export const usersRoutes = k.routes('users', {
     /**
      * @deprecated use `archiveUser` instead
@@ -49,7 +49,7 @@ The `kizuna` CLI ships in `@ts-kizuna/cli`, a build-time dev dependency:
 
 Generate the deprecation data into `.kizuna/deprecations.json`:
 
-```bash
+```bash title="Terminal"
 kizuna deprecations src/contract/index.ts
 ```
 
@@ -82,7 +82,7 @@ Generators read `.kizuna/deprecations.json` from the working directory.
 
 Pass each contract. They are merged into one `deprecations.json`; each generator applies only the entries whose routes exist in the contract it is generating.
 
-```bash
+```bash title="Terminal"
 kizuna deprecations src/app.ts src/workspace.ts src/admin.ts
 ```
 
@@ -112,7 +112,7 @@ On most hosts it already is: a VM, a single container, `next start`, or Railway/
 
 If your Dockerfile builds in one stage and then copies the result into a smaller final image, `.kizuna/` gets left behind, just like `dist/` would. Copy it across too:
 
-```dockerfile
+```dockerfile title="Dockerfile"
 COPY --from=builder /app/.kizuna ./.kizuna
 ```
 
@@ -172,6 +172,6 @@ export default withKizuna(nextConfig);
 
 The Swift CLI reads the contract source directly, with no separate step.
 
-```bash
+```bash title="Terminal"
 ts-kizuna-swift generate --contract src/contract/index.ts --output APIClient.swift --namespace-name API
 ```

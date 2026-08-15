@@ -5,7 +5,7 @@ description: Type the auth map against your routes and identities, beside the ro
 
 `k.auth(routes, map)` returns the map typed against the routes and identities, for defining it beside the routes rather than inside `k.contract`:
 
-```ts
+```ts title="auth.ts"
 export const auth = k.auth(routes, {
     users: false,
     members: 'user',

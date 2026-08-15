@@ -9,7 +9,7 @@ A plugin adds endpoints, helpers your handlers can call, or both. It gets your c
 
 A plugin ships as two modules. The declaration goes on `new Kizuna()`:
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 
@@ -26,7 +26,7 @@ export const k = new Kizuna({
 
 The server half goes on `server.api`, under the same key:
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 import { mcpPluginServer } from '@ts-kizuna/mcp/server';
 
 export const api = server.api({
@@ -47,7 +47,7 @@ The declaration takes plain data; the contract it rides on is shared with your c
 
 A plugin can hand your handlers functions to call, under `plugins`:
 
-```ts title="src/server/router/index.ts"
+```ts title="router/index.ts"
 updateUser: async ({ params, body, plugins }) => {
     const user = await db.users.update(params.id, body);
     plugins.audit.record('users.updateUser');
@@ -61,7 +61,7 @@ updateUser: async ({ params, body, plugins }) => {
 
 Plugin names come from other people, so they are namespaced under `plugins` rather than spread into the handler args, where one called `body` would shadow your request body. Destructure it for the short form:
 
-```ts
+```ts title="users.ts"
 updateUser: async ({ params, body, plugins: { audit } }) => {
 ```
 

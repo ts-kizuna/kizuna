@@ -61,8 +61,7 @@ The instance, the authoring surface for this API:
 
 Construct it once, usually in a `k.ts` file, then import `k` wherever you define routes.
 
-```ts
-// k.ts
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 import { user, member } from './identities';
@@ -87,7 +86,7 @@ export const k = new Kizuna({
 
 `requestContext` registers declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values like analytics ids or a logger. Every handler receives them typed under `requestContext`, keyed by their name; each is resolved per request by a [`server.requestContext`](/docs/reference/server-request-context) resolver wired on `server.api`.
 
-```ts title="src/contract/request-contexts.ts"
+```ts title="request-contexts.ts"
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 
@@ -98,7 +97,7 @@ export const analytics = Kizuna.requestContext(
 );
 ```
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 import { analytics } from './request-contexts';
 
 export const k = new Kizuna({
@@ -108,7 +107,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts
+```ts title="users.ts"
 listUsers: ({ query, requestContext }) => {
     track(requestContext.analytics.sessionId, 'listUsers');
     // ...

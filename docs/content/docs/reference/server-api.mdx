@@ -5,7 +5,7 @@ description: Assemble the router, guards and request context into the api object
 
 `server.api({ router, guards, requestContext, jobs })` puts the router and guards into the API object an adapter mounts.
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 import { server } from './server';
 import { router } from './router';
 import { requireUser, requireMember } from './guards';
@@ -36,7 +36,7 @@ See the [Mounting guide](/docs/building/mounting) for full setup with each adapt
 
 A contract that declares [scheduled jobs](/docs/jobs) needs their handlers here, bound with [`server.jobs`](/docs/reference/server-jobs):
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 export const api = server.api({
     router,
     jobs: jobHandlers,
@@ -52,7 +52,7 @@ export const api = server.api({
 
 A [plugin](/docs/plugins) is declared on [`new Kizuna()`](/docs/reference/kizuna); its server half goes here under the same key:
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 import { mcpPluginServer } from '@ts-kizuna/mcp/server';
 import { openApiPluginServer } from '@ts-kizuna/openapi/server';
 
@@ -67,7 +67,7 @@ export const api = server.api({
 
 Every plugin the contract declares needs its server half here, and `server.api` throws if one is missing, naming the module to import. Anything live the plugin needs, such as a store or a transport, is passed to that server half:
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 plugins: {
     audit: auditPluginServer({ store }),
 }

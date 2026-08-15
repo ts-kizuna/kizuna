@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { CodeWindow } from '@/components/code/code-window';
+import type { CodeCompletion } from '@/components/code/code-completion';
 import { TsLogo } from '@/components/code/brand-icons';
 import styles from './faq.module.css';
 
@@ -11,11 +12,12 @@ const client = new KizunaClient(contract, {
     baseUrl: 'https://api.example.com',
 });
 
-const result = await client.users.getUser({
-    params: {
-        id: '1',
-    },
-});`;
+const result = await client.users.`;
+
+const TRPC_COMPLETION: CodeCompletion = {
+    after: 'client.users.',
+    items: ['getUser', 'listUsers', 'createUser'],
+};
 
 interface Question {
     question: string;
@@ -79,6 +81,7 @@ export const questions: Question[] = [
                     <li>Webhooks, declared in the contract like routes</li>
                     <li>OpenAPI 3.2.0 output</li>
                     <li>A TanStack Query client, built from the same contract</li>
+                    <li>A TanStack Start adapter</li>
                     <li>Whatever the future brings</li>
                 </ul>
             </>
@@ -135,6 +138,7 @@ export const questions: Question[] = [
                         code={TRPC_EXAMPLE}
                         title="src/api-client.ts"
                         icon={<TsLogo className={styles.fileIcon} />}
+                        completion={TRPC_COMPLETION}
                         dots
                     />
                 </div>

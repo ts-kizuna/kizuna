@@ -7,9 +7,13 @@ description: Generate a native Swift client from your routes with the ts-kizuna-
 
 <InstallTabs packageName="@ts-kizuna/swift" />
 
-## Generate
+<Steps>
 
-```sh
+<Step>
+
+## Generate the client
+
+```sh title="Terminal"
 ts-kizuna-swift generate --contract src/contract/index.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
 ```
 
@@ -21,30 +25,21 @@ ts-kizuna-swift generate --contract src/contract/index.ts --output ios/MyApp/Gen
 | `--camel-case`        | Convert wire field names to camelCase properties with CodingKeys                        |
 | `--unknown-enum-case` | Emit enums with an `unknown(String)` fallback so new server values don't break decoding |
 
-The CLI reads the contract at runtime using `jiti`. Add the generated file to your Xcode project or Swift package as a regular source file.
+The CLI reads the contract at runtime using `jiti`.
 
-### Property naming
+</Step>
 
-By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type.
+<Step>
 
-Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `CodingKeys`.
+## Add it to your project
 
-### Unknown enum case (open enums)
+Add the generated file to your Xcode project or Swift package as a regular source file. It needs no third-party Swift dependencies.
 
-By default a `z.enum` is a closed Swift enum that throws on a wire value it doesn't know, failing the whole response. Pass `--unknown-enum-case` to make enums forward-compatible: each gains an `unknown(String)` case, so an unrecognised value decodes to `.unknown("newValue")` instead of throwing:
+</Step>
 
-```swift
-switch event.kind {
-case .login, .logout, .signup:
-    render(event)
-case .unknown(let raw):
-    log("skipping unknown event kind: \(raw)")
-}
-```
+<Step>
 
-The raw value is preserved, so re-encoding writes it back unchanged. Discriminated unions still throw on an unknown discriminator.
-
-## Usage
+## Call a route
 
 ```swift title="APISetup.swift"
 let client = APIClient(baseURL: URL(string: "https://api.example.com")!)
@@ -81,6 +76,72 @@ try await client.sendNotification(
 )
 ```
 
+</Step>
+
+<Step>
+
+## Use it in a screen
+
+A schema wrapped in [`Kizuna.model`](/docs/reference/kizuna-model) generates a named struct, so a view can name it in its signature and every route that returns a user hands back the same type:
+
+```swift title="UserRow.swift"
+import SwiftUI
+
+struct UserRow: View {
+    let user: API.User
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text(user.name)
+            Text(user.id)
+                .font(.caption)
+        }
+    }
+}
+```
+
+```swift title="UserList.swift"
+struct UserList: View {
+    @State private var users: [API.User] = []
+
+    var body: some View {
+        List(users, id: \.id) { user in
+            UserRow(user: user)
+        }
+        .task {
+            if let response = try? await client.users.listUsers() {
+                users = response.body.users
+            }
+        }
+    }
+}
+```
+
+</Step>
+
+</Steps>
+
+## Property naming
+
+By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type.
+
+Pass `--camel-case` to convert wire fields to camelCase properties (`total_count` becomes `totalCount`), preserving the wire name via `CodingKeys`.
+
+## Unknown enum case (open enums)
+
+By default a `z.enum` is a closed Swift enum that throws on a wire value it doesn't know, failing the whole response. Pass `--unknown-enum-case` to make enums forward-compatible: each gains an `unknown(String)` case, so an unrecognised value decodes to `.unknown("newValue")` instead of throwing:
+
+```swift title="EventFeed.swift"
+switch event.kind {
+case .login, .logout, .signup:
+    render(event)
+case .unknown(let raw):
+    log("skipping unknown event kind: \(raw)")
+}
+```
+
+The raw value is preserved, so re-encoding writes it back unchanged. Discriminated unions still throw on an unknown discriminator.
+
 ## Generated client
 
 The generated file exports a `Sendable` client with methods for each route and sub-clients for grouped routes. It is `Sendable`, so sharing it across tasks needs no actor hop per request. Each request group is a nested struct with a group-named factory:
@@ -114,7 +175,7 @@ public final class APIClient: Sendable {
 
 Routes and fields marked `/** @deprecated */` in the routes emit `@available(*, deprecated)` in the generated Swift code:
 
-```swift
+```swift title="APIClient.swift"
 @available(*, deprecated)
 public func deleteUser(_ params: APIClient.DeleteUser.Params) async throws(APIClient.DeleteUser.Failure) {
     // ...

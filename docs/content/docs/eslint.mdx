@@ -102,7 +102,7 @@ kizuna serializes only the **first** `@deprecated` message. Any later one is sil
 
 A schema defined elsewhere, such as a shared `PaginationQuery` in its own `zod`-only module, is still caught, and the error lands on the reference:
 
-```ts title="src/contract/pagination.ts"
+```ts title="pagination.ts"
 import { z } from 'zod';
 
 export const PaginationQuery = z.object({
@@ -110,7 +110,7 @@ export const PaginationQuery = z.object({
 });
 ```
 
-```ts title="src/contract/routes/users.ts"
+```ts title="users.ts"
 import { PaginationQuery } from './pagination.js';
 
 export const users = k.routes('users', {

@@ -7,6 +7,7 @@ import { Badge } from '@/components/shared/badge';
  * page is labelled with, or drop the entry to remove the badge entirely.
  */
 const badges: Record<string, string> = {
+    '/docs/authentication': 'Beta',
     '/docs/jobs': 'Beta',
     '/docs/mcp': 'Beta',
     '/docs/extend/create-plugin': 'Beta',

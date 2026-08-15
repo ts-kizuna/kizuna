@@ -3,12 +3,20 @@
     --explorer-line: #e0e0e0;
     --explorer-toolbar-line: #d8d8d8;
     --explorer-muted: var(--color-fd-muted-foreground);
+    --explorer-method-get: #0a7d4b;
+    --explorer-method-post: #1f6feb;
+    --explorer-method-write: #9a6700;
+    --explorer-method-delete: #cf222e;
 }
 
 :global(.dark) .root {
     --explorer-surface: var(--kizuna-surface, #1c1c1c);
     --explorer-line: #2e2e2e;
     --explorer-toolbar-line: #3a3a3a;
+    --explorer-method-get: #3fb950;
+    --explorer-method-post: #58a6ff;
+    --explorer-method-write: #d29922;
+    --explorer-method-delete: #f85149;
 }
 
 .card {
@@ -40,6 +48,29 @@
     width: 14px;
     height: 14px;
     flex-shrink: 0;
+}
+
+.method {
+    flex-shrink: 0;
+    font-size: 0.85em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.methodGet {
+    color: var(--explorer-method-get);
+}
+
+.methodPost {
+    color: var(--explorer-method-post);
+}
+
+.methodWrite {
+    color: var(--explorer-method-write);
+}
+
+.methodDelete {
+    color: var(--explorer-method-delete);
 }
 
 .chip {

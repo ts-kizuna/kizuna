@@ -7,11 +7,17 @@ description: Generate an OpenAPI 3.1.0 document from your contract, and serve it
 
 <InstallTabs packageName="@ts-kizuna/openapi" />
 
-## `openApiPlugin`
+## Install it
 
 `openApiPlugin` serves the document and an API reference UI for it, on any adapter.
 
-```ts title="src/contract/k.ts"
+<Steps>
+
+<Step>
+
+## Declare the plugin
+
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { openApiPlugin } from '@ts-kizuna/openapi';
 
@@ -23,14 +29,21 @@ export const k = new Kizuna({
                 title: 'My API',
                 version: '1.0.0',
             },
+            docsPath: '/docs',
         }),
     },
 });
 ```
 
-Then pass its server half to `server.api`, where the generator itself lives:
+</Step>
 
-```ts title="src/server/api.ts"
+<Step>
+
+## Register its server half
+
+`server.api` is where the generator itself lives:
+
+```ts title="api.ts"
 import { openApiPluginServer } from '@ts-kizuna/openapi/server';
 
 export const api = server.api({
@@ -40,6 +53,10 @@ export const api = server.api({
     },
 });
 ```
+
+</Step>
+
+</Steps>
 
 Each prop serves one route, and serves nothing until you give it a path:
 
@@ -63,7 +80,7 @@ The routes are public. Gate them with your framework's own middleware if that is
 
 ### Writing it to disk
 
-```ts title="scripts/generate-openapi.ts"
+```ts title="generate-openapi.ts"
 import { writeFileSync } from 'fs';
 import { generateOpenApi } from '@ts-kizuna/openapi/server';
 import { contract } from '../src/contract';
@@ -73,7 +90,7 @@ const spec = generateOpenApi(contract);
 writeFileSync('openapi.yaml', spec('yaml'));
 ```
 
-```sh
+```sh title="Terminal"
 tsx scripts/generate-openapi.ts
 ```
 
@@ -106,9 +123,9 @@ Point `cdnUrl` at a self-hosted copy for air-gapped deployments or a strict CSP.
 
 ## `generateOpenApi`
 
-`generateOpenApi` returns a renderer. Call it with `'json'` for the document object or `'yaml'` for a YAML string. Everything it needs, `info` included, comes off the contract, declared once on [`openApiPlugin`](#openapiplugin) in `k.ts`.
+`generateOpenApi` returns a renderer. Call it with `'json'` for the document object or `'yaml'` for a YAML string. Everything it needs, `info` included, comes off the contract, declared once on [`openApiPlugin`](#declare-the-plugin) in `k.ts`.
 
-```ts
+```ts title="generate-openapi.ts"
 import { generateOpenApi } from '@ts-kizuna/openapi/server';
 import { contract } from '@/contract';
 
@@ -126,7 +143,7 @@ Routes and fields marked `/** @deprecated */` get `deprecated: true` in the gene
 
 They go on `openApiPlugin` in `k.ts`, and `generateOpenApi` reads them from there.
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 openApiPlugin({
     info: {
         title: 'My API',
@@ -156,9 +173,9 @@ openApiPlugin({
 
 ## Security
 
-Security comes from the contract. The [identities](/docs/auth) you register on `new Kizuna()` are emitted as `components.securitySchemes`, and the contract's auth map becomes each operation's `security`, with oauth2 scopes included. There are no generator options for it, so the spec cannot disagree with what the server enforces.
+Security comes from the contract. The [identities](/docs/authentication) you register on `new Kizuna()` are emitted as `components.securitySchemes`, and the contract's auth map becomes each operation's `security`, with oauth2 scopes included. There are no generator options for it, so the spec cannot disagree with what the server enforces.
 
-```ts
+```ts title="identities.ts"
 export const user = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),
@@ -166,7 +183,7 @@ export const user = Kizuna.identity.bearer({
 });
 ```
 
-```yaml
+```yaml title="openapi.yaml"
 # generated
 components:
     securitySchemes:

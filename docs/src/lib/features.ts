@@ -1,17 +1,4 @@
-import {
-    ArrowLeftRight,
-    Clock,
-    BotMessageSquare,
-    FileText,
-    Globe,
-    KeyRound,
-    Plug,
-    Puzzle,
-    ScrollText,
-    Smartphone,
-    TriangleAlert,
-    Zap,
-} from 'lucide-react';
+import { ArrowLeftRight, Clock, FileText, Globe, KeyRound, Plug, Puzzle, ScrollText, TriangleAlert, Zap } from 'lucide-react';
 import { KotlinLogo, McpLogo, SwiftLogo } from '@/components/code/brand-icons';
 import type { ComponentType } from 'react';
 
@@ -50,8 +37,8 @@ export const features: Feature[] = [
     },
     {
         icons: [KeyRound],
-        title: 'Typed auth',
-        description: 'Identities and per-route auth declared on the contract.',
+        title: 'Typed authentication',
+        description: 'Identities and per-route authentication declared on the contract.',
     },
     {
         icons: [Plug],

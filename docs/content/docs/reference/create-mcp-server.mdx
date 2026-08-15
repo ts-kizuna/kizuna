@@ -42,7 +42,7 @@ Each call to a secured tool runs the same [guard](/docs/reference/server-guard) 
 
 Driving the transport yourself means passing those headers along. For stdio there is no HTTP request, so supply whatever the environment provides:
 
-```ts
+```ts title="mcp.ts"
 const server = createMcpServer(api, {
     name: 'My API',
     credentialHeaders: {

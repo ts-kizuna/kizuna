@@ -36,7 +36,7 @@ responses: {
 
 Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema). The handler supplies `detail`; `type`/`title`/`status` are filled in for you:
 
-```ts
+```ts title="routes/users.ts"
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 
 responses: {
@@ -49,7 +49,7 @@ responses: {
 
 This is the path for nearly every migration. If your errors carry fields beyond a message, such as an application code or a request ID, keep them as RFC 9457 **extension members** with `.extend()`:
 
-```ts
+```ts title="routes/users.ts"
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 
@@ -61,7 +61,7 @@ responses: {
 }
 ```
 
-```ts
+```ts title="router/users.ts"
 return throwError({
     status: 404,
     body: {
@@ -114,7 +114,7 @@ Say old clients expect this body, as `application/json`:
 
 Branch on whatever signal tells your clients apart, such as a version header, a build header, or `Accept`, and reshape to the legacy body only for the old ones:
 
-```ts
+```ts title="src/index.ts"
 api.mount(app, {
     // `problem` is the full Problem Details object (envelope + extension members).
     formatError: (problem, { request }) => {
@@ -149,7 +149,7 @@ Doing a coordinated cutover instead? Skip the branch, always return the legacy s
 
 If your handlers throw domain errors (or you rely on framework error middleware), map them into Problem Details at the boundary instead of rewriting each handler. On Next.js that's the `onError` option; on Express, Fastify, and Hono, build the response with [`problemDetails()`](/docs/reference/problem-details-schema) in the framework's error handler.
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 import { problemDetails } from '@ts-kizuna/core';
 
 export const api = server.api({

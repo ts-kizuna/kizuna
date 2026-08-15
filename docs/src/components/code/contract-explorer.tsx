@@ -18,6 +18,18 @@ const brandIcons = {
     kotlin: <KotlinLogo key="kotlin" className={styles.brandIcon} />,
 };
 
+const methodStyles = {
+    GET: styles.methodGet,
+    POST: styles.methodPost,
+    PUT: styles.methodWrite,
+    PATCH: styles.methodWrite,
+    DELETE: styles.methodDelete,
+};
+
+function Method({ name }: { name: keyof typeof methodStyles }) {
+    return <span className={clsx(styles.method, methodStyles[name])}>{name}</span>;
+}
+
 interface OutputNode {
     icon: ReactNode;
     label: string;
@@ -88,6 +100,7 @@ const NODES: OutputNode[] = [
         label: 'REST',
         desc: 'Every route is a real REST endpoint',
         file: 'localhost:3000/users/1',
+        fileIcon: <Method name="GET" />,
         lang: 'http',
         code: `HTTP/1.1 200 OK
 Content-Type: application/json
@@ -108,16 +121,16 @@ Content-Type: application/problem+json
     },
     {
         icon: <TsLogo className={styles.icon} />,
-        label: 'TS client',
-        desc: 'RPC-like, call routes like functions',
+        label: 'TypeScript client',
+        desc: 'Call your API like a function',
         file: 'api-client.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
-        code: `const client = new KizunaClient(contract, {
+        code: `const apiClient = new KizunaClient(contract, {
   baseUrl: 'http://localhost:3000',
 });
 
-const res = await client.users.getUser({
+const res = await apiClient.users.getUser({
   params: {
     id: '1',
   },
@@ -132,7 +145,7 @@ if (res.status === 200) {
     {
         icon: <SwiftLogo className={styles.icon} />,
         label: 'Swift client',
-        desc: 'Native generated client for iOS & macOS',
+        desc: 'A native client for iOS and macOS',
         file: 'UserService.swift',
         fileIcon: brandIcons.swift,
         lang: 'swift',
@@ -154,7 +167,7 @@ do {
     {
         icon: <KotlinLogo className={styles.icon} />,
         label: 'Kotlin client',
-        desc: 'Native generated client for Android & JVM',
+        desc: 'A native client for Android and the JVM',
         file: 'APIClient.kt',
         fileIcon: brandIcons.kotlin,
         lang: 'kotlin',
@@ -176,7 +189,7 @@ try {
     {
         icon: <McpLogo className={styles.icon} />,
         label: 'MCP server',
-        desc: 'Routes become tools for AI agents',
+        desc: 'Your routes as tools for AI agents',
         file: 'k.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',

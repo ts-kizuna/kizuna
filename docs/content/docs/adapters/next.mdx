@@ -9,9 +9,11 @@ description: Mount a ts-kizuna API on a Next.js App Router catch-all route.
 
 <InstallTabs packageName="@ts-kizuna/next" />
 
-## Setup
+<Steps>
 
-Wrap your `next.config.ts` with `withKizuna`:
+<Step>
+
+## Wrap the Next config
 
 ```ts title="next.config.ts"
 import type { NextConfig } from 'next';
@@ -24,16 +26,26 @@ const nextConfig: NextConfig = {
 export default withKizuna(nextConfig);
 ```
 
-Then create a catch-all route at `src/app/api/[...ts-kizuna]/route.ts`. The adapter exports handlers for every HTTP method, which Next.js dispatches automatically.
+</Step>
 
-```ts title="src/server/server.ts"
+<Step>
+
+## Create the server
+
+```ts title="server.ts"
 import { KizunaServer } from '@ts-kizuna/next';
 import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);
 ```
 
-```ts title="src/server/router/index.ts"
+</Step>
+
+<Step>
+
+## Implement the router
+
+```ts title="router/index.ts"
 import { server } from './server';
 
 export const router = server.router({
@@ -77,7 +89,13 @@ export const router = server.router({
 });
 ```
 
-```ts title="src/server/api.ts"
+</Step>
+
+<Step>
+
+## Build the api
+
+```ts title="api.ts"
 import { server } from './server';
 import { router } from './router';
 
@@ -85,6 +103,14 @@ export const api = server.api({
     router,
 });
 ```
+
+</Step>
+
+<Step>
+
+## Mount it at a catch-all route
+
+The adapter exports a handler for every HTTP method, which Next.js dispatches automatically:
 
 ```ts title="src/app/api/[...ts-kizuna]/route.ts"
 import { api } from '@/server/api';
@@ -94,11 +120,15 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
 });
 ```
 
+</Step>
+
+</Steps>
+
 ## Handler context
 
 Each handler receives `{ params, query, body, headers, request }`. The `request` is the native `NextRequest`, useful when you need to read cookies or access other request properties.
 
-```ts
+```ts title="users.ts"
 getUser: async ({ params, request }) => {
     const token = request.cookies.get('session')?.value;
     const user = await db.users.findById(params.id);
@@ -111,9 +141,9 @@ getUser: async ({ params, request }) => {
 
 ## Guards
 
-A guard receives the credential extracted and typed, alongside the native `request`. See the [Auth guide](/docs/auth).
+A guard receives the credential extracted and typed, alongside the native `request`. See the [Authentication guide](/docs/authentication).
 
-```ts title="src/server/guards.ts"
+```ts title="guards.ts"
 import { server } from './server';
 
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
@@ -133,7 +163,7 @@ For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/ref
 
 ## Options
 
-```ts
+```ts title="src/app/api/[...ts-kizuna]/route.ts"
 api.mount({
     basePath: '/api',
     responseValidation: false,
@@ -151,7 +181,7 @@ api.mount({
 
 Set `onError` on `server.api`, or pass it to `api.mount`, to send your own response:
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 import { server } from './server';
 import { router } from './router';
 
@@ -184,9 +214,9 @@ export const api = server.api({
 
 ## Type-safe request properties
 
-Middleware that sets custom properties on the request, such as a request id, needs module augmentation to extend `NextRequest` so handlers reach them without casts. Auth data does not: guards hand handlers typed context directly.
+Middleware that sets custom properties on the request, such as a request id, needs module augmentation to extend `NextRequest` so handlers reach them without casts. Authentication data does not: guards hand handlers typed context directly.
 
-```ts title="types/next.d.ts"
+```ts title="next.d.ts"
 import 'next/server';
 
 declare module 'next/server' {
@@ -198,7 +228,7 @@ declare module 'next/server' {
 
 Both middleware and handlers are then typed:
 
-```ts
+```ts title="users.ts"
 getUser: async ({ params, request }) => {
     console.log(request.requestId);
     // ...
@@ -209,7 +239,7 @@ getUser: async ({ params, request }) => {
 
 Routes with `contentType: 'multipart/form-data'` work natively. The adapter calls `request.formData()` internally.
 
-```ts
+```ts title="users.ts"
 uploadAvatar: async ({ body }) => {
     // body.file is a File, body.userId is a string
     await storage.upload(body.userId, body.file);

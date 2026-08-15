@@ -3,7 +3,7 @@ title: Kizuna.identity
 description: Define who can call your API with an OpenAPI security scheme, the context a passing guard provides, and the access fields routes may constrain.
 ---
 
-An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/server-guard) provides to handlers), and an optional `access` schema (the fields the [`auth` map](/docs/reference/k-contract#the-auth-map) may constrain per route). See the [Auth guide](/docs/auth) for the full walkthrough.
+An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/server-guard) provides to handlers), and an optional `access` schema (the fields the [`auth` map](/docs/reference/k-contract#the-auth-map) may constrain per route). See the [Authentication guide](/docs/authentication) for the full walkthrough.
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -33,7 +33,7 @@ Every builder takes `context` (optional), `access` (optional), `description` (op
 
 ## Example
 
-```ts title="src/contract/identities.ts"
+```ts title="identities.ts"
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 
@@ -66,7 +66,7 @@ An identity with no `access` can still be required by the auth map (`'user'`), j
 
 An identity that only proves the caller is known, such as an API key, has nothing to hand the handler. Omit `context` and `access`:
 
-```ts title="src/contract/identities.ts"
+```ts title="identities.ts"
 export const apiConsumer = Kizuna.identity.apiKey({
     name: 'x-api-key',
     in: 'header',
@@ -75,7 +75,7 @@ export const apiConsumer = Kizuna.identity.apiKey({
 
 Its [guard](/docs/reference/server-guard) returns nothing on success, or `deny(...)` to reject:
 
-```ts
+```ts title="guards.ts"
 export const requireApiKey = server.guard('apiConsumer', async ({ apiKey, deny }) => {
     if (!apiKey || !(await isKnownKey(apiKey.value))) return deny(401, 'Unauthorized');
 });
@@ -89,7 +89,7 @@ Some credentials don't fit any OpenAPI security scheme. A capability URL is the 
 
 `Kizuna.identity.custom` is the escape hatch. It has no OpenAPI scheme; its guard reads the credential itself from wherever it lives:
 
-```ts title="src/contract/identities.ts"
+```ts title="identities.ts"
 export const inviteToken = Kizuna.identity.custom({
     context: z.object({
         inviteId: z.string(),
@@ -97,7 +97,7 @@ export const inviteToken = Kizuna.identity.custom({
 });
 ```
 
-```ts
+```ts title="guards.ts"
 export const requireInviteToken = server.guard('inviteToken', async ({ params, deny }) => {
     const inviteId = await resolveInvite(params.token);
     if (!inviteId) return deny(404, 'Not found');
@@ -117,7 +117,7 @@ Reach for `custom` only when the credential is truly inexpressible. A token belo
 
 Pass identities to [`new Kizuna()`](/docs/reference/kizuna) under `identities`. Their keys become the names everything else uses: auth map values, guard registrations, and handler context keys:
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 import { user, member } from './identities';
@@ -135,19 +135,16 @@ export const k = new Kizuna({
 
 Routes never mention identities directly. The contract's `auth` map assigns them per group (or per route via a `'*'` cascade), keyed by the names above:
 
-```ts title="src/contract/index.ts"
-export const contract = k.contract({
-    routes,
-    auth: {
-        users: false,
-        health: false,
-        members: 'user',
-        workspace: {
-            '*': 'member',
-            deleteWorkspace: {
-                member: {
-                    role: 'owner',
-                },
+```ts title="auth.ts"
+export const auth = k.auth(routes, {
+    users: false,
+    health: false,
+    members: 'user',
+    workspace: {
+        '*': 'member',
+        deleteWorkspace: {
+            member: {
+                role: 'owner',
             },
         },
     },

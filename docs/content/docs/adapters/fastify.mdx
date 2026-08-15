@@ -9,16 +9,26 @@ description: Mount a ts-kizuna API on a Fastify application.
 
 <InstallTabs packageName="@ts-kizuna/fastify fastify" />
 
-## Setup
+<Steps>
 
-```ts title="src/server/server.ts"
+<Step>
+
+## Create the server
+
+```ts title="server.ts"
 import { KizunaServer } from '@ts-kizuna/fastify';
 import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);
 ```
 
-```ts title="src/server/router/index.ts"
+</Step>
+
+<Step>
+
+## Implement the router
+
+```ts title="router/index.ts"
 import { server } from './server';
 
 export const router = server.router({
@@ -62,7 +72,13 @@ export const router = server.router({
 });
 ```
 
-```ts title="src/server/api.ts"
+</Step>
+
+<Step>
+
+## Build the api
+
+```ts title="api.ts"
 import { server } from './server';
 import { router } from './router';
 
@@ -70,6 +86,12 @@ export const api = server.api({
     router,
 });
 ```
+
+</Step>
+
+<Step>
+
+## Mount it
 
 ```ts title="src/index.ts"
 import Fastify from 'fastify';
@@ -83,11 +105,15 @@ app.listen({
 });
 ```
 
+</Step>
+
+</Steps>
+
 ## Handler context
 
 Each handler receives `{ params, query, body, headers, request, reply }`. The `request` is the Fastify `FastifyRequest` and `reply` is `FastifyReply`, useful when you need access to raw headers, cookies, or other Fastify-specific features.
 
-```ts
+```ts title="users.ts"
 getUser: async ({ params, request }) => {
     const token = request.headers.authorization;
     const user = await db.users.findById(params.id);
@@ -100,9 +126,9 @@ getUser: async ({ params, request }) => {
 
 ## Guards
 
-A guard receives the credential extracted and typed, alongside the native `request`/`reply`. See the [Auth guide](/docs/auth).
+A guard receives the credential extracted and typed, alongside the native `request`/`reply`. See the [Authentication guide](/docs/authentication).
 
-```ts title="src/server/guards.ts"
+```ts title="guards.ts"
 import { server } from './server';
 
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
@@ -122,7 +148,7 @@ For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/ref
 
 ## Options
 
-```ts
+```ts title="src/index.ts"
 app.register(fastifyKizuna, {
     api,
     responseValidation: false,
@@ -136,9 +162,9 @@ app.register(fastifyKizuna, {
 
 ## Type-safe request properties
 
-Middleware that sets custom properties on `request`, such as a request id, needs Fastify's [declaration merging](https://fastify.dev/docs/latest/Reference/TypeScript/#creating-a-typescript-fastify-plugin) to extend the `FastifyRequest` interface. Auth data does not: guards hand handlers typed context directly.
+Middleware that sets custom properties on `request`, such as a request id, needs Fastify's [declaration merging](https://fastify.dev/docs/latest/Reference/TypeScript/#creating-a-typescript-fastify-plugin) to extend the `FastifyRequest` interface. Authentication data does not: guards hand handlers typed context directly.
 
-```ts title="types/fastify.d.ts"
+```ts title="fastify.d.ts"
 declare module 'fastify' {
     interface FastifyRequest {
         requestId: string;
@@ -148,7 +174,7 @@ declare module 'fastify' {
 
 Both middleware and handlers are then typed:
 
-```ts
+```ts title="users.ts"
 getUser: async ({ params, request }) => {
     console.log(request.requestId);
     // ...
@@ -159,7 +185,7 @@ The adapter also sets `request.kizunaRoute` on every matched request, containing
 
 Annotate handlers individually or as a whole tree:
 
-```ts
+```ts title="users.ts"
 import type { RouteHandler, Router } from '@ts-kizuna/fastify';
 import { contract } from '@/contract';
 

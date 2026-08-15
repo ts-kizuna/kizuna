@@ -9,13 +9,17 @@ Request-scoped values every handler receives, typed, such as analytics ids, logg
 
 A declaration that reads no headers takes the context schema on its own:
 
-```ts
-export const logger = Kizuna.requestContext(z.object({ requestId: z.string() }));
+```ts title="request-contexts.ts"
+export const logger = Kizuna.requestContext(
+    z.object({
+        requestId: z.string(),
+    })
+);
 ```
 
 A declaration can also read request `headers`. They stay off the routes and out of the OpenAPI document, and the clients type them, so a caller sets them once and the resolver reads them validated.
 
-```ts title="src/contract/request-contexts.ts"
+```ts title="request-contexts.ts"
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 
@@ -29,7 +33,7 @@ export const analytics = Kizuna.requestContext({
 });
 ```
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 import { analytics } from './request-contexts';
 
 export const k = new Kizuna({
@@ -39,7 +43,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts title="src/server/request-context.ts"
+```ts title="request-context.ts"
 import { server } from './server';
 
 export const captureAnalytics = server.requestContext('analytics', ({ headers }) => ({
@@ -47,7 +51,7 @@ export const captureAnalytics = server.requestContext('analytics', ({ headers })
 }));
 ```
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 export const api = server.api({
     router,
     requestContext: {
@@ -56,7 +60,7 @@ export const api = server.api({
 });
 ```
 
-```ts
+```ts title="users.ts"
 listUsers: ({ query, requestContext }) => {
     track(requestContext.analytics.sessionId, 'listUsers');
     // ...
@@ -67,7 +71,7 @@ listUsers: ({ query, requestContext }) => {
 
 The fetch client takes the declared headers under `requestContext` and sends them with every request:
 
-```ts
+```ts title="api-client.ts"
 const apiClient = new KizunaClient(contract, {
     baseUrl: 'https://api.example.com',
     requestContext: {
@@ -78,11 +82,11 @@ const apiClient = new KizunaClient(contract, {
 
 The generated Swift and Kotlin clients take a `RequestContext` in their initializer:
 
-```swift
+```swift title="APISetup.swift"
 let client = APIClient(baseURL: url, requestContext: .init(xPosthogSessionId: sessionId))
 ```
 
-```kotlin
+```kotlin title="APISetup.kt"
 val client = APIClient(baseUrl = baseUrl, requestContext = APIClient.RequestContext(xPosthogSessionId = sessionId))
 ```
 

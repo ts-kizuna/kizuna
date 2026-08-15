@@ -31,7 +31,7 @@ import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 
 Use `ProblemDetailsSchema` in your contract's `responses` to document error status codes:
 
-```ts
+```ts title="routes/users.ts"
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { k } from './k';
 
@@ -53,7 +53,7 @@ const usersRoutes = k.routes('users', {
 
 Handlers supply `detail`; `type`, `title`, and `status` are filled in:
 
-```ts
+```ts title="router/index.ts"
 const router = server.router({
     users: {
         getUser: ({ params, throwError }) => {
@@ -81,7 +81,7 @@ The client receives the full envelope shown under [Shape](#shape).
 
 RFC 9457 lets a problem carry extra fields, called **extension members**, alongside the standard envelope. `ProblemDetailsSchema` is a plain Zod object schema, so add them with `.extend()`:
 
-```ts
+```ts title="routes/users.ts"
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { k } from './k';
@@ -103,7 +103,7 @@ const usersRoutes = k.routes('users', {
 
 To reuse the extended schema across routes, and give it a name in the generated OpenAPI spec, wrap it in [`Kizuna.model`](/docs/reference/kizuna-model):
 
-```ts
+```ts title="routes/users.ts"
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
@@ -120,7 +120,7 @@ const ConflictError = Kizuna.model({
 
 The handler supplies `detail` plus the declared extensions:
 
-```ts
+```ts title="router/users.ts"
 return throwError({
     status: 409,
     body: {
@@ -146,7 +146,7 @@ Extension members are how you preserve an existing API's error fields when movin
 
 `isProblemDetails` is a type guard for the shared error shape, the sibling of [`isValidationError`](/docs/reference/is-validation-error):
 
-```ts
+```ts title="lib/users.ts"
 import { isProblemDetails } from '@ts-kizuna/core';
 
 if (isProblemDetails(response.body)) {
@@ -162,7 +162,7 @@ Every response with status `>= 400` must be Problem Details, and the type system
 
 Adapters accept a `formatError` option to reshape the outgoing bytes for clients that can't move to Problem Details yet. It receives the request, so during a transition you serve the legacy shape to old clients and Problem Details to new ones, branching on whatever signal your API has:
 
-```ts
+```ts title="src/index.ts"
 api.mount(app, {
     formatError: (problem, { request }) => {
         // new clients opt in via a signal you control, here a version header
