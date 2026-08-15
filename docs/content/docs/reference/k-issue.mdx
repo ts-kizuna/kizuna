@@ -65,7 +65,7 @@ A request whose body fails this refinement returns `400` with the custom code in
 
 By default `errors[].code` is typed as [`ValidationIssueCode`](/docs/reference/is-validation-error), so the built-in Zod codes are suggested in autocomplete and any custom string is accepted, but your `invalid_phone_number` is not _suggested_ (it lives only inside the refinement callback, where TypeScript can't see it).
 
-To make the client suggest your custom codes, declare them on `new Kizuna()`'s `validation.issueCodes` for that API and pass the contract to [`new KizunaClient()`](/docs/reference/kizuna-client):
+To make the client suggest your custom codes, declare them on `new Kizuna()`'s `settings.validation.issueCodes` for that API and pass the contract to [`new KizunaClient()`](/docs/reference/kizuna-client):
 
 ```ts
 // k.ts
@@ -74,8 +74,10 @@ import { tags } from './tags';
 
 export const k = new Kizuna({
     tags,
-    validation: {
-        issueCodes: ['invalid_phone_number'],
+    settings: {
+        validation: {
+            issueCodes: ['invalid_phone_number'],
+        },
     },
 });
 ```

@@ -4,7 +4,11 @@ import { Kizuna } from './kizuna.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({ users: { title: 'Users' } }),
-    validation: { issueCodes: ['invalid_phone_number'] },
+    settings: {
+        validation: {
+            issueCodes: ['invalid_phone_number'],
+        },
+    },
 });
 
 test('issueCodes literal is preserved, not widened to string', () => {

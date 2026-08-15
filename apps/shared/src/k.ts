@@ -16,8 +16,10 @@ export const k = new Kizuna({
         analytics,
     },
     tags,
-    validation: {
-        issueCodes: ['invalid_phone_number'],
+    settings: {
+        validation: {
+            issueCodes: ['invalid_phone_number'],
+        },
     },
     plugins: {
         mcp: mcpPlugin({

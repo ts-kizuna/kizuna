@@ -18,20 +18,24 @@ new Kizuna(config?: {
     identities?: Record<string, SecurityScheme>;
     requestContext?: Record<string, RequestContext>;
     tags?: TagSet;
-    validation?: { issueCodes?: readonly string[] };
     plugins?: Record<string, ContractPlugin>;
-    jobs?: JobsConfig;
+    settings?: {
+        validation?: { issueCodes?: readonly string[] };
+        jobs?: JobsConfig;
+    };
 }): K
 ```
 
-| Field                   | Type                             | Description                                                                                                                                                     |
-| ----------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `identities`            | `Record<string, SecurityScheme>` | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names the `auth` map and guards use. |
-| `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values every handler receives.                |
-| `tags`                  | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                  |
-| `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                |
-| `plugins`               | `Record<string, ContractPlugin>` | Optional. The plugins this API declares. Their keys become the names `server.api` and handlers use. See [Plugins](/docs/plugins).                               |
-| `jobs`                  | `JobsConfig`                     | Optional. Settings shared by every job. The jobs themselves are declared with `k.jobs`. See [Jobs](/docs/jobs).                                                 |
+What the surface declares sits at the top level. How it behaves sits under `settings`.
+
+| Field                            | Type                             | Description                                                                                                                                                     |
+| -------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `identities`                     | `Record<string, SecurityScheme>` | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names the `auth` map and guards use. |
+| `requestContext`                 | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values every handler receives.                |
+| `tags`                           | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                  |
+| `plugins`                        | `Record<string, ContractPlugin>` | Optional. The plugins this API declares. Their keys become the names `server.api` and handlers use. See [Plugins](/docs/plugins).                               |
+| `settings.validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                |
+| `settings.jobs`                  | `JobsConfig`                     | Optional. Settings shared by every job. The jobs themselves are declared with `k.jobs`. See [Jobs](/docs/jobs).                                                 |
 
 ### `JobsConfig`
 
@@ -77,8 +81,10 @@ export const k = new Kizuna({
         analytics,
     },
     tags,
-    validation: {
-        issueCodes: ['invalid_phone_number'],
+    settings: {
+        validation: {
+            issueCodes: ['invalid_phone_number'],
+        },
     },
 });
 ```

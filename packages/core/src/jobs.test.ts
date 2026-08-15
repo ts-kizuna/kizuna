@@ -354,8 +354,10 @@ describe('a job endpoint colliding with a route', () => {
             identities: {
                 scheduler,
             },
-            jobs: {
-                path: '/internal/tick',
+            settings: {
+                jobs: {
+                    path: '/internal/tick',
+                },
             },
         });
         expect(() =>

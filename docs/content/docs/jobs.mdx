@@ -9,11 +9,11 @@ Jobs are new and still settling. The shape of `k.jobs`, the handler signature, a
 
 </BetaNotice>
 
-`k.jobs` puts background work in the contract, beside the routes.
+`k.jobs` declares background work on the contract. A job has no path and no method.
 
 ## Declaring jobs
 
-Jobs sit alongside `routes` on the contract. The first argument is the identity every job requires.
+The first argument is the [identity](/docs/reference/kizuna-identity) every job requires.
 
 ```ts title="src/contract/jobs.ts"
 import { z } from 'zod';
@@ -33,6 +33,19 @@ export const jobs = k.jobs('scheduler', {
             userId: z.string(),
         }),
     },
+});
+```
+
+Pass the result to [`k.contract`](/docs/reference/k-contract) under `jobs`:
+
+```ts title="src/contract/index.ts"
+import { k } from './k';
+import { routes } from './routes';
+import { jobs } from './jobs';
+
+export const contract = k.contract({
+    routes,
+    jobs,
 });
 ```
 
@@ -78,7 +91,7 @@ An invalid expression throws when the contract is built, naming the field.
 
 ## Writing handlers
 
-`server.jobs` mirrors the declaration, nesting included:
+[`server.jobs`](/docs/reference/server-jobs) mirrors the declaration, nesting included:
 
 ```ts title="src/server/jobs.ts"
 export const jobHandlers = server.jobs({
@@ -106,7 +119,7 @@ export const jobHandlers = server.jobs({
 
 A handler receives `input`, `throwError`, and `jobs`. A job with no declared `result` can return nothing.
 
-Pass the handlers to `server.api` next to the router:
+Pass the handlers to [`server.api`](/docs/reference/server-api) next to the router:
 
 ```ts
 export const api = server.api({
@@ -251,8 +264,10 @@ export const k = new Kizuna({
     identities: {
         scheduler,
     },
-    jobs: {
-        method: 'GET',
+    settings: {
+        jobs: {
+            method: 'GET',
+        },
     },
 });
 ```
@@ -322,7 +337,7 @@ A job is addressed by its dotted key, so a transport carries the name and the in
 
 `POST /jobs/run` runs the one job the body names, validating `input` against that job's schema and answering `422` when it does not fit. It answers with the job's own status, which a queue reads as the [retry signal](#return-status-and-retries).
 
-Configure both on `new Kizuna()` under `jobs`:
+Configure both on [`new Kizuna()`](/docs/reference/kizuna) under `settings.jobs`:
 
 | Option     | Default | Description                                        |
 | ---------- | ------- | -------------------------------------------------- |

@@ -179,7 +179,7 @@ export const contract = k.contract({
 });
 ```
 
-API-wide settings are configured on `new Kizuna()` and carried onto every contract `k.contract` produces, so you set them once. That covers tags and [`validation.issueCodes`](/docs/reference/k-issue) for custom validation codes.
+API-wide settings are configured on `new Kizuna()` and carried onto every contract `k.contract` produces, so you set them once. That covers tags and [`settings.validation.issueCodes`](/docs/reference/k-issue) for custom validation codes.
 
 For non-JSON responses, set `contentType` to send the body as-is instead of JSON. Responses default to `application/json`, and errors to `application/problem+json`. Declare a non-JSON body as `z.string()`:
 

@@ -31,7 +31,7 @@ export interface CodedIssue<Input> {
  */
 export interface RegisteredIssue<Codes extends string, Input> {
     /**
-     * Machine-readable error classification, from `validation.issueCodes` or
+     * Machine-readable error classification, from `settings.validation.issueCodes` or
      * Zod's built-ins.
      */
     code: Codes | BuiltinIssueCode;

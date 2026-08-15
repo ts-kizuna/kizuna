@@ -309,7 +309,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
     >;
     /**
      * Emit a validation issue with a machine-readable `code`, checked against the
-     * codes declared under `validation.issueCodes`.
+     * codes declared under `settings.validation.issueCodes`.
      *
      * @example
      * const phone = z.string().superRefine((value, ctx) => {
@@ -342,8 +342,25 @@ type SpecOf<
 };
 
 /**
- * The tags, identities, request contexts, plugins and custom validation issue
- * codes one API surface is bound to.
+ * Behavior every contract from one surface inherits: the custom validation
+ * codes its handlers may emit, and how its job endpoints are served.
+ */
+export interface KizunaSettings<Codes extends string = never> {
+    validation?: {
+        /**
+         * Custom validation issue codes this API's handlers may emit via `k.issue`.
+         */
+        issueCodes?: readonly Codes[];
+    };
+    /**
+     * Settings shared by every job. The jobs themselves are declared with `k.jobs`.
+     */
+    jobs?: JobsConfig;
+}
+
+/**
+ * The tags, identities, request contexts, plugins and settings one API surface
+ * is bound to.
  */
 export interface KizunaConfig<
     Tags extends Record<string, TagOptions> = Record<string, never>,
@@ -355,18 +372,12 @@ export interface KizunaConfig<
     identities?: Identities;
     requestContext?: RequestContext;
     tags?: TagSet<Tags>;
-    validation?: {
-        issueCodes?: readonly Codes[];
-    };
     /**
      * Plugins to install, keyed by name. That key is what handlers read under
      * `plugins`.
      */
     plugins?: Plugins;
-    /**
-     * Settings shared by every job. The jobs themselves are declared with `k.jobs`.
-     */
-    jobs?: JobsConfig;
+    settings?: KizunaSettings<Codes>;
 }
 
 const createSurface = <
@@ -401,7 +412,7 @@ const createSurface = <
             for (const { routeKey, route } of flattenRoutes(contractRoutes)) {
                 routePaths.set(`${route.method}:${route.path}`, routeKey);
             }
-            assertNoJobEndpointCollision(contractJobs, config?.jobs, routePaths);
+            assertNoJobEndpointCollision(contractJobs, config?.settings?.jobs, routePaths);
         }
         if (auth) {
             for (const groupKey of Object.keys(auth)) {
@@ -426,9 +437,9 @@ const createSurface = <
             tags: config?.tags,
             securitySchemes: config?.identities,
             requestContext: config?.requestContext,
-            validation: config?.validation,
+            validation: config?.settings?.validation,
             plugins: config?.plugins,
-            jobsConfig: config?.jobs,
+            jobsConfig: config?.settings?.jobs,
         });
     };
 
@@ -444,9 +455,9 @@ const createSurface = <
 };
 
 /**
- * Declare one API surface: its tags, identities, request contexts and custom
- * validation issue codes. Keep the instance and use `k.routes` to define route
- * groups, `k.auth` to type the auth map, and `k.contract` to assemble them.
+ * Declare one API surface: its tags, identities, request contexts, plugins and
+ * settings. Keep the instance and use `k.routes` to define route groups,
+ * `k.auth` to type the auth map, and `k.contract` to assemble them.
  *
  * The authoring helpers that need no instance stay static: `Kizuna.tags`,
  * `Kizuna.identity`, `Kizuna.requestContext` and `Kizuna.model`.
@@ -457,8 +468,10 @@ const createSurface = <
  *         user,
  *     },
  *     tags,
- *     validation: {
- *         issueCodes: ['invalid_phone_number'],
+ *     settings: {
+ *         validation: {
+ *             issueCodes: ['invalid_phone_number'],
+ *         },
  *     },
  * });
  */

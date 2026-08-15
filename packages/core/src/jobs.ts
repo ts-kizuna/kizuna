@@ -12,8 +12,8 @@ import type { JobRunner as JobRunnerOf } from './job-runner.js';
 export const DEFAULT_JOBS_PATH = '/jobs';
 
 /**
- * Settings shared by every job, passed to `new Kizuna()` under `jobs`. The jobs
- * themselves are declared with `k.jobs`.
+ * Settings shared by every job, passed to `new Kizuna()` under `settings.jobs`.
+ * The jobs themselves are declared with `k.jobs`.
  */
 export interface JobsConfig {
     /**
