@@ -1,5 +1,9 @@
-import type { ComponentProps, ReactNode } from 'react';
+'use client';
+
+import clsx from 'clsx';
+import type { ComponentProps, CSSProperties, ReactNode } from 'react';
 import { DynamicCodeBlock } from 'fumadocs-ui/components/dynamic-codeblock';
+import { completionTransformer, resolveCompletion, type CodeCompletion } from './code-completion';
 import styles from './code-window.module.css';
 
 type CodeWindowSize = 'small' | 'medium';
@@ -11,12 +15,33 @@ interface CodeWindowProps {
     icon?: ReactNode;
     dots?: boolean;
     size?: CodeWindowSize;
+    completion?: CodeCompletion;
     options?: ComponentProps<typeof DynamicCodeBlock>['options'];
 }
 
-export function CodeWindow({ lang, code, title, icon, dots = false, size = 'medium', options }: CodeWindowProps) {
+export function CodeWindow({ lang, code, title, icon, dots = false, size = 'medium', completion, options }: CodeWindowProps) {
+    const anchor = completion ? resolveCompletion(code, completion) : null;
+
+    const codeOptions = {
+        themes: {
+            light: 'github-light',
+            dark: 'github-dark',
+        },
+        ...options,
+        transformers:
+            completion && anchor ? [...(options?.transformers ?? []), completionTransformer(completion, anchor)] : options?.transformers,
+    } as CodeWindowProps['options'];
+
     return (
-        <div className={size === 'small' ? `${styles.window} ${styles.small}` : styles.window}>
+        <div
+            className={clsx(styles.window, size === 'small' && styles.small, anchor && styles.withCompletion)}
+            style={
+                completion && anchor
+                    ? ({
+                          '--completion-rows': completion.items.length,
+                      } as CSSProperties)
+                    : undefined
+            }>
             {dots ? (
                 <div className={styles.dots}>
                     <span className={styles.dot} />
@@ -28,7 +53,7 @@ export function CodeWindow({ lang, code, title, icon, dots = false, size = 'medi
                 <DynamicCodeBlock
                     lang={lang}
                     code={code}
-                    options={options}
+                    options={codeOptions}
                     codeblock={
                         title
                             ? {

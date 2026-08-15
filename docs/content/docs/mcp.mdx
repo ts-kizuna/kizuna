@@ -13,11 +13,15 @@ MCP support is new and still settling. The plugin options and the generated tool
 
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
-## Install it
+<Steps>
+
+<Step>
+
+## Declare the plugin
 
 MCP is a [plugin](/docs/plugins), declared on `new Kizuna()` and served by `api.mount`:
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 
@@ -32,9 +36,15 @@ export const k = new Kizuna({
 });
 ```
 
-Then pass its server half to `server.api`, where the MCP SDK and the transport live:
+</Step>
 
-```ts title="src/server/api.ts"
+<Step>
+
+## Register its server half
+
+`server.api` is where the MCP SDK and the transport live:
+
+```ts title="api.ts"
 import { mcpPluginServer } from '@ts-kizuna/mcp/server';
 
 export const api = server.api({
@@ -44,6 +54,10 @@ export const api = server.api({
     },
 });
 ```
+
+</Step>
+
+</Steps>
 
 The endpoint answers at `/mcp` by default. On Next.js it is served by the catch-all route file that already serves your contract, so with `basePath: '/api'` it lands at `/api/mcp`.
 
@@ -62,13 +76,13 @@ Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-url
 
 Handlers receive the same framework context they do over HTTP, passed through from the transport request, so one reading `req` or `c` keeps working as a tool.
 
-## Auth
+## Authentication
 
-Secured tools authenticate via the headers of the MCP transport request. The endpoint runs the [guards](/docs/auth) registered on `server.api`, exactly like the HTTP pipeline: the credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context.
+Secured tools authenticate via the headers of the MCP transport request. The endpoint runs the [guards](/docs/authentication) registered on `server.api`, exactly like the HTTP pipeline: the credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context.
 
 Configure the MCP client to send the credential as a header on the connection. For example, with Claude Code:
 
-```sh
+```sh title="Terminal"
 claude mcp add --transport http my-api http://localhost:3000/mcp --header "Authorization: Bearer <token>"
 ```
 
@@ -100,13 +114,13 @@ Public routes (`false` in the auth map) run without guards, credentials or not.
 
 ### Claude Code
 
-```sh
+```sh title="Terminal"
 claude mcp add --transport http my-api http://localhost:3000/mcp
 ```
 
 ### VS Code
 
-```json
+```json title=".vscode/mcp.json"
 {
     "mcp.servers": {
         "my-api": {
@@ -119,7 +133,7 @@ claude mcp add --transport http my-api http://localhost:3000/mcp
 
 ### Cursor
 
-```json
+```json title=".cursor/mcp.json"
 {
     "mcpServers": {
         "my-api": {

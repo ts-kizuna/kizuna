@@ -7,9 +7,9 @@ export function Hero({ className }: { className?: string }) {
     return (
         <section className={clsx(styles.hero, className)}>
             <h1 className={styles.headline}>Build fully typed REST APIs with TypeScript</h1>
-            <p className={styles.tagline}>
+            <h2 className={styles.tagline}>
                 Write one contract. Get a fully typed server, an OpenAPI spec, Swift and Kotlin clients, and more.
-            </p>
+            </h2>
             <div className={styles.actions}>
                 <Link href="/docs" className={styles.primary}>
                     Get started

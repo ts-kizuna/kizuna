@@ -96,13 +96,13 @@ The callback also receives `api`, for plugins that read the contract's routes. M
 
 ## What the app writes
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 plugins: {
     audit: auditPlugin({ path: '/internal/audit' }),
 }
 ```
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 export const api = server.api({
     router,
     plugins: {
@@ -117,7 +117,7 @@ Use the same key both times. Leave the second one out and `server.api` throws, n
 
 A plugin route can return `rawResponse` when its wire format is not a JSON body, which is how MCP serves JSON-RPC over server-sent events:
 
-```ts
+```ts title="plugin.ts"
 import { rawResponse } from '@ts-kizuna/core/adapter';
 
 endpoint: async ({ body, headers }) => rawResponse(await transport.handleRequest(request)),

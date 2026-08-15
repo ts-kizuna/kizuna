@@ -5,20 +5,20 @@ description: Assemble route groups into the Contract your server, clients, and g
 
 `k.contract({ routes, jobs, auth })` bundles your route groups into the `Contract`, the one object you hand to the [client](/docs/reference/kizuna-client), [server](/docs/reference/server-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `new Kizuna()`.
 
-```ts
-// contract.ts
+Every client imports it, so the contract and everything it imports travel with them. It holds route shapes, and server config stays in the API app. See [the contract guide](/docs/building/contract).
+
+```ts title="contract/index.ts"
 import { k } from './k';
-import { usersRoutes } from './routes';
+import { routes } from './routes';
+import { auth } from './auth';
 
 export const contract = k.contract({
-    routes: {
-        users: usersRoutes,
-    },
-    auth: {
-        users: false,
-    },
+    routes,
+    auth,
 });
 ```
+
+`auth` is the map built with [`k.auth`](/docs/reference/k-auth) beside the routes. `k.contract` also accepts it written inline.
 
 The declared `issueCodes` widen `errors[].code` on `400` responses to `ValidationIssueCode | <your codes>`, so the client suggests them in autocomplete. Emit them at runtime with [`k.issue`](/docs/reference/k-issue). The factory is per API, so codes and tags stay scoped to it.
 
@@ -26,15 +26,11 @@ The declared `issueCodes` widen `errors[].code` on `400` responses to `Validatio
 
 Jobs declared with [`k.jobs`](/docs/reference/k-jobs) go under `jobs`, beside `routes`:
 
-```ts
+```ts title="contract/index.ts"
 export const contract = k.contract({
-    routes: {
-        users: usersRoutes,
-    },
+    routes,
     jobs,
-    auth: {
-        users: false,
-    },
+    auth,
 });
 ```
 
@@ -42,28 +38,25 @@ A job carries its own identity, so it takes no entry in the `auth` map, and it s
 
 ## The auth map
 
-The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `new Kizuna()`. It is **exhaustive over groups**: every key in `routes` must appear, and public takes an explicit `false`. See the [Auth guide](/docs/auth) for the full walkthrough.
+The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `new Kizuna()`. It is **exhaustive over groups**: every key in `routes` must appear, and public takes an explicit `false`. See the [Authentication guide](/docs/authentication) for the full walkthrough.
 
-```ts
-export const contract = k.contract({
-    routes,
-    auth: {
-        users: false,
-        health: false,
-        members: {
-            '*': 'user',
-            inviteMember: {
-                member: {
-                    role: ['owner', 'admin'],
-                },
+```ts title="auth.ts"
+export const auth = k.auth(routes, {
+    users: false,
+    health: false,
+    members: {
+        '*': 'user',
+        inviteMember: {
+            member: {
+                role: ['owner', 'admin'],
             },
         },
-        workspace: {
-            '*': 'member',
-            deleteWorkspace: {
-                member: {
-                    role: 'owner',
-                },
+    },
+    workspace: {
+        '*': 'member',
+        deleteWorkspace: {
+            member: {
+                role: 'owner',
             },
         },
     },
@@ -85,7 +78,7 @@ export const contract = k.contract({
 
 A group's value can be a cascade, where `'*'` sets the group default and a route entry refines it: the route inherits the default's identities and states only its delta. `false` opts a route out.
 
-```ts
+```ts title="auth.ts"
 workspace: {
     '*': 'member',
     deleteWorkspace: {
@@ -100,7 +93,7 @@ Inside `deleteWorkspace`, `auth.member.role` is typed `'owner'`.
 
 Cascade keys name the group's own routes and subgroups. A subgroup key takes a value for its whole subtree, or its own nested cascade; a key that matches nothing in the group is an error.
 
-```ts
+```ts title="auth.ts"
 members: {
     '*': 'user',
     session: {

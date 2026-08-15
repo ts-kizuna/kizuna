@@ -9,16 +9,26 @@ description: Mount a ts-kizuna API on an Express 5 application.
 
 <InstallTabs packageName="@ts-kizuna/express express" />
 
-## Setup
+<Steps>
 
-```ts title="src/server/server.ts"
+<Step>
+
+## Create the server
+
+```ts title="server.ts"
 import { KizunaServer } from '@ts-kizuna/express';
 import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);
 ```
 
-```ts title="src/server/router/index.ts"
+</Step>
+
+<Step>
+
+## Implement the router
+
+```ts title="router/index.ts"
 import { server } from './server';
 
 export const router = server.router({
@@ -62,7 +72,13 @@ export const router = server.router({
 });
 ```
 
-```ts title="src/server/api.ts"
+</Step>
+
+<Step>
+
+## Build the api
+
+```ts title="api.ts"
 import { server } from './server';
 import { router } from './router';
 
@@ -70,6 +86,12 @@ export const api = server.api({
     router,
 });
 ```
+
+</Step>
+
+<Step>
+
+## Mount it
 
 ```ts title="src/index.ts"
 import express from 'express';
@@ -83,11 +105,15 @@ api.mount(app);
 app.listen(3000);
 ```
 
+</Step>
+
+</Steps>
+
 ## Handler context
 
 Each handler receives `{ params, query, body, headers, req, res }`. The `req` and `res` are the native Express objects, useful when you need to access cookies, set custom headers, or stream a response.
 
-```ts
+```ts title="users.ts"
 getUser: async ({ params, req, res }) => {
     console.log(req.ip);
     res.setHeader('x-custom', 'value');
@@ -101,9 +127,9 @@ getUser: async ({ params, req, res }) => {
 
 ## Guards
 
-A guard receives the credential extracted and typed, alongside the native `req`/`res`. See the [Auth guide](/docs/auth).
+A guard receives the credential extracted and typed, alongside the native `req`/`res`. See the [Authentication guide](/docs/authentication).
 
-```ts title="src/server/guards.ts"
+```ts title="guards.ts"
 import { server } from './server';
 
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
@@ -123,7 +149,7 @@ For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/ref
 
 ## Options
 
-```ts
+```ts title="src/index.ts"
 api.mount(app, {
     responseValidation: false,
 });
@@ -136,9 +162,9 @@ api.mount(app, {
 
 ## Type-safe request properties
 
-Middleware that sets custom properties on `req`, such as a request id, needs declaration merging to extend the Express `Request` interface. Auth data does not: guards hand handlers typed context directly.
+Middleware that sets custom properties on `req`, such as a request id, needs declaration merging to extend the Express `Request` interface. Authentication data does not: guards hand handlers typed context directly.
 
-```ts title="types/express.d.ts"
+```ts title="express.d.ts"
 declare global {
     namespace Express {
         interface Request {
@@ -150,7 +176,7 @@ declare global {
 
 Both middleware and handlers are then typed:
 
-```ts
+```ts title="users.ts"
 getUser: async ({ params, req }) => {
     console.log(req.requestId);
     // ...
@@ -165,7 +191,7 @@ If a path is matched but the method is not defined in the contract, the adapter 
 
 For routes with `contentType: 'multipart/form-data'`, add a multipart middleware such as `multer` or `busboy` before the ts-kizuna handler. The adapter reads `req.body` as-is.
 
-```ts
+```ts title="src/index.ts"
 import multer from 'multer';
 
 const upload = multer({

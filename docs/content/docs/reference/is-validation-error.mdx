@@ -44,7 +44,7 @@ Common error codes: `invalid_type`, `too_small`, `too_big`, `invalid_string_form
 
 When a route declares its own `400` response, the client sees a union of your type and `ValidationError`. Use `isValidationError` to distinguish them:
 
-```ts
+```ts title="users.ts"
 import { isValidationError } from '@ts-kizuna/fetch';
 
 const result = await client.users.createUser({

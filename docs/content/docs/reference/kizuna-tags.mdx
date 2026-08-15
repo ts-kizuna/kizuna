@@ -31,8 +31,7 @@ A `TagSet`. On `new Kizuna()`, it gives `k.routes` completion for the group tag 
 
 ## Example
 
-```ts
-// tags.ts
+```ts title="tags.ts"
 import { Kizuna } from '@ts-kizuna/core';
 
 export const tags = Kizuna.tags({
@@ -44,8 +43,7 @@ export const tags = Kizuna.tags({
 });
 ```
 
-```ts
-// k.ts
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 
@@ -54,8 +52,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts
-// routes.ts
+```ts title="users.ts"
 import { k } from './k';
 
 export const usersRoutes = k.routes('users', {
@@ -75,7 +72,7 @@ export const usersRoutes = k.routes('users', {
 
 Routes reference tags by key, with completion. A route can list more than one tag, which is useful for tagging it across groups:
 
-```ts
+```ts title="users.ts"
 cancelAccount: {
     method: 'POST',
     path: '/account/cancel',

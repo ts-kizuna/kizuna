@@ -5,7 +5,7 @@ description: Implement one identity by turning the extracted credential into typ
 
 `server.guard(identity, run)` implements one [identity](/docs/reference/kizuna-identity): it turns the extracted credential into the typed context handlers receive, or denies the request. The [auth map](/docs/reference/k-contract#the-auth-map) decides which routes it protects.
 
-```ts title="src/server/guards.ts"
+```ts title="guards.ts"
 import { server } from './server';
 
 export const requireUser = server.guard('user', ({ bearer, deny }) => {

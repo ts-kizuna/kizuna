@@ -11,8 +11,7 @@ Handlers implement the contract, one function per route. Inputs arrive validated
 
 Each group lives in its own file, typed against its group in the contract with the [`Router`](#routehandler-and-router-types) type so inputs and responses stay inferred:
 
-```ts
-// users.router.ts
+```ts title="users.router.ts"
 import type { Router } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
 import type { contract } from '@/contract';
 
@@ -57,8 +56,7 @@ export const users: Router<typeof contract.routes.users> = {
 
 `server.router` then composes the groups into the full handler tree. Keep this in its own `router.ts`:
 
-```ts
-// router.ts
+```ts title="router/index.ts"
 import { server } from './server';
 import { users } from './users.router';
 import { health } from './health.router';
@@ -82,7 +80,7 @@ Each handler receives an object with the validated inputs for that route:
 | `body`             | Route has a `body` schema                                                    |
 | `headers`          | Route has a `headers` schema                                                 |
 | `throwError`       | Always                                                                       |
-| `auth`             | Route is secured by the contract's [auth map](/docs/auth)                    |
+| `auth`             | Route is secured by the contract's [auth map](/docs/authentication)          |
 | `requestContext`   | Contract declares [`requestContext`](/docs/reference/kizuna-request-context) |
 | `plugins`          | Contract declares [plugins](/docs/plugins)                                   |
 | `jobs`             | Contract declares [jobs](/docs/jobs)                                         |
@@ -93,9 +91,9 @@ Each handler receives an object with the validated inputs for that route:
 
 ## Identity context
 
-When the contract's [auth map](/docs/auth) secures a route, the handler receives the identity's context under `auth`, keyed by the identity's name. That context is whatever the guard returned, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/kizuna-request-context) arrive the same way, under `requestContext` on every route.
+When the contract's [auth map](/docs/authentication) secures a route, the handler receives the identity's context under `auth`, keyed by the identity's name. That context is whatever the guard returned, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/kizuna-request-context) arrive the same way, under `requestContext` on every route.
 
-```ts
+```ts title="members.ts"
 listMembers: ({ auth }) => ({
     status: 200,
     body: {
@@ -106,15 +104,15 @@ listMembers: ({ auth }) => ({
 
 A route requiring several identities receives all of them under `auth`:
 
-```ts
+```ts title="workspace.ts"
 transfer: ({ body, auth }) => {
     // auth.user.userId and auth.member.workspaceUserId are both available and typed
 },
 ```
 
-On routes with an [access gate](/docs/auth#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `auth.member.role` is typed `'owner'`:
+On routes with an [access gate](/docs/authentication#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `auth.member.role` is typed `'owner'`:
 
-```ts
+```ts title="workspace.ts"
 deleteWorkspace: ({ auth }) => ({
     status: 200,
     body: {
@@ -158,7 +156,7 @@ return {
 
 Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` in your routes to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/server-guard) in guards and all built-in kizuna errors.
 
-```ts title="src/contract/index.ts"
+```ts title="contract/index.ts"
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { k } from './k';
 
@@ -176,7 +174,7 @@ const usersRoutes = k.routes('users', {
 
 In the handler, use the `throwError` helper to return typed error responses. It accepts the same `{ status, body }` as a normal return but throws internally, which is useful in branching logic where you want to bail out early.
 
-```ts
+```ts title="users.ts"
 getUser: async ({ params, throwError }) => {
     const user = await db.users.findById(params.id);
     if (!user) {
@@ -245,7 +243,7 @@ If you declare your own `400` response in the routes, the client will see a unio
 
 Annotate a single route, one group, or the whole tree:
 
-```ts
+```ts title="users.ts"
 import type { RouteHandler, Router } from '@ts-kizuna/express';
 import { contract } from '@/contract';
 

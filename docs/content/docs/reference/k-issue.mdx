@@ -27,7 +27,7 @@ k.issue<Input>(
 
 ## Example
 
-```ts
+```ts title="routes/contacts.ts"
 import { z } from 'zod';
 import { isValidPhoneNumber } from 'libphonenumber-js';
 
@@ -67,8 +67,7 @@ By default `errors[].code` is typed as [`ValidationIssueCode`](/docs/reference/i
 
 To make the client suggest your custom codes, declare them on `new Kizuna()`'s `validation.issueCodes` for that API and pass the contract to [`new KizunaClient()`](/docs/reference/kizuna-client):
 
-```ts
-// k.ts
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 
@@ -80,8 +79,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts
-// api-client.ts
+```ts title="api-client.ts"
 import { KizunaClient } from '@ts-kizuna/fetch';
 import { contract } from './contract';
 
@@ -92,7 +90,7 @@ export const apiClient = new KizunaClient(contract, {
 
 Now `errors[].code` on a `400` response is widened to `ValidationIssueCode | 'invalid_phone_number'`, so `invalid_phone_number` shows up in autocomplete when you read or compare it:
 
-```ts
+```ts title="lib/contacts.ts"
 const result = await apiClient.contacts.createContact({ body: { phone: 'nope' } });
 if (result.status === 400 && isValidationError(result.body)) {
     for (const issue of result.body.errors) {

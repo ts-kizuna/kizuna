@@ -9,16 +9,26 @@ description: Mount a ts-kizuna API on a Hono application.
 
 <InstallTabs packageName="@ts-kizuna/hono hono" />
 
-## Setup
+<Steps>
 
-```ts title="src/server/server.ts"
+<Step>
+
+## Create the server
+
+```ts title="server.ts"
 import { KizunaServer } from '@ts-kizuna/hono';
 import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);
 ```
 
-```ts title="src/server/router/index.ts"
+</Step>
+
+<Step>
+
+## Implement the router
+
+```ts title="router/index.ts"
 import { server } from './server';
 
 export const router = server.router({
@@ -62,7 +72,13 @@ export const router = server.router({
 });
 ```
 
-```ts title="src/server/api.ts"
+</Step>
+
+<Step>
+
+## Build the api
+
+```ts title="api.ts"
 import { server } from './server';
 import { router } from './router';
 
@@ -70,6 +86,12 @@ export const api = server.api({
     router,
 });
 ```
+
+</Step>
+
+<Step>
+
+## Mount it
 
 ```ts title="src/index.ts"
 import { Hono } from 'hono';
@@ -81,11 +103,15 @@ api.mount(app);
 export default app;
 ```
 
+</Step>
+
+</Steps>
+
 ## Handler context
 
 Each handler receives `{ params, query, body, headers, c }`. The `c` is the Hono `Context` object, useful when you need to access cookies, environment bindings, or other Hono-specific features.
 
-```ts
+```ts title="users.ts"
 getUser: async ({ params, c }) => {
     const token = c.req.header('Authorization');
     const user = await db.users.findById(params.id);
@@ -100,7 +126,7 @@ getUser: async ({ params, c }) => {
 
 On runtimes like Cloudflare Workers, environment bindings are available on the Hono context as `c.env`.
 
-```ts title="src/server/router/index.ts"
+```ts title="router/index.ts"
 import { server } from './server';
 
 export const router = server.router({
@@ -118,9 +144,9 @@ export const router = server.router({
 
 ## Guards
 
-A guard receives the credential extracted and typed, alongside the native context `c`. See the [Auth guide](/docs/auth).
+A guard receives the credential extracted and typed, alongside the native context `c`. See the [Authentication guide](/docs/authentication).
 
-```ts title="src/server/guards.ts"
+```ts title="guards.ts"
 import { server } from './server';
 
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
@@ -140,7 +166,7 @@ For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/ref
 
 ## Options
 
-```ts
+```ts title="src/index.ts"
 api.mount(app, {
     responseValidation: false,
 });
@@ -155,7 +181,7 @@ api.mount(app, {
 
 Annotate handlers individually or as a whole tree:
 
-```ts
+```ts title="users.ts"
 import type { RouteHandler, Router } from '@ts-kizuna/hono';
 import { contract } from '@/contract';
 

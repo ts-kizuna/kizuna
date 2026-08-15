@@ -45,9 +45,9 @@ The response is a discriminated union over the route's declared status codes. Na
 
 ## Example
 
-When the contract secures routes with [identities](/docs/auth), send the credential in `baseHeaders`:
+When the contract secures routes with [identities](/docs/authentication), send the credential in `baseHeaders`:
 
-```ts
+```ts title="api-client.ts"
 import { KizunaClient } from '@ts-kizuna/fetch';
 import { contract } from './contract';
 
@@ -76,7 +76,7 @@ if (result.status === 201) {
 
 Pass `fetchOptions` to customize individual requests:
 
-```ts
+```ts title="users.ts"
 const { body } = await client.users.listUsers({
     query: {
         page: 1,

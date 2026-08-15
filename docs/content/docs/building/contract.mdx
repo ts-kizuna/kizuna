@@ -5,11 +5,13 @@ description: Define your routes and bundle them into a contract, the source of t
 
 The contract is the source of truth for your API. You hand it to [`new KizunaServer()`](/docs/building/router) on the server and [`new KizunaClient()`](/docs/clients/fetch) on every client.
 
+<ContractNotice />
+
 ## Create the factory
 
 Construct it once, usually in a `k.ts` file, and export `k`. Pass a tag set so route groups have a tag to sit under, where the keys become the allowed group names.
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 
 const tags = Kizuna.tags({
@@ -25,7 +27,7 @@ export const k = new Kizuna({
 
 Call `k.routes` with a tag and your routes.
 
-```ts title="src/contract/routes/users.ts"
+```ts title="users.ts"
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { k } from './k';
@@ -106,8 +108,6 @@ getUser: {
 },
 ```
 
-The keys must be exactly the `:name` placeholders in the path, so a typo like `/users/:usrId` is a type error on `pathParams`.
-
 Each value must be a scalar, since a path segment arrives as one string. Structured values belong in `query`. To parse one into something richer, use `z.string().transform(...)`:
 
 ```ts
@@ -168,7 +168,7 @@ responses: {
 
 Assemble your route groups with `k.contract` and default-export the result. This is the object `client` and `server.api` consume.
 
-```ts title="src/contract/index.ts"
+```ts title="contract/index.ts"
 import { k } from './k';
 import { usersRoutes } from './routes';
 
@@ -194,7 +194,7 @@ responses: {
 
 For binary responses, use [`BinarySchema`](/docs/reference/binary-and-file-schemas) for a body of raw bytes (`Uint8Array`/`Buffer`), such as a PDF download:
 
-```ts
+```ts title="reports.ts"
 import { BinarySchema } from '@ts-kizuna/core/schemas';
 
 responses: {
@@ -205,15 +205,15 @@ responses: {
 },
 ```
 
-## Auth
+## Authentication
 
-Auth is part of the contract too: you declare identities with [`Kizuna.identity`](/docs/reference/kizuna-identity), register them on `new Kizuna()`, and give `k.contract` an `auth` map saying which routes require which identity. That one declaration drives runtime enforcement, typed handler context, the OpenAPI spec's security, and client-side access checks. The [Auth guide](/docs/auth) walks the whole pipeline.
+Authentication is part of the contract too: you declare identities with [`Kizuna.identity`](/docs/reference/kizuna-identity), register them on `new Kizuna()`, and give `k.contract` an `auth` map saying which routes require which identity. That one declaration drives runtime enforcement, typed handler context, and the OpenAPI spec's security. The [Authentication guide](/docs/authentication) walks the whole pipeline.
 
 ## Jobs
 
 Scheduled work is declared on the contract too. [`k.jobs`](/docs/reference/k-jobs) takes the identity every job requires and the jobs themselves, and the result goes under `jobs` on `k.contract`, beside `routes`:
 
-```ts
+```ts title="contract/index.ts"
 export const contract = k.contract({
     routes: {
         users: usersRoutes,
@@ -230,7 +230,7 @@ A job carries its own identity, so it takes no entry in the `auth` map, and it s
 
 By default the generators inline each schema wherever it appears. Use [`Kizuna.model`](/docs/reference/kizuna-model) to give a schema a name they can reuse:
 
-```ts
+```ts title="users.ts"
 import { Kizuna } from '@ts-kizuna/core';
 
 export const UserSchema = Kizuna.model({
@@ -252,7 +252,7 @@ export const UserSchema = Kizuna.model({
 
 Large contracts split into groups. Declare the tags once with [`Kizuna.tags`](/docs/reference/kizuna-tags), pass them to `new Kizuna()`, then define each group with `k.routes` in its own file:
 
-```ts title="src/contract/tags.ts"
+```ts title="tags.ts"
 import { Kizuna } from '@ts-kizuna/core';
 
 export const tags = Kizuna.tags({
@@ -264,7 +264,7 @@ export const tags = Kizuna.tags({
 });
 ```
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 
@@ -273,7 +273,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts title="src/contract/routes/users.ts"
+```ts title="users.ts"
 import { k } from '../k';
 
 export const usersRoutes = k.routes('users', {
@@ -284,7 +284,7 @@ export const usersRoutes = k.routes('users', {
 
 An `index.ts` beside them collects the groups, so the contract has one import to make:
 
-```ts title="src/contract/routes/index.ts"
+```ts title="routes/index.ts"
 import { usersRoutes } from './users';
 import { healthRoutes } from './health';
 
@@ -294,7 +294,7 @@ export const routes = {
 };
 ```
 
-```ts title="src/contract/index.ts"
+```ts title="contract/index.ts"
 import { k } from './k';
 import { routes } from './routes';
 
@@ -358,7 +358,7 @@ IDEs show a strikethrough on deprecated routes and fields right away. To carry t
 
 Infer TypeScript types from your schemas in a separate `types.ts` so consumers can import them without pulling in runtime code:
 
-```ts title="src/contract/types.ts"
+```ts title="types.ts"
 import type { z } from 'zod';
 import { UserSchema, CreateUserSchema } from './routes';
 
@@ -366,7 +366,7 @@ export type User = z.infer<typeof UserSchema>;
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 ```
 
-```ts
+```tsx title="UserCard.tsx"
 import type { User } from '@/contract/types';
 
 function UserCard({ user }: { user: User }) {

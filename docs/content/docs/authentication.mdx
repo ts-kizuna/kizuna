@@ -1,11 +1,25 @@
 ---
-title: Auth
-description: Declare identities and per-route auth on the contract. Runtime guards, typed handler context, OpenAPI security, and client access checks all follow.
+title: Authentication
+description: Declare who can call your API. Identities describe the credential, guards verify it, and the handler receives the caller typed.
 ---
 
-Auth lives in the contract: **identities** say who can call your API, the **auth map** says which routes they can call.
+<BetaNotice>
 
-```ts title="src/contract/identities.ts"
+Authentication is still settling. `Kizuna.identity` and `server.guard` may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
+An **identity** describes a credential your API accepts. A **guard** verifies it and returns who the caller is. The **auth map** says which routes need which identity.
+
+<Steps>
+
+<Step>
+
+## Declare an identity
+
+`Kizuna.identity` picks the credential's shape. Its `context` schema is what a guard returns and handlers receive:
+
+```ts title="identities.ts"
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 
@@ -16,7 +30,9 @@ export const user = Kizuna.identity.bearer({
 });
 ```
 
-```ts title="src/contract/k.ts"
+Register it on `new Kizuna()` under the name the rest of the contract refers to it by:
+
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 import { user } from './identities';
@@ -29,20 +45,44 @@ export const k = new Kizuna({
 });
 ```
 
-```ts title="src/contract/index.ts"
+</Step>
+
+<Step>
+
+## Say which routes need it
+
+`k.auth` types the map against your routes and identities. Every group must appear, so public is an explicit `false`:
+
+```ts title="auth.ts"
 import { k } from './k';
 import { routes } from './routes';
 
-export const contract = k.contract({
-    routes,
-    auth: {
-        health: false,
-        members: 'user',
-    },
+export const auth = k.auth(routes, {
+    health: false,
+    members: 'user',
 });
 ```
 
-```ts title="src/server/guards.ts"
+```ts title="contract/index.ts"
+import { k } from './k';
+import { routes } from './routes';
+import { auth } from './auth';
+
+export const contract = k.contract({
+    routes,
+    auth,
+});
+```
+
+</Step>
+
+<Step>
+
+## Verify the credential with a guard
+
+One guard per identity, registered on `server.api`. It returns the identity's context, or denies:
+
+```ts title="guards.ts"
 import { server } from './server';
 
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
@@ -56,7 +96,7 @@ export const requireUser = server.guard('user', async ({ bearer, deny }) => {
 });
 ```
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 import { server } from './server';
 import { router } from './router';
 import { requireUser } from './guards';
@@ -69,9 +109,15 @@ export const api = server.api({
 });
 ```
 
+</Step>
+
+<Step>
+
+## Read the caller in the handler
+
 Every route under `members` now runs the guard, and its handler receives the guard's return, typed, under `auth`, keyed by the identity's name:
 
-```ts
+```ts title="members.ts"
 members: {
     listMembers: ({ auth }) => ({
         status: 200,
@@ -84,11 +130,15 @@ members: {
 
 Split into its own file, a handler keeps the typed `auth` via [`RouteHandler`](/docs/reference/server-router)`<typeof contract.routes.members.listMembers>`.
 
+</Step>
+
+</Steps>
+
 ## Identities
 
 One builder per authentication method: `bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`, and `custom`. Each optionally takes `context` (what a guard returns and handlers receive) and `access` (fields the auth map may gate per route):
 
-```ts title="src/contract/identities.ts"
+```ts title="identities.ts"
 export const member = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
@@ -103,7 +153,7 @@ export const member = Kizuna.identity.apiKey({
 
 Omit `context` for an authentication-only identity, a pure gate like an API key that only proves the caller is a known client. Its guard returns nothing on success (or `deny(...)`), and routes secured by it receive no handler arg for it:
 
-```ts title="src/contract/identities.ts"
+```ts title="identities.ts"
 export const apiConsumer = Kizuna.identity.apiKey({
     name: 'x-api-key',
     in: 'header',
@@ -112,7 +162,7 @@ export const apiConsumer = Kizuna.identity.apiKey({
 
 When the credential doesn't fit any OpenAPI scheme, a capability-URL token in a path segment for instance, use `custom`. Its guard reads the credential itself, and the route stays explicitly guarded:
 
-```ts title="src/contract/identities.ts"
+```ts title="identities.ts"
 export const inviteToken = Kizuna.identity.custom({
     context: z.object({
         inviteId: z.string(),
@@ -135,24 +185,21 @@ Keyed by route group; every group must appear, so public is always an explicit `
 | `{ user: true, member: { ... } }` | Multiple identities, all must pass                                                  |
 | `{ '*': ..., login: false }`      | Cascade. `'*'` sets the group default, named keys override its routes and subgroups |
 
-```ts title="src/contract/index.ts"
-export const contract = k.contract({
-    routes,
-    auth: {
-        users: false,
-        health: false,
-        members: 'user',
-        workspace: {
-            '*': 'member',
-            deleteWorkspace: {
-                member: {
-                    role: 'owner',
-                },
+```ts title="auth.ts"
+export const auth = k.auth(routes, {
+    users: false,
+    health: false,
+    members: 'user',
+    workspace: {
+        '*': 'member',
+        deleteWorkspace: {
+            member: {
+                role: 'owner',
             },
-            transfer: {
-                member: {
-                    role: 'owner',
-                },
+        },
+        transfer: {
+            member: {
+                role: 'owner',
             },
         },
     },
@@ -165,7 +212,7 @@ A route entry inherits the `'*'` default and only states its delta. `deleteWorks
 
 A subgroup key covers its whole subtree, or nests its own cascade to opt out deeper. A key that matches nothing in the group is an error:
 
-```ts
+```ts title="auth.ts"
 members: {
     '*': 'user',
     session: {
@@ -180,7 +227,7 @@ members: {
 
 `{ member: { role: 'owner' } }` rejects other roles with a `403` before the handler runs, and inside the handler `auth.member.role` narrows to `'owner'`. Array fields pass when they contain the value (`{ member: { permissions: 'invoicing' } }`):
 
-```ts
+```ts title="workspace.ts"
 workspace: {
     deleteWorkspace: ({ auth }) => ({
         status: 200,
@@ -197,7 +244,7 @@ A route requiring several identities receives all of them under `auth`, as in `t
 
 A guard receives the credential extracted and typed, along with the route's path `params`. For a request to `/workspaces/ws_42/members`, `params.workspaceId` is `'ws_42'`, so the guard can check that the caller belongs to that workspace, not just that the token is valid:
 
-```ts title="src/server/guards.ts"
+```ts title="guards.ts"
 export const requireMember = server.guard('member', async ({ apiKey, params, deny }) => {
     const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
     if (!membership) {
@@ -215,7 +262,7 @@ The return is checked against the identity's schemas. `deny(status, detail)` res
 
 [`generateOpenApi`](/docs/reference/generate-openapi) emits `securitySchemes` and per-route `security` from the auth map:
 
-```yaml
+```yaml title="openapi.yaml"
 # generated
 components:
     securitySchemes:
@@ -234,9 +281,9 @@ A `custom` identity has no scheme to emit, so its routes carry an `x-kizuna-guar
 
 ### Client
 
-The [`new KizunaClient()`](/docs/reference/kizuna-client) client sends the credential in `baseHeaders`, and the typed `401`/`403` come back on the response union:
+The [`new KizunaClient()`](/docs/reference/kizuna-client) client sends the credential in `baseHeaders`:
 
-```ts
+```ts title="api-client.ts"
 const apiClient = new KizunaClient(contract, {
     baseUrl,
     baseHeaders: {

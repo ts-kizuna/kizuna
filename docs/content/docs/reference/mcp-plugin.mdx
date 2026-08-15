@@ -38,7 +38,7 @@ Props are pure data. `mcpPluginServer()` takes nothing: declaring the plugin is 
 
 ## Example
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 
@@ -53,7 +53,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 import { mcpPluginServer } from '@ts-kizuna/mcp/server';
 
 export const api = server.api({

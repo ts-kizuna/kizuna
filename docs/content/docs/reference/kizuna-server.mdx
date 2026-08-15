@@ -19,7 +19,7 @@ new KizunaServer(contract: Contract, options?: ServerOptions): Server
 | `options.jobTransport` | `JobTransport`                          | Where a queued job goes. See [Jobs](/docs/jobs#transports).  |
 | `options.onJobError`   | `(job: string, error: unknown) => void` | Called when a job queued without a transport rejects.        |
 
-```ts title="src/server/server.ts"
+```ts title="server.ts"
 import { KizunaServer } from '@ts-kizuna/express';
 import { contract } from './contract';
 
@@ -40,7 +40,7 @@ The handle, the serving surface for this contract:
 
 With jobs that you queue from your own code, name a transport here. Without one, `queue` runs the job in this process and it is lost on a crash:
 
-```ts
+```ts title="server.ts"
 export const server = new KizunaServer(contract, {
     jobTransport: myQueue,
 });
@@ -48,7 +48,7 @@ export const server = new KizunaServer(contract, {
 
 A job queued without a transport has already outlived its request, so a failure has nowhere to report. `onJobError` is where it surfaces; without one it is logged.
 
-```ts
+```ts title="server.ts"
 export const server = new KizunaServer(contract, {
     onJobError: (job, error) => Sentry.captureException(error, { tags: { job } }),
 });

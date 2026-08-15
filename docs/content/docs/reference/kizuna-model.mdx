@@ -29,7 +29,7 @@ The Zod schema with metadata attached, usable anywhere a Zod schema is.
 
 ## Example
 
-```ts
+```ts title="users.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { z } from 'zod';
 
@@ -50,12 +50,13 @@ With `Kizuna.model`:
 
 - **OpenAPI**: the schema is extracted into `components.schemas.User` and every usage becomes a `$ref` reference
 - **Swift**: the schema becomes a named `public struct User` in the generated client, shared across all routes that reference it
+- **Kotlin**: the schema becomes a named `@Serializable data class User` in the generated client, shared across all routes that reference it
 
 ## Extracting TypeScript types
 
 Export a type alongside the schema with `z.infer`:
 
-```ts
+```ts title="types.ts"
 export type User = z.infer<typeof UserSchema>;
 ```
 

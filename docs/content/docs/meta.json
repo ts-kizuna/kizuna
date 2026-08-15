@@ -6,7 +6,7 @@
         "building",
         "adapters",
         "clients",
-        "auth",
+        "authentication",
         "jobs",
         "---Plugins---",
         "[Overview](/docs/plugins)",

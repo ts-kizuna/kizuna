@@ -5,7 +5,7 @@ description: Type a route group or a whole handler tree against the contract.
 
 `server.router(router)` types the handler tree against the contract, one function per route, grouped to mirror the contract. Pass a group key first to type a single group in its own file.
 
-```ts title="src/server/router/index.ts"
+```ts title="router/index.ts"
 import { server } from './server';
 
 export const router = server.router({

@@ -8,6 +8,7 @@ import { AdapterTabs } from './adapter-tabs';
 import { ContractExplorer } from '@/components/code/contract-explorer';
 import { HandlerExplorer } from '@/components/code/handler-explorer';
 import { BetaNotice } from './beta-notice';
+import { ContractNotice } from './contract-notice';
 import { InstallTabs } from './install-tabs';
 import { FeatureList } from './feature-list';
 
@@ -29,6 +30,7 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         ContractExplorer: () => <ContractExplorer className={blockStyles.block} />,
         HandlerExplorer: () => <HandlerExplorer className={blockStyles.block} />,
         BetaNotice,
+        ContractNotice,
         InstallTabs,
         FeatureList,
     };

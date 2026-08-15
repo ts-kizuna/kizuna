@@ -45,7 +45,7 @@ Each path prop is off until you give it a path. The document paths carry their e
 
 ## Example
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { openApiPlugin } from '@ts-kizuna/openapi';
 
@@ -64,7 +64,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 import { openApiPluginServer } from '@ts-kizuna/openapi/server';
 
 export const api = server.api({

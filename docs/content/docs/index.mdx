@@ -33,7 +33,7 @@ Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
 Declare your API surface once with `new Kizuna()` and export `k`, then group your routes with `k.routes`. Keep each piece in its own file (a package both your server and client import).
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 
 export const k = new Kizuna();
@@ -43,7 +43,7 @@ export const k = new Kizuna();
 
 Each route pairs a method and path with Zod schemas:
 
-```ts title="src/contract/routes/users.ts"
+```ts title="users.ts"
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { k } from './k';
@@ -98,7 +98,7 @@ export const usersRoutes = k.routes({
 
 ## Bundle them into a contract
 
-```ts title="src/contract/index.ts"
+```ts title="contract/index.ts"
 import { k } from './k';
 import { usersRoutes } from './routes';
 
@@ -121,14 +121,14 @@ Pick an adapter, here Next.js. `new KizunaServer()` turns the contract into a `s
 
 `server.router` takes one function per route, with inputs validated and typed.
 
-```ts title="src/server/server.ts"
+```ts title="server.ts"
 import { KizunaServer } from '@ts-kizuna/next';
 import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);
 ```
 
-```ts title="src/server/router/index.ts"
+```ts title="router/index.ts"
 import { server } from './server';
 
 export const router = server.router({
@@ -183,7 +183,7 @@ export const router = server.router({
 
 `server.api` puts the router into the API object the adapter mounts.
 
-```ts title="src/server/api.ts"
+```ts title="api.ts"
 import { server } from './server';
 import { router } from './router';
 
@@ -212,7 +212,7 @@ The client is built from the same contract, so every route, input, and response 
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
-```ts title="src/lib/api-client.ts"
+```ts title="api-client.ts"
 import { KizunaClient } from '@ts-kizuna/fetch';
 import { contract } from '@/contract';
 
@@ -221,7 +221,7 @@ export const apiClient = new KizunaClient(contract, {
 });
 ```
 
-```tsx title="src/app/users/page.tsx"
+```tsx title="page.tsx"
 import { apiClient } from '@/lib/api-client';
 
 export default async function UsersPage() {
@@ -245,7 +245,7 @@ export default async function UsersPage() {
 
 Writing is the same:
 
-```tsx title="src/app/users/actions.ts"
+```tsx title="actions.ts"
 'use server';
 
 import { apiClient } from '@/lib/api-client';
@@ -274,7 +274,7 @@ export async function createUser(name: string, email: string) {
 ## Next steps
 
 - [Building an API](/docs/building/contract) covers the contract, router, and mounting in depth
-- [Auth](/docs/auth) declares identities and per-route auth on the contract, and guards, handler types, OpenAPI security, and client access checks all follow
+- [Authentication](/docs/authentication) declares identities and per-route authentication on the contract, and guards, handler types, and OpenAPI security all follow
 - [Adapters](/docs/adapters/express) covers Express, Fastify, Hono, and Next.js setup and options
 - [Fetch client](/docs/clients/fetch) covers headers, custom fetch, and error handling
 - [OpenAPI generation](/docs/openapi) serves a spec alongside your API

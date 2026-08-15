@@ -7,9 +7,13 @@ description: A fully typed HTTP client for consuming ts-kizuna routes in the bro
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
-## `new KizunaClient()`
+<Steps>
 
-```ts title="src/lib/api-client.ts"
+<Step>
+
+## Create the client
+
+```ts title="api-client.ts"
 import { KizunaClient } from '@ts-kizuna/fetch';
 import { contract } from '@/contract';
 
@@ -20,9 +24,13 @@ export const apiClient = new KizunaClient(contract, {
 
 The returned client mirrors the contract's route groups, one function per route.
 
-## Calling routes
+</Step>
 
-```ts
+<Step>
+
+## Call a route
+
+```ts title="users.ts"
 // GET /users?page=1&limit=10
 const { status, body } = await apiClient.users.listUsers({
     query: {
@@ -34,7 +42,7 @@ const { status, body } = await apiClient.users.listUsers({
 // body is { users: User[]; total: number }
 ```
 
-```ts
+```ts title="users.ts"
 // POST /users
 const result = await apiClient.users.createUser({
     body: {
@@ -51,7 +59,7 @@ if (result.status === 201) {
 }
 ```
 
-```ts
+```ts title="users.ts"
 // GET /users/:id
 const { status, body } = await apiClient.users.getUser({
     params: {
@@ -60,11 +68,11 @@ const { status, body } = await apiClient.users.getUser({
 });
 ```
 
-The `params` field is required when the route path contains `:param` placeholders, and rejected when it does not.
+`params` is required when the path contains `:param` placeholders, and rejected when it does not.
 
 When the route declares a `pathParams` schema, `params` is typed by that schema's output type instead of the path template, the same typing the server-side handler receives. Refinements like `.brand()` flow to the caller:
 
-```ts
+```ts title="users.ts"
 // contract declares: pathParams: z.object({ id: z.string().brand<'UserId'>() })
 const { body } = await apiClient.users.getUser({
     params: {
@@ -72,6 +80,10 @@ const { body } = await apiClient.users.getUser({
     },
 });
 ```
+
+</Step>
+
+</Steps>
 
 ## `ClientConfig`
 
@@ -97,7 +109,7 @@ export interface ClientConfig {
 
 If a route declares a `headers` schema, the client requires those headers:
 
-```ts
+```ts title="users.ts"
 // the route declares: headers: z.object({ 'x-request-id': z.string() })
 const { body } = await apiClient.users.getUser({
     params: { id: 'usr_abc123' },
@@ -107,11 +119,11 @@ const { body } = await apiClient.users.getUser({
 
 Routes without a `headers` schema accept an optional `headers?: Record<string, string>` for arbitrary request headers.
 
-## Auth
+## Authentication
 
-When the contract secures routes with [identities](/docs/auth), send the credential in `baseHeaders`. The server's guards read it and return the typed `401`/`403` when it's missing or insufficient:
+When the contract secures routes with [identities](/docs/authentication), send the credential in `baseHeaders`. The server's guards read it, and answer `401`/`403` when it's missing or insufficient:
 
-```ts
+```ts title="api-client.ts"
 const apiClient = new KizunaClient(contract, {
     baseUrl: 'https://api.example.com',
     baseHeaders: {
@@ -124,7 +136,7 @@ const apiClient = new KizunaClient(contract, {
 
 Pass any `RequestInit` option via `fetchOptions`:
 
-```ts
+```ts title="users.ts"
 const { body } = await apiClient.users.listUsers({
     query: { page: 1 },
     fetchOptions: {
@@ -138,14 +150,21 @@ const { body } = await apiClient.users.listUsers({
 Each call returns a discriminated union over the route's defined status codes:
 
 ```ts
-type ListUsersResponse = { status: 200; body: { users: User[]; total: number }; headers: Record<string, string> };
+type ListUsersResponse = {
+    status: 200;
+    body: {
+        users: User[];
+        total: number;
+    };
+    headers: Record<string, string>;
+};
 ```
 
 ## Validation errors
 
 A route with a `body` or `query` schema can answer `400` when the request fails validation. It is in the response type already, without you declaring it.
 
-```ts
+```ts title="users.ts"
 const result = await apiClient.users.createUser({
     body: {
         name: '',
@@ -167,7 +186,7 @@ A route with neither takes no `400` in its response type.
 
 If your routes also declares a `400` response on the same route, the body becomes a union of your type and `ValidationError`. Use the `isValidationError` type guard to distinguish them:
 
-```ts
+```ts title="users.ts"
 import { isValidationError } from '@ts-kizuna/fetch';
 
 if (result.status === 400) {
@@ -187,7 +206,7 @@ The client works in Expo and in bare React Native, importing the [same contract]
 
 `baseHeaders` is fixed when the client is constructed, so a credential that lives in storage goes in `onRequest`. It runs before every request, and the `Headers` it receives are the ones sent:
 
-```ts title="src/lib/api-client.ts"
+```ts title="api-client.ts"
 import { KizunaClient } from '@ts-kizuna/fetch';
 import * as SecureStore from 'expo-secure-store';
 import { contract } from '@/contract';
@@ -205,7 +224,7 @@ export const apiClient = new KizunaClient(contract, {
 
 Expo SDK 54 and later ships a `File` class, and `expo/fetch` is the implementation that puts one inside a multipart body. Hand the client Expo's:
 
-```ts title="src/lib/api-client.ts"
+```ts title="api-client.ts"
 import { fetch } from 'expo/fetch';
 
 export const apiClient = new KizunaClient(contract, {
@@ -216,7 +235,7 @@ export const apiClient = new KizunaClient(contract, {
 
 Then build the `FormData` yourself, since the client forwards a `FormData` body untouched:
 
-```ts
+```ts title="upload-avatar.ts"
 import { File } from 'expo-file-system';
 
 const formData = new FormData();

@@ -5,7 +5,7 @@ description: Write a handler for each of the contract's jobs.
 
 `server.jobs(handlers)` takes a handler for each of the contract's [jobs](/docs/jobs), mirroring the declaration including its nesting.
 
-```ts title="src/server/jobs.ts"
+```ts title="jobs.ts"
 import { server } from './server';
 
 export const jobHandlers = server.jobs({

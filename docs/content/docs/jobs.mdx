@@ -11,11 +11,15 @@ Jobs are new and still settling. The shape of `k.jobs`, the handler signature, a
 
 `k.jobs` puts background work in the contract, beside the routes.
 
-## Declaring jobs
+<Steps>
+
+<Step>
+
+## Declare the jobs
 
 Jobs sit alongside `routes` on the contract. The first argument is the identity every job requires.
 
-```ts title="src/contract/jobs.ts"
+```ts title="contract/jobs.ts"
 import { z } from 'zod';
 import { cron } from '@ts-kizuna/core';
 import { k } from './k';
@@ -38,9 +42,9 @@ export const jobs = k.jobs('scheduler', {
 
 A job with a `schedule` runs on a clock; one without is only ever queued. A job can have both.
 
-They nest like routes:
+Jobs can nest in groups:
 
-```ts
+```ts title="contract/jobs.ts"
 export const jobs = k.jobs('scheduler', {
     billing: {
         reconcileInvoices: {
@@ -50,37 +54,15 @@ export const jobs = k.jobs('scheduler', {
 });
 ```
 
-### Schedules
+</Step>
 
-A five-field cron expression, read as UTC, or an object to read it in a time zone:
+<Step>
 
-```ts
-schedule: '0 5 * * *';
-
-schedule: {
-    cron: '0 3 * * *',
-    timezone: 'Europe/Oslo',
-}
-```
-
-Helpers return plain cron strings:
-
-| Helper                        | Expression     |
-| ----------------------------- | -------------- |
-| `cron.every('15m')`           | `*/15 * * * *` |
-| `cron.every('2h')`            | `0 */2 * * *`  |
-| `cron.hourly(30)`             | `30 * * * *`   |
-| `cron.daily('05:00')`         | `0 5 * * *`    |
-| `cron.weekly('mon', '09:00')` | `0 9 * * 1`    |
-| `cron.monthly(1, '05:00')`    | `0 5 1 * *`    |
-
-An invalid expression throws when the contract is built, naming the field.
-
-## Writing handlers
+## Write the handlers
 
 `server.jobs` mirrors the declaration, nesting included:
 
-```ts title="src/server/jobs.ts"
+```ts title="server/jobs.ts"
 export const jobHandlers = server.jobs({
     sendDigests: async () => ({
         status: 200,
@@ -106,9 +88,15 @@ export const jobHandlers = server.jobs({
 
 A handler receives `input`, `throwError`, and `jobs`. A job with no declared `result` can return nothing.
 
+</Step>
+
+<Step>
+
+## Register them on the api
+
 Pass the handlers to `server.api` next to the router:
 
-```ts
+```ts title="api.ts"
 export const api = server.api({
     router,
     jobs: jobHandlers,
@@ -118,7 +106,37 @@ export const api = server.api({
 });
 ```
 
-### Return status and retries
+</Step>
+
+</Steps>
+
+## Schedules
+
+A five-field cron expression, read as UTC, or an object to read it in a time zone:
+
+```ts
+schedule: '0 5 * * *';
+
+schedule: {
+    cron: '0 3 * * *',
+    timezone: 'Europe/Oslo',
+}
+```
+
+Helpers return plain cron strings:
+
+| Helper                        | Expression     |
+| ----------------------------- | -------------- |
+| `cron.every('15m')`           | `*/15 * * * *` |
+| `cron.every('2h')`            | `0 */2 * * *`  |
+| `cron.hourly(30)`             | `30 * * * *`   |
+| `cron.daily('05:00')`         | `0 5 * * *`    |
+| `cron.weekly('mon', '09:00')` | `0 9 * * 1`    |
+| `cron.monthly(1, '05:00')`    | `0 5 1 * *`    |
+
+An invalid expression throws when the contract is built, naming the field.
+
+## Return status and retries
 
 | Return              | Status                           | Read as                    |
 | ------------------- | -------------------------------- | -------------------------- |
@@ -133,7 +151,7 @@ export const api = server.api({
 
 Every handler receives a `jobs` runner shaped like the declaration, with two methods per job:
 
-```ts title="src/server/router/index.ts"
+```ts title="router/index.ts"
 export const router = server.router({
     createUser: async ({ body, jobs }) => {
         const user = await db.users.create(body);
@@ -152,7 +170,7 @@ export const router = server.router({
 });
 ```
 
-```ts
+```ts title="router/index.ts"
 // Run it now, block, get the result.
 const result = await jobs.billing.reconcileInvoices.run({ since });
 
@@ -162,7 +180,7 @@ await jobs.search.reindex.queue();
 
 `queue` takes a message:
 
-```ts
+```ts title="router/index.ts"
 await jobs.chargeInvoice.queue({
     input: {
         invoiceId,
@@ -176,7 +194,7 @@ Input is validated against the job's `input` schema either way.
 
 Outside a request, build a runner yourself:
 
-```ts
+```ts title="run-job.ts"
 import { createJobRunner } from '@ts-kizuna/core';
 
 const jobs = createJobRunner(contract, jobHandlers);
@@ -195,7 +213,7 @@ No queue. `startJobs` watches the clock, and a queued job runs right here.
 
 A job that fails after the response has gone needs somewhere to report:
 
-```ts title="src/server/server.ts"
+```ts title="server.ts"
 export const server = new KizunaServer(contract, {
     onJobError: (job, error) => Sentry.captureException(error, { tags: { job } }),
 });
@@ -218,7 +236,7 @@ startJobs(api);
 
 The same `startJobs`, plus a queue holding the jobs you call `queue()` on, so a restart does not lose them.
 
-```ts title="src/server/server.ts"
+```ts title="server.ts"
 export const server = new KizunaServer(contract, {
     jobTransport: bullmq(connection),
 });
@@ -231,7 +249,7 @@ startJobs(api);
 
 If your queue hands work back rather than calling your job's URL, run a worker to pull from it:
 
-```ts title="src/worker.ts"
+```ts title="worker.ts"
 import { startJobWorker } from '@ts-kizuna/core/jobs';
 
 const worker = await startJobWorker(api);
@@ -246,7 +264,7 @@ More than one instance is fine, as long as the queue drops repeated keys. You ca
 
 Vercel, Lambda, Cloudflare. Platform cron ticks the dispatch endpoint and that covers every schedule:
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 export const k = new Kizuna({
     identities: {
         scheduler,
@@ -272,7 +290,7 @@ One entry covers every job you ever add: the endpoint works out which are due. `
 
 `queue` needs a transport here, because the function can be frozen the moment it answers. Use a queue that delivers over HTTP, like QStash, Cloud Tasks, or SQS. It posts to the run endpoint, which the same identity guards.
 
-```ts title="src/server/server.ts"
+```ts title="server.ts"
 export const server = new KizunaServer(contract, {
     jobTransport: qstash({
         token: process.env.QSTASH_TOKEN,
@@ -290,7 +308,7 @@ export const server = new KizunaServer(contract, {
 
 A transport carries a queued job out of this process to whatever runs it. Name one and your existing `queue` calls become as durable as it is:
 
-```ts title="src/server/server.ts"
+```ts title="server.ts"
 export const server = new KizunaServer(contract, {
     jobTransport: myQueue,
 });
@@ -336,7 +354,7 @@ Configure both on `new Kizuna()` under `jobs`:
 
 A tick runs each due job inline, in the request the scheduler made, so the function's timeout is the budget for all of them. Keep the tick short by having a scheduled job queue one job per unit of work:
 
-```ts title="src/server/jobs.ts"
+```ts title="server/jobs.ts"
 export const jobHandlers = server.jobs({
     sendDigests: async ({ jobs }) => {
         const due = await db.users.needingDigest();

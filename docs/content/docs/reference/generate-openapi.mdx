@@ -50,7 +50,7 @@ renderer('yaml'); // YAML string
 
 ## Example
 
-```ts title="src/contract/k.ts"
+```ts title="k.ts"
 import { Kizuna } from '@ts-kizuna/core';
 import { openApiPlugin } from '@ts-kizuna/openapi';
 
@@ -73,7 +73,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts
+```ts title="generate-openapi.ts"
 import { generateOpenApi } from '@ts-kizuna/openapi/server';
 import { contract } from './contract';
 
@@ -90,7 +90,7 @@ Security is generated from the contract, not configured on the generator. Every 
 
 With the `user` (bearer) and `member` (API key) identities and `workspace: 'member'` in the auth map, the document contains:
 
-```yaml
+```yaml title="openapi.yaml"
 components:
     securitySchemes:
         user:
