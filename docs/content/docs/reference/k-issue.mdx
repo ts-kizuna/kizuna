@@ -93,7 +93,7 @@ export const apiClient = new KizunaClient(contract, {
 Now `errors[].code` on a `400` response is widened to `ValidationIssueCode | 'invalid_phone_number'`, so `invalid_phone_number` shows up in autocomplete when you read or compare it:
 
 ```ts
-const result = await apiClient.contacts.createContact({ body: { phone: 'nope' } });
+const result = await apiClient.routes.contacts.createContact({ body: { phone: 'nope' } });
 if (result.status === 400 && isValidationError(result.body)) {
     for (const issue of result.body.errors) {
         if (issue.code === 'invalid_phone_number') {

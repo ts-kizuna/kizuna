@@ -24,7 +24,7 @@ The returned client mirrors the contract's route groups, one function per route.
 
 ```ts
 // GET /users?page=1&limit=10
-const { status, body } = await apiClient.users.listUsers({
+const { status, body } = await apiClient.routes.users.listUsers({
     query: {
         page: 1,
         limit: 10,
@@ -36,7 +36,7 @@ const { status, body } = await apiClient.users.listUsers({
 
 ```ts
 // POST /users
-const result = await apiClient.users.createUser({
+const result = await apiClient.routes.users.createUser({
     body: {
         name: 'Alice',
         email: 'alice@example.com',
@@ -53,7 +53,7 @@ if (result.status === 201) {
 
 ```ts
 // GET /users/:id
-const { status, body } = await apiClient.users.getUser({
+const { status, body } = await apiClient.routes.users.getUser({
     params: {
         id: 'usr_abc123',
     },
@@ -66,7 +66,7 @@ When the route declares a `pathParams` schema, `params` is typed by that schema'
 
 ```ts
 // contract declares: pathParams: z.object({ id: z.string().brand<'UserId'>() })
-const { body } = await apiClient.users.getUser({
+const { body } = await apiClient.routes.users.getUser({
     params: {
         id: userId, // must be a UserId, a plain string is a type error
     },
@@ -99,7 +99,7 @@ If a route declares a `headers` schema, the client requires those headers:
 
 ```ts
 // the route declares: headers: z.object({ 'x-request-id': z.string() })
-const { body } = await apiClient.users.getUser({
+const { body } = await apiClient.routes.users.getUser({
     params: { id: 'usr_abc123' },
     headers: { 'x-request-id': crypto.randomUUID() },
 });
@@ -125,7 +125,7 @@ const apiClient = new KizunaClient(contract, {
 Pass any `RequestInit` option via `fetchOptions`:
 
 ```ts
-const { body } = await apiClient.users.listUsers({
+const { body } = await apiClient.routes.users.listUsers({
     query: { page: 1 },
     fetchOptions: {
         signal: AbortSignal.timeout(5000),
@@ -146,7 +146,7 @@ type ListUsersResponse = { status: 200; body: { users: User[]; total: number }; 
 A route with a `body` or `query` schema can answer `400` when the request fails validation. It is in the response type already, without you declaring it.
 
 ```ts
-const result = await apiClient.users.createUser({
+const result = await apiClient.routes.users.createUser({
     body: {
         name: '',
         email: 'not-an-email',
@@ -223,7 +223,7 @@ const formData = new FormData();
 formData.append('userId', userId);
 formData.append('file', new File(photo.uri));
 
-const { status } = await apiClient.users.uploadAvatar({
+const { status } = await apiClient.routes.users.uploadAvatar({
     body: formData as never,
 });
 ```

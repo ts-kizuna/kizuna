@@ -58,7 +58,7 @@ const apiClient = new KizunaClient(contract, {
     },
 });
 
-const result = await apiClient.users.createUser({
+const result = await apiClient.routes.users.createUser({
     body: {
         name: 'Alice',
         email: 'alice@example.com',
@@ -72,12 +72,21 @@ if (result.status === 201) {
 }
 ```
 
+## routes
+
+Every route lives under `routes`, mirroring the contract's own groups. The client's own accessors, such as [`permissions`](#permissions), sit beside it rather than inside it, so a route group may be named anything the contract needs without colliding with them.
+
+```ts
+await apiClient.routes.members.listMembers();
+await apiClient.permissions();
+```
+
 ## Per-request options
 
 Pass `fetchOptions` to customize individual requests:
 
 ```ts
-const { body } = await client.users.listUsers({
+const { body } = await client.routes.users.listUsers({
     query: {
         page: 1,
     },
@@ -91,14 +100,16 @@ See the [Fetch client guide](/docs/clients/fetch) for per-request headers, valid
 
 ## permissions
 
-When the contract declares a [permissions endpoint](/docs/access-control#the-client), the client carries a `permissions()` accessor. It fetches the caller's coarse rules once and hands back one boolean per permission:
+When the contract declares a [permissions endpoint](/docs/access-control#the-client), the client carries a `permissions()` accessor. It fetches the caller's coarse rules once and hands back a reader over them:
 
 ```ts
-const { viewEventLog } = await apiClient.permissions();
+const { hasPermission } = await apiClient.permissions();
 
-if (viewEventLog) {
+if (hasPermission('events:read')) {
     // show the event log tab
 }
 ```
 
-Only permissions applying to no record cross the wire, so this is enough to hide an action the caller cannot perform and never enough to decide about one specific record. Those stay on the server, behind `permission.x(record)` in a handler.
+`hasPermission` takes the same `resource:action` name a route gate takes, narrowed to the declared union, so a permission is spelled one way across the contract, the server and here.
+
+Only permissions applying to no record cross the wire, so this is enough to hide an action the caller cannot perform and never enough to decide about one specific record. Those stay on the server, behind `permission.group.name(record)` in a handler.

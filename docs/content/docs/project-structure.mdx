@@ -32,7 +32,10 @@ my-repo/
 │           │   ├── health.ts
 │           │   └── index.ts    # re-exports the groups
 │           ├── access.ts       # k.access, who may call what and what they must hold
-│           ├── permissions.ts  # Kizuna.permission, what may be permitted
+│           ├── permissions/
+│           │   ├── members.ts  # Kizuna.permission, one group per file
+│           │   ├── events.ts
+│           │   └── index.ts    # re-exports the groups
 │           ├── jobs.ts         # k.jobs
 │           └── contract.ts     # k.contract, the object everything reads
 ├── apps/
@@ -41,6 +44,10 @@ my-repo/
 │   │       ├── server/
 │   │       │   ├── server.ts   # new KizunaServer(contract)
 │   │       │   ├── guards.ts   # server.guard per identity
+│   │       │   ├── permissions/
+│   │       │   │   ├── members.ts  # server.permission per group
+│   │       │   │   ├── events.ts
+│   │       │   │   └── index.ts
 │   │       │   ├── router/
 │   │       │   │   ├── users.ts    # Router<typeof contract.routes.users>
 │   │       │   │   ├── events.ts
@@ -89,12 +96,19 @@ my-repo/
     │   │   ├── health.ts
     │   │   └── index.ts    # re-exports the groups
     │   ├── access.ts       # k.access, who may call what and what they must hold
-    │   ├── permissions.ts  # Kizuna.permission, what may be permitted
+    │   ├── permissions/
+    │   │   ├── members.ts  # Kizuna.permission, one group per file
+    │   │   ├── events.ts
+    │   │   └── index.ts    # re-exports the groups
     │   ├── jobs.ts         # k.jobs
     │   └── index.ts        # k.contract, the object everything reads
     ├── server/
     │   ├── server.ts       # new KizunaServer(contract)
     │   ├── guards.ts       # server.guard per identity
+    │   ├── permissions/
+    │   │   ├── members.ts  # server.permission per group
+    │   │   ├── events.ts
+    │   │   └── index.ts
     │   ├── router/
     │   │   ├── users.ts    # Router<typeof contract.routes.users>
     │   │   ├── events.ts

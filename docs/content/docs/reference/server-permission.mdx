@@ -1,6 +1,6 @@
 ---
 title: server.permission
-description: Decide whether the caller holds one permission, once per request and only when something asks.
+description: Answer every permission in one group, once per request and only when something asks.
 ---
 
 <BetaNotice>
@@ -9,20 +9,22 @@ Permissions are new and still settling. `server.permission` and what an implemen
 
 </BetaNotice>
 
-`server.permission(name, run)` implements one [permission](/docs/reference/kizuna-permission). `server.api` requires one implementation per declared permission, the way it requires one guard per identity.
+`server.permission(name, run)` implements one group of [permissions](/docs/reference/kizuna-permission). `server.api` requires one implementation per declared group, the way it requires one guard per identity.
 
-```ts title="src/server/permissions.ts"
-import { server } from './server';
+```ts title="src/server/permissions/members.ts"
+import { server } from '../server';
 
-export const canViewEventLog = server.permission('viewEventLog', () => db.featureFlags.enabled('event-log'));
-
-export const canPromoteMember = server.permission('promoteMember', async () => {
-    const memberIds = await db.memberships.findUserIds();
-    return (target) => memberIds.has(target.id);
+export const members = server.permission('members', async ({ auth }) => {
+    const roles = await db.memberships.findRolesByUserId();
+    const role = roles.get(auth.user.userId);
+    return {
+        manage: role === 'owner' || role === 'admin',
+        remove: (target) => roles.get(target.id) !== 'owner',
+    };
 });
 ```
 
-A permission applying to no record returns a boolean. One with `appliesTo` returns a predicate over that record, which may be async. One shape each.
+The body returns one answer per permission in the group. One applying to no record returns a boolean; one with `appliesTo` returns a predicate over that record, which may be async. Missing a key is a compile error, and so is returning the wrong shape for one.
 
 ## Arguments
 
@@ -32,18 +34,24 @@ A permission applying to no record returns a boolean. One with `appliesTo` retur
 | `params` | The matched route's path params.                                                                                       |
 | adapter  | The adapter's own context: `req`/`res` on Express, `c` on Hono, and so on.                                             |
 
+## The group shares the body
+
+`findRolesByUserId` above runs once and answers both permissions. That is the reason to group them: a route gated on `members:manage` and a handler asking `permission.members.remove(target)` cost one query between them.
+
+Group what shares a lookup. Two permissions whose bodies have nothing in common belong in two groups.
+
 ## It runs once, and only when asked
 
-At most once per request, on first use, and not at all when nothing asks. A route gated on `viewEventLog` never runs the `promoteMember` implementation, and two `permission.promoteMember(...)` calls in one handler resolve it once.
+At most once per request, on first use, and not at all when nothing asks. A route gated on `events:read` never runs the `members` implementation, and two `permission.members.remove(...)` calls in one handler share the one resolution.
 
-That is why the grant set belongs in the body. Loading it there makes the predicate a set test rather than a query per record, so checking fifty records costs one query.
+That is why the grant set belongs in the body. Loading it there makes each predicate a set test rather than a query per record, so checking fifty records costs one query.
 
 ## It returns an answer, not a response
 
-There is no `deny`. A route gate answers `403` with Problem Details on its own; a handler wanting its own wording declares `403` and uses `can` plus `throwError`. See [Permissions](/docs/access-control#denials).
+There is no `deny`. A route gate answers `403` with Problem Details on its own; a handler wanting its own wording declares `403` and uses `permission` plus `throwError`. See [Denials](/docs/access-control#denials).
 
 ## Reference
 
-- [Permissions](/docs/access-control)
+- [Access Control](/docs/access-control)
 - [`Kizuna.permission`](/docs/reference/kizuna-permission)
 - [`server.api`](/docs/reference/server-api)

@@ -225,7 +225,7 @@ export const apiClient = new KizunaClient(contract, {
 import { apiClient } from '@/lib/api-client';
 
 export default async function UsersPage() {
-    const { body } = await apiClient.users.listUsers({
+    const { body } = await apiClient.routes.users.listUsers({
         query: {
             page: 1,
             limit: 10,
@@ -251,7 +251,7 @@ Writing is the same:
 import { apiClient } from '@/lib/api-client';
 
 export async function createUser(name: string, email: string) {
-    const result = await apiClient.users.createUser({
+    const result = await apiClient.routes.users.createUser({
         body: {
             name,
             email,

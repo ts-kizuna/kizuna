@@ -22,7 +22,7 @@ export const access = k.access(routes, {
         '*': 'user',
         removeMember: {
             auth: 'member',
-            permission: 'manageMembers',
+            permission: 'members:manage',
         },
     },
     workspace: {
@@ -47,17 +47,17 @@ export const contract = k.contract({
 
 Keyed by route group, and every group must appear, so a public group is always an explicit `false`.
 
-| Value                                             | Meaning                                                       |
-| ------------------------------------------------- | ------------------------------------------------------------- |
-| `false`                                           | Public, no identity and no permission                         |
-| `'user'`                                          | Requires the `user` identity                                  |
-| `{ member: { role: 'owner' } }`                   | Access gate: requires `member` with `role` limited to a value |
-| `{ user: ['read:events'] }`                       | Requires `user` with these oauth2 scopes                      |
-| `{ user: true, member: { ... } }`                 | Several identities, all of which must pass                    |
-| `{ auth: 'member', permission: 'manageMembers' }` | The identity, and what that caller must be permitted          |
-| `{ '*': ..., login: false }`                      | Cascade: `'*'` is the group default, named keys override      |
+| Value                                              | Meaning                                                       |
+| -------------------------------------------------- | ------------------------------------------------------------- |
+| `false`                                            | Public, no identity and no permission                         |
+| `'user'`                                           | Requires the `user` identity                                  |
+| `{ member: { role: 'owner' } }`                    | Access gate: requires `member` with `role` limited to a value |
+| `{ user: ['read:events'] }`                        | Requires `user` with these oauth2 scopes                      |
+| `{ user: true, member: { ... } }`                  | Several identities, all of which must pass                    |
+| `{ auth: 'member', permission: 'members:manage' }` | The identity, and what that caller must be permitted          |
+| `{ '*': ..., login: false }`                       | Cascade: `'*'` is the group default, named keys override      |
 
-The `permission` half takes one name, a list requiring all of them, or `{ oneOf: [...] }` requiring at least one.
+The `permission` half takes one `resource:action` name, a list requiring all of them, or `{ oneOf: [...] }` requiring at least one. Only actions declared with no `appliesTo` can appear, since a route has loaded no record yet.
 
 ## A permission requires a caller
 
@@ -68,7 +68,7 @@ notifications: {
     // Type error: a public route has no caller
     listEvents: {
         auth: false,
-        permission: 'viewEventLog',
+        permission: 'events:read',
     },
 },
 ```
@@ -85,7 +85,7 @@ A bare auth value states nothing about permissions, so it inherits the group's.
 
 ## Errors
 
-`k.contract` throws rather than resolving something surprising when a permission is not declared, when one applies to a record so a route cannot demand it, when a map key matches no route group, when a cascade key matches nothing in its group, when a cascade targets a route with a nested cascade, and when an `oneOf` is empty.
+`k.contract` throws rather than resolving something surprising when a permission or action is not declared, when an action applies to a record so a route cannot demand it, when a map key matches no route group, when a cascade key matches nothing in its group, when a cascade targets a route with a nested cascade, and when an `oneOf` is empty.
 
 ## Reference
 

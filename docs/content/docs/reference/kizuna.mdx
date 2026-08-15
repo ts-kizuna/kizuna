@@ -16,7 +16,7 @@ import { Kizuna } from '@ts-kizuna/core';
 ```ts
 new Kizuna(config?: {
     identities?: Record<string, SecurityScheme>;
-    permissions?: Record<string, Permission>;
+    permissions?: Record<string, Record<string, Permission>>;
     settings?: { permissions?: { path?: string; identity?: string }; jobs?: JobsConfig };
     requestContext?: Record<string, RequestContext>;
     tags?: TagSet;
@@ -26,16 +26,16 @@ new Kizuna(config?: {
 }): K
 ```
 
-| Field                   | Type                             | Description                                                                                                                                                                                            |
-| ----------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `identities`            | `Record<string, SecurityScheme>` | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names the `auth` map and guards use.                                        |
-| `permissions`           | `Record<string, Permission>`     | Optional. The API's permissions from [`Kizuna.permission`](/docs/reference/kizuna-permission). Declaring any makes `k.contract`'s `permissions` map required. See [Permissions](/docs/access-control). |
-| `permissions`           | `{ path?; identity? }`           | Optional. Serves an endpoint reporting the caller's resolved permissions, for a UI that hides what it cannot do. See [Permissions](/docs/access-control#the-client).                                   |
-| `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values every handler receives.                                                       |
-| `tags`                  | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                                                         |
-| `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                                                       |
-| `plugins`               | `Record<string, ContractPlugin>` | Optional. The plugins this API declares. Their keys become the names `server.api` and handlers use. See [Plugins](/docs/plugins).                                                                      |
-| `jobs`                  | `JobsConfig`                     | Optional. Settings shared by every job. The jobs themselves are declared with `k.jobs`. See [Jobs](/docs/jobs).                                                                                        |
+| Field                   | Type                                         | Description                                                                                                                                                                                                                                                                                                  |
+| ----------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `identities`            | `Record<string, SecurityScheme>`             | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names the `auth` map and guards use.                                                                                                                                              |
+| `permissions`           | `Record<string, Record<string, Permission>>` | Optional. The API's permissions from [`Kizuna.permission`](/docs/reference/kizuna-permission), grouped by what they are about. The two keys join into the `resource:action` name a route demands. Declaring any makes `k.contract`'s `permissions` map required. See [Access Control](/docs/access-control). |
+| `settings.permissions`  | `{ path?; identity? }`                       | Optional. Serves an endpoint reporting the caller's resolved permissions, for a UI that hides what it cannot do. `identity` is who may call that endpoint, which the access map cannot say because the endpoint sits outside `contract.routes`. See [The client](/docs/access-control#the-client).           |
+| `requestContext`        | `Record<string, RequestContext>`             | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values every handler receives.                                                                                                                                                             |
+| `tags`                  | `TagSet`                                     | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                                                                                                                                                               |
+| `validation.issueCodes` | `readonly string[]`                          | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                                                                                                                                                             |
+| `plugins`               | `Record<string, ContractPlugin>`             | Optional. The plugins this API declares. Their keys become the names `server.api` and handlers use. See [Plugins](/docs/plugins).                                                                                                                                                                            |
+| `jobs`                  | `JobsConfig`                                 | Optional. Settings shared by every job. The jobs themselves are declared with `k.jobs`. See [Jobs](/docs/jobs).                                                                                                                                                                                              |
 
 ### `JobsConfig`
 

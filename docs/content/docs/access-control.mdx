@@ -23,34 +23,31 @@ The first is [authentication](/docs/authentication). This page is the other two,
 
 Keyed by route group; every group must appear, so public is always an explicit `false`. Each entry is one of:
 
-| Value                                             | Meaning                                                                             |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `false`                                           | Public, no auth                                                                     |
-| `'user'`                                          | Requires the `user` identity                                                        |
-| `{ member: { role: 'owner' } }`                   | Access gate. Requires `member` with `role` limited to a value (or an array)         |
-| `{ user: ['read:events'] }`                       | Requires `user` with these oauth2 scopes                                            |
-| `{ user: true, member: { ... } }`                 | Multiple identities, all must pass                                                  |
-| `{ '*': ..., login: false }`                      | Cascade. `'*'` sets the group default, named keys override its routes and subgroups |
-| `{ auth: 'member', permission: 'manageMembers' }` | Both: the identity, and what that caller must be permitted                          |
+| Value                                              | Meaning                                                                             |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `false`                                            | Public, no auth                                                                     |
+| `'user'`                                           | Requires the `user` identity                                                        |
+| `{ member: { role: 'owner' } }`                    | Access gate. Requires `member` with `role` limited to a value (or an array)         |
+| `{ user: ['read:events'] }`                        | Requires `user` with these oauth2 scopes                                            |
+| `{ user: true, member: { ... } }`                  | Multiple identities, all must pass                                                  |
+| `{ '*': ..., login: false }`                       | Cascade. `'*'` sets the group default, named keys override its routes and subgroups |
+| `{ auth: 'member', permission: 'members:manage' }` | Both: the identity, and what that caller must be permitted                          |
 
-```ts title="src/contract/index.ts"
-export const contract = k.contract({
-    routes,
-    auth: {
-        users: false,
-        health: false,
-        members: 'user',
-        workspace: {
-            '*': 'member',
-            deleteWorkspace: {
-                member: {
-                    role: 'owner',
-                },
+```ts title="src/contract/access.ts"
+export const access = k.access(routes, {
+    users: false,
+    health: false,
+    members: 'user',
+    workspace: {
+        '*': 'member',
+        deleteWorkspace: {
+            member: {
+                role: 'owner',
             },
-            transfer: {
-                member: {
-                    role: 'owner',
-                },
+        },
+        transfer: {
+            member: {
+                role: 'owner',
             },
         },
     },
@@ -59,11 +56,11 @@ export const contract = k.contract({
 
 The `permission` half takes the same forms as `auth` does:
 
-| Value                              | Meaning                  |
-| ---------------------------------- | ------------------------ |
-| `'manageMembers'`                  | Requires that permission |
-| `['manageMembers', 'viewBilling']` | Requires all of them     |
-| `{ oneOf: [...] }`                 | Requires at least one    |
+| Value                                | Meaning                  |
+| ------------------------------------ | ------------------------ |
+| `'members:manage'`                   | Requires that permission |
+| `['members:manage', 'billing:read']` | Requires all of them     |
+| `{ oneOf: [...] }`                   | Requires at least one    |
 
 <Callout type="warn">
     The two halves inherit differently, because they mean different things. A route's `auth` **merges** into the group's `'*'`, since
@@ -107,15 +104,114 @@ A route requiring several identities receives all of them under `auth`, as in `t
 
 An access gate compares one field against a literal, and that is all it can do. When the decision needs a lookup, or depends on the record being acted on, that is what a permission is for. Keep role gates here: the guard already fetched the role, so the gate costs nothing and narrows the field in the handler.
 
+## Permissions
+
+A permission is one thing a caller may be permitted. Group them by what they are about, one file per group:
+
+```ts title="src/contract/permissions/members.ts"
+export const members = {
+    manage: Kizuna.permission({
+        description: 'Administer the workspace member list',
+    }),
+    remove: Kizuna.permission({
+        appliesTo: UserSchema,
+    }),
+    promote: Kizuna.permission({
+        appliesTo: UserSchema,
+    }),
+};
+```
+
+The group's name comes from where it is registered and the action's from its key, the same way an identity is named. Registered as `members`, that declares `members:manage`, `members:remove` and `members:promote`. A route demands one by its full name, and a handler reaches it as `permission.members.manage()`.
+
+A group of one is still a group:
+
+```ts title="src/contract/permissions/events.ts"
+export const events = {
+    read: Kizuna.permission({
+        description: 'Read the session event log',
+    }),
+};
+```
+
+Register them on the `kizuna` factory, the way identities are registered:
+
+```ts title="src/contract/k.ts"
+export const k = new Kizuna({
+    identities: {
+        user,
+        member,
+    },
+    permissions: {
+        members,
+        events,
+    },
+});
+```
+
+Grouping buys more than a shorter list. One implementation answers every action in a group, so a lookup they share runs once.
+
+### appliesTo
+
+Most permissions are a plain yes or no: may this caller administer members at all. Some depend on _which_ record, since the workspace owner cannot be removed. Add `appliesTo` to those:
+
+```ts
+remove: Kizuna.permission({
+    appliesTo: UserSchema,
+}),
+```
+
+It buys two typed call sites and nothing else. It types the predicate's parameter, so `target.idd` fails to compile, and it constrains the argument at the check, so passing a workspace is a compile error. Nothing parses against it at runtime: the record reaches `permission.members.remove` from the handler that loaded it and goes into your own predicate, so there is no trust boundary to check.
+
+Its presence is load-bearing. **A permission with `appliesTo` cannot gate a route**, because the route has not loaded the record yet, and the type says so. It also never reaches the client, because a predicate cannot cross a wire.
+
+## Implementations
+
+One per group, the way there is one guard per identity. The body returns an answer for every action in the group: a boolean for one applying to no record, a predicate for one that does.
+
+```ts title="src/server/permissions/members.ts"
+export const members = server.permission('members', async ({ auth }) => {
+    const roles = await db.memberships.findRolesByUserId();
+    const role = roles.get(auth.user.userId);
+    return {
+        manage: role === 'owner' || role === 'admin',
+        remove: (target) => roles.get(target.id) !== 'owner',
+        promote: (target) => roles.has(target.id),
+    };
+});
+```
+
+`findRolesByUserId` runs once and answers all three. That is what grouping buys: a route gated on `members:manage` and a handler asking `permission.members.remove(target)` cost one query between them.
+
+**A body runs at most once per request, on first use, and only when something asks.** A route gated on `events:read` never runs the `members` implementation, and two `permission.members.remove(...)` calls in one handler share the one it did run. That is why the grant set belongs in the body: load it there and the predicate is a set test, so checking fifty records costs one query.
+
+An implementation receives the adapter's handler context, `params`, and `auth`. Because one serves every route its actions gate, each identity in `auth` is optional, the same compromise [`server.guard`](/docs/reference/server-guard) makes for path params.
+
+Register them beside the guards:
+
+```ts title="src/server/api.ts"
+export const api = server.api({
+    router,
+    guards: {
+        user: requireUser,
+        member: requireMember,
+    },
+    permissions: {
+        members,
+        events,
+    },
+});
+```
+
 ## One route, all three
 
-Removing a workspace member needs all three answers, so it makes the whole feature fit on one page.
+Removing a workspace member needs all three answers, so it makes the whole feature fit on one page. Both permission questions are actions on `members`, declared and implemented above.
 
 ### Who is calling
 
 The access map says the route needs a workspace membership.
 
-```ts title="src/contract/auth.ts"
+```ts title="src/contract/access.ts"
 members: {
     '*': 'user',
     removeMember: 'member',
@@ -124,13 +220,7 @@ members: {
 
 ### May they do this at all
 
-Name the permission, say which routes demand it, and write the one implementation that decides it.
-
-```ts title="src/contract/permissions.ts"
-export const manageMembers = Kizuna.permission({
-    description: 'Administer the workspace member list',
-});
-```
+Name the action the route demands.
 
 ```ts title="src/contract/access.ts"
 export const access = k.access(routes, {
@@ -138,7 +228,7 @@ export const access = k.access(routes, {
         '*': 'user',
         removeMember: {
             auth: 'member',
-            permission: 'manageMembers',
+            permission: 'members:manage',
         },
     },
     users: false,
@@ -148,36 +238,11 @@ export const access = k.access(routes, {
 });
 ```
 
-```ts title="src/server/permissions.ts"
-export const canManageMembers = server.permission('manageMembers', async ({ auth }) => {
-    const roles = await db.memberships.findRolesByUserId();
-    const role = roles.get(auth.user.userId);
-    return role === 'owner' || role === 'admin';
-});
-```
-
 A caller without it gets a 403 before the handler runs. The map is exhaustive, so every group answers, and a route with no permission says `false` out loud rather than by omission.
 
 ### May they do it to this record
 
-Whether one particular member may go depends on that member: the owner cannot be removed. Declare what the permission applies to, and the implementation returns a predicate instead of a boolean.
-
-```ts title="src/contract/permissions.ts"
-export const removeMember = Kizuna.permission({
-    appliesTo: UserSchema,
-});
-```
-
-```ts title="src/server/permissions.ts"
-export const canRemoveMember = server.permission('removeMember', async () => {
-    const roles = await db.memberships.findRolesByUserId();
-    return (member) => roles.get(member.id) !== 'owner';
-});
-```
-
-The lookup runs once per request, then the predicate is just a lookup, so checking twenty members costs one query rather than twenty.
-
-Now the handler can ask about the record it loaded:
+Whether one particular member may go depends on that member, so the handler asks once it has loaded them:
 
 ```ts title="src/server/router/members.ts"
 removeMember: async ({ params, permission, throwError }) => {
@@ -190,7 +255,7 @@ removeMember: async ({ params, permission, throwError }) => {
             },
         });
     }
-    if (!(await permission.removeMember(member))) {
+    if (!(await permission.members.remove(member))) {
         return throwError({
             status: 403,
             body: {
@@ -207,21 +272,7 @@ removeMember: async ({ params, permission, throwError }) => {
 },
 ```
 
-Finally, register the implementations, the way guards are registered:
-
-```ts title="src/server/api.ts"
-export const api = server.api({
-    router,
-    guards: {
-        user: requireUser,
-        member: requireMember,
-    },
-    permissions: {
-        manageMembers: canManageMembers,
-        removeMember: canRemoveMember,
-    },
-});
-```
+The gate already ran the `members` body to answer `members:manage`, so this check costs a map lookup.
 
 ## Gate or permission
 
@@ -237,42 +288,120 @@ Both live in the same entry, so the only question is which half states the rule.
 
 Keep a role in `auth`. The guard already fetched it, so the gate costs nothing and `auth.member.role` narrows inside the handler. Restating it as a permission would be a second way to say one thing, and would lose the narrowing.
 
-## Permissions
+## Naming actions
 
-A permission is a name. Most are a plain yes or no, which is what both real kizuna apps are almost entirely made of:
+Actions are yours to name. `read`, `write` and `admin` are the common set and a good default, though `members:promote` and `workspace:transfer` say what they mean where `members:write` would not.
 
-```ts title="src/contract/permissions.ts"
-export const viewEventLog = Kizuna.permission({
-    description: 'Read the session event log',
+Nothing is implied. `billing:admin` does not grant `billing:read`. Say it where you mean it, either in the route:
+
+```ts
+viewInvoices: {
+    auth: 'user',
+    permission: {
+        oneOf: ['billing:read', 'billing:admin'],
+    },
+},
+```
+
+or in the implementation:
+
+```ts
+return {
+    read: isAdmin || hasRead,
+    admin: isAdmin,
+};
+```
+
+## Servers as callers
+
+Not every caller is a person. A server component rendering a page, a nightly job, a webhook processor: each holds a credential with no user behind it.
+
+The tempting answer is a token that can do everything, because it is your own server. That moves every decision on this page out of your API and into the app calling it, so a missed check in one page has nothing behind it. The credential already said yes.
+
+### On whose behalf
+
+A page rendering someone's dashboard is not one of these. It is that person's request taking a detour through your server, so send that person's credential. Your API sees the person, the access map gates on the person, and permissions answer about the person. Nothing new is declared. Prefer this whenever there is a person to act for; it is the simple form of what OAuth 2.0 Token Exchange (RFC 8693) formalises.
+
+What follows is for work with nobody behind it, where the server authenticates as itself, usually with the OAuth 2.0 client credentials grant.
+
+### Declaring it
+
+<Callout type="warn">
+    Several identities on one route mean **all** of them must pass. There is no "either" in the access map, so whether a route serves both a
+    person and a server decides how you declare them.
+</Callout>
+
+A route only a server calls gets an identity of its own, the way the demo's `scheduler` does:
+
+```ts title="src/contract/access.ts"
+maintenance: 'scheduler',
+```
+
+A route both call takes one identity, because both are one credential. A person's token and a server's token arrive in the same header and are verified by the same code, so they are one thing your API accepts. An identity describes the credential; its context describes what that credential turned out to be:
+
+```ts title="src/contract/identities.ts"
+export const caller = Kizuna.identity.bearer({
+    context: z.object({
+        userId: z.string().optional(),
+        clientId: z.string().optional(),
+    }),
 });
 ```
 
-Add `appliesTo` when the answer depends on _which_ record:
+Both fields optional is the load-bearing part. It makes the compiler find every place that quietly assumed a person:
 
-```ts title="src/contract/permissions.ts"
-export const promoteMember = Kizuna.permission({
-    appliesTo: UserSchema,
-});
+```ts
+// no longer compiles: userId is string | undefined
+.where(eq(events.userId, auth.caller.userId));
 ```
 
-`appliesTo` buys two typed call sites and nothing else. It types the predicate's parameter, so `user.idd` fails to compile, and it constrains the argument of `permission.x(...)`, so passing a workspace is a compile error. Nothing parses against it at runtime: the record reaches `permission.x(...)` from the handler that loaded it and goes into your own predicate, so there is no trust boundary to check.
+Each of those has to decide what a server means there. A context of `{ userId: string }` for both kinds would claim a person is always present, and the question would never be put.
 
-Its presence is load-bearing. **A permission that applies to a record cannot gate a route**, because the route has not loaded the record yet, and the type says so. It also never reaches the client, because a predicate cannot cross a wire.
+Declaring two identities instead would mean two guards reading the same header, one of which is built to fail on every request. One identity, one guard, one token check.
 
-## Implementations
+### What it may do
 
-One per permission, the way there is one guard per identity. A permission applying to no record returns a boolean; one applying to a record returns a predicate over it, which may be async.
+Once the two are distinguishable, the difference between them is a permission, not a check in a handler:
 
-```ts title="src/server/permissions.ts"
-export const canPromoteMember = server.permission('promoteMember', async () => {
-    const memberIds = await db.memberships.findUserIds();
-    return (target) => memberIds.has(target.id);
-});
+```ts title="src/contract/permissions/events.ts"
+export const events = {
+    read: Kizuna.permission({
+        description: 'Read the session event log',
+    }),
+    purge: Kizuna.permission({
+        description: 'Delete expired entries from the event log',
+    }),
+};
 ```
 
-**Each runs at most once per request, on first use, and only when something asks about it.** A route gated on `viewEventLog` never runs the `promoteMember` implementation, and two `permission.promoteMember(...)` calls in one handler resolve it once. That is why the grant set belongs in the body: load it there and the predicate is a set test, so checking fifty records costs one query.
+```ts title="src/server/permissions/events.ts"
+export const events = server.permission('events', ({ auth }) => ({
+    read: true,
+    purge: auth.caller.clientId !== undefined,
+}));
+```
 
-An implementation receives the adapter's handler context, `params`, and `auth`. Because one serves every route its permission gates, each identity in `auth` is optional, the same compromise [`server.guard`](/docs/reference/server-guard) makes for path params.
+```ts title="src/contract/access.ts"
+purgeEvents: {
+    auth: 'caller',
+    permission: 'events:purge',
+},
+```
+
+The same rule written inside the handler rejects the same callers:
+
+```ts
+if (auth.caller.clientId === undefined) {
+    return throwError({
+        status: 403,
+        body: {
+            detail: 'Not authorized',
+        },
+    });
+}
+```
+
+Only the declared one appears in the route list, resolves once per request however many routes ask, and answers before the handler is entered.
 
 ## Denials
 
@@ -283,11 +412,11 @@ A route gate answers `403` with RFC 9457 Problem Details, worded the way an acce
     "type": "about:blank",
     "title": "Forbidden",
     "status": 403,
-    "detail": "Forbidden: viewEventLog is not permitted on this route."
+    "detail": "Forbidden: members:manage is not permitted on this route."
 }
 ```
 
-Like the access gate's `403`, this is framework-generated and sits outside the route's declared responses. A handler that wants its own wording declares `403` and uses `can` plus `throwError`, as `transfer` does above.
+Like the access gate's `403`, this is framework-generated and sits outside the route's declared responses. A handler that wants its own wording declares `403` and uses `permission` plus `throwError`, as `removeMember` does above.
 
 An implementation returns an answer, not a response. There is no `deny` and no `onForbidden`.
 
@@ -303,8 +432,8 @@ export const k = new Kizuna({
         user,
     },
     permissions: {
-        viewEventLog,
-        promoteMember,
+        members,
+        events,
     },
     settings: {
         permissions: {
@@ -316,30 +445,83 @@ export const k = new Kizuna({
 ```
 
 ```ts
-const { viewEventLog } = await apiClient.permissions();
+const { hasPermission } = await apiClient.permissions();
 
-if (viewEventLog) {
+if (hasPermission('events:read')) {
     // show the event log tab
 }
 ```
 
+`hasPermission` takes the same name the route gate takes, so a permission is spelled one way everywhere: in the access map, in the `403` detail, and here. The argument is the declared union, so a typo is a compile error.
+
+It takes one name and answers about that one. The route gate needs `['a', 'b']` and `{ oneOf: [...] }` because it is data the framework reads and emits into OpenAPI. Here you are writing code, so combine with the operators:
+
+```ts
+const maySeeBilling = hasPermission('billing:read') || hasPermission('billing:admin');
+```
+
+Every answer is already in memory, so a second call costs a lookup rather than a request.
+
 Only permissions applying to no record cross the wire. A predicate cannot, so a decision about one specific record stays on the server. The endpoint lives outside `contract.routes`, like the job endpoints, so it never reaches the generators.
 
-### OpenAPI
+### In a Next.js frontend
 
-Each gated operation carries an `x-kizuna-permission` extension. OpenAPI has no concept for this, so an extension is the honest emission:
+A server component fetches the permissions alongside the data and renders against them:
 
-```yaml
-# generated
-paths:
-    /events:
-        get:
-            security:
-                - member: []
-            x-kizuna-permission:
-                all:
-                    - viewEventLog
+```tsx title="src/app/members/page.tsx"
+import { memberClient } from '../../lib/api-client';
+import { removeMemberAction } from '../actions';
+
+export default async function MembersPage() {
+    const { hasPermission } = await memberClient.permissions();
+    const result = await memberClient.routes.members.listMembers();
+    const list = result.status === 200 ? result.body.members : [];
+    const mayManage = hasPermission('members:manage');
+
+    return (
+        <main>
+            <h1>Members</h1>
+            <ul>
+                {list.map((member) => (
+                    <li key={member.id}>
+                        {member.name}
+                        {mayManage ? (
+                            <form action={removeMemberAction}>
+                                <input type="hidden" name="id" value={member.id} />
+                                <button type="submit">Remove</button>
+                            </form>
+                        ) : null}
+                    </li>
+                ))}
+            </ul>
+        </main>
+    );
+}
 ```
+
+`'members:manage'` is checked against the contract, so a renamed permission is a build error rather than a button that never appears. `mayManage` is a boolean, so it crosses into a client component as a prop; `hasPermission` itself is a function and does not.
+
+`members:remove` is not in that response, because it has `appliesTo` and a predicate cannot cross a wire. The frontend therefore renders the button for every member, and the server decides which ones actually go. Read the status rather than predicting it:
+
+```ts title="src/app/actions.ts"
+'use server';
+
+export async function removeMemberAction(formData: FormData) {
+    const result = await memberClient.routes.members.removeMember({
+        params: {
+            id: String(formData.get('id')),
+        },
+    });
+    if (result.status === 403) {
+        return {
+            error: result.body.detail,
+        };
+    }
+    revalidatePath('/members');
+}
+```
+
+That split is the whole shape of the feature on a frontend. The coarse answer hides what the caller can never do, and the per-record answer stays where the record is.
 
 ### A report
 
@@ -356,9 +538,11 @@ console.table(report.ungated);
 
 ## Deliberate omissions
 
-- **No permission storage.** Roles, memberships and grants are yours. kizuna computes rules from what a resolver returns, as it computes sessions from what a guard returns.
-- **No list scoping and no query building.** `permission.x(record)` answers about one record. It appends no `where` clause and cannot catch a read that forgot its tenant predicate. For a list, load the grant set in the resolver and filter or decorate in your own query; `permission.x(...)` inside a `.map` is the wrong reach.
-- **No wildcards.** `['a', 'b']` and `{ oneOf: [...] }` say it without new sigils.
+- **No permission storage.** Roles, memberships and grants are yours. kizuna computes rules from what an implementation returns, as it computes sessions from what a guard returns.
+- **Nothing in OpenAPI.** The generated document names the identity a route requires and stops there. `security` describes what a client must present, which is why oauth2 scopes belong in it: the client has to obtain them. A permission the server resolves is not something a client can negotiate, so emitting it would publish your authorization model while telling a consumer nothing they can act on.
+- **No implication between actions.** See [Naming actions](#naming-actions).
+- **No list scoping and no query building.** `permission.x.y(record)` answers about one record. It appends no `where` clause and cannot catch a read that forgot its tenant predicate. For a list, load the grant set in the implementation and filter or decorate in your own query; `permission.x.y(...)` inside a `.map` is the wrong reach.
+- **No wildcards.** `['a:read', 'b:read']` and `{ oneOf: [...] }` say it without new sigils, and `billing:*` would silently widen every time an action is added.
 - **No client-side predicates.** See the client above.
 
 ## Reference

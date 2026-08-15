@@ -9,7 +9,7 @@ Authentication is still settling. `Kizuna.identity` and `server.guard` may chang
 
 </BetaNotice>
 
-An **identity** describes a credential your API accepts. A **guard** verifies it and returns who the caller is. Which routes need which identity is [access control](/docs/access-control), one page over.
+An **identity** describes a credential your API accepts. A **guard** verifies it and returns who the caller is. Which routes need which identity is [access control](/docs/access-control), one page over. When the caller is a server rather than a person, see [servers as callers](/docs/access-control#servers-as-callers).
 
 ```ts title="src/contract/identities.ts"
 import { z } from 'zod';

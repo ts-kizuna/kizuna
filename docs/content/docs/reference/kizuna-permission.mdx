@@ -9,22 +9,23 @@ Permissions are new and still settling. `Kizuna.permission` and its options may 
 
 </BetaNotice>
 
-`Kizuna.permission({ appliesTo?, description? })` declares a permission. Register them on the `kizuna` factory under `permissions`; the contract's [`permissions` map](/docs/reference/k-access) says which routes demand them, and [`server.permission`](/docs/reference/server-permission) decides whether this caller holds them.
+`Kizuna.permission({ appliesTo?, description? })` declares a permission. Group them by what they are about and register the group on the `kizuna` factory under `permissions`; the contract's [access map](/docs/reference/k-access) says which routes demand them, and [`server.permission`](/docs/reference/server-permission) decides whether this caller holds them.
 
-```ts title="src/contract/permissions.ts"
+```ts title="src/contract/permissions/members.ts"
 import { Kizuna } from '@ts-kizuna/core';
-import { UserSchema } from './models';
+import { UserSchema } from '../models';
 
-export const viewEventLog = Kizuna.permission({
-    description: 'Read the session event log',
-});
-
-export const promoteMember = Kizuna.permission({
-    appliesTo: UserSchema,
-});
+export const members = {
+    manage: Kizuna.permission({
+        description: 'Administer the workspace member list',
+    }),
+    remove: Kizuna.permission({
+        appliesTo: UserSchema,
+    }),
+};
 ```
 
-A permission is the name, not the decision. It says `viewEventLog` exists; an implementation says whether this caller has it.
+A permission is the name, not the decision. It says `members:manage` exists; an implementation says whether this caller has it.
 
 ## Options
 
@@ -33,20 +34,41 @@ A permission is the name, not the decision. It says `viewEventLog` exists; an im
 | `appliesTo`   | Schema for the record this permission is about, when the answer depends on which one. Optional. |
 | `description` | Shown beside the permission wherever it is reported.                                            |
 
-## What `appliesTo` buys
+## Names come from keys
 
-Two typed call sites, and nothing else:
+Neither half of the name is written twice. The group is named where it is registered, and each permission by its key inside the group:
 
-```ts
-// the predicate's parameter is typed
-return (user) => memberIds.has(user.id);
-
-// the argument at the check is constrained
-await permission.promoteMember(targetUser);
-await permission.promoteMember(theWorkspace); // compile error
+```ts title="src/contract/k.ts"
+export const k = new Kizuna({
+    permissions: {
+        members,
+        events,
+    },
+});
 ```
 
-Nothing parses against it at runtime. The record reaches `can` from the handler that loaded it and goes into your own predicate, so there is no trust boundary to check and parsing it would cost a request. It is a Zod schema rather than a type parameter because that is how kizuna declares every shape, and because the schema is already in your contract.
+That yields `members:manage`, `members:remove` and whatever `events` holds. Neither a group name nor a key may contain `:`, since that is what joins them.
+
+Group by what the answers share. Two permissions whose implementations would run the same query belong together; two with nothing in common do not.
+
+## What `appliesTo` buys
+
+Two typed call sites, and nothing else. The predicate's parameter is typed:
+
+```ts
+return {
+    remove: (target) => roles.get(target.id) !== 'owner',
+};
+```
+
+And the argument at the check is constrained:
+
+```ts
+await permission.members.remove(targetUser);
+await permission.members.remove(theWorkspace); // compile error
+```
+
+Nothing parses against it at runtime. The record reaches the check from the handler that loaded it and goes into your own predicate, so there is no trust boundary to check and parsing it would cost a request. It is a Zod schema rather than a type parameter because that is how kizuna declares every shape, and because the schema is already in your contract.
 
 ## Its presence is load-bearing
 
@@ -56,10 +78,10 @@ Omit it and the permission is a plain yes or no, which is the common case, the o
 
 ## Where a permission earns its place
 
-A decision comparing one field of a guard's return against a literal belongs in the [auth map's access gate](/docs/access-control#access-gates), which costs nothing and narrows the field in the handler. Permissions are for decisions that need a lookup, or that depend on the record. See [Permissions](/docs/access-control#when-to-reach-for-this).
+A decision comparing one field of a guard's return against a literal belongs in the [auth map's access gate](/docs/access-control#access-gates), which costs nothing and narrows the field in the handler. Permissions are for decisions that need a lookup, or that depend on the record. See [Gate or permission](/docs/access-control#gate-or-permission).
 
 ## Reference
 
-- [Permissions](/docs/access-control)
+- [Access Control](/docs/access-control)
 - [`k.access`](/docs/reference/k-access)
 - [`server.permission`](/docs/reference/server-permission)

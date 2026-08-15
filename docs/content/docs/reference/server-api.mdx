@@ -33,13 +33,13 @@ export const api = server.api({
         member: requireMember,
     },
     permissions: {
-        viewEventLog: canViewEventLog,
-        promoteMember: canPromoteMember,
+        members,
+        events,
     },
 });
 ```
 
-Each entry comes from [`server.permission`](/docs/reference/server-permission). Each runs at most once per request and only when a route's `permissions` entry or a handler's `permission` asks about it.
+Each entry comes from [`server.permission`](/docs/reference/server-permission). Each runs at most once per request and only when a route's `permissions` entry or a handler's `permission` asks about one of its actions.
 
 Mount the returned object with the adapter's mount verb:
 
