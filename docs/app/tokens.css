@@ -8,7 +8,7 @@
     --kizuna-field: #f0f0f0;
 
     --kizuna-max-width: 1152px;
-    --kizuna-text-width: 704px;
+    --kizuna-text-width: 700px;
     --kizuna-gutter: 20px;
     --kizuna-section-gap: 96px;
     --kizuna-head-gap: 22px;
@@ -29,7 +29,7 @@
     --kizuna-radius-card: 14px;
     --kizuna-button-height: 51px;
     --kizuna-button-padding-inline: 20px;
-    --kizuna-logo-width: 136px;
+    --kizuna-logo-width: 137px;
     --kizuna-gap-actions: 12px;
 }
 
