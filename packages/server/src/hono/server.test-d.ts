@@ -13,7 +13,7 @@ import {
     type ExpectedRouteHandler,
     type ExpectedRouter,
 } from '../adapter-testing/type-testing.js';
-import { KizunaServer, type HonoHandlerContext, type RouteHandler, type Router } from '../next/server.js';
+import { KizunaServer, type HonoHandlerContext, type RouteHandler, type Router } from './server.js';
 
 interface SessionEnv extends Env {
     Variables: {

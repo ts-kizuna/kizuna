@@ -1,6 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import { KizunaServer } from '../next/server.js';
+import { KizunaServer } from './server.js';
 import { readTestBody } from '../adapter-testing/transport.js';
 import { testAdapterFeatures } from '../adapter-testing/feature-tests.js';
 

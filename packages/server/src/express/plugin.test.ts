@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/contract/internal';
 import { createPlugin } from '../adapter.js';
 import { implementPlugin } from '../plugin-server.js';
-import { KizunaServer } from '../next/server.js';
+import { KizunaServer } from './server.js';
 
 const probePlugin = createPlugin<{ queue: (id: string) => string }>()({
     name: 'probe',

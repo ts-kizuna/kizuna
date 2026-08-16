@@ -14,7 +14,7 @@ import {
     type ExpectedRouteHandler,
     type ExpectedRouter,
 } from '../adapter-testing/type-testing.js';
-import { KizunaServer, type ExpressHandlerContext, type RouteHandler, type Router } from '../next/server.js';
+import { KizunaServer, type ExpressHandlerContext, type RouteHandler, type Router } from './server.js';
 
 const securedServer = new KizunaServer(securedContract);
 const gateServer = new KizunaServer(gateContract);

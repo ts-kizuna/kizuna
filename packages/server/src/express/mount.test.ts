@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { KizunaServer } from '../next/server.js';
+import { KizunaServer } from './server.js';
 import { userContract, createUserRouter } from '../adapter-testing/fixtures.js';
 
 describe('api.mount', () => {

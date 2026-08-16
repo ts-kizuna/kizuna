@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { RouteDefinition, Routes, Method } from '@ts-kizuna/contract/internal';
 import type { SecurityScheme } from '@ts-kizuna/contract/internal';
 import type { Credential, NoCredential } from '@ts-kizuna/contract/internal';
-import { type RouteHandler, type Router } from './next/server.js';
+import type { RouteHandler, Router } from '@ts-kizuna/contract/internal';
 import { allowedMethodsForPath, flattenRoutes, formatValidationError, validateRequest } from './adapter.js';
 import { type RawInputs, type ValidationStage } from '@ts-kizuna/contract/internal';
 import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes } from './route-matcher.js';

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/contract/internal';
-import { KizunaServer } from '../next/server.js';
+import { KizunaServer } from './server.js';
 import { readTestBody } from '../adapter-testing/transport.js';
 import { testAdapterFeatures } from '../adapter-testing/feature-tests.js';
 
