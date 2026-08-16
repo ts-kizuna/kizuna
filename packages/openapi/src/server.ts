@@ -1,5 +1,5 @@
-import type { Contract } from '@ts-kizuna/shared';
-import { contractOf, implementPlugin, rawResponse } from '@ts-kizuna/shared/adapter';
+import type { Contract } from '@ts-kizuna/contract';
+import { contractOf, implementPlugin, rawResponse } from '@ts-kizuna/server';
 import { openApiPlugin } from './plugin.js';
 import { renderOpenApi } from './generator.js';
 import { renderDocsHtml } from './docs-html.js';
@@ -11,7 +11,7 @@ export {
     type SerializedDeprecationMap,
     serializeDeprecationMap,
     deserializeDeprecationMap,
-} from '@ts-kizuna/shared/generator';
+} from '@ts-kizuna/contract/generator';
 
 const HTML = 'text/html; charset=utf-8';
 const JSON_TYPE = 'application/json';

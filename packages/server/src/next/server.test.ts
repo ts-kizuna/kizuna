@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/shared';
+import { Kizuna } from '@ts-kizuna/contract';
 import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 import { KizunaServer, NextRequest, NextResponse } from './server.js';
 import { readTestBody, testAdapterFeatures } from '@ts-kizuna/contract';

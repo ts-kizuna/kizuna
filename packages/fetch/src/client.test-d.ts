@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type ValidationError } from '@ts-kizuna/shared';
+import { Kizuna, type ValidationError } from '@ts-kizuna/contract';
 import { KizunaClient } from './client.js';
 
 const k = new Kizuna({

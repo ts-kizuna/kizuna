@@ -1,4 +1,4 @@
-import { Kizuna } from '@ts-kizuna/shared';
+import { Kizuna } from '@ts-kizuna/contract';
 import { z } from 'zod';
 
 export const Model = Kizuna.model({

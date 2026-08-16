@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/server';
-import { flattenRoutes, validateRequest } from '@ts-kizuna/shared/adapter';
+import { flattenRoutes, validateRequest } from '@ts-kizuna/server';
 import {
     ResponseError,
     isResponseError,
@@ -16,8 +16,8 @@ import {
     resolveSecurityRequirements,
     guardDeny,
     isGuardDenial,
-} from '@ts-kizuna/shared/adapter';
-import type { Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/shared';
+} from '@ts-kizuna/server';
+import type { Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/contract';
 import { deriveToolNames } from './tool-name.js';
 import { buildToolInputSchema, type ToolInputSchema } from './schema.js';
 

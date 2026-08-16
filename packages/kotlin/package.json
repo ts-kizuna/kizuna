@@ -60,17 +60,19 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/shared --external @ts-kizuna/cli --external zod",
+    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/contract --external @ts-kizuna/cli --external zod --external @ts-kizuna/contract --external @ts-kizuna/server",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ts-kizuna/cli": "workspace:*",
-    "@ts-kizuna/shared": "workspace:*"
+    "@ts-kizuna/contract": "workspace:*"
   },
   "peerDependencies": {
+    "@ts-kizuna/contract": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@ts-kizuna/contract": "workspace:*",
     "@types/node": "^22.9.0",
     "tsdown": "^0.21.0",
     "typescript": "^5.6.3",

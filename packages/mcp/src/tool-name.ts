@@ -1,4 +1,4 @@
-import type { FlattenedRoute } from '@ts-kizuna/shared/adapter';
+import type { FlattenedRoute } from '@ts-kizuna/server';
 
 const MAX_TOOL_NAME_LENGTH = 128;
 

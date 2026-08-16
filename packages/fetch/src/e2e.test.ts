@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import express from 'express';
 import { z } from 'zod';
 import type { Server, AddressInfo } from 'node:net';
-import { Kizuna } from '@ts-kizuna/shared';
+import { Kizuna } from '@ts-kizuna/contract';
 import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 import { KizunaClient, type Client } from '@ts-kizuna/fetch';
 import { KizunaServer } from '@ts-kizuna/server/express';

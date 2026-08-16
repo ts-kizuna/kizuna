@@ -67,17 +67,20 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/server.ts --format esm,cjs --dts --clean --external @ts-kizuna/shared --external zod",
+    "build": "tsdown src/index.ts src/server.ts --format esm,cjs --dts --clean --external @ts-kizuna/contract --external zod --external @ts-kizuna/contract --external @ts-kizuna/server",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ts-kizuna/shared": "workspace:*",
+    "@ts-kizuna/contract": "workspace:*",
     "yaml": "^2.8.4"
   },
   "peerDependencies": {
+    "@ts-kizuna/contract": "workspace:*",
+    "@ts-kizuna/server": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@ts-kizuna/contract": "workspace:*",
     "@ts-kizuna/server": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",

@@ -1,7 +1,7 @@
 import type { RouteDefinition, Routes, Method } from '@ts-kizuna/contract';
 import { flattenRoutes } from '@ts-kizuna/contract';
-import type { PathSegment } from '@ts-kizuna/shared';
-import { parsePath } from '@ts-kizuna/shared';
+import type { PathSegment } from '@ts-kizuna/contract';
+import { parsePath } from '@ts-kizuna/contract';
 
 interface CompiledRoute {
     routeKey: string;

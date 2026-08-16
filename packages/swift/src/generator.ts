@@ -22,9 +22,9 @@ import {
     mergeHeaderFields,
     type Routes,
     type RouteDefinition,
-} from '@ts-kizuna/shared/generator';
-import { loadDeprecations } from '@ts-kizuna/shared/load-deprecations';
-import type { Contract } from '@ts-kizuna/shared';
+} from '@ts-kizuna/contract/generator';
+import { loadDeprecations } from '@ts-kizuna/contract/load-deprecations';
+import type { Contract } from '@ts-kizuna/contract';
 import { SwiftWriter, stringLiteral } from './emit.js';
 import {
     TypeRegistry,

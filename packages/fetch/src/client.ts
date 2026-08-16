@@ -9,9 +9,9 @@ import type {
     RequestContextSchema,
     RequestContextHeaderInputs,
     SecurityScheme,
-} from '@ts-kizuna/shared';
-import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/shared';
-import { buildPath, isRouteDefinition } from '@ts-kizuna/shared/adapter';
+} from '@ts-kizuna/contract';
+import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/contract';
+import { buildPath, isRouteDefinition } from '@ts-kizuna/server';
 
 type ResponseUnion<R extends RouteDefinition> = {
     [S in keyof R['responses']]: {

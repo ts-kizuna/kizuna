@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { parsePath } from '@ts-kizuna/shared/adapter';
-import { isVoidSchema, readObjectShape } from '@ts-kizuna/shared/generator';
-import type { RouteDefinition } from '@ts-kizuna/shared';
+import { parsePath } from '@ts-kizuna/server';
+import { isVoidSchema, readObjectShape } from '@ts-kizuna/contract/generator';
+import type { RouteDefinition } from '@ts-kizuna/contract';
 
 export interface ToolInputSchema {
     shape: Record<string, z.ZodType> | undefined;

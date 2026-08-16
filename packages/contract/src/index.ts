@@ -125,7 +125,7 @@ export {
 } from './schedule.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export { ResponseError, isResponseError } from './response-error.js';
-export { STATUS_TITLES, getStatusText } from '@ts-kizuna/shared';
+export { STATUS_TITLES, getStatusText } from '@ts-kizuna/contract';
 
 export {
     type Method,
@@ -140,7 +140,7 @@ export {
     type AuthoredRouteDefinition,
     type AuthoredRoutes,
 } from './types.js';
-export { type ExtractPathParams, type PathParamName, type HasPathParams } from '@ts-kizuna/shared';
+export { type ExtractPathParams, type PathParamName, type HasPathParams } from '@ts-kizuna/contract';
 export {
     type HandlerArgs,
     type HandlerReturn,

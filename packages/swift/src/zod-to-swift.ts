@@ -15,7 +15,7 @@ import {
     toCamelCase,
     sanitizeFieldName,
     sanitizeIdentifier,
-} from '@ts-kizuna/shared/generator';
+} from '@ts-kizuna/contract/generator';
 
 export interface SwiftField {
     name: string;

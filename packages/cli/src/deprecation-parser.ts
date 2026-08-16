@@ -7,8 +7,8 @@ import {
     type SerializedDeprecationMap,
     serializeDeprecationMap,
     contractFingerprint,
-} from '@ts-kizuna/shared/generator';
-import type { Contract } from '@ts-kizuna/shared';
+} from '@ts-kizuna/contract/generator';
+import type { Contract } from '@ts-kizuna/contract';
 
 const SCHEMA_KEYS: ReadonlySet<string> = new Set(['body', 'query', 'headers']);
 

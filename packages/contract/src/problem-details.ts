@@ -1,4 +1,4 @@
-import { STATUS_TITLES } from '@ts-kizuna/shared';
+import { STATUS_TITLES } from '@ts-kizuna/contract';
 
 export interface ProblemDetails {
     type: string;
@@ -11,7 +11,7 @@ export interface ProblemDetails {
  * Build an RFC 9457 Problem Details body.
  *
  * ```ts
- * import { problemDetails } from '@ts-kizuna/shared';
+ * import { problemDetails } from '@ts-kizuna/contract';
  *
  * return throwError({
  *     status: 404,

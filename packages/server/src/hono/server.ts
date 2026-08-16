@@ -38,7 +38,7 @@ import {
     renderJsonResult,
     parseFetchBody,
     headersToObject,
-} from '@ts-kizuna/shared/adapter';
+} from '@ts-kizuna/contract';
 import type { z } from 'zod';
 import type {
     Contract,
@@ -50,8 +50,8 @@ import type {
     JobsArg,
     RequestContextSchema,
     RequestContextHeaderValues,
-} from '@ts-kizuna/shared';
-import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/shared/adapter';
+} from '@ts-kizuna/contract';
+import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/contract';
 
 export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;

@@ -129,7 +129,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ts-kizuna/shared": "workspace:*"
+    "@ts-kizuna/contract": "workspace:*"
   },
   "peerDependencies": {
     "@ts-kizuna/contract": "workspace:*",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/shared';
-import { assembleApi, type GuardDeny } from '@ts-kizuna/shared/adapter';
+import { Kizuna } from '@ts-kizuna/contract';
+import { assembleApi, type GuardDeny } from '@ts-kizuna/server';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/client';
 import { buildToolDefinitions, createMcpServer } from './mcp-server.js';

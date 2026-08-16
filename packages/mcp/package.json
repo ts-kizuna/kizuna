@@ -68,18 +68,21 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/server.ts --format esm,cjs --dts --clean --external @ts-kizuna/shared --external zod --external @modelcontextprotocol/sdk",
+    "build": "tsdown src/index.ts src/server.ts --format esm,cjs --dts --clean --external @ts-kizuna/contract --external zod --external @modelcontextprotocol/sdk --external @ts-kizuna/contract --external @ts-kizuna/server",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
-    "@ts-kizuna/shared": "workspace:*"
+    "@ts-kizuna/contract": "workspace:*"
   },
   "peerDependencies": {
+    "@ts-kizuna/contract": "workspace:*",
+    "@ts-kizuna/server": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.0.0",
+    "@ts-kizuna/contract": "workspace:*",
     "@ts-kizuna/server": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",

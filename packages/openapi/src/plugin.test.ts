@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/shared';
+import { Kizuna } from '@ts-kizuna/contract';
 import { KizunaServer } from '@ts-kizuna/server/express';
 import express from 'express';
 import request from 'supertest';

@@ -2,9 +2,9 @@ import type { z } from 'zod';
 import { ROUTES_TAG, type Routes, type RouteDefinition, type ResponseDefinition } from './types.js';
 import { isRouteDefinition } from './handler-pipeline.js';
 import { type TagSet, type TagKeysOf, isTagSet } from './tags.js';
-import { findCoercedSchemaPath, readObjectShape, resolveBaseType } from '@ts-kizuna/shared';
-import { resolveCoercionPlans } from '@ts-kizuna/shared';
-import { parsePath, type PathParamsCheck } from '@ts-kizuna/shared';
+import { findCoercedSchemaPath, readObjectShape, resolveBaseType } from '@ts-kizuna/contract';
+import { resolveCoercionPlans } from '@ts-kizuna/contract';
+import { parsePath, type PathParamsCheck } from '@ts-kizuna/contract';
 
 const isEmptyObjectSchema = (schema: unknown): boolean => {
     if (!schema || typeof schema !== 'object') return false;

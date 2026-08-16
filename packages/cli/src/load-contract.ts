@@ -1,5 +1,5 @@
 import { createJiti } from 'jiti';
-import type { Contract } from '@ts-kizuna/shared';
+import type { Contract } from '@ts-kizuna/contract';
 
 /**
  * Imports a contract module with jiti (so a `.ts` entry works without a build

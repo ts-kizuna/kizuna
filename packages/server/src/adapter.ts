@@ -13,16 +13,16 @@ import {
     validateRequest,
 } from '@ts-kizuna/contract';
 import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes } from './route-matcher.js';
-import { parsePath } from '@ts-kizuna/shared';
+import { parsePath } from '@ts-kizuna/contract';
 import { ResponseError, isResponseError } from '@ts-kizuna/contract';
 import { problemDetails, type ProblemDetails } from '@ts-kizuna/contract';
-import { STATUS_TITLES } from '@ts-kizuna/shared';
-import { isVoidSchema, isBinarySchema } from '@ts-kizuna/shared';
-import { resolveCoercionPlans } from '@ts-kizuna/shared';
+import { STATUS_TITLES } from '@ts-kizuna/contract';
+import { isVoidSchema, isBinarySchema } from '@ts-kizuna/contract';
+import { resolveCoercionPlans } from '@ts-kizuna/contract';
 import { isRawResponse, type RawResponse } from './raw-response.js';
 import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from '@ts-kizuna/contract';
 import { resolvePluginServers, type PluginImplementation } from './plugin-server.js';
-import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from '@ts-kizuna/shared';
+import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from '@ts-kizuna/contract';
 import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from '@ts-kizuna/contract';
 import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
 import {
@@ -485,7 +485,7 @@ export type {
     RouteAuthValue,
     ContextFromAuthValue,
 } from '@ts-kizuna/contract';
-export { buildPath, parsePath, type PathSegment } from '@ts-kizuna/shared';
+export { buildPath, parsePath, type PathSegment } from '@ts-kizuna/contract';
 export { sortFlattenedRoutes } from './route-matcher.js';
 export { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand } from '@ts-kizuna/contract';
 export { tagRoutes } from '@ts-kizuna/contract';

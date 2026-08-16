@@ -63,6 +63,16 @@
         "default": "./dist/plugin.cjs"
       }
     },
+    "./generator": {
+      "import": {
+        "types": "./dist/generator.d.mts",
+        "default": "./dist/generator.mjs"
+      },
+      "require": {
+        "types": "./dist/generator.d.cts",
+        "default": "./dist/generator.cjs"
+      }
+    },
     "./authoring-names": {
       "import": {
         "types": "./dist/authoring-names.d.mts",
@@ -72,6 +82,16 @@
         "types": "./dist/authoring-names.d.cts",
         "default": "./dist/authoring-names.cjs"
       }
+    },
+    "./load-deprecations": {
+      "import": {
+        "types": "./dist/load-deprecations.d.mts",
+        "default": "./dist/load-deprecations.mjs"
+      },
+      "require": {
+        "types": "./dist/load-deprecations.d.cts",
+        "default": "./dist/load-deprecations.cjs"
+      }
     }
   },
   "kizuna": {
@@ -79,7 +99,9 @@
       ".": "client",
       "./schemas": "client",
       "./plugin": "client",
-      "./authoring-names": "client"
+      "./generator": "client",
+      "./authoring-names": "client",
+      "./load-deprecations": "server"
     }
   },
   "files": [
@@ -89,11 +111,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/schemas.ts src/plugin.ts src/authoring-names.ts --format esm,cjs --dts --clean --external @ts-kizuna/shared --external zod",
+    "build": "tsdown src/index.ts src/schemas.ts src/plugin.ts src/generator.ts src/authoring-names.ts src/load-deprecations.ts --format esm,cjs --dts --clean --external zod",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@ts-kizuna/shared": "workspace:*"
   },
   "peerDependencies": {
     "zod": "^4.0.0"

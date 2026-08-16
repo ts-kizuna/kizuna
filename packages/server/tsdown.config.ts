@@ -19,5 +19,5 @@ export default defineConfig({
     format: ['esm', 'cjs'],
     dts: true,
     clean: true,
-    external: ['@ts-kizuna/shared', '@ts-kizuna/contract', 'express', 'fastify', 'hono', 'next', 'zod'],
+    external: ['@ts-kizuna/contract', '@ts-kizuna/contract', 'express', 'fastify', 'hono', 'next', 'zod'],
 });

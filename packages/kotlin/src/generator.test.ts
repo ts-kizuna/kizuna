@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type Contract } from '@ts-kizuna/shared';
+import { Kizuna, type Contract } from '@ts-kizuna/contract';
 import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateKotlinClient } from './generator.js';
 import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
