@@ -1,4 +1,4 @@
 {
     "title": "Clients",
-    "pages": ["fetch", "swift", "kotlin"]
+    "pages": ["fetch", "tanstack-query", "swift", "kotlin"]
 }

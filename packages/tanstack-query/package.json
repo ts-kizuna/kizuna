@@ -1,0 +1,84 @@
+{
+  "name": "@ts-kizuna/tanstack-query",
+  "version": "1.49.6",
+  "private": true,
+  "description": "TanStack Query client for ts-kizuna",
+  "keywords": [
+    "ts-kizuna",
+    "typescript",
+    "zod",
+    "openapi",
+    "contract-first",
+    "type-safe",
+    "rest",
+    "api",
+    "tanstack-query",
+    "react-query",
+    "query-options",
+    "typed-client"
+  ],
+  "license": "MIT",
+  "homepage": "https://ts-kizuna.com/docs/clients/tanstack-query",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "directory": "packages/tanstack-query"
+  },
+  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "kizuna": {
+    "entries": {
+      ".": "client"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external @ts-kizuna/fetch --external @tanstack/query-core --external zod",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@tanstack/query-core": "^5.0.0",
+    "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/fetch": "workspace:*",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@tanstack/query-core": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/svelte-query": "catalog:",
+    "@tanstack/vue-query": "catalog:",
+    "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/fetch": "workspace:*",
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "svelte": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vue": "catalog:",
+    "zod": "catalog:"
+  }
+}

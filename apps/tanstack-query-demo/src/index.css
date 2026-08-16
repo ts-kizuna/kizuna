@@ -1,0 +1,33 @@
+:root {
+    --ink: #16202b;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --surface: #ffffff;
+    --ground: #fafafa;
+    --accent: #1a5b5f;
+
+    color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ink: #e7e9e3;
+        --muted: #9ca3af;
+        --line: #2a3236;
+        --surface: #171b1f;
+        --ground: #101316;
+        --accent: #74c2b6;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: system-ui, sans-serif;
+    line-height: 1.5;
+}

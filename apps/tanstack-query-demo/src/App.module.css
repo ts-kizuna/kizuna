@@ -1,0 +1,101 @@
+.page {
+    max-width: 48rem;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 5rem;
+}
+
+.title {
+    margin: 0;
+    font-size: 1.75rem;
+    letter-spacing: -0.02em;
+}
+
+.lede {
+    margin: 0.5rem 0 0;
+    color: var(--muted);
+}
+
+.section {
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--line);
+}
+
+.heading {
+    margin: 0 0 1rem;
+    font-size: 1.1rem;
+    letter-spacing: -0.01em;
+}
+
+.row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.7rem;
+    font: inherit;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+}
+
+.input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.button {
+    padding: 0.5rem 0.9rem;
+    font: inherit;
+    font-weight: 500;
+    color: var(--surface);
+    background: var(--accent);
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.users {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.users li {
+    padding: 0.6rem 0.8rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+}
+
+.note {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.more {
+    margin-top: 1rem;
+}
+
+.code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85em;
+    padding: 0.1em 0.35em;
+    background: var(--ground);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+}

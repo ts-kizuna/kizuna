@@ -1,0 +1,30 @@
+{
+  "name": "@ts-kizuna-demo/tanstack-query",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "kizuna deprecations ../shared/src/contract.ts && vite",
+    "build": "kizuna deprecations ../shared/src/contract.ts && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "catalog:",
+    "@ts-kizuna-demo/shared": "workspace:*",
+    "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/fetch": "workspace:*",
+    "@ts-kizuna/tanstack-query": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@ts-kizuna/cli": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

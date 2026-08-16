@@ -1,8 +1,8 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import { FileText, Globe, Server, TriangleAlert } from 'lucide-react';
+import { FileText, Globe, Server, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { CodeWindow } from './code-window';
-import { KotlinLogo, McpLogo, SwiftLogo, TsLogo } from './brand-icons';
+import { KotlinLogo, McpLogo, SwiftLogo, TanstackLogo, TsLogo } from './brand-icons';
 import styles from './contract-explorer.module.css';
 
 const icons = {
@@ -10,6 +10,7 @@ const icons = {
     file: <FileText className={styles.icon} />,
     alert: <TriangleAlert className={styles.icon} />,
     globe: <Globe className={styles.icon} />,
+    shield: <ShieldCheck className={styles.icon} />,
 };
 
 const brandIcons = {
@@ -143,6 +144,30 @@ if (res.status === 200) {
 }`,
     },
     {
+        icon: <TanstackLogo className={styles.icon} />,
+        label: 'TanStack Query client',
+        desc: 'Query and mutation options, keys included',
+        file: 'user-list.tsx',
+        fileIcon: brandIcons.typescript,
+        lang: 'tsx',
+        code: `const api = new KizunaTanstackQuery(contract, apiClient);
+
+const { data } = useQuery(
+  api.users.getUser.queryOptions({
+    input: {
+      params: {
+        id: '1',
+      },
+    },
+  })
+);
+
+// invalidate every users query
+queryClient.invalidateQueries({
+  queryKey: api.users.key(),
+});`,
+    },
+    {
         icon: <SwiftLogo className={styles.icon} />,
         label: 'Swift client',
         desc: 'A native client for iOS and macOS',
@@ -200,6 +225,30 @@ try {
 // each route → a typed MCP tool:
 // GET → read-only · DELETE → destructive
 // PUT → idempotent`,
+    },
+    {
+        icon: icons.shield,
+        label: 'Built-in validation',
+        desc: 'Every request checked against the contract',
+        file: 'localhost:3000/users',
+        fileIcon: <Method name="POST" />,
+        lang: 'http',
+        code: `{
+  "name": "Ada",
+  "email": "nope"
+}
+
+HTTP/1.1 400 Bad Request
+Content-Type: application/problem+json
+
+{
+  "status": 400,
+  "errors": [
+    { "code": "invalid_string_format",
+      "path": ["email"],
+      "message": "Invalid email" }
+  ]
+}`,
     },
     {
         icon: icons.alert,

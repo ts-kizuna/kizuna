@@ -11,6 +11,7 @@ import { BetaNotice } from './beta-notice';
 import { ContractNotice } from './contract-notice';
 import { InstallTabs } from './install-tabs';
 import { FeatureList } from './feature-list';
+import { Supports } from './supports';
 
 import blockStyles from './mdx-block.module.css';
 
@@ -33,5 +34,6 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         ContractNotice,
         InstallTabs,
         FeatureList,
+        Supports,
     };
 }

@@ -45,7 +45,12 @@ type ClientParams<R extends RouteDefinition> = R extends { pathParams: z.ZodType
  */
 type IsOmittable<Payload> = {} extends Payload ? true : [undefined] extends [Payload] ? true : false;
 
-type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends true ? { params: ClientParams<R> } : {}) &
+/**
+ * Everything a caller passes for one route: `params`, `body`, `query`, `headers`,
+ * and `fetchOptions`. Each key is present only when the route declares it, and
+ * optional when its input accepts `{}` or `undefined`.
+ */
+export type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends true ? { params: ClientParams<R> } : {}) &
     (R extends { body: z.ZodType } ? (ClientPayload<R['body']> extends void ? {} : { body: ClientPayload<R['body']> }) : {}) &
     (R extends { query: z.ZodType }
         ? IsOmittable<ClientPayload<R['query']>> extends true
@@ -70,7 +75,12 @@ type ValidationErrorResult<Codes extends string> = {
 
 type HasValidation<R extends RouteDefinition> = R extends { body: z.ZodType } ? true : R extends { query: z.ZodType } ? true : false;
 
-type ClientResponse<R extends RouteDefinition, Codes extends string> =
+/**
+ * Every response one route can produce, as a union discriminated on `status`.
+ * Routes with a `body` or `query` schema also carry the automatic `400`
+ * validation error.
+ */
+export type ClientResponse<R extends RouteDefinition, Codes extends string = never> =
     HasValidation<R> extends true ? ResponseUnion<R> | ValidationErrorResult<Codes> : ResponseUnion<R>;
 
 type ClientFn<R extends RouteDefinition, Codes extends string> =

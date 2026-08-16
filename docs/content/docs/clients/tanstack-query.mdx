@@ -1,0 +1,281 @@
+---
+title: TanStack Query
+description: Build TanStack Query options from your contract, with query keys derived from your routes.
+---
+
+<Supports items={['React Query', 'Vue Query', 'Svelte Query']} />
+
+<BetaNotice>
+
+The TanStack Query client is new and still settling. Its API surface may change before v2, so pin your version if you depend on it.
+
+</BetaNotice>
+
+`@ts-kizuna/tanstack-query` turns a contract and a [fetch client](/docs/clients/fetch) into TanStack Query options. Query keys come from each route's own path, so invalidation is a method call.
+
+It builds on `@tanstack/query-core`, the package every TanStack Query adapter shares, and returns options objects. You pass them to your own framework's hooks.
+
+Install it alongside the fetch client and your framework's package:
+
+<Tabs groupId="tanstack-framework" items={['React', 'Vue', 'Svelte']}>
+
+<Tab value="React">
+
+<InstallTabs packageName="@ts-kizuna/fetch @ts-kizuna/tanstack-query @tanstack/react-query" />
+
+</Tab>
+
+<Tab value="Vue">
+
+<InstallTabs packageName="@ts-kizuna/fetch @ts-kizuna/tanstack-query @tanstack/vue-query" />
+
+</Tab>
+
+<Tab value="Svelte">
+
+<InstallTabs packageName="@ts-kizuna/fetch @ts-kizuna/tanstack-query @tanstack/svelte-query" />
+
+</Tab>
+
+</Tabs>
+
+The examples here use React.
+
+<Steps>
+
+<Step>
+
+## Create the client
+
+```ts title="api.ts"
+import { KizunaClient } from '@ts-kizuna/fetch';
+import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
+import { contract } from '@/contract';
+
+export const apiClient = new KizunaClient(contract, {
+    baseUrl: 'http://localhost:3000',
+});
+
+export const api = new KizunaTanstackQuery(contract, apiClient);
+```
+
+</Step>
+
+<Step>
+
+## Run a query
+
+```tsx title="user-list.tsx"
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+
+const { data } = useQuery(
+    api.users.listUsers.queryOptions({
+        input: {
+            query: {
+                page: 1,
+                limit: 10,
+            },
+        },
+        staleTime: 60_000,
+    })
+);
+```
+
+`input` is what you would pass the fetch client. Everything beside it is TanStack's own and passes through untouched, so `staleTime`, `retry`, `select`, `enabled`, `initialData`, and `placeholderData` behave as documented.
+
+`data` is the route's response union, discriminated on `status`.
+
+```tsx title="user-list.tsx"
+if (data?.status === 200) {
+    console.log(data.body.name);
+}
+```
+
+A route with a `body` or `query` schema also carries the automatic `400`, so narrow before reading the body.
+
+</Step>
+
+<Step>
+
+## Run a mutation
+
+```tsx title="create-user.tsx"
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+const queryClient = useQueryClient();
+
+const createUser = useMutation(
+    api.users.createUser.mutationOptions({
+        onSuccess: () =>
+            queryClient.invalidateQueries({
+                queryKey: api.users.key(),
+            }),
+    })
+);
+
+createUser.mutate({
+    body: {
+        name: 'Alice',
+        email: 'alice@example.com',
+    },
+});
+```
+
+`mutate` takes the route's call arguments, or nothing when every argument is optional.
+
+</Step>
+
+</Steps>
+
+## Infinite queries
+
+`input` is a function of the page parameter. Annotate that parameter, since it types `initialPageParam` and `getNextPageParam`.
+
+```tsx title="user-search.tsx"
+import { useInfiniteQuery } from '@tanstack/react-query';
+
+const search = useInfiniteQuery(
+    api.users.searchUsers.infiniteOptions({
+        input: (cursor: number) => ({
+            query: {
+                q: 'alice',
+                limit: 10,
+                cursor,
+            },
+        }),
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => (lastPage.status === 200 ? lastPage.body.nextCursor : null),
+    })
+);
+```
+
+## Keys and invalidation
+
+Keys are `[segments, { input, type }]`, where the segments are the route's path through the contract. A group's key is a prefix of every key beneath it.
+
+| Factory                  | Returns                                   | Use it for                          |
+| ------------------------ | ----------------------------------------- | ----------------------------------- |
+| `key()`                  | `[segments]`                              | Invalidating a whole group or route |
+| `queryKey({ input })`    | `[segments, { input, type: 'query' }]`    | `getQueryData`, `setQueryData`      |
+| `infiniteKey({ input })` | `[segments, { input, type: 'infinite' }]` | The route's infinite query          |
+| `mutationKey()`          | `[segments]`                              | `useMutationState`, `isMutating`    |
+
+```tsx title="user-list.tsx"
+queryClient.invalidateQueries({
+    queryKey: api.users.key(),
+});
+
+queryClient.setQueryData(
+    api.users.getUser.queryKey({
+        input: {
+            params: {
+                id: '1',
+            },
+        },
+    }),
+    (old) => old
+);
+```
+
+`fetchOptions` is stripped from the key, because the `AbortSignal` it carries changes per attempt. The signal is forwarded to the client for you, and one you set yourself is left alone.
+
+## Error handling
+
+A status your contract declares arrives as `data`. Anything else throws `UndeclaredResponseError`, so `retry`, `throwOnError`, and error boundaries work.
+
+```tsx title="user-profile.tsx"
+import { isUndeclaredResponseError } from '@ts-kizuna/tanstack-query';
+
+const { data, error } = useQuery(
+    api.users.getUser.queryOptions({
+        input: {
+            params: {
+                id: 'usr_abc123',
+            },
+        },
+    })
+);
+
+if (data?.status === 404) {
+    return <NotFound />;
+}
+
+if (error !== null && isUndeclaredResponseError(error)) {
+    console.error(error.status, error.body);
+}
+```
+
+Declaring a status changes this: a contract declaring `500` has said a 500 is an outcome, so it arrives as data and is not retried. Network failures reject on their own.
+
+## Disabling a query
+
+```tsx title="user-search.tsx"
+import { skipToken } from '@tanstack/react-query';
+
+const { data } = useQuery(
+    api.users.searchUsers.queryOptions({
+        input:
+            term === ''
+                ? skipToken
+                : {
+                      query: {
+                          q: term,
+                          limit: 10,
+                          cursor: 0,
+                      },
+                  },
+    })
+);
+```
+
+## Server rendering
+
+Prefetch with a client built for the request, then dehydrate. Keys are derived the same way on both sides, so the cache hydrates.
+
+```tsx title="app/page.tsx"
+import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query';
+import { serverApi } from '@/lib/server-api';
+
+export default async function Page() {
+    const queryClient = new QueryClient();
+
+    await queryClient.prefetchQuery(
+        serverApi.users.listUsers.queryOptions({
+            input: {
+                query: {
+                    page: 1,
+                    limit: 10,
+                },
+            },
+        })
+    );
+
+    return (
+        <HydrationBoundary state={dehydrate(queryClient)}>
+            <UserList />
+        </HydrationBoundary>
+    );
+}
+```
+
+Responses are plain JSON, so the default `dehydrate` and `hydrate` need no custom serializer.
+
+`serverApi` is built from a client whose `onRequest` forwards the incoming cookies. Client components use the browser one.
+
+## Calling a route directly
+
+`call` runs a route through the client without touching the cache.
+
+```ts title="users.ts"
+const result = await api.users.getUser.call({
+    params: {
+        id: 'usr_abc123',
+    },
+});
+```
+
+## Reference
+
+- [`new KizunaTanstackQuery()`](/docs/reference/kizuna-tanstack-query)
+- [`isUndeclaredResponseError`](/docs/reference/is-undeclared-response-error)

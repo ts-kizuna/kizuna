@@ -1,0 +1,77 @@
+---
+title: isUndeclaredResponseError
+description: Narrow a TanStack Query error to a response whose status the contract does not declare.
+---
+
+Narrows an `error` from a query or mutation to `UndeclaredResponseError`. See the [TanStack Query guide](/docs/clients/tanstack-query#error-handling).
+
+<InstallTabs packageName="@ts-kizuna/tanstack-query" />
+
+```ts
+import { isUndeclaredResponseError } from '@ts-kizuna/tanstack-query';
+```
+
+## Parameters
+
+```ts
+isUndeclaredResponseError(error: unknown): error is UndeclaredResponseError
+```
+
+| Parameter | Type      | Description                          |
+| --------- | --------- | ------------------------------------ |
+| `error`   | `unknown` | The `error` from a query or mutation |
+
+## `UndeclaredResponseError`
+
+| Property  | Type                     | Description                    |
+| --------- | ------------------------ | ------------------------------ |
+| `status`  | `number`                 | The status the server returned |
+| `body`    | `unknown`                | The parsed response body       |
+| `headers` | `Record<string, string>` | The response headers           |
+
+It extends `Error`, so `retry`, `throwOnError`, and error boundaries treat it as one.
+
+## When it is thrown
+
+A route's declared statuses are the keys of its `responses`, plus `400` when the route has a `body` or `query` schema. Those arrive as `data`. Every other status throws.
+
+```ts
+getUser: {
+    method: 'GET',
+    path: '/users/:id',
+    responses: {
+        200: UserSchema,
+        404: ProblemDetailsSchema,
+    },
+},
+```
+
+A `200` or `404` is data. A `500` throws.
+
+## Example
+
+```ts
+const { data, error } = useQuery(
+    api.users.getUser.queryOptions({
+        input: {
+            params: {
+                id: 'usr_abc123',
+            },
+        },
+    })
+);
+
+if (data?.status === 404) {
+    return <NotFound />;
+}
+
+if (error !== null && isUndeclaredResponseError(error)) {
+    console.error(error.status, error.body);
+}
+```
+
+## See also
+
+- [TanStack Query client](/docs/clients/tanstack-query)
+- [`new KizunaTanstackQuery()`](/docs/reference/kizuna-tanstack-query)
+- [`isValidationError`](/docs/reference/is-validation-error)

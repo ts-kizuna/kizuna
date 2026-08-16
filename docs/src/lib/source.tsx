@@ -13,6 +13,7 @@ const badges: Record<string, string> = {
     '/docs/extend/create-plugin': 'Beta',
     '/docs/extend/create-job-transport': 'Beta',
     '/docs/clients/kotlin': 'Beta',
+    '/docs/clients/tanstack-query': 'Beta',
     '/docs/deprecations': 'Beta',
 };
 
