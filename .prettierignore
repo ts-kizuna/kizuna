@@ -7,6 +7,7 @@ pnpm-lock.yaml
 # Don't touch package manifests or TS configs, leave those to the user / pnpm.
 package.json
 **/package.json
+pnpm-workspace.yaml
 tsconfig.json
 **/tsconfig*.json
 
