@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 /**
  * A signed-in user, authenticated by a bearer session token. Guards resolve the

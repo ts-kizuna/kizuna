@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { db } from '@ts-kizuna-demo/shared';
 import { toCsv } from '@ts-kizuna-demo/shared/csv';
-import type { Router } from '@ts-kizuna/fastify';
+import type { Router } from '@ts-kizuna/server/fastify';
 import type { contract } from '@ts-kizuna-demo/shared';
 
 export const users: Router<typeof contract.routes.users> = {

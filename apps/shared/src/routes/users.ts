@@ -1,5 +1,5 @@
-import { Kizuna } from '@ts-kizuna/core';
-import { ProblemDetailsSchema, BinarySchema } from '@ts-kizuna/core/schemas';
+import { Kizuna } from '@ts-kizuna/contract';
+import { ProblemDetailsSchema, BinarySchema } from '@ts-kizuna/contract/schemas';
 import { z } from 'zod';
 import { k } from '../k.js';
 import { PaginationQuery } from '../pagination.js';

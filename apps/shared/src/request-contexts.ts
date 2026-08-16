@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 /**
  * PostHog ids clients send once, on the client initializer; every handler

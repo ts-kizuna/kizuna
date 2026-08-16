@@ -1,4 +1,4 @@
-import type { Router } from '@ts-kizuna/express';
+import type { Router } from '@ts-kizuna/server/express';
 import type { contract } from '@ts-kizuna-demo/shared';
 
 export const invites: Router<typeof contract.routes.invites> = {

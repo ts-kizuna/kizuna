@@ -3,11 +3,11 @@ title: Next.js
 description: Mount a ts-kizuna API on a Next.js App Router catch-all route.
 ---
 
-`@ts-kizuna/next` connects a ts-kizuna API to a Next.js App Router application via a single catch-all route file.
+`@ts-kizuna/server/next` connects a ts-kizuna API to a Next.js App Router application via a single catch-all route file.
 
 **Requires Next.js ≥ 16** (App Router).
 
-<InstallTabs packageName="@ts-kizuna/next" />
+<InstallTabs packageName="@ts-kizuna/server" />
 
 <Steps>
 
@@ -17,7 +17,7 @@ description: Mount a ts-kizuna API on a Next.js App Router catch-all route.
 
 ```ts title="next.config.ts"
 import type { NextConfig } from 'next';
-import { withKizuna } from '@ts-kizuna/next/config';
+import { withKizuna } from '@ts-kizuna/server/next/config';
 
 const nextConfig: NextConfig = {
     // your config
@@ -33,7 +33,7 @@ export default withKizuna(nextConfig);
 ## Create the server
 
 ```ts title="server.ts"
-import { KizunaServer } from '@ts-kizuna/next';
+import { KizunaServer } from '@ts-kizuna/server/next';
 import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);

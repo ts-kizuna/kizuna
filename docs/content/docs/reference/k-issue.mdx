@@ -68,7 +68,7 @@ By default `errors[].code` is typed as [`ValidationIssueCode`](/docs/reference/i
 To make the client suggest your custom codes, declare them on `new Kizuna()`'s `validation.issueCodes` for that API and pass the contract to [`new KizunaClient()`](/docs/reference/kizuna-client):
 
 ```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 import { tags } from './tags';
 
 export const k = new Kizuna({

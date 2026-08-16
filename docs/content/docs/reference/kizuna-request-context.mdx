@@ -21,7 +21,7 @@ A declaration can also read request `headers`. They stay off the routes and out 
 
 ```ts title="request-contexts.ts"
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 export const analytics = Kizuna.requestContext({
     headers: z.object({

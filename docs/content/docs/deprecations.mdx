@@ -136,7 +136,7 @@ Vercel functions and Next's `output: 'standalone'` bundle only the files the tra
 
 ```ts title="next.config.ts"
 import type { NextConfig } from 'next';
-import { withKizuna } from '@ts-kizuna/next/config';
+import { withKizuna } from '@ts-kizuna/server/next/config';
 
 const nextConfig: NextConfig = {
     // your config
@@ -159,7 +159,7 @@ It merges into `outputFileTracingIncludes`, so it composes with other config wra
 ```ts title="next.config.ts"
 import path from 'node:path';
 import type { NextConfig } from 'next';
-import { withKizuna } from '@ts-kizuna/next/config';
+import { withKizuna } from '@ts-kizuna/server/next/config';
 
 const nextConfig: NextConfig = {
     outputFileTracingRoot: path.join(import.meta.dirname, '../..'),

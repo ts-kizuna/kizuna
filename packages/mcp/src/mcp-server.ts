@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { flattenRoutes, validateRequest } from '@ts-kizuna/core/adapter';
 import {
     ResponseError,
+    isResponseError,
     type AdapterRequest,
     type ApiWithRouter,
     type GuardMap,
@@ -347,7 +348,7 @@ const executeToolCall = async (
             isError,
         };
     } catch (error) {
-        if (error instanceof ResponseError) {
+        if (isResponseError(error)) {
             return {
                 content: [
                     {

@@ -11,9 +11,9 @@ A ts-kizuna project has three parts:
 
 ## Installation
 
-Install `@ts-kizuna/core`, which defines routes and contracts, together with Zod 4 for the schemas.
+Install `@ts-kizuna/contract`, which defines routes and contracts, together with Zod 4 for the schemas.
 
-<InstallTabs packageName="@ts-kizuna/core zod" />
+<InstallTabs packageName="@ts-kizuna/contract zod" />
 
 Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
@@ -34,7 +34,7 @@ Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 Declare your API surface once with `new Kizuna()` and export `k`, then group your routes with `k.routes`. Keep each piece in its own file (a package both your server and client import).
 
 ```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 export const k = new Kizuna();
 ```
@@ -45,7 +45,7 @@ Each route pairs a method and path with Zod schemas:
 
 ```ts title="users.ts"
 import { z } from 'zod';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 import { k } from './k';
 
 export const UserSchema = z.object({
@@ -117,12 +117,12 @@ export const contract = k.contract({
 
 Pick an adapter, here Next.js. `new KizunaServer()` turns the contract into a `server` handle.
 
-<InstallTabs packageName="@ts-kizuna/next" />
+<InstallTabs packageName="@ts-kizuna/server" />
 
 `server.router` takes one function per route, with inputs validated and typed.
 
 ```ts title="server.ts"
-import { KizunaServer } from '@ts-kizuna/next';
+import { KizunaServer } from '@ts-kizuna/server/next';
 import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);

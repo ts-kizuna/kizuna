@@ -14,11 +14,11 @@
   "dependencies": {
     "@hono/node-server": "catalog:",
     "@ts-kizuna-demo/shared": "workspace:*",
-    "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/contract": "workspace:*",
     "@ts-kizuna/fetch": "workspace:*",
-    "@ts-kizuna/hono": "workspace:*",
     "@ts-kizuna/mcp": "workspace:*",
     "@ts-kizuna/openapi": "workspace:*",
+    "@ts-kizuna/server": "workspace:*",
     "hono": "catalog:",
     "zod": "catalog:"
   },

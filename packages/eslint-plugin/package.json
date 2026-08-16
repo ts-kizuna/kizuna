@@ -60,16 +60,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ts-kizuna/core": "workspace:*",
     "@typescript-eslint/parser": "^8.0.0",
     "@typescript-eslint/utils": "^8.0.0"
   },
   "peerDependencies": {
     "eslint": ">=9.0.0",
-    "typescript": ">=5.0.0",
-    "@ts-kizuna/core": "workspace:*"
+    "typescript": ">=5.0.0"
   },
   "devDependencies": {
-    "@ts-kizuna/core": "workspace:*",
     "eslint": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

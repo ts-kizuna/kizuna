@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { KizunaServer } from '@ts-kizuna/express';
+import { KizunaServer } from '@ts-kizuna/server/express';
 import express from 'express';
 import request from 'supertest';
 import { generateOpenApi } from './generator.js';

@@ -21,7 +21,7 @@ Jobs sit alongside `routes` on the contract. The first argument is the identity 
 
 ```ts title="contract/jobs.ts"
 import { z } from 'zod';
-import { cron } from '@ts-kizuna/core';
+import { cron } from '@ts-kizuna/contract';
 import { k } from './k';
 
 export const jobs = k.jobs('scheduler', {
@@ -195,7 +195,7 @@ Input is validated against the job's `input` schema either way.
 Outside a request, build a runner yourself:
 
 ```ts title="run-job.ts"
-import { createJobRunner } from '@ts-kizuna/core';
+import { createJobRunner } from '@ts-kizuna/contract';
 
 const jobs = createJobRunner(contract, jobHandlers);
 await jobs.sendDigests.run();
@@ -203,7 +203,7 @@ await jobs.sendDigests.run();
 
 ## Setting it up
 
-<InstallTabs packageName="@ts-kizuna/core" />
+<InstallTabs packageName="@ts-kizuna/contract" />
 
 <Tabs groupId="jobs-setup" items={['In process (long running server)', 'Long running server and transport', 'Serverless and transport']}>
 
@@ -220,7 +220,7 @@ export const server = new KizunaServer(contract, {
 ```
 
 ```ts title="src/index.ts"
-import { startJobs } from '@ts-kizuna/core/jobs';
+import { startJobs } from '@ts-kizuna/server/jobs';
 
 api.mount(app);
 startJobs(api);
@@ -250,7 +250,7 @@ startJobs(api);
 If your queue hands work back rather than calling your job's URL, run a worker to pull from it:
 
 ```ts title="worker.ts"
-import { startJobWorker } from '@ts-kizuna/core/jobs';
+import { startJobWorker } from '@ts-kizuna/server/jobs';
 
 const worker = await startJobWorker(api);
 process.on('SIGTERM', () => void worker?.stop());
@@ -385,7 +385,7 @@ export const jobHandlers = server.jobs({
 When you deploy to platform cron and want `pnpm dev` to exercise the real HTTP path, `startJobsDevRunner` ticks the dispatch endpoint over the network on an interval, the way your platform cron will:
 
 ```ts title="src/index.ts"
-import { startJobsDevRunner } from '@ts-kizuna/core/jobs';
+import { startJobsDevRunner } from '@ts-kizuna/server/jobs';
 
 if (process.env.NODE_ENV !== 'production') {
     startJobsDevRunner(contract, {

@@ -60,16 +60,17 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@ts-kizuna/core": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/express": "workspace:*",
+    "@ts-kizuna/server": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "@ts-kizuna/core": "workspace:*"
   }
 }

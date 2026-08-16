@@ -71,15 +71,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ts-kizuna/core": "workspace:*",
     "yaml": "^2.8.4"
   },
   "peerDependencies": {
-    "@ts-kizuna/core": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/express": "workspace:*",
+    "@ts-kizuna/server": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",
     "tsdown": "catalog:",

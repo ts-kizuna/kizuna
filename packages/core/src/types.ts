@@ -144,13 +144,13 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
  * `flattenRoutes` and the generator use to apply the group's tag to every route
  * in it. Stamped by `k.routes`.
  */
-export const ROUTES_TAG: unique symbol = Symbol('ts-kizuna.routes.tag');
+export const ROUTES_TAG: unique symbol = Symbol.for('ts-kizuna.routes.tag');
 
 /**
  * Type-only key under which `k.contract` brands each route with its resolved
  * handler context. Never written at runtime.
  */
-export const HANDLER_CONTEXT_BRAND: unique symbol = Symbol('ts-kizuna.route.handlerContext');
+export const HANDLER_CONTEXT_BRAND: unique symbol = Symbol.for('ts-kizuna.route.handlerContext');
 
 export interface HandlerContextBrand<Context> {
     readonly [HANDLER_CONTEXT_BRAND]?: Context;

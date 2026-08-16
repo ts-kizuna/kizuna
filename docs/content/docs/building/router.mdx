@@ -12,7 +12,7 @@ Handlers implement the contract, one function per route. Inputs arrive validated
 Each group lives in its own file, typed against its group in the contract with the [`Router`](#routehandler-and-router-types) type so inputs and responses stay inferred:
 
 ```ts title="users.router.ts"
-import type { Router } from '@ts-kizuna/express'; // or @ts-kizuna/fastify, @ts-kizuna/hono, @ts-kizuna/next
+import type { Router } from '@ts-kizuna/server/express'; // or @ts-kizuna/server/fastify, @ts-kizuna/server/hono, @ts-kizuna/server/next
 import type { contract } from '@/contract';
 
 export const users: Router<typeof contract.routes.users> = {
@@ -154,10 +154,10 @@ return {
 
 ## Error responses
 
-Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` in your routes to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/server-guard) in guards and all built-in kizuna errors.
+Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/contract/schemas` in your routes to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/server-guard) in guards and all built-in kizuna errors.
 
 ```ts title="contract/index.ts"
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 import { k } from './k';
 
 const usersRoutes = k.routes('users', {
@@ -244,7 +244,7 @@ If you declare your own `400` response in the routes, the client will see a unio
 Annotate a single route, one group, or the whole tree:
 
 ```ts title="users.ts"
-import type { RouteHandler, Router } from '@ts-kizuna/express';
+import type { RouteHandler, Router } from '@ts-kizuna/server/express';
 import { contract } from '@/contract';
 
 // Single route

@@ -5,24 +5,48 @@ import { DynamicCodeBlock } from 'fumadocs-ui/components/dynamic-codeblock';
 import { InstallTabs } from './install-tabs';
 import styles from './adapter-tabs.module.css';
 
+interface Adapter {
+    label: string;
+    /**
+     * What the import comes from, a subpath of the package named by `install`.
+     */
+    package: string;
+    /**
+     * What `pnpm add` takes, which a subpath cannot be.
+     */
+    install: string;
+}
+
 interface AdapterTabsProps {
     functionName: string;
-    adapters?: Array<string | { label: string; package: string }>;
+    adapters?: Array<string | Adapter>;
     showInstall?: boolean;
 }
 
-const adapterPackages: Record<string, string> = {
-    Express: '@ts-kizuna/express',
-    Fastify: '@ts-kizuna/fastify',
-    Hono: '@ts-kizuna/hono',
-    'Next.js': '@ts-kizuna/next',
+const adapterPackages: Record<string, Omit<Adapter, 'label'>> = {
+    Express: {
+        package: '@ts-kizuna/server/express',
+        install: '@ts-kizuna/server express',
+    },
+    Fastify: {
+        package: '@ts-kizuna/server/fastify',
+        install: '@ts-kizuna/server fastify',
+    },
+    Hono: {
+        package: '@ts-kizuna/server/hono',
+        install: '@ts-kizuna/server hono',
+    },
+    'Next.js': {
+        package: '@ts-kizuna/server/next',
+        install: '@ts-kizuna/server',
+    },
 };
 
-function resolveAdapter(adapter: string | { label: string; package: string }) {
+function resolveAdapter(adapter: string | Adapter): Adapter {
     if (typeof adapter === 'string') {
         return {
             label: adapter,
-            package: adapterPackages[adapter],
+            ...adapterPackages[adapter]!,
         };
     }
     return adapter;
@@ -36,7 +60,7 @@ export function AdapterTabs({ functionName, adapters = ['Express', 'Fastify', 'H
                 <Tab key={adapter.label} value={adapter.label}>
                     {showInstall ? (
                         <div className={styles.install}>
-                            <InstallTabs packageName={adapter.package} />
+                            <InstallTabs packageName={adapter.install} />
                             <DynamicCodeBlock lang="ts" code={`import { ${functionName} } from '${adapter.package}';`} />
                         </div>
                     ) : (

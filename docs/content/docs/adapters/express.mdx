@@ -3,11 +3,11 @@ title: Express
 description: Mount a ts-kizuna API on an Express 5 application.
 ---
 
-`@ts-kizuna/express` connects a ts-kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by your contract.
+`@ts-kizuna/server/express` connects a ts-kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by your contract.
 
 **Requires Express ≥ 5.**
 
-<InstallTabs packageName="@ts-kizuna/express express" />
+<InstallTabs packageName="@ts-kizuna/server express" />
 
 <Steps>
 
@@ -16,7 +16,7 @@ description: Mount a ts-kizuna API on an Express 5 application.
 ## Create the server
 
 ```ts title="server.ts"
-import { KizunaServer } from '@ts-kizuna/express';
+import { KizunaServer } from '@ts-kizuna/server/express';
 import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);

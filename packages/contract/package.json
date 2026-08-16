@@ -1,0 +1,117 @@
+{
+  "name": "@ts-kizuna/contract",
+  "version": "1.49.7",
+  "private": true,
+  "description": "Routes, contract definition, and validation for ts-kizuna",
+  "keywords": [
+    "ts-kizuna",
+    "typescript",
+    "zod",
+    "openapi",
+    "contract-first",
+    "type-safe",
+    "rest",
+    "api",
+    "routes",
+    "validation",
+    "http"
+  ],
+  "license": "MIT",
+  "homepage": "https://ts-kizuna.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "directory": "packages/contract"
+  },
+  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./schemas": {
+      "import": {
+        "types": "./dist/schemas.d.mts",
+        "default": "./dist/schemas.mjs"
+      },
+      "require": {
+        "types": "./dist/schemas.d.cts",
+        "default": "./dist/schemas.cjs"
+      }
+    },
+    "./authoring-names": {
+      "import": {
+        "types": "./dist/authoring-names.d.mts",
+        "default": "./dist/authoring-names.mjs"
+      },
+      "require": {
+        "types": "./dist/authoring-names.d.cts",
+        "default": "./dist/authoring-names.cjs"
+      }
+    },
+    "./plugin": {
+      "import": {
+        "types": "./dist/plugin.d.mts",
+        "default": "./dist/plugin.mjs"
+      },
+      "require": {
+        "types": "./dist/plugin.d.cts",
+        "default": "./dist/plugin.cjs"
+      }
+    },
+    "./generator": {
+      "import": {
+        "types": "./dist/generator.d.mts",
+        "default": "./dist/generator.mjs"
+      },
+      "require": {
+        "types": "./dist/generator.d.cts",
+        "default": "./dist/generator.cjs"
+      }
+    }
+  },
+  "kizuna": {
+    "entries": {
+      ".": "client",
+      "./schemas": "client",
+      "./authoring-names": "client",
+      "./plugin": "client",
+      "./generator": "client"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts src/schemas.ts src/authoring-names.ts src/plugin.ts src/generator.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ts-kizuna/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

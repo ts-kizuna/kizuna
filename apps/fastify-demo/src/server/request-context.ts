@@ -1,4 +1,4 @@
-import { getHeaderValue } from '@ts-kizuna/core';
+import { getHeaderValue } from '@ts-kizuna/server';
 import { server } from './server';
 
 export const captureAnalytics = server.requestContext('analytics', ({ request }) => ({

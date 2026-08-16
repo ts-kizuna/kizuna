@@ -1,0 +1,177 @@
+{
+  "name": "@ts-kizuna/server",
+  "version": "1.49.7",
+  "private": true,
+  "description": "Server runtime and framework adapters for ts-kizuna",
+  "keywords": [
+    "ts-kizuna",
+    "typescript",
+    "zod",
+    "openapi",
+    "contract-first",
+    "type-safe",
+    "rest",
+    "api",
+    "server",
+    "adapter",
+    "express",
+    "fastify",
+    "hono",
+    "nextjs"
+  ],
+  "license": "MIT",
+  "homepage": "https://ts-kizuna.com/docs/adapters",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "directory": "packages/server"
+  },
+  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./jobs": {
+      "import": {
+        "types": "./dist/jobs.d.mts",
+        "default": "./dist/jobs.mjs"
+      },
+      "require": {
+        "types": "./dist/jobs.d.cts",
+        "default": "./dist/jobs.cjs"
+      }
+    },
+    "./load-deprecations": {
+      "import": {
+        "types": "./dist/load-deprecations.d.mts",
+        "default": "./dist/load-deprecations.mjs"
+      },
+      "require": {
+        "types": "./dist/load-deprecations.d.cts",
+        "default": "./dist/load-deprecations.cjs"
+      }
+    },
+    "./express": {
+      "import": {
+        "types": "./dist/express.d.mts",
+        "default": "./dist/express.mjs"
+      },
+      "require": {
+        "types": "./dist/express.d.cts",
+        "default": "./dist/express.cjs"
+      }
+    },
+    "./fastify": {
+      "import": {
+        "types": "./dist/fastify.d.mts",
+        "default": "./dist/fastify.mjs"
+      },
+      "require": {
+        "types": "./dist/fastify.d.cts",
+        "default": "./dist/fastify.cjs"
+      }
+    },
+    "./hono": {
+      "import": {
+        "types": "./dist/hono.d.mts",
+        "default": "./dist/hono.mjs"
+      },
+      "require": {
+        "types": "./dist/hono.d.cts",
+        "default": "./dist/hono.cjs"
+      }
+    },
+    "./next": {
+      "import": {
+        "types": "./dist/next.d.mts",
+        "default": "./dist/next.mjs"
+      },
+      "require": {
+        "types": "./dist/next.d.cts",
+        "default": "./dist/next.cjs"
+      }
+    },
+    "./next/config": {
+      "import": {
+        "types": "./dist/next-config.d.mts",
+        "default": "./dist/next-config.mjs"
+      },
+      "require": {
+        "types": "./dist/next-config.d.cts",
+        "default": "./dist/next-config.cjs"
+      }
+    }
+  },
+  "kizuna": {
+    "entries": {
+      ".": "server",
+      "./jobs": "server",
+      "./load-deprecations": "server",
+      "./express": "server",
+      "./fastify": "server",
+      "./hono": "server",
+      "./next": "server",
+      "./next/config": "server"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ts-kizuna/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "express": "^5.0.0",
+    "fastify": "^5.0.0",
+    "hono": "^4.0.0",
+    "next": ">=16.0.0",
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    },
+    "next": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/express": "catalog:",
+    "express": "catalog:",
+    "fastify": "catalog:",
+    "fastify-plugin": "^5.1.0",
+    "hono": "catalog:",
+    "next": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

@@ -14,7 +14,7 @@ import {
 } from './handler-pipeline.js';
 import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes } from './route-matcher.js';
 import { parsePath } from './path-params.js';
-import { ResponseError } from './response-error.js';
+import { ResponseError, isResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
@@ -99,13 +99,19 @@ export class ResponseValidationError extends Error {
     }
 }
 
-export const API_META: unique symbol = Symbol('ts-kizuna.api.meta');
-export const ROUTER_META: unique symbol = Symbol('ts-kizuna.router');
-export const GUARDS_META: unique symbol = Symbol('ts-kizuna.guards');
-export const SCHEMES_META: unique symbol = Symbol('ts-kizuna.schemes');
-export const REQUEST_CONTEXT_META: unique symbol = Symbol('ts-kizuna.request-context');
+/**
+ * Registered symbols, not unique ones. `@ts-kizuna/contract` and
+ * `@ts-kizuna/server` each depend on this package, so a tree can hold two
+ * copies of it. A plain `Symbol()` would give each copy its own key, and
+ * metadata stamped by one would be invisible to the other.
+ */
+export const API_META: unique symbol = Symbol.for('ts-kizuna.api.meta');
+export const ROUTER_META: unique symbol = Symbol.for('ts-kizuna.router');
+export const GUARDS_META: unique symbol = Symbol.for('ts-kizuna.guards');
+export const SCHEMES_META: unique symbol = Symbol.for('ts-kizuna.schemes');
+export const REQUEST_CONTEXT_META: unique symbol = Symbol.for('ts-kizuna.request-context');
 const CONTRACT_META: unique symbol = Symbol.for('ts-kizuna.contract');
-export const JOBS_META: unique symbol = Symbol('ts-kizuna.jobs');
+export const JOBS_META: unique symbol = Symbol.for('ts-kizuna.jobs');
 
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
@@ -121,7 +127,7 @@ export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
  * The marker a guard's `deny(status, detail)` returns. Distinguishes a denial
  * from the context object a passing guard returns.
  */
-const GUARD_DENY: unique symbol = Symbol('ts-kizuna.guard.deny');
+const GUARD_DENY: unique symbol = Symbol.for('ts-kizuna.guard.deny');
 
 /**
  * The result of `deny(status, detail)` inside a guard, short-circuits the
@@ -484,7 +490,7 @@ export { sortFlattenedRoutes } from './route-matcher.js';
 export { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand } from './types.js';
 export { tagRoutes } from './routes.js';
 export { isTagSet, type NormalizeTags } from './tags.js';
-export { ResponseError } from './response-error.js';
+export { ResponseError, isResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';
 export { matchRoute } from './route-matcher.js';
@@ -1003,7 +1009,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             headers: successHeaders,
         };
     } catch (error) {
-        if (error instanceof ResponseError) {
+        if (isResponseError(error)) {
             return {
                 kind: 'success',
                 routeKey,

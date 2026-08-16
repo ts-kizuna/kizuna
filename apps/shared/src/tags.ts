@@ -1,4 +1,4 @@
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 export const tags = Kizuna.tags({
     health: {

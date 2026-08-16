@@ -124,9 +124,8 @@ export {
     cron,
 } from './schedule.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
-export { ResponseError } from './response-error.js';
+export { ResponseError, isResponseError } from './response-error.js';
 export { STATUS_TITLES, getStatusText } from './status-titles.js';
-export { getHeaderValue } from './adapter.js';
 
 export {
     type Method,

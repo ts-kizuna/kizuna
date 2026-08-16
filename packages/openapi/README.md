@@ -13,7 +13,7 @@ pnpm add @ts-kizuna/openapi
 Declare the plugin on `new Kizuna()`:
 
 ```ts
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 import { openApiPlugin } from '@ts-kizuna/openapi';
 
 export const k = new Kizuna({

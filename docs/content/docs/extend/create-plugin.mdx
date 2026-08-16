@@ -23,7 +23,7 @@ A plugin is declared on `new Kizuna()`, so whatever its declaration module impor
 ## The declaration
 
 ```ts title="@ts-kizuna/audit/src/index.ts"
-import { createPlugin } from '@ts-kizuna/core/plugin';
+import { createPlugin } from '@ts-kizuna/contract/plugin';
 import { z } from 'zod';
 import type { AuditExports } from './server.js';
 
@@ -62,7 +62,7 @@ export const auditPlugin = (props: AuditPluginProps = {}) =>
 ## The server
 
 ```ts title="@ts-kizuna/audit/src/server.ts"
-import { implementPlugin } from '@ts-kizuna/core/adapter';
+import { implementPlugin } from '@ts-kizuna/server';
 import { auditPlugin } from './index.js';
 
 export interface AuditExports {
@@ -118,7 +118,7 @@ Use the same key both times. Leave the second one out and `server.api` throws, n
 A plugin route can return `rawResponse` when its wire format is not a JSON body, which is how MCP serves JSON-RPC over server-sent events:
 
 ```ts title="plugin.ts"
-import { rawResponse } from '@ts-kizuna/core/adapter';
+import { rawResponse } from '@ts-kizuna/server';
 
 endpoint: async ({ body, headers }) => rawResponse(await transport.handleRequest(request)),
 ```

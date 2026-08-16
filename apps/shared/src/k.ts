@@ -1,4 +1,4 @@
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { openApiPlugin } from '@ts-kizuna/openapi';
 import { tags } from './tags.js';

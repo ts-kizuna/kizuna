@@ -1,4 +1,4 @@
-import type { Router } from '@ts-kizuna/next';
+import type { Router } from '@ts-kizuna/server/next';
 import type { contract } from '@ts-kizuna-demo/shared';
 
 export const notifications: Router<typeof contract.routes.notifications> = {

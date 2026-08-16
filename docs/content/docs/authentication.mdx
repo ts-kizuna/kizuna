@@ -21,7 +21,7 @@ An **identity** describes a credential your API accepts. A **guard** verifies it
 
 ```ts title="identities.ts"
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 export const user = Kizuna.identity.bearer({
     context: z.object({
@@ -33,7 +33,7 @@ export const user = Kizuna.identity.bearer({
 Register it on `new Kizuna()` under the name the rest of the contract refers to it by:
 
 ```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 import { tags } from './tags';
 import { user } from './identities';
 

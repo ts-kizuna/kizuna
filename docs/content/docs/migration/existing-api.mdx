@@ -37,7 +37,7 @@ responses: {
 Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema). The handler supplies `detail`; `type`/`title`/`status` are filled in for you:
 
 ```ts title="routes/users.ts"
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 
 responses: {
     200: UserSchema,
@@ -51,7 +51,7 @@ This is the path for nearly every migration. If your errors carry fields beyond 
 
 ```ts title="routes/users.ts"
 import { z } from 'zod';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 
 responses: {
     404: ProblemDetailsSchema.extend({
@@ -150,7 +150,7 @@ Doing a coordinated cutover instead? Skip the branch, always return the legacy s
 If your handlers throw domain errors (or you rely on framework error middleware), map them into Problem Details at the boundary instead of rewriting each handler. On Next.js that's the `onError` option; on Express, Fastify, and Hono, build the response with [`problemDetails()`](/docs/reference/problem-details-schema) in the framework's error handler.
 
 ```ts title="api.ts"
-import { problemDetails } from '@ts-kizuna/core';
+import { problemDetails } from '@ts-kizuna/contract';
 
 export const api = server.api({
     router,

@@ -5,10 +5,10 @@ description: Declare the set of tags used to group routes across nested route tr
 
 Declare the tags routes are grouped under. Pass the result to [`new Kizuna()`](/docs/reference/kizuna).
 
-<InstallTabs packageName="@ts-kizuna/core" />
+<InstallTabs packageName="@ts-kizuna/contract" />
 
 ```ts
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 ```
 
 ## Parameters
@@ -32,7 +32,7 @@ A `TagSet`. On `new Kizuna()`, it gives `k.routes` completion for the group tag 
 ## Example
 
 ```ts title="tags.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 export const tags = Kizuna.tags({
     users: {
@@ -44,7 +44,7 @@ export const tags = Kizuna.tags({
 ```
 
 ```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 import { tags } from './tags';
 
 export const k = new Kizuna({

@@ -7,12 +7,12 @@ ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneer
 
 ## Package mapping
 
-| ts-rest             | ts-kizuna                              | Notes                              |
-| ------------------- | -------------------------------------- | ---------------------------------- |
-| `@ts-rest/core`     | `@ts-kizuna/core` + `@ts-kizuna/fetch` | Client lives in a separate package |
-| `@ts-rest/express`  | `@ts-kizuna/express`                   |                                    |
-| `@ts-rest/next`     | `@ts-kizuna/next`                      |                                    |
-| `@ts-rest/open-api` | `@ts-kizuna/openapi`                   |                                    |
+| ts-rest             | ts-kizuna                                  | Notes                              |
+| ------------------- | ------------------------------------------ | ---------------------------------- |
+| `@ts-rest/core`     | `@ts-kizuna/contract` + `@ts-kizuna/fetch` | Client lives in a separate package |
+| `@ts-rest/express`  | `@ts-kizuna/server/express`                |                                    |
+| `@ts-rest/next`     | `@ts-kizuna/server/next`                   |                                    |
+| `@ts-rest/open-api` | `@ts-kizuna/openapi`                       |                                    |
 
 ## Routes
 
@@ -29,7 +29,7 @@ export const contract = c.router({ ... });
 
 ```ts title="ts-kizuna"
 // ts-kizuna
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 const tags = Kizuna.tags({
     users: 'Users',
@@ -147,7 +147,7 @@ const router = s.router(contract, { ... });
 
 ```ts title="ts-kizuna"
 // ts-kizuna
-import { KizunaServer } from '@ts-kizuna/express';
+import { KizunaServer } from '@ts-kizuna/server/express';
 
 const server = new KizunaServer(contract);
 
@@ -168,7 +168,7 @@ const router: RouterImpl<typeof contract> = { ... };
 
 ```ts title="ts-kizuna"
 // ts-kizuna
-import type { Router, RouteHandler } from '@ts-kizuna/express';
+import type { Router, RouteHandler } from '@ts-kizuna/server/express';
 import { contract } from './contract';
 
 // Whole handler tree

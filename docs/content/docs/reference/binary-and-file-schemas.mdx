@@ -3,10 +3,10 @@ title: BinarySchema & FileSchema
 description: Helper schemas for binary response bodies (BinarySchema) and multipart upload fields (FileSchema).
 ---
 
-Two helper schemas for non-JSON bodies, both from `@ts-kizuna/core/schemas`.
+Two helper schemas for non-JSON bodies, both from `@ts-kizuna/contract/schemas`.
 
 ```ts
-import { BinarySchema, FileSchema } from '@ts-kizuna/core/schemas';
+import { BinarySchema, FileSchema } from '@ts-kizuna/contract/schemas';
 ```
 
 **Sending or returning a blob of bytes, use `BinarySchema`. Taking a file uploaded through a form, use `FileSchema`.**
@@ -23,7 +23,7 @@ The split follows what each type carries. A `File` has a filename and MIME type,
 Use it as a response `body` and pair it with a `contentType`. It defaults to `application/octet-stream`. The body goes to the wire as raw bytes (never JSON-serialized); the OpenAPI generator emits `type: string, format: binary`, and the Swift client decodes it to `Data`.
 
 ```ts title="routes/reports.ts"
-import { BinarySchema } from '@ts-kizuna/core/schemas';
+import { BinarySchema } from '@ts-kizuna/contract/schemas';
 import { k } from './k';
 
 export const reportsRoutes = k.routes('reports', {
@@ -60,7 +60,7 @@ downloadReport: async ({ params }) => {
 Use it inside a `multipart/form-data` request body for uploaded files:
 
 ```ts title="users.ts"
-import { FileSchema } from '@ts-kizuna/core/schemas';
+import { FileSchema } from '@ts-kizuna/contract/schemas';
 
 uploadAvatar: {
     method: 'POST',

@@ -13,11 +13,11 @@
   },
   "dependencies": {
     "@ts-kizuna-demo/shared": "workspace:*",
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/express": "workspace:*",
+    "@ts-kizuna/contract": "workspace:*",
     "@ts-kizuna/fetch": "workspace:*",
     "@ts-kizuna/mcp": "workspace:*",
     "@ts-kizuna/openapi": "workspace:*",
+    "@ts-kizuna/server": "workspace:*",
     "express": "catalog:",
     "zod": "catalog:"
   },

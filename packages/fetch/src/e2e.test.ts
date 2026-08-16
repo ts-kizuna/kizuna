@@ -5,7 +5,7 @@ import type { Server, AddressInfo } from 'node:net';
 import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { KizunaClient, type Client } from '@ts-kizuna/fetch';
-import { KizunaServer } from '@ts-kizuna/express';
+import { KizunaServer } from '@ts-kizuna/server/express';
 
 const k = new Kizuna({
     tags: Kizuna.tags({

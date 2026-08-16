@@ -3,11 +3,11 @@ title: Hono
 description: Mount a ts-kizuna API on a Hono application.
 ---
 
-`@ts-kizuna/hono` connects a ts-kizuna API to a [Hono](https://hono.dev) application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes.
+`@ts-kizuna/server/hono` connects a ts-kizuna API to a [Hono](https://hono.dev) application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes.
 
 **Requires Hono >= 4.**
 
-<InstallTabs packageName="@ts-kizuna/hono hono" />
+<InstallTabs packageName="@ts-kizuna/server hono" />
 
 <Steps>
 
@@ -16,7 +16,7 @@ description: Mount a ts-kizuna API on a Hono application.
 ## Create the server
 
 ```ts title="server.ts"
-import { KizunaServer } from '@ts-kizuna/hono';
+import { KizunaServer } from '@ts-kizuna/server/hono';
 import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);
@@ -182,7 +182,7 @@ api.mount(app, {
 Annotate handlers individually or as a whole tree:
 
 ```ts title="users.ts"
-import type { RouteHandler, Router } from '@ts-kizuna/hono';
+import type { RouteHandler, Router } from '@ts-kizuna/server/hono';
 import { contract } from '@/contract';
 
 // Single route

@@ -13,7 +13,7 @@ pnpm add @ts-kizuna/mcp
 Declare the plugin on `new Kizuna()`:
 
 ```ts
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 
 export const k = new Kizuna({

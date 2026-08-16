@@ -3,11 +3,11 @@ title: Fastify
 description: Mount a ts-kizuna API on a Fastify application.
 ---
 
-`@ts-kizuna/fastify` connects a ts-kizuna API to a [Fastify](https://fastify.dev) application.
+`@ts-kizuna/server/fastify` connects a ts-kizuna API to a [Fastify](https://fastify.dev) application.
 
 **Requires Fastify >= 5.**
 
-<InstallTabs packageName="@ts-kizuna/fastify fastify" />
+<InstallTabs packageName="@ts-kizuna/server fastify" />
 
 <Steps>
 
@@ -16,7 +16,7 @@ description: Mount a ts-kizuna API on a Fastify application.
 ## Create the server
 
 ```ts title="server.ts"
-import { KizunaServer } from '@ts-kizuna/fastify';
+import { KizunaServer } from '@ts-kizuna/server/fastify';
 import { contract } from '@/contract';
 
 export const server = new KizunaServer(contract);
@@ -186,7 +186,7 @@ The adapter also sets `request.kizunaRoute` on every matched request, containing
 Annotate handlers individually or as a whole tree:
 
 ```ts title="users.ts"
-import type { RouteHandler, Router } from '@ts-kizuna/fastify';
+import type { RouteHandler, Router } from '@ts-kizuna/server/fastify';
 import { contract } from '@/contract';
 
 // Single route

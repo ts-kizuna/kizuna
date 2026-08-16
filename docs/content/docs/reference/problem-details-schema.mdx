@@ -6,7 +6,7 @@ description: RFC 9457 Problem Details error response schema (ProblemDetailsSchem
 The standard [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) error response shape used by kizuna. Matches the format produced by [`deny()`](/docs/reference/server-guard) in guards and all built-in error responses (404, 405, 415, etc.).
 
 ```ts
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 ```
 
 ## Shape
@@ -32,7 +32,7 @@ import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 Use `ProblemDetailsSchema` in your contract's `responses` to document error status codes:
 
 ```ts title="routes/users.ts"
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 import { k } from './k';
 
 const usersRoutes = k.routes('users', {
@@ -83,7 +83,7 @@ RFC 9457 lets a problem carry extra fields, called **extension members**, alongs
 
 ```ts title="routes/users.ts"
 import { z } from 'zod';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 import { k } from './k';
 
 const usersRoutes = k.routes('users', {
@@ -105,8 +105,8 @@ To reuse the extended schema across routes, and give it a name in the generated 
 
 ```ts title="routes/users.ts"
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { Kizuna } from '@ts-kizuna/contract';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 
 const ConflictError = Kizuna.model({
     title: 'ConflictError',
@@ -147,7 +147,7 @@ Extension members are how you preserve an existing API's error fields when movin
 `isProblemDetails` is a type guard for the shared error shape, the sibling of [`isValidationError`](/docs/reference/is-validation-error):
 
 ```ts title="lib/users.ts"
-import { isProblemDetails } from '@ts-kizuna/core';
+import { isProblemDetails } from '@ts-kizuna/contract';
 
 if (isProblemDetails(response.body)) {
     console.error(`${response.body.status}: ${response.body.detail}`);

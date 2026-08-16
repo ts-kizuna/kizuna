@@ -64,14 +64,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ts-kizuna/cli": "workspace:*"
+    "@ts-kizuna/cli": "workspace:*",
+    "@ts-kizuna/core": "workspace:*"
   },
   "peerDependencies": {
-    "@ts-kizuna/core": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@ts-kizuna/core": "workspace:*",
     "@types/node": "^22.9.0",
     "tsdown": "^0.21.0",
     "typescript": "^5.6.3",

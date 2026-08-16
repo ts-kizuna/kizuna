@@ -125,12 +125,9 @@ importers:
       '@ts-kizuna-demo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@ts-kizuna/core':
+      '@ts-kizuna/contract':
         specifier: workspace:*
-        version: link:../../packages/core
-      '@ts-kizuna/express':
-        specifier: workspace:*
-        version: link:../../packages/express
+        version: link:../../packages/contract
       '@ts-kizuna/fetch':
         specifier: workspace:*
         version: link:../../packages/fetch
@@ -140,6 +137,9 @@ importers:
       '@ts-kizuna/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
+      '@ts-kizuna/server':
+        specifier: workspace:*
+        version: link:../../packages/server
       express:
         specifier: 'catalog:'
         version: 5.2.1(supports-color@8.1.1)
@@ -171,12 +171,9 @@ importers:
       '@ts-kizuna-demo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@ts-kizuna/core':
+      '@ts-kizuna/contract':
         specifier: workspace:*
-        version: link:../../packages/core
-      '@ts-kizuna/fastify':
-        specifier: workspace:*
-        version: link:../../packages/fastify
+        version: link:../../packages/contract
       '@ts-kizuna/fetch':
         specifier: workspace:*
         version: link:../../packages/fetch
@@ -186,6 +183,9 @@ importers:
       '@ts-kizuna/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
+      '@ts-kizuna/server':
+        specifier: workspace:*
+        version: link:../../packages/server
       fastify:
         specifier: 'catalog:'
         version: 5.8.5
@@ -217,21 +217,21 @@ importers:
       '@ts-kizuna-demo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@ts-kizuna/core':
+      '@ts-kizuna/contract':
         specifier: workspace:*
-        version: link:../../packages/core
+        version: link:../../packages/contract
       '@ts-kizuna/fetch':
         specifier: workspace:*
         version: link:../../packages/fetch
-      '@ts-kizuna/hono':
-        specifier: workspace:*
-        version: link:../../packages/hono
       '@ts-kizuna/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
       '@ts-kizuna/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
+      '@ts-kizuna/server':
+        specifier: workspace:*
+        version: link:../../packages/server
       hono:
         specifier: 'catalog:'
         version: 4.12.19
@@ -282,21 +282,21 @@ importers:
       '@ts-kizuna-demo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@ts-kizuna/core':
+      '@ts-kizuna/contract':
         specifier: workspace:*
-        version: link:../../packages/core
+        version: link:../../packages/contract
       '@ts-kizuna/fetch':
         specifier: workspace:*
         version: link:../../packages/fetch
       '@ts-kizuna/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
-      '@ts-kizuna/next':
-        specifier: workspace:*
-        version: link:../../packages/next
       '@ts-kizuna/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
+      '@ts-kizuna/server':
+        specifier: workspace:*
+        version: link:../../packages/server
       next:
         specifier: 'catalog:'
         version: 16.2.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -331,9 +331,9 @@ importers:
 
   apps/shared:
     dependencies:
-      '@ts-kizuna/core':
+      '@ts-kizuna/contract':
         specifier: workspace:*
-        version: link:../../packages/core
+        version: link:../../packages/contract
       '@ts-kizuna/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
@@ -435,6 +435,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@ts-kizuna/core':
+        specifier: workspace:*
+        version: link:../core
       jiti:
         specifier: ^2.7.0
         version: 2.7.0
@@ -442,15 +445,28 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
     devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
+
+  packages/contract:
+    dependencies:
+      '@ts-kizuna/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
       zod:
         specifier: 'catalog:'
         version: 4.3.6
@@ -475,6 +491,9 @@ importers:
 
   packages/eslint-plugin:
     dependencies:
+      '@ts-kizuna/core':
+        specifier: workspace:*
+        version: link:../core
       '@typescript-eslint/parser':
         specifier: ^8.0.0
         version: 8.59.1(eslint@9.39.4(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@5.9.3)
@@ -482,9 +501,6 @@ importers:
         specifier: ^8.0.0
         version: 8.59.1(eslint@9.39.4(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@5.9.3)
     devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
       eslint:
         specifier: 'catalog:'
         version: 9.39.4(jiti@2.7.0)(supports-color@8.1.1)
@@ -498,81 +514,21 @@ importers:
         specifier: 'catalog:'
         version: 4.3.6
 
-  packages/express:
-    devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
-      '@types/express':
-        specifier: 'catalog:'
-        version: 5.0.6
-      express:
-        specifier: 'catalog:'
-        version: 5.2.1(supports-color@8.1.1)
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      zod:
-        specifier: 'catalog:'
-        version: 4.3.6
-
-  packages/fastify:
-    dependencies:
-      fastify-plugin:
-        specifier: ^5.1.0
-        version: 5.1.0
-    devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
-      fastify:
-        specifier: 'catalog:'
-        version: 5.8.5
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      zod:
-        specifier: 'catalog:'
-        version: 4.3.6
-
   packages/fetch:
-    devDependencies:
+    dependencies:
       '@ts-kizuna/core':
         specifier: workspace:*
         version: link:../core
-      '@ts-kizuna/express':
+    devDependencies:
+      '@ts-kizuna/server':
         specifier: workspace:*
-        version: link:../express
+        version: link:../server
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.6
       express:
         specifier: 'catalog:'
         version: 5.2.1(supports-color@8.1.1)
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      zod:
-        specifier: 'catalog:'
-        version: 4.3.6
-
-  packages/hono:
-    devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
-      hono:
-        specifier: 'catalog:'
-        version: 4.12.19
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)
@@ -588,10 +544,10 @@ importers:
       '@ts-kizuna/cli':
         specifier: workspace:*
         version: link:../cli
-    devDependencies:
       '@ts-kizuna/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
       '@types/node':
         specifier: ^22.9.0
         version: 22.20.0
@@ -610,40 +566,22 @@ importers:
       '@modelcontextprotocol/server':
         specifier: ^2.0.0
         version: 2.0.0
+      '@ts-kizuna/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@modelcontextprotocol/client':
         specifier: ^2.0.0
         version: 2.0.0
-      '@ts-kizuna/core':
+      '@ts-kizuna/server':
         specifier: workspace:*
-        version: link:../core
-      '@ts-kizuna/express':
-        specifier: workspace:*
-        version: link:../express
+        version: link:../server
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.6
       express:
         specifier: 'catalog:'
         version: 5.2.1(supports-color@8.1.1)
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      zod:
-        specifier: 'catalog:'
-        version: 4.3.6
-
-  packages/next:
-    devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
-      next:
-        specifier: 'catalog:'
-        version: 16.2.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)
@@ -656,22 +594,56 @@ importers:
 
   packages/openapi:
     dependencies:
+      '@ts-kizuna/core':
+        specifier: workspace:*
+        version: link:../core
       yaml:
         specifier: ^2.8.4
         version: 2.8.4
     devDependencies:
-      '@ts-kizuna/core':
+      '@ts-kizuna/server':
         specifier: workspace:*
-        version: link:../core
-      '@ts-kizuna/express':
-        specifier: workspace:*
-        version: link:../express
+        version: link:../server
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.6
       express:
         specifier: 'catalog:'
         version: 5.2.1(supports-color@8.1.1)
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
+
+  packages/server:
+    dependencies:
+      '@ts-kizuna/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/express':
+        specifier: 'catalog:'
+        version: 5.0.6
+      express:
+        specifier: 'catalog:'
+        version: 5.2.1(supports-color@8.1.1)
+      fastify:
+        specifier: 'catalog:'
+        version: 5.8.5
+      fastify-plugin:
+        specifier: ^5.1.0
+        version: 5.1.0
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.19
+      next:
+        specifier: 'catalog:'
+        version: 16.2.4(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@5.9.3)
@@ -687,10 +659,10 @@ importers:
       '@ts-kizuna/cli':
         specifier: workspace:*
         version: link:../cli
-    devDependencies:
       '@ts-kizuna/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2

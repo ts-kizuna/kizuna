@@ -5,10 +5,10 @@ description: Give a Zod schema a name so OpenAPI and Swift generators produce na
 
 Give a Zod schema a name, so OpenAPI and the Swift and Kotlin generators emit a named type for it.
 
-<InstallTabs packageName="@ts-kizuna/core" />
+<InstallTabs packageName="@ts-kizuna/contract" />
 
 ```ts
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 ```
 
 ## Parameters
@@ -30,7 +30,7 @@ The Zod schema with metadata attached, usable anywhere a Zod schema is.
 ## Example
 
 ```ts title="users.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 import { z } from 'zod';
 
 export const UserSchema = Kizuna.model({

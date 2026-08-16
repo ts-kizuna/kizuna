@@ -1,5 +1,5 @@
 import express from 'express';
-import { startJobsDevRunner } from '@ts-kizuna/core/jobs';
+import { startJobsDevRunner } from '@ts-kizuna/server/jobs';
 import { contract } from '@ts-kizuna-demo/shared';
 
 import { api } from './server/api';

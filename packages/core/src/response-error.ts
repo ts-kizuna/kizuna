@@ -7,7 +7,14 @@ interface ResponseErrorPayload {
     headers?: Record<string, string>;
 }
 
+/**
+ * Registered so `isResponseError` holds across two copies of this package,
+ * which `instanceof` would not.
+ */
+const RESPONSE_ERROR: unique symbol = Symbol.for('ts-kizuna.response-error');
+
 export class ResponseError<R extends RouteDefinition = never> extends Error {
+    public readonly [RESPONSE_ERROR] = true;
     public readonly status: number;
     public readonly body: unknown;
     public readonly headers?: Record<string, string>;
@@ -27,3 +34,5 @@ export class ResponseError<R extends RouteDefinition = never> extends Error {
         this.headers = response.headers;
     }
 }
+
+export const isResponseError = (value: unknown): value is ResponseError => value instanceof Error && RESPONSE_ERROR in value;

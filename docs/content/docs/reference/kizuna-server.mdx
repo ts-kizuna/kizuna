@@ -20,7 +20,7 @@ new KizunaServer(contract: Contract, options?: ServerOptions): Server
 | `options.onJobError`   | `(job: string, error: unknown) => void` | Called when a job queued without a transport rejects.        |
 
 ```ts title="server.ts"
-import { KizunaServer } from '@ts-kizuna/express';
+import { KizunaServer } from '@ts-kizuna/server/express';
 import { contract } from './contract';
 
 export const server = new KizunaServer(contract);

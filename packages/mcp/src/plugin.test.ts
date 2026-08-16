@@ -3,7 +3,7 @@ import { z } from 'zod';
 import express from 'express';
 import type { Server } from 'node:http';
 import { Kizuna } from '@ts-kizuna/core';
-import { KizunaServer } from '@ts-kizuna/express';
+import { KizunaServer } from '@ts-kizuna/server/express';
 import { Client } from '@modelcontextprotocol/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { mcpPlugin } from './plugin.js';

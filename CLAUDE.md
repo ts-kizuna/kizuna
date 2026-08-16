@@ -89,12 +89,25 @@ Applies equally to docs pages, README, JSDoc, and code comments.
 
 Examples in comments and JSDoc use names from this repo's own contract (`UserSchema`, `createUser`, `listEvents`, etc.), not from consumer projects.
 
+# Package layering
+
+- `@ts-kizuna/contract` is what a contract imports. Every entry is client reach.
+- `@ts-kizuna/server` is what serves one: the adapters, the job runtime, `createAdapter`, `implementPlugin`.
+- `@ts-kizuna/core` holds the implementation. Users never name it.
+
+Both faces are re-exports of a core entry and nothing else. Logic belongs in core.
+
+Every package under `packages/` takes `@ts-kizuna/core` as a regular dependency, never a peer. So core can appear twice in one tree: **use `Symbol.for`, never `Symbol()`**, and `isResponseError` rather than `instanceof ResponseError`.
+
 # Adapters
 
-First-party adapters (in `packages/`) always ship with:
+Every first-party adapter lives in `@ts-kizuna/server`, one directory per framework under `packages/server/src/`, reached by its own subpath (`@ts-kizuna/server/express`). A framework can only be imported for its values inside its own directory, which is why the package has no single root entry covering all four. Its framework peer dependency is optional, so nobody installs Fastify to use Hono.
 
+A new adapter ships with:
+
+- **Entry**: `packages/server/src/<framework>/`, an entry in `tsdown.config.ts`, and matching `exports` plus `kizuna.entries` in `packages/server/package.json`
 - **Demo app**: a working example app in `apps/` (e.g. `apps/express-demo`, `apps/hono-demo`)
-- **Documentation**: an adapter page in `docs/content/docs/adapters/`, plus updates to every doc page that lists adapters
+- **Documentation**: an adapter page in `docs/content/docs/adapters/`, an entry in `adapterPackages` in `docs/src/components/docs/adapter-tabs.tsx`, plus updates to every doc page that lists adapters
 - **Shared suites**: a `testAdapterFeatures(...)` call in its `*.test.ts` and a `checkAdapterTypeFeatures(...)` call in its `*.test-d.ts`, both from `packages/core/src/adapter-testing/`. Both catalogues are exhaustive, so adding a feature to either one breaks every adapter until each answers it. Legitimate framework differences belong in `ADAPTER_BEHAVIOUR` or in a plain `test()` beside the catalogue call, never silently dropped.
 
 # Plugins
@@ -103,6 +116,8 @@ A plugin ships in two halves, and which half a module belongs to decides what it
 
 - **Declaration**: the package's main entry, built with `createPlugin` from `@ts-kizuna/core/plugin`. It rides on the contract, and a contract is shared with browser bundles, so it may import only what a browser bundles. Use `import type` for anything the server half owns; types are erased, values are not.
 - **Server**: the `./server` subpath, built with `implementPlugin` from `@ts-kizuna/core/adapter`. Only the server app imports it, so it may import anything, including Node built-ins and Node-only dependencies.
+
+Packages under `packages/` import `@ts-kizuna/core` directly, which is why those two paths name `core` rather than `contract` or `server`. Consumers write `@ts-kizuna/contract/plugin` and `@ts-kizuna/server` for the same two modules.
 
 Every export subpath of every package under `packages/` declares its reach under `kizuna.entries` in its own `package.json`. `tests/client-safe.test.ts` enforces the boundary rather than documenting it: it bundles each `client` entry for a browser target and fails on any Node built-in, derives reach from the demo contract's own import graph so a mislabelled entry is caught, and requires every plugin to be installed on `apps/shared/src/k.ts`. It reads `dist`, so run `pnpm build` before it.
 
@@ -116,7 +131,7 @@ Every package under `packages/` publishes to npmjs as `@ts-kizuna/*`. The releas
 
 ## Adding a package
 
-A package needs everything the published twelve carry, or its npm page is the poorer for it. Copy an existing sibling's `package.json` and keep every field: `description`, `keywords` (the shared base plus a few specific), `license`, `homepage` pointing at that package's own docs page, `repository` with its `directory`, `bugs`, `sideEffects`, `engines`, and `publishConfig.access` set to `public`. A scoped package publishes **restricted** without that last one.
+A package needs everything the published ten carry, or its npm page is the poorer for it. Copy an existing sibling's `package.json` and keep every field: `description`, `keywords` (the shared base plus a few specific), `license`, `homepage` pointing at that package's own docs page, `repository` with its `directory`, `bugs`, `sideEffects`, `engines`, and `publishConfig.access` set to `public`. A scoped package publishes **restricted** without that last one.
 
 Also add a `README.md`, because npm renders the package's own file and nothing else. Four parts: the description, an install line, the smallest snippet that works, and a link to its docs page. Take the snippet from the docs rather than writing a fresh one. Add the package to the table in the root `README.md` too, which is where its `description` comes from.
 

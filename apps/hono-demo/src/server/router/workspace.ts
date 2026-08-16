@@ -1,5 +1,5 @@
 import { db } from '@ts-kizuna-demo/shared';
-import type { Router } from '@ts-kizuna/hono';
+import type { Router } from '@ts-kizuna/server/hono';
 import type { contract } from '@ts-kizuna-demo/shared';
 
 export const workspace: Router<typeof contract.routes.workspace> = {

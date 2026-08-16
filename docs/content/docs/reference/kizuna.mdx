@@ -5,10 +5,10 @@ description: Declare one API surface, with its tags, identities, request context
 
 `new Kizuna()` creates one API surface. Keep the instance as `k`, then use `k.routes` to define route groups and `k.contract` to assemble them.
 
-<InstallTabs packageName="@ts-kizuna/core" />
+<InstallTabs packageName="@ts-kizuna/contract" />
 
 ```ts
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 ```
 
 ## Parameters
@@ -62,7 +62,7 @@ The instance, the authoring surface for this API:
 Construct it once, usually in a `k.ts` file, then import `k` wherever you define routes.
 
 ```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 import { tags } from './tags';
 import { user, member } from './identities';
 import { analytics } from './request-contexts';
@@ -88,7 +88,7 @@ export const k = new Kizuna({
 
 ```ts title="request-contexts.ts"
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 export const analytics = Kizuna.requestContext(
     z.object({

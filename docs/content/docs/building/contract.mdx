@@ -12,7 +12,7 @@ The contract is the source of truth for your API. You hand it to [`new KizunaSer
 Construct it once, usually in a `k.ts` file, and export `k`. Pass a tag set so route groups have a tag to sit under, where the keys become the allowed group names.
 
 ```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 const tags = Kizuna.tags({
     users: 'Users',
@@ -29,7 +29,7 @@ Call `k.routes` with a tag and your routes.
 
 ```ts title="users.ts"
 import { z } from 'zod';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 import { k } from './k';
 
 export const UserSchema = z.object({
@@ -195,7 +195,7 @@ responses: {
 For binary responses, use [`BinarySchema`](/docs/reference/binary-and-file-schemas) for a body of raw bytes (`Uint8Array`/`Buffer`), such as a PDF download:
 
 ```ts title="reports.ts"
-import { BinarySchema } from '@ts-kizuna/core/schemas';
+import { BinarySchema } from '@ts-kizuna/contract/schemas';
 
 responses: {
     200: {
@@ -231,7 +231,7 @@ A job carries its own identity, so it takes no entry in the `auth` map, and it s
 By default the generators inline each schema wherever it appears. Use [`Kizuna.model`](/docs/reference/kizuna-model) to give a schema a name they can reuse:
 
 ```ts title="users.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 export const UserSchema = Kizuna.model({
     title: 'User',
@@ -253,7 +253,7 @@ export const UserSchema = Kizuna.model({
 Large contracts split into groups. Declare the tags once with [`Kizuna.tags`](/docs/reference/kizuna-tags), pass them to `new Kizuna()`, then define each group with `k.routes` in its own file:
 
 ```ts title="tags.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 
 export const tags = Kizuna.tags({
     users: {
@@ -265,7 +265,7 @@ export const tags = Kizuna.tags({
 ```
 
 ```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/contract';
 import { tags } from './tags';
 
 export const k = new Kizuna({

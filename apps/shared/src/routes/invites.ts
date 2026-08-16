@@ -1,4 +1,4 @@
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 import { z } from 'zod';
 import { k } from '../k.js';
 

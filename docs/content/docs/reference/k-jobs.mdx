@@ -7,7 +7,7 @@ Declares the contract's scheduled jobs. The first argument is the identity every
 
 ```ts title="jobs.ts"
 import { z } from 'zod';
-import { cron } from '@ts-kizuna/core';
+import { cron } from '@ts-kizuna/contract';
 
 export const jobs = k.jobs('scheduler', {
     sendDigests: {
@@ -61,7 +61,7 @@ Every job answers with the same set. A scheduler reads the status code to decide
 
 ## Schedule helpers
 
-Exported from `@ts-kizuna/core`. Each returns a plain cron string.
+Exported from `@ts-kizuna/contract`. Each returns a plain cron string.
 
 | Helper                        | Expression     |
 | ----------------------------- | -------------- |

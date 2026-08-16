@@ -72,16 +72,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0"
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@ts-kizuna/core": "workspace:*"
   },
   "peerDependencies": {
-    "@ts-kizuna/core": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.0.0",
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/express": "workspace:*",
+    "@ts-kizuna/server": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",
     "tsdown": "catalog:",
