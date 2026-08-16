@@ -1,6 +1,6 @@
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
-import { k } from '../k.js';
+import { k } from '../k';
 
 export const inviteRoutes = k.routes('invites', {
     getInvite: {

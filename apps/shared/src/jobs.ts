@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { cron } from '@ts-kizuna/core';
-import { k } from './k.js';
+import { k } from './k';
 
 /**
  * The API's scheduled jobs, grouped the way a real contract would be.

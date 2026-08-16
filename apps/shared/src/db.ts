@@ -1,4 +1,4 @@
-import type { User } from './types.js';
+import type { User } from './types';
 
 const users = new Map<string, User>([
     ['1', { id: '1', name: 'Ada Lovelace', email: 'ada@example.com', last_name: 'Lovelace' }],
