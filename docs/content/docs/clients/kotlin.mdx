@@ -261,16 +261,45 @@ suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.Us
 }
 ```
 
-## Tip: automate with a script
+## Keep the client in sync
 
-You can add a script to your `package.json` to regenerate the client whenever the contract changes:
+Run the generator as part of the build:
 
 ```json title="package.json"
 {
     "scripts": {
-        "generate:kotlin": "ts-kizuna-kotlin generate --contract src/contract/index.ts --out ../android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example"
+        "generate:kotlin": "ts-kizuna-kotlin generate --contract src/contract/index.ts --out ./kotlin/APIClient.kt --namespace-name API --package com.example",
+        "build": "tsdown && pnpm generate:kotlin"
     }
 }
+```
+
+<Callout type="info">
+    Where the file lands depends on how you ship the client: a Gradle module when you release it as a library, the app's own source set
+    (`../android/app/src/main/kotlin/com/example/`) when the app is in the same repo.
+</Callout>
+
+Commit the generated file, then have CI regenerate it and diff. Output is deterministic, so a diff means the contract moved and the client did not:
+
+```yaml title=".github/workflows/build-and-tests.yml"
+- name: Check the Kotlin client is up to date
+  run: pnpm generate:kotlin && git diff --exit-code kotlin/
+```
+
+Give the client its own directory so the check sees nothing but generated output.
+
+A current client still has to compile. With the file in an Android or JVM source set, add a Gradle job:
+
+```yaml title=".github/workflows/build-and-tests.yml"
+kotlin:
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v6
+        - uses: actions/setup-java@v4
+          with:
+              distribution: temurin
+              java-version: 17
+        - run: ./gradlew test
 ```
 
 ## Reference

@@ -182,16 +182,41 @@ public func deleteUser(_ params: APIClient.DeleteUser.Params) async throws(APICl
 }
 ```
 
-## Tip: automate with a script
+## Keep the client in sync
 
-You can add a script to your `package.json` to regenerate the client whenever the contract changes:
+Run the generator as part of the build:
 
 ```json title="package.json"
 {
     "scripts": {
-        "generate:swift": "ts-kizuna-swift generate --contract src/contract/index.ts --output ../ios/MyApp/Generated/APIClient.swift --namespace-name API"
+        "generate:swift": "ts-kizuna-swift generate --contract src/contract/index.ts --output ./swift/APIClient.swift --namespace-name API",
+        "build": "tsdown && pnpm generate:swift"
     }
 }
+```
+
+<Callout type="info">
+    Where the file lands depends on how you ship the client: a SwiftPM target when you release it as a Swift package, the app's own source
+    tree (`../ios/MyApp/Generated/`) when the app is in the same repo.
+</Callout>
+
+Commit the generated file, then have CI regenerate it and diff. Output is deterministic, so a diff means the contract moved and the client did not:
+
+```yaml title=".github/workflows/build-and-tests.yml"
+- name: Check the Swift client is up to date
+  run: pnpm generate:swift && git diff --exit-code swift/
+```
+
+Give the client its own directory so the check sees nothing but generated output. Generating a Swift file needs Node, not Xcode, so this runs on the same Linux runner as your other checks.
+
+A current client still has to compile. With the file in a SwiftPM target, add a macOS job:
+
+```yaml title=".github/workflows/build-and-tests.yml"
+swift:
+    runs-on: macos-latest
+    steps:
+        - uses: actions/checkout@v6
+        - run: swift test
 ```
 
 ## Reference
