@@ -1,9 +1,9 @@
 import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema, BinarySchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
-import { k } from '../k.js';
-import { PaginationQuery } from '../pagination.js';
-import { UserSessionEvent } from './notifications.js';
+import { k } from '../k';
+import { PaginationQuery } from '../pagination';
+import { UserSessionEvent } from './notifications';
 
 export const UserSchema = Kizuna.model({
     title: 'User',

@@ -1,7 +1,7 @@
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
-import { k } from '../k.js';
-import { UserSchema } from './users.js';
+import { k } from '../k';
+import { UserSchema } from './users';
 
 const workspaceMembers = k.routes('members', {
     listMembers: {

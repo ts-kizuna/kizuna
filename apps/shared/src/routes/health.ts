@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { k } from '../k.js';
+import { k } from '../k';
 
 export const healthRoutes = k.routes('health', {
     check: {

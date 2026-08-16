@@ -1,9 +1,9 @@
 import { Kizuna } from '@ts-kizuna/core';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { openApiPlugin } from '@ts-kizuna/openapi';
-import { tags } from './tags.js';
-import { user, member, inviteToken, scheduler } from './identities.js';
-import { analytics } from './request-contexts.js';
+import { tags } from './tags';
+import { user, member, inviteToken, scheduler } from './identities';
+import { analytics } from './request-contexts';
 
 export const k = new Kizuna({
     identities: {

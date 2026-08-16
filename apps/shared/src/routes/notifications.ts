@@ -1,7 +1,7 @@
 import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
-import { k } from '../k.js';
+import { k } from '../k';
 
 export const EmailEvent = Kizuna.model({
     title: 'EmailEvent',
