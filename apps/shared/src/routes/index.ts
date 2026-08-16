@@ -1,14 +1,14 @@
-export * from './users.js';
-export * from './health.js';
-export * from './workspace.js';
-export * from './notifications.js';
-export * from './invites.js';
+export * from './users';
+export * from './health';
+export * from './workspace';
+export * from './notifications';
+export * from './invites';
 
-import { usersRoutes } from './users.js';
-import { healthRoutes } from './health.js';
-import { workspaceRoutes } from './workspace.js';
-import { notificationsRoutes } from './notifications.js';
-import { inviteRoutes } from './invites.js';
+import { usersRoutes } from './users';
+import { healthRoutes } from './health';
+import { workspaceRoutes } from './workspace';
+import { notificationsRoutes } from './notifications';
+import { inviteRoutes } from './invites';
 
 export const routes = {
     users: usersRoutes,

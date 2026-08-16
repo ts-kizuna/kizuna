@@ -1,7 +1,7 @@
-import { k } from './k.js';
-import { routes } from './routes/index.js';
-import { jobs } from './jobs.js';
-import { auth } from './auth.js';
+import { k } from './k';
+import { routes } from './routes/index';
+import { jobs } from './jobs';
+import { auth } from './auth';
 
 export const contract = k.contract({
     routes,

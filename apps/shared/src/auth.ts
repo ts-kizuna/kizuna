@@ -1,5 +1,5 @@
-import { k } from './k.js';
-import { routes } from './routes/index.js';
+import { k } from './k';
+import { routes } from './routes/index';
 
 export const auth = k.auth(routes, {
     users: false,
