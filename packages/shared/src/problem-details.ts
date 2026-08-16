@@ -11,7 +11,7 @@ export interface ProblemDetails {
  * Build an RFC 9457 Problem Details body.
  *
  * ```ts
- * import { problemDetails } from '@ts-kizuna/core';
+ * import { problemDetails } from '@ts-kizuna/shared';
  *
  * return throwError({
  *     status: 404,

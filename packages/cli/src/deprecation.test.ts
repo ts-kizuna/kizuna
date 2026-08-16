@@ -4,9 +4,9 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import * as url from 'node:url';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { contractFingerprint, serializeDeprecationMap, deserializeDeprecationMap } from '@ts-kizuna/core/generator';
-import { loadDeprecations } from '@ts-kizuna/core/load-deprecations';
+import { Kizuna } from '@ts-kizuna/shared';
+import { contractFingerprint, serializeDeprecationMap, deserializeDeprecationMap } from '@ts-kizuna/shared/generator';
+import { loadDeprecations } from '@ts-kizuna/shared/load-deprecations';
 import { createDeprecationMap, writeKizunaDeprecations } from './deprecation-parser.js';
 import { contract } from './deprecation.fixture.js';
 
@@ -76,7 +76,7 @@ describe('createDeprecationMap', () => {
         const file = path.join(dir, 'contract.ts');
         fs.writeFileSync(
             file,
-            `import { Kizuna, createContract } from '@ts-kizuna/core';
+            `import { Kizuna, createContract } from '@ts-kizuna/shared';
 import { z } from 'zod';
 const InnerModel = Kizuna.model({
     title: 'InnerModel',

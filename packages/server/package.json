@@ -140,9 +140,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ts-kizuna/core": "workspace:*"
+    "@ts-kizuna/shared": "workspace:*"
   },
   "peerDependencies": {
+    "@ts-kizuna/contract": "workspace:*",
     "express": "^5.0.0",
     "fastify": "^5.0.0",
     "hono": "^4.0.0",
@@ -164,6 +165,7 @@
     }
   },
   "devDependencies": {
+    "@ts-kizuna/contract": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",
     "fastify": "catalog:",

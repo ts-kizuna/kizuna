@@ -1,11 +1,11 @@
 // Not `../handler-pipeline.js`: see the note in `type-fixtures.ts`.
-import type { Contract, RouteDefinition, Routes } from '@ts-kizuna/core';
+import type { Contract, RouteDefinition, Routes } from '@ts-kizuna/shared';
 import type {
     HandlersFromAuth,
     RequestContextValues,
     RouteHandler as CoreRouteHandler,
     Router as CoreRouter,
-} from '@ts-kizuna/core/adapter';
+} from '@ts-kizuna/shared/adapter';
 
 /**
  * The one definition every adapter's own `Router<C>` must resolve to, with its handler context substituted in.

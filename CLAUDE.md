@@ -93,11 +93,11 @@ Examples in comments and JSDoc use names from this repo's own contract (`UserSch
 
 - `@ts-kizuna/contract` is what a contract imports. Every entry is client reach.
 - `@ts-kizuna/server` is what serves one: the adapters, the job runtime, `createAdapter`, `implementPlugin`.
-- `@ts-kizuna/core` holds the implementation. Users never name it.
+- `@ts-kizuna/shared` holds the implementation. Users never name it.
 
 Both faces are re-exports of a core entry and nothing else. Logic belongs in core.
 
-Every package under `packages/` takes `@ts-kizuna/core` as a regular dependency, never a peer. So core can appear twice in one tree: **use `Symbol.for`, never `Symbol()`**, and `isResponseError` rather than `instanceof ResponseError`.
+Every package under `packages/` takes `@ts-kizuna/shared` as a regular dependency, never a peer. So core can appear twice in one tree: **use `Symbol.for`, never `Symbol()`**, and `isResponseError` rather than `instanceof ResponseError`.
 
 # Adapters
 
@@ -114,10 +114,10 @@ A new adapter ships with:
 
 A plugin ships in two halves, and which half a module belongs to decides what it may import:
 
-- **Declaration**: the package's main entry, built with `createPlugin` from `@ts-kizuna/core/plugin`. It rides on the contract, and a contract is shared with browser bundles, so it may import only what a browser bundles. Use `import type` for anything the server half owns; types are erased, values are not.
-- **Server**: the `./server` subpath, built with `implementPlugin` from `@ts-kizuna/core/adapter`. Only the server app imports it, so it may import anything, including Node built-ins and Node-only dependencies.
+- **Declaration**: the package's main entry, built with `createPlugin` from `@ts-kizuna/shared/plugin`. It rides on the contract, and a contract is shared with browser bundles, so it may import only what a browser bundles. Use `import type` for anything the server half owns; types are erased, values are not.
+- **Server**: the `./server` subpath, built with `implementPlugin` from `@ts-kizuna/shared/adapter`. Only the server app imports it, so it may import anything, including Node built-ins and Node-only dependencies.
 
-Packages under `packages/` import `@ts-kizuna/core` directly, which is why those two paths name `core` rather than `contract` or `server`. Consumers write `@ts-kizuna/contract/plugin` and `@ts-kizuna/server` for the same two modules.
+Packages under `packages/` import `@ts-kizuna/shared` directly, which is why those two paths name `core` rather than `contract` or `server`. Consumers write `@ts-kizuna/contract/plugin` and `@ts-kizuna/server` for the same two modules.
 
 Every export subpath of every package under `packages/` declares its reach under `kizuna.entries` in its own `package.json`. `tests/client-safe.test.ts` enforces the boundary rather than documenting it: it bundles each `client` entry for a browser target and fails on any Node built-in, derives reach from the demo contract's own import graph so a mislabelled entry is caught, and requires every plugin to be installed on `apps/shared/src/k.ts`. It reads `dist`, so run `pnpm build` before it.
 

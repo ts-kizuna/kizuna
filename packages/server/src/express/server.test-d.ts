@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import type { Request } from 'express';
-import type { RouteDefinition } from '@ts-kizuna/core';
-import type { GuardRun, RequestContextRun } from '@ts-kizuna/core/adapter';
+import type { RouteDefinition } from '@ts-kizuna/shared';
+import type { GuardRun, RequestContextRun } from '@ts-kizuna/shared/adapter';
 import {
     checkAdapterTypeFeatures,
     gateContract,

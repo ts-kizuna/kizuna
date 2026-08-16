@@ -39,7 +39,7 @@ import {
     type PluginArgs,
     type ContractPlugins,
     pluginRouterOf,
-} from '@ts-kizuna/core/adapter';
+} from '@ts-kizuna/shared/adapter';
 import type { z } from 'zod';
 import type {
     Contract,
@@ -51,8 +51,8 @@ import type {
     JobsArg,
     RequestContextSchema,
     RequestContextHeaderValues,
-} from '@ts-kizuna/core';
-import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
+} from '@ts-kizuna/shared';
+import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/shared/adapter';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export { NextRequest, NextResponse } from 'next/server';

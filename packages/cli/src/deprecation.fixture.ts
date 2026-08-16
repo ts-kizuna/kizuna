@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/shared';
 import { KizunaClient } from '../../fetch/src/client.js';
 
 const Paginated = <T extends z.ZodType>(itemSchema: T) =>

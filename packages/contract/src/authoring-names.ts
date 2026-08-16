@@ -1,1 +1,1 @@
-export * from '@ts-kizuna/core/authoring-names';
+export * from '@ts-kizuna/shared/authoring-names';

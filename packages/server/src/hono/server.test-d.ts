@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import type { Env } from 'hono';
-import type { GuardRun, RequestContextRun } from '@ts-kizuna/core/adapter';
+import type { GuardRun, RequestContextRun } from '@ts-kizuna/shared/adapter';
 import {
     checkAdapterTypeFeatures,
     gateContract,

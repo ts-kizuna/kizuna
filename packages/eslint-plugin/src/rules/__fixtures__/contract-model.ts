@@ -1,4 +1,4 @@
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/shared';
 import { z } from 'zod';
 
 export const Model = Kizuna.model({

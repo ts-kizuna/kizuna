@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/shared';
 import { KizunaServer } from './server.js';
 import { readTestBody, testAdapterFeatures } from '../../../core/src/adapter-testing/index.js';
 

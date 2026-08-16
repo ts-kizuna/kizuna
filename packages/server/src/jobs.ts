@@ -1,1 +1,1 @@
-export * from '@ts-kizuna/core/jobs';
+export * from '@ts-kizuna/shared/jobs';

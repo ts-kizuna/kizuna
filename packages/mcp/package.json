@@ -68,12 +68,12 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/server.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external @modelcontextprotocol/sdk",
+    "build": "tsdown src/index.ts src/server.ts --format esm,cjs --dts --clean --external @ts-kizuna/shared --external zod --external @modelcontextprotocol/sdk",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
-    "@ts-kizuna/core": "workspace:*"
+    "@ts-kizuna/shared": "workspace:*"
   },
   "peerDependencies": {
     "zod": "^4.0.0"

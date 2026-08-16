@@ -14,7 +14,7 @@ import {
     toCamelCase,
     sanitizeFieldName,
     sanitizeIdentifier,
-} from '@ts-kizuna/core/generator';
+} from '@ts-kizuna/shared/generator';
 
 export interface KotlinField {
     name: string;

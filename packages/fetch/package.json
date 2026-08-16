@@ -56,7 +56,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod",
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/shared --external zod",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -71,6 +71,6 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "@ts-kizuna/core": "workspace:*"
+    "@ts-kizuna/shared": "workspace:*"
   }
 }

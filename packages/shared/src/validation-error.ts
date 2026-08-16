@@ -58,7 +58,7 @@ const ValidationIssueCodeSchema = z.union([
  * listing each field-level validation failure.
  *
  * ```ts
- * import { ValidationErrorSchema } from '@ts-kizuna/core/schemas';
+ * import { ValidationErrorSchema } from '@ts-kizuna/contract/schemas';
  *
  * const routes = k.routes({
  *     createUser: {

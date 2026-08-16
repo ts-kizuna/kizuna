@@ -2,7 +2,7 @@ import { describe, expect, it, afterEach } from 'vitest';
 import { z } from 'zod';
 import express from 'express';
 import type { Server } from 'node:http';
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from '@ts-kizuna/shared';
 import { KizunaServer } from '@ts-kizuna/server/express';
 import { Client } from '@modelcontextprotocol/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';

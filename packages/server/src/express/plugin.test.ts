@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { createPlugin, implementPlugin } from '@ts-kizuna/core/adapter';
+import { Kizuna } from '@ts-kizuna/shared';
+import { createPlugin, implementPlugin } from '@ts-kizuna/shared/adapter';
 import { KizunaServer } from './server.js';
 
 const probePlugin = createPlugin<{ queue: (id: string) => string }>()({

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
+import { createPlugin, type RoutePath } from '@ts-kizuna/contract/plugin';
 import type { DocsProvider } from './docs-html.js';
 import type { GenerateOpenApiOptions } from './types.js';
 

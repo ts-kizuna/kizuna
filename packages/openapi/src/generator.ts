@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { stringify as stringifyYaml } from 'yaml';
-import { loadDeprecations } from '@ts-kizuna/core/load-deprecations';
+import { loadDeprecations } from '@ts-kizuna/shared/load-deprecations';
 import {
     createGenerator,
     contractFingerprint,
@@ -18,9 +18,9 @@ import {
     resolveResponseHeaders,
     resolveResponseContentType,
     type RouteDefinition,
-} from '@ts-kizuna/core/generator';
-import { getStatusText } from '@ts-kizuna/core';
-import type { Contract, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
+} from '@ts-kizuna/shared/generator';
+import { getStatusText } from '@ts-kizuna/shared';
+import type { Contract, SecurityRequirement, TagOptions } from '@ts-kizuna/shared';
 import { OPENAPI_PLUGIN_NAME } from './plugin.js';
 import type { GenerateOpenApiOptions, OpenApiDocument, OpenApiOperation, OpenApiParameter, OpenApiRenderer, OpenApiTag } from './types.js';
 

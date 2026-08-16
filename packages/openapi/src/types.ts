@@ -1,4 +1,4 @@
-import type { RouteDefinition } from '@ts-kizuna/core/generator';
+import type { RouteDefinition } from '@ts-kizuna/shared/generator';
 
 /**
  * The OpenAPI Specification version declared in the document's `openapi` field.

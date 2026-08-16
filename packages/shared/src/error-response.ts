@@ -8,7 +8,7 @@ import { createModel } from './model.js';
  * and all built-in error responses (404, 405, 415, etc.).
  *
  * ```ts
- * import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+ * import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
  *
  * const routes = k.routes({
  *     getUser: {

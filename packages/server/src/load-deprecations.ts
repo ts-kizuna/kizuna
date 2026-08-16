@@ -1,1 +1,1 @@
-export * from '@ts-kizuna/core/load-deprecations';
+export * from '@ts-kizuna/shared/load-deprecations';

@@ -1,8 +1,7 @@
 {
-  "name": "@ts-kizuna/contract",
+  "name": "@ts-kizuna/shared",
   "version": "1.49.7",
-  "private": true,
-  "description": "Routes, contract definition, and validation for ts-kizuna",
+  "description": "Utilities shared by the ts-kizuna contract and server packages",
   "keywords": [
     "ts-kizuna",
     "typescript",
@@ -21,7 +20,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ts-kizuna/kizuna.git",
-    "directory": "packages/contract"
+    "directory": "packages/shared"
   },
   "bugs": "https://github.com/ts-kizuna/kizuna/issues",
   "type": "module",
@@ -43,64 +42,57 @@
         "default": "./dist/index.cjs"
       }
     },
-    "./schemas": {
+    "./generator": {
       "import": {
-        "types": "./dist/schemas.d.mts",
-        "default": "./dist/schemas.mjs"
+        "types": "./dist/generator.d.mts",
+        "default": "./dist/generator.mjs"
       },
       "require": {
-        "types": "./dist/schemas.d.cts",
-        "default": "./dist/schemas.cjs"
+        "types": "./dist/generator.d.cts",
+        "default": "./dist/generator.cjs"
       }
     },
-    "./plugin": {
+    "./load-deprecations": {
       "import": {
-        "types": "./dist/plugin.d.mts",
-        "default": "./dist/plugin.mjs"
+        "types": "./dist/load-deprecations.d.mts",
+        "default": "./dist/load-deprecations.mjs"
       },
       "require": {
-        "types": "./dist/plugin.d.cts",
-        "default": "./dist/plugin.cjs"
-      }
-    },
-    "./authoring-names": {
-      "import": {
-        "types": "./dist/authoring-names.d.mts",
-        "default": "./dist/authoring-names.mjs"
-      },
-      "require": {
-        "types": "./dist/authoring-names.d.cts",
-        "default": "./dist/authoring-names.cjs"
+        "types": "./dist/load-deprecations.d.cts",
+        "default": "./dist/load-deprecations.cjs"
       }
     }
   },
   "kizuna": {
     "entries": {
       ".": "client",
-      "./schemas": "client",
-      "./plugin": "client",
-      "./authoring-names": "client"
+      "./generator": "client",
+      "./load-deprecations": "server"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test-d.ts",
+    "!src/**/*.fixture.ts",
+    "!src/adapter-testing"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/schemas.ts src/plugin.ts src/authoring-names.ts --format esm,cjs --dts --clean --external @ts-kizuna/shared --external zod",
+    "build": "tsdown src/index.ts src/generator.ts src/load-deprecations.ts --format esm,cjs --dts --clean --external zod",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@ts-kizuna/shared": "workspace:*"
   },
   "peerDependencies": {
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "vitest": "3.2.4"
   }
 }

@@ -2,8 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import express from 'express';
 import { z } from 'zod';
 import type { Server, AddressInfo } from 'node:net';
-import { Kizuna } from '@ts-kizuna/core';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { Kizuna } from '@ts-kizuna/shared';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 import { KizunaClient, type Client } from '@ts-kizuna/fetch';
 import { KizunaServer } from '@ts-kizuna/server/express';
 

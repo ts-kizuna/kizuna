@@ -1,8 +1,8 @@
 import { z } from 'zod';
 // Not `../kizuna.js`: an identity's credential is branded, so a contract built from `src` hands the adapters identities
 // their own `server.guard` cannot resolve.
-import { Kizuna } from '@ts-kizuna/core';
-import { createPlugin } from '@ts-kizuna/core/adapter';
+import { Kizuna } from '@ts-kizuna/shared';
+import { createPlugin } from '@ts-kizuna/shared/adapter';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -232,7 +232,7 @@ export const requestContextContract = requestContextK.contract({
 
 const typedProbePlugin = createPlugin<{ label: () => string }>()({
     name: 'probe',
-    serverModule: '@ts-kizuna/core/adapter-testing',
+    serverModule: '@ts-kizuna/shared/adapter-testing',
     routes: {
         ping: {
             method: 'GET',

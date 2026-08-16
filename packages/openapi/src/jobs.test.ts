@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type Contract } from '@ts-kizuna/core';
+import { Kizuna, type Contract } from '@ts-kizuna/shared';
 import { renderOpenApi } from './generator.js';
 
 const scheduler = Kizuna.identity.bearer({});

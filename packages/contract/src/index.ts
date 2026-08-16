@@ -1,1 +1,1 @@
-export * from '@ts-kizuna/core';
+export * from '@ts-kizuna/shared';

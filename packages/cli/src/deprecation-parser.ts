@@ -1,14 +1,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ts from 'typescript';
-import { AUTHORING_NAMES, CONTRACT_EXPORT_NAMES } from '@ts-kizuna/core/authoring-names';
+import { AUTHORING_NAMES, CONTRACT_EXPORT_NAMES } from '@ts-kizuna/shared/authoring-names';
 import {
     type DeprecationMap,
     type SerializedDeprecationMap,
     serializeDeprecationMap,
     contractFingerprint,
-} from '@ts-kizuna/core/generator';
-import type { Contract } from '@ts-kizuna/core';
+} from '@ts-kizuna/shared/generator';
+import type { Contract } from '@ts-kizuna/shared';
 
 const SCHEMA_KEYS: ReadonlySet<string> = new Set(['body', 'query', 'headers']);
 

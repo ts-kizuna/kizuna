@@ -1,5 +1,5 @@
 import { createMcpHandler } from '@modelcontextprotocol/server';
-import { adapterContextOf, implementPlugin, rawResponse, type ApiWithRouter } from '@ts-kizuna/core/adapter';
+import { adapterContextOf, implementPlugin, rawResponse, type ApiWithRouter } from '@ts-kizuna/shared/adapter';
 import { createMcpServer } from './mcp-server.js';
 import { mcpPlugin } from './plugin.js';
 

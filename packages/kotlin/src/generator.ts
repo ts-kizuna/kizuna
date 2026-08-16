@@ -16,9 +16,9 @@ import {
     isSuccessStatus,
     mergeHeaderFields,
     type RouteDefinition,
-} from '@ts-kizuna/core/generator';
-import { loadDeprecations } from '@ts-kizuna/core/load-deprecations';
-import type { Contract } from '@ts-kizuna/core';
+} from '@ts-kizuna/shared/generator';
+import { loadDeprecations } from '@ts-kizuna/shared/load-deprecations';
+import type { Contract } from '@ts-kizuna/shared';
 import { KotlinWriter, stringLiteral } from './emit.js';
 import {
     TypeRegistry,

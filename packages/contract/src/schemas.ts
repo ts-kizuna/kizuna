@@ -1,1 +1,1 @@
-export * from '@ts-kizuna/core/schemas';
+export * from '@ts-kizuna/contract/schemas';

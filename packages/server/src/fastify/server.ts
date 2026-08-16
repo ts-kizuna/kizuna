@@ -37,7 +37,7 @@ import {
     jobRouter,
     jobRunnerFrom,
     type Jobs,
-} from '@ts-kizuna/core/adapter';
+} from '@ts-kizuna/shared/adapter';
 import type { z } from 'zod';
 import type {
     Contract,
@@ -49,8 +49,8 @@ import type {
     JobsArg,
     RequestContextSchema,
     RequestContextHeaderValues,
-} from '@ts-kizuna/core';
-import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
+} from '@ts-kizuna/shared';
+import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/shared/adapter';
 
 export type FastifyApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;

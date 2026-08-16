@@ -58,12 +58,12 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external typescript --external jiti",
+    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/shared --external zod --external typescript --external jiti",
     "prepare": "pnpm run build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/shared": "workspace:*",
     "jiti": "^2.7.0",
     "typescript": "catalog:"
   },

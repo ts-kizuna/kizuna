@@ -1,1 +1,1 @@
-export * from '@ts-kizuna/core/plugin';
+export * from '@ts-kizuna/contract/plugin';

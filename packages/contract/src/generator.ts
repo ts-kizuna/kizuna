@@ -1,1 +1,1 @@
-export * from '@ts-kizuna/core/generator';
+export * from '@ts-kizuna/shared/generator';

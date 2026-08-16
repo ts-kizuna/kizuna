@@ -612,7 +612,7 @@ const probePlugin = createPlugin<{ label: () => string }>()({
             },
         },
     },
-    serverModule: '@ts-kizuna/core/adapter-testing',
+    serverModule: '@ts-kizuna/shared/adapter-testing',
 });
 
 const probeServer = (config: { label: string }) =>

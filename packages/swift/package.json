@@ -59,12 +59,12 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external @ts-kizuna/cli --external zod",
+    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/shared --external @ts-kizuna/cli --external zod",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ts-kizuna/cli": "workspace:*",
-    "@ts-kizuna/core": "workspace:*"
+    "@ts-kizuna/shared": "workspace:*"
   },
   "peerDependencies": {
     "zod": "^4.0.0"
