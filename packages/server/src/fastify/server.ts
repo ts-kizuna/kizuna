@@ -1,8 +1,35 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginAsync } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
 import { Readable } from 'node:stream';
-import { type AdapterRequest, type ApiWithRouter, type ErrorFormatter, type GuardMap, type GuardRun, type GuardDeny, type GuardDenial, type RequestContextMap, type RequestContextRun, type ApiParts, ROUTER_META, GUARDS_META, SCHEMES_META, REQUEST_CONTEXT_META, JOBS_META, warnUnsupportedJobOptions, type ServerOptions, type JobsMeta, type PluginArgs, type ContractPlugins, assembleApi, createAdapter, renderJsonResult, jobRoutes, jobRouter, jobRunnerFrom } from '../adapter.js';
-import { type RouteHandler as CoreRouteHandler, type Router as CoreRouter } from './server.js';
+import {
+    type AdapterRequest,
+    type ApiWithRouter,
+    type ErrorFormatter,
+    type GuardMap,
+    type GuardRun,
+    type GuardDeny,
+    type GuardDenial,
+    type RequestContextMap,
+    type RequestContextRun,
+    type ApiParts,
+    ROUTER_META,
+    GUARDS_META,
+    SCHEMES_META,
+    REQUEST_CONTEXT_META,
+    JOBS_META,
+    warnUnsupportedJobOptions,
+    type ServerOptions,
+    type JobsMeta,
+    type PluginArgs,
+    type ContractPlugins,
+    assembleApi,
+    createAdapter,
+    renderJsonResult,
+    jobRoutes,
+    jobRouter,
+    jobRunnerFrom,
+} from '../adapter.js';
+import type { RouteHandler as CoreRouteHandler, Router as CoreRouter } from '@ts-kizuna/contract/internal';
 import { pluginRoutesOf, pluginExportsOf, type PluginImplementations, pluginRouterOf } from '../plugin-server.js';
 import { type RouteDefinition, type Routes, type Jobs } from '@ts-kizuna/contract/internal';
 import type { z } from 'zod';
@@ -17,7 +44,7 @@ import type {
     RequestContextSchema,
     RequestContextHeaderValues,
 } from '@ts-kizuna/contract/internal';
-import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/contract/internal';
+import type { HandlersFromAuth, GuardParams, RequestContextValues } from '../adapter.js';
 
 export type FastifyApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;

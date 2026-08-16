@@ -116,7 +116,6 @@ export {
     type AuthoredRouteDefinition,
     type AuthoredRoutes,
 } from './types.js';
-export { type ExtractPathParams, type PathParamName, type HasPathParams } from '@ts-kizuna/contract';
 export {
     type HandlerArgs,
     type HandlerReturn,
@@ -126,5 +125,6 @@ export {
     type RouteHandler,
     type Router,
 } from './handler-pipeline.js';
+export { type ExtractPathParams, type PathParamName, type HasPathParams } from './path-params.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
 export { type DeprecationMap, type SerializedDeprecationMap } from './deprecation.js';

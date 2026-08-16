@@ -18,7 +18,6 @@ export * from './job-runner.js';
 export * from './job-transport.js';
 export * from './jobs.js';
 export * from './kizuna.js';
-export * from './load-deprecations.js';
 export * from './model.js';
 export * from './path-params.js';
 export * from './plugin.js';

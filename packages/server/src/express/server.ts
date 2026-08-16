@@ -29,7 +29,7 @@ import {
     jobRouter,
     jobRunnerFrom,
 } from '../adapter.js';
-import { type RouteHandler as CoreRouteHandler, type Router as CoreRouter } from './server.js';
+import type { RouteHandler as CoreRouteHandler, Router as CoreRouter } from '@ts-kizuna/contract/internal';
 import { pluginRoutesOf, pluginExportsOf, type PluginImplementations, pluginRouterOf } from '../plugin-server.js';
 import { type RouteDefinition, type Routes, type Jobs } from '@ts-kizuna/contract/internal';
 import type { z } from 'zod';
@@ -44,7 +44,7 @@ import type {
     RequestContextSchema,
     RequestContextHeaderValues,
 } from '@ts-kizuna/contract/internal';
-import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/contract/internal';
+import type { HandlersFromAuth, GuardParams, RequestContextValues } from '../adapter.js';
 
 export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;
