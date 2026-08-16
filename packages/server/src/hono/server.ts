@@ -1,44 +1,9 @@
 import type { Context, Env, Hono, MiddlewareHandler } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import {
-    type AdapterRequest,
-    type RouteDefinition,
-    type Routes,
-    type RouteHandler as CoreRouteHandler,
-    type Router as CoreRouter,
-    type ApiWithRouter,
-    type ErrorFormatter,
-    type GuardMap,
-    type GuardRun,
-    type GuardDeny,
-    type GuardDenial,
-    type RequestContextMap,
-    type RequestContextRun,
-    type ApiParts,
-    ROUTER_META,
-    GUARDS_META,
-    SCHEMES_META,
-    REQUEST_CONTEXT_META,
-    JOBS_META,
-    warnUnsupportedJobOptions,
-    type ServerOptions,
-    type JobsMeta,
-    pluginRoutesOf,
-    pluginExportsOf,
-    type PluginImplementations,
-    type PluginArgs,
-    type ContractPlugins,
-    pluginRouterOf,
-    assembleApi,
-    createAdapter,
-    jobRoutes,
-    jobRouter,
-    jobRunnerFrom,
-    type Jobs,
-    renderJsonResult,
-    parseFetchBody,
-    headersToObject,
-} from '@ts-kizuna/contract';
+import { type AdapterRequest, type ApiWithRouter, type ErrorFormatter, type GuardMap, type GuardRun, type GuardDeny, type GuardDenial, type RequestContextMap, type RequestContextRun, type ApiParts, ROUTER_META, GUARDS_META, SCHEMES_META, REQUEST_CONTEXT_META, JOBS_META, warnUnsupportedJobOptions, type ServerOptions, type JobsMeta, type PluginArgs, type ContractPlugins, assembleApi, createAdapter, jobRoutes, jobRouter, jobRunnerFrom, renderJsonResult, parseFetchBody, headersToObject } from '../adapter.js';
+import { type RouteHandler as CoreRouteHandler, type Router as CoreRouter } from '../next/server.js';
+import { pluginRoutesOf, pluginExportsOf, type PluginImplementations, pluginRouterOf } from '../plugin-server.js';
+import { type RouteDefinition, type Routes, type Jobs } from '@ts-kizuna/contract/internal';
 import type { z } from 'zod';
 import type {
     Contract,
@@ -50,8 +15,8 @@ import type {
     JobsArg,
     RequestContextSchema,
     RequestContextHeaderValues,
-} from '@ts-kizuna/contract';
-import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/contract';
+} from '@ts-kizuna/contract/internal';
+import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/contract/internal';
 
 export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;

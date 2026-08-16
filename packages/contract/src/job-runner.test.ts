@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/contract';
+import { Kizuna } from './kizuna.js';
 import { createJobRunner, JobInputError } from './job-runner.js';
-import { createJobTransport, JobDispatchError, type JobMessage } from '@ts-kizuna/contract';
-import { ResponseError } from '@ts-kizuna/contract';
+import { createJobTransport, JobDispatchError, type JobMessage } from './job-transport.js';
+import { ResponseError } from './response-error.js';
 
 const scheduler = Kizuna.identity.bearer({});
 

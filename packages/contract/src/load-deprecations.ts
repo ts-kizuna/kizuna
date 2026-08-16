@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { DeprecationMap, SerializedDeprecationMap } from '@ts-kizuna/contract';
+import type { DeprecationMap, SerializedDeprecationMap } from './deprecation.js';
 
 const deserialize = (data: SerializedDeprecationMap): DeprecationMap => ({
     routes: new Map(Object.entries(data.routes)),

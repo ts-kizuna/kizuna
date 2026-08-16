@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/contract';
-import { createJobTransport, type JobMessage, type ScheduledJob } from '@ts-kizuna/contract';
+import { Kizuna } from '@ts-kizuna/contract/internal';
+import { createJobTransport, type JobMessage, type ScheduledJob } from './adapter.js';
 import { JOBS_META } from './adapter.js';
 import { occurrenceKey, startJobs } from './start-jobs.js';
 

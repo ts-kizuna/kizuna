@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/contract';
-import { KizunaServer } from '@ts-kizuna/contract';
+import { Kizuna } from '@ts-kizuna/contract/internal';
+import { KizunaServer } from './server.js';
 
 const scheduler = Kizuna.identity.bearer({
     context: z.object({

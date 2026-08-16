@@ -1,30 +1,25 @@
 import { z } from 'zod';
-import type { RouteDefinition, Routes, Method } from '@ts-kizuna/contract';
-import type { SecurityScheme } from '@ts-kizuna/contract';
-import type { Credential, NoCredential } from '@ts-kizuna/contract';
-import {
-    type RouteHandler,
-    type Router,
-    type RawInputs,
-    type ValidationStage,
-    allowedMethodsForPath,
-    flattenRoutes,
-    formatValidationError,
-    validateRequest,
-} from '@ts-kizuna/contract';
+import type { RouteDefinition, Routes, Method } from '@ts-kizuna/contract/internal';
+import type { SecurityScheme } from '@ts-kizuna/contract/internal';
+import type { Credential, NoCredential } from '@ts-kizuna/contract/internal';
+import { type RouteHandler, type Router } from './next/server.js';
+import { allowedMethodsForPath, flattenRoutes, formatValidationError, validateRequest } from './adapter.js';
+import { type RawInputs, type ValidationStage } from '@ts-kizuna/contract/internal';
 import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes } from './route-matcher.js';
-import { parsePath } from '@ts-kizuna/contract';
-import { ResponseError, isResponseError } from '@ts-kizuna/contract';
-import { problemDetails, type ProblemDetails } from '@ts-kizuna/contract';
-import { STATUS_TITLES } from '@ts-kizuna/contract';
-import { isVoidSchema, isBinarySchema } from '@ts-kizuna/contract';
-import { resolveCoercionPlans } from '@ts-kizuna/contract';
+import { parsePath } from './adapter.js';
+import { ResponseError, isResponseError } from './adapter.js';
+import { problemDetails, type ProblemDetails } from './adapter.js';
+import { STATUS_TITLES } from '@ts-kizuna/contract/internal';
+import { isVoidSchema, isBinarySchema } from '@ts-kizuna/contract/internal';
+import { resolveCoercionPlans } from '@ts-kizuna/contract/internal';
 import { isRawResponse, type RawResponse } from './raw-response.js';
-import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from '@ts-kizuna/contract';
+import { pluginRouteTree, type ContractPlugins } from './adapter.js';
+import { PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY } from '@ts-kizuna/contract/internal';
 import { resolvePluginServers, type PluginImplementation } from './plugin-server.js';
-import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from '@ts-kizuna/contract';
-import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from '@ts-kizuna/contract';
-import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
+import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from '@ts-kizuna/contract/internal';
+import { flattenJobs } from './adapter.js';
+import { DEFAULT_JOBS_PATH, type Jobs, type JobsConfig } from '@ts-kizuna/contract/internal';
+import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './adapter.js';
 import {
     DispatchFailedSchema,
     DispatchResultSchema,
@@ -33,11 +28,11 @@ import {
     dispatchSucceeded,
     failedJobs,
 } from './job-dispatch.js';
-import { ProblemDetailsSchema } from '@ts-kizuna/contract';
-import type { Contract } from '@ts-kizuna/contract';
-import type { JobTransport } from '@ts-kizuna/contract';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/internal';
+import type { Contract } from '@ts-kizuna/contract/internal';
+import type { JobTransport } from './adapter.js';
 
-export type { RouteDefinition, RoutePath, Routes, Method } from '@ts-kizuna/contract';
+export type { RouteDefinition, RoutePath, Routes, Method } from '@ts-kizuna/contract/internal';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
 export {
     createPlugin,
@@ -51,9 +46,9 @@ export {
     type PluginRoutesOf,
     type PluginPropsOf,
     type PluginExportsOf,
-} from '@ts-kizuna/contract';
-export type { CompiledJob, Jobs, JobHandler, JobHandlers, FlattenedJob } from '@ts-kizuna/contract';
-export { flattenJobs, isCompiledJob, jobAt } from '@ts-kizuna/contract';
+} from '@ts-kizuna/contract/internal';
+export type { CompiledJob, Jobs, JobHandler, JobHandlers, FlattenedJob } from '@ts-kizuna/contract/internal';
+export { flattenJobs, isCompiledJob, jobAt } from '@ts-kizuna/contract/internal';
 export {
     createJobRunner,
     jobFnAt,
@@ -62,7 +57,7 @@ export {
     type JobRunnerOptions,
     type JobErrorHandler,
     type JobFnByKey,
-} from './job-runner.js';
+} from '@ts-kizuna/contract/internal';
 export {
     createJobTransport,
     JobDispatchError,
@@ -72,7 +67,7 @@ export {
     type ScheduledJob,
     type JobWorker,
     type JobWorkerContext,
-} from '@ts-kizuna/contract';
+} from '@ts-kizuna/contract/internal';
 export {
     implementPlugin,
     pluginRoutesOf,
@@ -473,8 +468,8 @@ export const boundJobKeys = (meta: JobsMeta | undefined): Set<string> => {
     }
     return bound;
 };
-export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from '@ts-kizuna/contract';
-export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from '@ts-kizuna/contract';
+export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from '@ts-kizuna/contract/internal';
+export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from '@ts-kizuna/contract/internal';
 export type {
     HandlersFromAuth,
     GuardParams,
@@ -484,14 +479,14 @@ export type {
     BrandedHandlerContext,
     RouteAuthValue,
     ContextFromAuthValue,
-} from '@ts-kizuna/contract';
-export { buildPath, parsePath, type PathSegment } from '@ts-kizuna/contract';
+} from '@ts-kizuna/contract/internal';
+export { buildPath, parsePath, type PathSegment } from '@ts-kizuna/contract/internal';
 export { sortFlattenedRoutes } from './route-matcher.js';
-export { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand } from '@ts-kizuna/contract';
-export { tagRoutes } from '@ts-kizuna/contract';
-export { isTagSet, type NormalizeTags } from '@ts-kizuna/contract';
-export { ResponseError, isResponseError } from '@ts-kizuna/contract';
-export { problemDetails, type ProblemDetails } from '@ts-kizuna/contract';
+export { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand } from '@ts-kizuna/contract/internal';
+export { tagRoutes } from '@ts-kizuna/contract/internal';
+export { isTagSet, type NormalizeTags } from '@ts-kizuna/contract/internal';
+export { ResponseError, isResponseError } from '@ts-kizuna/contract/internal';
+export { problemDetails, type ProblemDetails } from '@ts-kizuna/contract/internal';
 export type { MatchResult, RouteMatch } from './route-matcher.js';
 export { matchRoute } from './route-matcher.js';
 

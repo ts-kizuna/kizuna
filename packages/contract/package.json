@@ -92,6 +92,16 @@
         "types": "./dist/load-deprecations.d.cts",
         "default": "./dist/load-deprecations.cjs"
       }
+    },
+    "./internal": {
+      "import": {
+        "types": "./dist/internal.d.mts",
+        "default": "./dist/internal.mjs"
+      },
+      "require": {
+        "types": "./dist/internal.d.cts",
+        "default": "./dist/internal.cjs"
+      }
     }
   },
   "kizuna": {
@@ -101,7 +111,8 @@
       "./plugin": "client",
       "./generator": "client",
       "./authoring-names": "client",
-      "./load-deprecations": "server"
+      "./load-deprecations": "server",
+      "./internal": "client"
     }
   },
   "files": [
@@ -111,7 +122,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/schemas.ts src/plugin.ts src/generator.ts src/authoring-names.ts src/load-deprecations.ts --format esm,cjs --dts --clean --external zod",
+    "build": "tsdown src/index.ts src/internal.ts src/schemas.ts src/plugin.ts src/generator.ts src/authoring-names.ts src/load-deprecations.ts --format esm,cjs --dts --clean --external zod",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

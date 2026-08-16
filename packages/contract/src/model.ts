@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { markModelSchema } from '@ts-kizuna/contract';
+import { markModelSchema } from './zod-internals.js';
 
 export interface ModelOptions<T extends z.ZodType> {
     /**

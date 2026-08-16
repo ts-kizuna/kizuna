@@ -1,11 +1,7 @@
 // Not `../handler-pipeline.js`: see the note in `type-fixtures.ts`.
-import type { Contract, RouteDefinition, Routes } from '@ts-kizuna/contract';
-import type {
-    HandlersFromAuth,
-    RequestContextValues,
-    RouteHandler as CoreRouteHandler,
-    Router as CoreRouter,
-} from '@ts-kizuna/contract';
+import type { Contract, RouteDefinition, Routes } from '@ts-kizuna/contract/internal';
+import type { HandlersFromAuth, RequestContextValues } from '../adapter.js';
+import type { RouteHandler as CoreRouteHandler, Router as CoreRouter } from '../next/server.js';
 
 /**
  * The one definition every adapter's own `Router<C>` must resolve to, with its handler context substituted in.

@@ -1,12 +1,12 @@
 import express from 'express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/contract';
-import type { Contract } from '@ts-kizuna/contract';
+import { Kizuna } from '@ts-kizuna/contract/internal';
+import type { Contract } from '@ts-kizuna/contract/internal';
 import { KizunaServer } from '../next/server.js';
 import { createServer as createHttpServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { startJobsDevRunner, type JobsDevRunner } from '@ts-kizuna/contract';
+import { startJobsDevRunner, type JobsDevRunner } from '../jobs-entry.js';
 
 const scheduler = Kizuna.identity.bearer({});
 

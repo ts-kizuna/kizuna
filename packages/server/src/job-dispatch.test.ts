@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/contract';
-import type { Contract } from '@ts-kizuna/contract';
+import { Kizuna } from '@ts-kizuna/contract/internal';
+import type { Contract } from '@ts-kizuna/contract/internal';
 import { dispatchDueJobs, dispatchSucceeded, dueJobs } from './job-dispatch.js';
 
 const scheduler = Kizuna.identity.bearer({});

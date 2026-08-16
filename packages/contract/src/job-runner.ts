@@ -1,6 +1,6 @@
-import { isCompiledJob, jobAt, toJobResponse, type CompiledJob, type JobHandlerReturn, type JobHandlers, type Jobs } from '@ts-kizuna/contract';
-import { ResponseError } from '@ts-kizuna/contract';
-import type { JobMessage, JobTransport } from '@ts-kizuna/contract';
+import { isCompiledJob, jobAt, toJobResponse, type CompiledJob, type JobHandlerReturn, type JobHandlers, type Jobs } from './jobs.js';
+import { ResponseError } from './response-error.js';
+import type { JobMessage, JobTransport } from './job-transport.js';
 import type { z } from 'zod';
 
 /**

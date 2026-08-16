@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/contract';
+import { Kizuna } from '@ts-kizuna/contract/internal';
 import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 import { KizunaServer, NextRequest, NextResponse } from './server.js';
-import { readTestBody, testAdapterFeatures } from '@ts-kizuna/contract';
+import { readTestBody } from '../adapter-testing/transport.js';
+import { testAdapterFeatures } from '../adapter-testing/feature-tests.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({

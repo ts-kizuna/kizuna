@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { ProblemDetailsSchema } from '@ts-kizuna/contract';
-import { Kizuna } from '@ts-kizuna/contract';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
+import { Kizuna } from '@ts-kizuna/contract/internal';
 import { createPlugin, implementPlugin, rawResponse } from '../adapter.js';
-import type { Router } from '@ts-kizuna/contract';
+import type { Router } from '@ts-kizuna/contract/internal';
 import type { GuardDeny } from '../adapter.js';
 
 const k = new Kizuna({
@@ -612,7 +612,7 @@ const probePlugin = createPlugin<{ label: () => string }>()({
             },
         },
     },
-    serverModule: '@ts-kizuna/contract',
+    serverModule: '@ts-kizuna/contract/internal',
 });
 
 const probeServer = (config: { label: string }) =>

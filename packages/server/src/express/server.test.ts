@@ -1,7 +1,8 @@
 import express from 'express';
 import request from 'supertest';
 import { KizunaServer } from '../next/server.js';
-import { readTestBody, testAdapterFeatures } from '@ts-kizuna/contract';
+import { readTestBody } from '../adapter-testing/transport.js';
+import { testAdapterFeatures } from '../adapter-testing/feature-tests.js';
 
 testAdapterFeatures({
     name: 'express',

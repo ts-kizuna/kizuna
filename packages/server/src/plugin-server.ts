@@ -1,16 +1,8 @@
-import type { HandlerArgs, HandlerReturn } from '@ts-kizuna/contract';
+import type { HandlerArgs, HandlerReturn } from '@ts-kizuna/contract/internal';
 import type { RawResponse } from './raw-response.js';
-import {
-    PLUGIN_ROUTES_META_KEY,
-    PLUGIN_SERVERS_META_KEY,
-    type ContractPlugins,
-    type PluginDeclaration,
-    type PluginExportsOf,
-    type PluginPropsOf,
-    type PluginRoutes,
-    type PluginRoutesOf,
-} from '@ts-kizuna/contract';
-import type { Routes } from '@ts-kizuna/contract';
+import { type ContractPlugins, type PluginDeclaration, type PluginExportsOf, type PluginPropsOf, type PluginRoutes, type PluginRoutesOf } from './adapter.js';
+import { PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY } from '@ts-kizuna/contract/internal';
+import type { Routes } from '@ts-kizuna/contract/internal';
 
 /**
  * A plugin's handlers, typed against its routes. A plugin may also answer with

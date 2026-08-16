@@ -20,7 +20,7 @@ import { createModel } from './model.js';
 import type { Routes, RouteDefinition, SecurityRequirement, AccessGate, AuthoredRoutes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
-import type { PathParamsCheck } from '@ts-kizuna/contract';
+import type { PathParamsCheck } from './path-params.js';
 
 /**
  * A constraint on an identity's `access` fields: each key is a field, each value

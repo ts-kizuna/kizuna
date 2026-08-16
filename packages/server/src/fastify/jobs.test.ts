@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/contract';
+import { Kizuna } from '@ts-kizuna/contract/internal';
 import { KizunaServer } from '../next/server.js';
 
 const scheduler = Kizuna.identity.bearer({

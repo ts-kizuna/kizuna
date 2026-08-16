@@ -1,7 +1,7 @@
-import type { RouteDefinition, Routes, Method } from '@ts-kizuna/contract';
-import { flattenRoutes } from '@ts-kizuna/contract';
-import type { PathSegment } from '@ts-kizuna/contract';
-import { parsePath } from '@ts-kizuna/contract';
+import type { RouteDefinition, Routes, Method } from '@ts-kizuna/contract/internal';
+import { flattenRoutes } from './adapter.js';
+import type { PathSegment } from './adapter.js';
+import { parsePath } from './adapter.js';
 
 interface CompiledRoute {
     routeKey: string;

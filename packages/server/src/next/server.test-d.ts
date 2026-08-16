@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from 'vitest';
-import type { GuardRun, RequestContextRun } from '@ts-kizuna/contract';
+import type { GuardRun, RequestContextRun } from '../adapter.js';
 import {
     checkAdapterTypeFeatures,
     gateContract,

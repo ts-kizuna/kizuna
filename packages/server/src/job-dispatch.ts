@@ -1,7 +1,7 @@
-import { dueSchedules, type JobSchedule } from '@ts-kizuna/contract';
-import { flattenJobs } from '@ts-kizuna/contract';
-import type { Contract } from '@ts-kizuna/contract';
-import { ProblemDetailsSchema } from '@ts-kizuna/contract';
+import { dueSchedules, type JobSchedule } from '@ts-kizuna/contract/internal';
+import { flattenJobs } from './adapter.js';
+import type { Contract } from '@ts-kizuna/contract/internal';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract/internal';
 import { z } from 'zod';
 
 export interface DispatchOptions {

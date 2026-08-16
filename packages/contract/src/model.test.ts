@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { readMetaId, readMetaDescription } from '@ts-kizuna/contract';
+import { readMetaId, readMetaDescription } from './zod-internals.js';
 import { Kizuna } from './kizuna.js';
 
 describe('Kizuna.model', () => {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { applyCoercion, coercionPlanFor, resolveCoercionPlans } from './coercion.js';
-import { tagRoutes } from '@ts-kizuna/contract';
+import { tagRoutes } from './routes.js';
 import { readDef } from './zod-internals.js';
-import type { RouteDefinition } from '@ts-kizuna/contract';
-import { Kizuna } from '@ts-kizuna/contract';
+import type { RouteDefinition } from './types.js';
+import { Kizuna } from './kizuna.js';
 
 describe('coercion plans', () => {
     it('is null when no field can be coerced', () => {
