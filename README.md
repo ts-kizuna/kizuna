@@ -22,6 +22,7 @@ Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typ
 - **Type-safe everywhere**: full inference on both sides, no casting
 - **Typed authentication**: identities and per-route authentication declared on the contract
 - **RPC-like client**: call your API like a function, get fully typed responses back
+- **TanStack Query**: typed query and mutation options with caching and invalidation
 - **Adapters**: mount your API on Express, Fastify, Hono, or Next.js
 - **HTTP/REST**: follows HTTP and REST standards. RFC 9110 semantics, RFC 9457 Problem Details
 - **Built-in coercion**: query, path, and header params are coerced to their declared types (`z.number()`, `z.boolean()`, `z.date()`, `z.bigint()`), with no manual parsing or `z.coerce` needed
@@ -175,20 +176,21 @@ if (result.status === 200) {
 
 ## Packages
 
-| Package                    | Description                                           |
-| -------------------------- | ----------------------------------------------------- |
-| `@ts-kizuna/core`          | Routes & contract definition, validation, adapter API |
-| `@ts-kizuna/fetch`         | Typed fetch-based client                              |
-| `@ts-kizuna/express`       | Express adapter                                       |
-| `@ts-kizuna/fastify`       | Fastify adapter                                       |
-| `@ts-kizuna/hono`          | Hono adapter                                          |
-| `@ts-kizuna/next`          | Next.js App Router adapter                            |
-| `@ts-kizuna/openapi`       | OpenAPI generation                                    |
-| `@ts-kizuna/swift`         | Swift client generation                               |
-| `@ts-kizuna/kotlin`        | Kotlin client generation                              |
-| `@ts-kizuna/mcp`           | MCP server generation                                 |
-| `@ts-kizuna/eslint-plugin` | ESLint rules                                          |
-| `@ts-kizuna/cli`           | Shared CLI and build tooling                          |
+| Package                     | Description                                           |
+| --------------------------- | ----------------------------------------------------- |
+| `@ts-kizuna/core`           | Routes & contract definition, validation, adapter API |
+| `@ts-kizuna/fetch`          | Typed fetch-based client                              |
+| `@ts-kizuna/tanstack-query` | TanStack Query client                                 |
+| `@ts-kizuna/express`        | Express adapter                                       |
+| `@ts-kizuna/fastify`        | Fastify adapter                                       |
+| `@ts-kizuna/hono`           | Hono adapter                                          |
+| `@ts-kizuna/next`           | Next.js App Router adapter                            |
+| `@ts-kizuna/openapi`        | OpenAPI generation                                    |
+| `@ts-kizuna/swift`          | Swift client generation                               |
+| `@ts-kizuna/kotlin`         | Kotlin client generation                              |
+| `@ts-kizuna/mcp`            | MCP server generation                                 |
+| `@ts-kizuna/eslint-plugin`  | ESLint rules                                          |
+| `@ts-kizuna/cli`            | Shared CLI and build tooling                          |
 
 ## License
 

@@ -1,0 +1,106 @@
+---
+title: new KizunaTanstackQuery()
+description: Build TanStack Query options from a ts-kizuna contract and a fetch client.
+---
+
+Build TanStack Query options from a contract. See the [TanStack Query guide](/docs/clients/tanstack-query) for usage.
+
+<InstallTabs packageName="@ts-kizuna/tanstack-query" />
+
+```ts
+import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
+```
+
+## Parameters
+
+```ts
+new KizunaTanstackQuery(contract: Contract, client: Client): KizunaQueryProxy
+```
+
+| Parameter  | Type       | Description                                                                                   |
+| ---------- | ---------- | --------------------------------------------------------------------------------------------- |
+| `contract` | `Contract` | The contract from [`k.contract`](/docs/reference/k-contract)                                  |
+| `client`   | `Client`   | A client from [`new KizunaClient()`](/docs/reference/kizuna-client), built from that contract |
+
+The contract is needed as well as the client: each route's `method` decides which factories it gets, and its `responses` decide which statuses are data.
+
+## Returns
+
+An object mirroring the contract's route groups.
+
+**`GET` and `HEAD` routes**
+
+| Factory                    | Description                                           |
+| -------------------------- | ----------------------------------------------------- |
+| `queryOptions(options)`    | For `useQuery`, `useSuspenseQuery`, `prefetchQuery`   |
+| `infiniteOptions(options)` | For `useInfiniteQuery`, `prefetchInfiniteQuery`       |
+| `queryKey({ input })`      | The query's full key                                  |
+| `infiniteKey({ input })`   | The infinite query's full key                         |
+| `key()`                    | The partial key matching every operation on the route |
+| `call(args)`               | Calls the route, bypassing the cache                  |
+
+**Every other method**
+
+| Factory                    | Description                        |
+| -------------------------- | ---------------------------------- |
+| `mutationOptions(options)` | For `useMutation`                  |
+| `mutationKey()`            | The mutation's full key            |
+| `key()`                    | The partial key matching the route |
+| `call(args)`               | Calls the route                    |
+
+**Groups and the root** carry `key()`. Where a route is named the same as a factory, the route wins.
+
+## Options
+
+| Option  | Type                      | Description                                                                                             |
+| ------- | ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `input` | `ClientArgs \| SkipToken` | The route's `{ params, query, body, headers, fetchOptions }`. Optional when every argument is optional. |
+| …       | TanStack Query options    | Passed through untouched                                                                                |
+
+For `infiniteOptions`, `input` is a function of the page parameter. `skipToken` disables the query.
+
+## Query keys
+
+```ts
+type KizunaQueryKey = readonly [readonly string[], { input?: unknown; type: 'query' | 'infinite' }];
+type KizunaPathKey = readonly [readonly string[]];
+```
+
+Segments are the route's path through the contract, so `api.users.key()` prefixes every key under `users`. `fetchOptions` is stripped from the input first.
+
+## Errors
+
+Declared statuses come back as data. Anything else throws [`UndeclaredResponseError`](/docs/reference/is-undeclared-response-error).
+
+## Example
+
+```ts
+import { useQuery } from '@tanstack/react-query';
+import { KizunaClient } from '@ts-kizuna/fetch';
+import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
+import { contract } from '@/contract';
+
+const apiClient = new KizunaClient(contract, {
+    baseUrl: 'http://localhost:3000',
+});
+
+const api = new KizunaTanstackQuery(contract, apiClient);
+
+const { data } = useQuery(
+    api.users.listUsers.queryOptions({
+        input: {
+            query: {
+                page: 1,
+                limit: 10,
+            },
+        },
+        staleTime: 60_000,
+    })
+);
+```
+
+## See also
+
+- [TanStack Query client](/docs/clients/tanstack-query)
+- [`new KizunaClient()`](/docs/reference/kizuna-client)
+- [`isUndeclaredResponseError`](/docs/reference/is-undeclared-response-error)

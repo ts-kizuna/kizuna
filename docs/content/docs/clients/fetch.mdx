@@ -160,6 +160,8 @@ type ListUsersResponse = {
 };
 ```
 
+`ClientArgs<Route>` and `ClientResponse<Route>` are exported for building on top of the client, as [`@ts-kizuna/tanstack-query`](/docs/clients/tanstack-query) does. Reach for them when writing your own wrapper; calling routes needs neither.
+
 ## Validation errors
 
 A route with a `body` or `query` schema can answer `400` when the request fails validation. It is in the response type already, without you declaring it.

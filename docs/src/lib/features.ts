@@ -1,5 +1,5 @@
-import { ArrowLeftRight, Clock, FileText, Globe, KeyRound, Plug, Puzzle, ScrollText, TriangleAlert, Zap } from 'lucide-react';
-import { KotlinLogo, McpLogo, SwiftLogo } from '@/components/code/brand-icons';
+import { ArrowLeftRight, Clock, FileText, Globe, KeyRound, Plug, Puzzle, TriangleAlert, Zap } from 'lucide-react';
+import { KotlinLogo, McpLogo, SwiftLogo, TanstackLogo } from '@/components/code/brand-icons';
 import type { ComponentType } from 'react';
 
 type FeatureIcon = ComponentType<{ className?: string }>;
@@ -31,19 +31,19 @@ export const features: Feature[] = [
         description: 'Expose your API as MCP tools so AI assistants can call your endpoints.',
     },
     {
-        icons: [ScrollText],
-        title: 'Contract-first',
-        description: 'Define request and response schemas once, share them between server and client.',
-    },
-    {
-        icons: [KeyRound],
-        title: 'Typed authentication',
-        description: 'Identities and per-route authentication declared on the contract.',
+        icons: [TanstackLogo],
+        title: 'TanStack Query',
+        description: 'Typed query and mutation options with caching and invalidation.',
     },
     {
         icons: [Plug],
         title: 'Adapters',
         description: 'Mount your API on Express, Fastify, Hono, or Next.js.',
+    },
+    {
+        icons: [KeyRound],
+        title: 'Typed authentication',
+        description: 'Identities and per-route authentication declared on the contract.',
     },
     {
         icons: [Puzzle],

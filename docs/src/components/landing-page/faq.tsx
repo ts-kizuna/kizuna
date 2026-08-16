@@ -80,7 +80,6 @@ export const questions: Question[] = [
                     <li>SSE and streaming responses</li>
                     <li>Webhooks, declared in the contract like routes</li>
                     <li>OpenAPI 3.2.0 output</li>
-                    <li>A TanStack Query client, built from the same contract</li>
                     <li>A TanStack Start adapter</li>
                     <li>Whatever the future brings</li>
                 </ul>
