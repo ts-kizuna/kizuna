@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { ESLintUtils, type TSESTree } from '@typescript-eslint/utils';
 import ts from 'typescript';
-import { AUTHORING_NAMES } from '@ts-kizuna/shared/authoring-names';
+import { AUTHORING_NAMES } from '@ts-kizuna/contract/authoring-names';
 import { collectSchemaIssues, type SchemaIssue, type SchemaResolver } from '../schema-violations.js';
 
 const SCHEMA_KEYS: ReadonlySet<string> = new Set(['body', 'query', 'pathParams', 'headers']);

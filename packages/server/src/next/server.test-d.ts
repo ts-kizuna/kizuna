@@ -11,7 +11,7 @@ import {
     securedContract,
     type ExpectedRouteHandler,
     type ExpectedRouter,
-} from '../../../core/src/adapter-testing/type-testing.js';
+} from '../adapter-testing/type-testing.js';
 import { KizunaServer, type NextHandlerContext, type NextMiddlewareHandler, type RouteHandler, type Router } from './server.js';
 
 const securedServer = new KizunaServer(securedContract);

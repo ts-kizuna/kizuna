@@ -12,8 +12,8 @@ import {
     securedContract,
     type ExpectedRouteHandler,
     type ExpectedRouter,
-} from '../../../core/src/adapter-testing/type-testing.js';
-import { KizunaServer, type HonoHandlerContext, type RouteHandler, type Router } from './server.js';
+} from '../adapter-testing/type-testing.js';
+import { KizunaServer, type HonoHandlerContext, type RouteHandler, type Router } from '../next/server.js';
 
 interface SessionEnv extends Env {
     Variables: {

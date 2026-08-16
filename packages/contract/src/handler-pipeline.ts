@@ -1,9 +1,9 @@
 import type { z } from 'zod';
 import { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand, type RouteDefinition, type Routes, type Method } from './types.js';
-import type { ExtractPathParams } from './path-params.js';
+import type { ExtractPathParams } from '@ts-kizuna/shared';
 import type { ContextOf } from './security-scheme.js';
 import type { IdentityAccess } from './identity.js';
-import { applyCoercion, coercionPlanFor } from './coercion.js';
+import { applyCoercion, coercionPlanFor } from '@ts-kizuna/shared';
 
 type ProblemDetailsEnvelope = { type: string; title: string; status: number; detail: string };
 

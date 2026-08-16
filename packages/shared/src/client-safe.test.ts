@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { Kizuna } from './kizuna.js';
+import { Kizuna } from '@ts-kizuna/contract';
 
 const DIST_DIR = path.resolve(import.meta.dirname, '../dist');
 

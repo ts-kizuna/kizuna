@@ -9,8 +9,8 @@ import {
     type AdapterResult,
     type GuardMap,
 } from './adapter.js';
-import type { RouteDefinition } from './types.js';
-import { Kizuna } from './kizuna.js';
+import type { RouteDefinition } from '@ts-kizuna/contract';
+import { Kizuna } from '@ts-kizuna/contract';
 
 const user = Kizuna.identity.bearer({
     context: z.object({

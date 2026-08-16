@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { ProblemDetailsSchema } from './schemas.js';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract';
 import { createAdapter, renderJsonResult, ResponseValidationError, type AdapterRequest, type AdapterResult } from './adapter.js';
-import { Kizuna } from './kizuna.js';
+import { Kizuna } from '@ts-kizuna/contract';
 
 const k = new Kizuna({
     tags: Kizuna.tags({

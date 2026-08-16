@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from './kizuna.js';
-import { createJobTransport, type JobMessage, type JobWorkerContext } from './job-transport.js';
+import { Kizuna } from '@ts-kizuna/contract';
+import { createJobTransport, type JobMessage, type JobWorkerContext } from '@ts-kizuna/contract';
 import { JOBS_META } from './adapter.js';
 import { startJobWorker } from './start-job-worker.js';
 

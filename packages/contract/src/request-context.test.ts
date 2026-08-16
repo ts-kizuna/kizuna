@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createAdapter, type AdapterRequest, type AdapterResult, type RequestContextMap, type GuardMap } from './adapter.js';
+import { createAdapter, type AdapterRequest, type AdapterResult, type RequestContextMap, type GuardMap } from '@ts-kizuna/server';
 import { Kizuna } from './kizuna.js';
 
 const user = Kizuna.identity.bearer({

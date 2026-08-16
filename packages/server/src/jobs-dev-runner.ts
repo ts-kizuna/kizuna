@@ -1,5 +1,5 @@
-import { DEFAULT_JOBS_PATH, flattenJobs } from './jobs.js';
-import type { Contract } from './contract.js';
+import { DEFAULT_JOBS_PATH, flattenJobs } from '@ts-kizuna/contract';
+import type { Contract } from '@ts-kizuna/contract';
 
 export interface JobsDevRunnerOptions {
     /**

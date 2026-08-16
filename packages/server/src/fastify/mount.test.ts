@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
-import { KizunaServer } from './server.js';
-import { userContract, createUserRouter } from '../../../core/src/adapter-testing/fixtures.js';
+import { KizunaServer } from '../next/server.js';
+import { userContract, createUserRouter } from '../adapter-testing/fixtures.js';
 
 describe('api.mount and api.plugin', () => {
     it('mount(app) serves routes', async () => {

@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ts from 'typescript';
-import { AUTHORING_NAMES, CONTRACT_EXPORT_NAMES } from '@ts-kizuna/shared/authoring-names';
+import { AUTHORING_NAMES, CONTRACT_EXPORT_NAMES } from '@ts-kizuna/contract/authoring-names';
 import {
     type DeprecationMap,
     type SerializedDeprecationMap,

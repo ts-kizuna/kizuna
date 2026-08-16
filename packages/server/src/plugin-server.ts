@@ -1,4 +1,4 @@
-import type { HandlerArgs, HandlerReturn } from './handler-pipeline.js';
+import type { HandlerArgs, HandlerReturn } from '@ts-kizuna/contract';
 import type { RawResponse } from './raw-response.js';
 import {
     PLUGIN_ROUTES_META_KEY,
@@ -9,8 +9,8 @@ import {
     type PluginPropsOf,
     type PluginRoutes,
     type PluginRoutesOf,
-} from './plugin.js';
-import type { Routes } from './types.js';
+} from '@ts-kizuna/contract';
+import type { Routes } from '@ts-kizuna/contract';
 
 /**
  * A plugin's handlers, typed against its routes. A plugin may also answer with

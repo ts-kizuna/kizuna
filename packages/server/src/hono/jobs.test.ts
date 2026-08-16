@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/shared';
-import { KizunaServer } from './server.js';
+import { KizunaServer } from '../next/server.js';
 
 const scheduler = Kizuna.identity.bearer({
     context: z.object({

@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { Method } from './types.js';
+import type { Method } from '@ts-kizuna/contract';
 
 type LowercaseLetter =
     | 'a'

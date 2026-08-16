@@ -435,6 +435,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@ts-kizuna/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@ts-kizuna/shared':
         specifier: workspace:*
         version: link:../shared
@@ -473,6 +476,9 @@ importers:
 
   packages/eslint-plugin:
     dependencies:
+      '@ts-kizuna/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@ts-kizuna/shared':
         specifier: workspace:*
         version: link:../shared

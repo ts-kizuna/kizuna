@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildPath } from './path-params.js';
-import { Kizuna } from './kizuna.js';
+import { Kizuna } from '@ts-kizuna/contract';
 
 describe('buildPath', () => {
     it('returns the path as-is when no params given', () => {

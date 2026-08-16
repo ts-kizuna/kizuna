@@ -3,7 +3,7 @@ import { ProblemDetailsSchema } from './error-response.js';
 import { assertValidSchedule, type JobSchedule } from './schedule.js';
 import type { ResponseDefinition } from './types.js';
 import type { HandlerReturn } from './handler-pipeline.js';
-import type { JobRunner as JobRunnerOf } from './job-runner.js';
+import type { JobRunner as JobRunnerOf } from '@ts-kizuna/server';
 
 /**
  * The namespace the job endpoints are mounted under when `jobs.path` says

@@ -4,12 +4,12 @@ import {
     deserializeDeprecationMap,
     type DeprecationMap,
     type SerializedDeprecationMap,
-} from './deprecation.js';
-import { flattenRoutes } from './handler-pipeline.js';
-import { flattenJobs, isCompiledJob, jobAt, type CompiledJob, type FlattenedJob, type Jobs } from './jobs.js';
+} from '@ts-kizuna/contract';
+import { flattenRoutes } from '@ts-kizuna/contract';
+import { flattenJobs, isCompiledJob, jobAt, type CompiledJob, type FlattenedJob, type Jobs } from '@ts-kizuna/contract';
 import { parsePath } from './path-params.js';
-import type { Routes, RouteDefinition } from './types.js';
-import type { Contract } from './contract.js';
+import type { Routes, RouteDefinition } from '@ts-kizuna/contract';
+import type { Contract } from '@ts-kizuna/contract';
 
 export { contractFingerprint, serializeDeprecationMap, deserializeDeprecationMap, type DeprecationMap, type SerializedDeprecationMap };
 export type { Routes, RouteDefinition };

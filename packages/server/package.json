@@ -56,16 +56,6 @@
         "default": "./dist/jobs.cjs"
       }
     },
-    "./load-deprecations": {
-      "import": {
-        "types": "./dist/load-deprecations.d.mts",
-        "default": "./dist/load-deprecations.mjs"
-      },
-      "require": {
-        "types": "./dist/load-deprecations.d.cts",
-        "default": "./dist/load-deprecations.cjs"
-      }
-    },
     "./express": {
       "import": {
         "types": "./dist/express.d.mts",
@@ -121,7 +111,6 @@
     "entries": {
       ".": "server",
       "./jobs": "server",
-      "./load-deprecations": "server",
       "./express": "server",
       "./fastify": "server",
       "./hono": "server",

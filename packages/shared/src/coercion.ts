@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { RouteDefinition } from './types.js';
+import type { RouteDefinition } from '@ts-kizuna/contract';
 import { readDef, readObjectShape, resolveBaseType, WRAPPER_TYPES } from './zod-internals.js';
 
 /**

@@ -1,4 +1,4 @@
-import { STATUS_TITLES } from './status-titles.js';
+import { STATUS_TITLES } from '@ts-kizuna/shared';
 
 export interface ProblemDetails {
     type: string;

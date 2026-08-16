@@ -1,7 +1,7 @@
-import type { RouteDefinition, Routes, Method } from './types.js';
-import { flattenRoutes } from './handler-pipeline.js';
-import type { PathSegment } from './path-params.js';
-import { parsePath } from './path-params.js';
+import type { RouteDefinition, Routes, Method } from '@ts-kizuna/contract';
+import { flattenRoutes } from '@ts-kizuna/contract';
+import type { PathSegment } from '@ts-kizuna/shared';
+import { parsePath } from '@ts-kizuna/shared';
 
 interface CompiledRoute {
     routeKey: string;

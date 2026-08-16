@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { addCodedIssue } from './coded-issue.js';
-import { renderJsonResult } from './adapter.js';
+import { renderJsonResult } from '@ts-kizuna/server';
 import { Kizuna } from './kizuna.js';
 
 /**

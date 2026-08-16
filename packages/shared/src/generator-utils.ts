@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { ResponseDefinition } from './types.js';
+import type { ResponseDefinition } from '@ts-kizuna/contract';
 
 // Kept out of generator.ts so importing these doesn't pull in its node:fs dependency.
 

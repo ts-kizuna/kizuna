@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/shared';
 import type { Contract } from '@ts-kizuna/shared';
-import { KizunaServer } from './server.js';
+import { KizunaServer } from '../next/server.js';
 import { createServer as createHttpServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { startJobsDevRunner, type JobsDevRunner } from '@ts-kizuna/shared/jobs';

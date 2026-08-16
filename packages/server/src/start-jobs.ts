@@ -1,4 +1,4 @@
-import { nextRun, scheduleExpression, scheduleTimezone, type JobSchedule } from './schedule.js';
+import { nextRun, scheduleExpression, scheduleTimezone, type JobSchedule } from '@ts-kizuna/contract';
 import { flattenJobs, jobFnAt, jobRunnerFrom, JOBS_META, type JobsMeta, type ScheduledJob } from './adapter.js';
 
 export interface StartJobsOptions {

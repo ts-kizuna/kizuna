@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { createPlugin, type RoutePath } from '@ts-kizuna/contract/plugin';
+import { createPlugin } from '@ts-kizuna/contract/plugin';
+import type { RoutePath } from '@ts-kizuna/contract';
 import type { McpServerOptions } from './mcp-server.js';
 
 export interface McpPluginProps {

@@ -1,7 +1,7 @@
-import { dueSchedules, type JobSchedule } from './schedule.js';
-import { flattenJobs } from './jobs.js';
-import type { Contract } from './contract.js';
-import { ProblemDetailsSchema } from './schemas.js';
+import { dueSchedules, type JobSchedule } from '@ts-kizuna/contract';
+import { flattenJobs } from '@ts-kizuna/contract';
+import type { Contract } from '@ts-kizuna/contract';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract';
 import { z } from 'zod';
 
 export interface DispatchOptions {

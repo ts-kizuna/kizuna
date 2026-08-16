@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { ProblemDetailsSchema } from '../error-response.js';
-import { Kizuna } from '../kizuna.js';
+import { ProblemDetailsSchema } from '@ts-kizuna/contract';
+import { Kizuna } from '@ts-kizuna/contract';
 import { createPlugin, implementPlugin, rawResponse } from '../adapter.js';
-import type { Router } from '../handler-pipeline.js';
+import type { Router } from '@ts-kizuna/contract';
 import type { GuardDeny } from '../adapter.js';
 
 const k = new Kizuna({

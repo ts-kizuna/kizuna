@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/shared';
 import { ProblemDetailsSchema } from '@ts-kizuna/contract/schemas';
 import { KizunaServer, NextRequest, NextResponse } from './server.js';
-import { readTestBody, testAdapterFeatures } from '../../../core/src/adapter-testing/index.js';
+import { readTestBody, testAdapterFeatures } from '@ts-kizuna/contract';
 
 const k = new Kizuna({
     tags: Kizuna.tags({

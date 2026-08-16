@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { assembleApi } from './adapter.js';
 import { matchRoute } from './route-matcher.js';
-import { Kizuna } from './kizuna.js';
+import { Kizuna } from '@ts-kizuna/contract';
 
 const k = new Kizuna({
     tags: Kizuna.tags({

@@ -56,10 +56,11 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external eslint --external typescript --external @typescript-eslint/utils --external @typescript-eslint/parser --external @ts-kizuna/shared",
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external eslint --external typescript --external @typescript-eslint/utils --external @typescript-eslint/parser --external @ts-kizuna/shared --external @ts-kizuna/contract",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ts-kizuna/contract": "workspace:*",
     "@ts-kizuna/shared": "workspace:*",
     "@typescript-eslint/parser": "^8.0.0",
     "@typescript-eslint/utils": "^8.0.0"
