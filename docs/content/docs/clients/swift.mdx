@@ -200,16 +200,14 @@ Run the generator as part of the build:
     tree (`../ios/MyApp/Generated/`) when the app is in the same repo.
 </Callout>
 
-Commit the generated file, then have CI regenerate it and diff. Output is deterministic, so a diff means the contract moved and the client did not:
+Commit the generated file, and have CI regenerate it and diff, which catches the change that landed without it:
 
 ```yaml title=".github/workflows/build-and-tests.yml"
 - name: Check the Swift client is up to date
   run: pnpm generate:swift && git diff --exit-code swift/
 ```
 
-Give the client its own directory so the check sees nothing but generated output. Generating a Swift file needs Node, not Xcode, so this runs on the same Linux runner as your other checks.
-
-A current client still has to compile. With the file in a SwiftPM target, add a macOS job:
+That proves the client matches the contract. Compiling it proves the app still does:
 
 ```yaml title=".github/workflows/build-and-tests.yml"
 swift:
@@ -217,6 +215,18 @@ swift:
     steps:
         - uses: actions/checkout@v6
         - run: swift test
+```
+
+### Tip: regenerate on save
+
+Watch the contract while you work and the client is current by the time you commit, so the check never has anything to catch:
+
+```json title="package.json"
+{
+    "scripts": {
+        "dev": "tsdown --watch --onSuccess 'pnpm generate:swift'"
+    }
+}
 ```
 
 ## Reference
