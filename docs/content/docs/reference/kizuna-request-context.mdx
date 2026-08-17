@@ -1,15 +1,15 @@
 ---
 title: Kizuna.requestContext
-description: Provide request-scoped values to every handler, typed, such as analytics ids, loggers, and tenants.
+description: Provide request-scoped values to every handler, typed, such as analytics ids, loggers, and the caller's locale.
 ---
 
-Request-scoped values every handler receives, typed, such as analytics ids, loggers, and tenant lookups. Declare them with `Kizuna.requestContext`, register them on `new Kizuna()`, and resolve each with the adapter's `server.requestContext`. Handlers read them under `requestContext`, keyed by name.
+Request-scoped values every handler receives, typed, such as analytics ids, loggers, and the caller's locale. Declare them with `Kizuna.requestContext`, register them on `new Kizuna()`, and resolve each with the adapter's `server.requestContext`. Handlers read them under `requestContext`, keyed by name. See the [Request Context guide](/docs/request-context) for the full walkthrough.
 
 <AdapterTabs functionName="KizunaServer" />
 
 A declaration that reads no headers takes the context schema on its own:
 
-```ts title="request-contexts.ts"
+```ts title="request-context.ts"
 export const logger = Kizuna.requestContext(
     z.object({
         requestId: z.string(),
@@ -19,7 +19,7 @@ export const logger = Kizuna.requestContext(
 
 A declaration can also read request `headers`. They stay off the routes and out of the OpenAPI document, and the clients type them, so a caller sets them once and the resolver reads them validated.
 
-```ts title="request-contexts.ts"
+```ts title="request-context.ts"
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 
@@ -34,7 +34,7 @@ export const analytics = Kizuna.requestContext({
 ```
 
 ```ts title="k.ts"
-import { analytics } from './request-contexts';
+import { analytics } from './request-context';
 
 export const k = new Kizuna({
     requestContext: {
@@ -80,14 +80,24 @@ const apiClient = new KizunaClient(contract, {
 });
 ```
 
-The generated Swift and Kotlin clients take a `RequestContext` in their initializer:
+The Swift and Kotlin clients take a `RequestContext` in their initializer:
 
 ```swift title="APISetup.swift"
-let client = APIClient(baseURL: url, requestContext: .init(xPosthogSessionId: sessionId))
+let client = APIClient(
+    baseURL: url,
+    requestContext: .init(
+        xPosthogSessionId: sessionId
+    )
+)
 ```
 
 ```kotlin title="APISetup.kt"
-val client = APIClient(baseUrl = baseUrl, requestContext = APIClient.RequestContext(xPosthogSessionId = sessionId))
+val client = APIClient(
+    baseUrl = baseUrl,
+    requestContext = APIClient.RequestContext(
+        xPosthogSessionId = sessionId
+    )
+)
 ```
 
 Resolvers run on every route, public ones included, before the guards, and never deny a request. They receive the adapter's native request objects, the route's `params`, and the declared `headers` (validated). The return is checked against the `context` schema, and `server.api` requires a resolver for every declared key. Request context never appears in the OpenAPI document.

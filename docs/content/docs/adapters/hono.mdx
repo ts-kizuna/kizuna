@@ -162,7 +162,7 @@ export const requireUser = server.guard('user', async ({ bearer, deny }) => {
 
 ## Middleware
 
-For request-scoped values handlers need, use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context). For other middleware, such as logging, rate limiting, and caching headers, use Hono's own `app.use`. Authentication belongs in [guards](#guards).
+For request-scoped values handlers need, use [request context](/docs/request-context). For other middleware, such as logging, rate limiting, and caching headers, use Hono's own `app.use`. Authentication belongs in [guards](#guards).
 
 ## Options
 

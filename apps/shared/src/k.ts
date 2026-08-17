@@ -3,7 +3,7 @@ import { mcpPlugin } from '@ts-kizuna/mcp';
 import { openApiPlugin } from '@ts-kizuna/openapi';
 import { tags } from './tags';
 import { user, member, inviteToken, scheduler } from './identities';
-import { analytics } from './request-contexts';
+import { analytics } from './request-context';
 
 export const k = new Kizuna({
     identities: {
