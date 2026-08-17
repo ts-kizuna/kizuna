@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "bench": "tsx src/run.ts",
+    "bench:ab": "tsx src/interleaved.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
