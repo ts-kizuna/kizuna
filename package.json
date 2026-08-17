@@ -22,6 +22,7 @@
     "format:check": "prettier --check .",
     "lint": "pnpm --filter @ts-kizuna/core --filter @ts-kizuna/eslint-plugin build && eslint .",
     "lint:fix": "pnpm --filter @ts-kizuna/eslint-plugin build && eslint . --fix",
+    "bench": "pnpm --filter @ts-kizuna-demo/bench bench",
     "docs": "pnpm --filter docs dev",
     "release": "release-it"
   },

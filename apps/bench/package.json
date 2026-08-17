@@ -1,0 +1,29 @@
+{
+  "name": "@ts-kizuna-demo/bench",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "bench": "tsx src/run.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@ts-kizuna/core": "workspace:*",
+    "@ts-kizuna/express": "workspace:*",
+    "@ts-kizuna/fastify": "workspace:*",
+    "@ts-kizuna/hono": "workspace:*",
+    "autocannon": "^8.0.0",
+    "express": "catalog:",
+    "fastify": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/autocannon": "^7.12.7",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}
