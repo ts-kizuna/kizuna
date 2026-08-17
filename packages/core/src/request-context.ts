@@ -31,9 +31,9 @@ interface RequestContextConfig<ContextSchema extends z.ZodType, HeadersSchema ex
 }
 
 /**
- * Declare a request-scoped value, an analytics id, a logger, a tenant. Register
- * it on `new Kizuna()` under `requestContext`; handlers receive it typed under its
- * registered name. It never gates a request.
+ * Declare a request-scoped value, an analytics id, a logger, the caller's locale.
+ * Register it on `new Kizuna()` under `requestContext`; handlers receive it typed
+ * under its registered name.
  *
  * Pass a schema alone for a server-derived value, or `{ context, headers }`
  * when the value comes from request headers, clients are then typed to send

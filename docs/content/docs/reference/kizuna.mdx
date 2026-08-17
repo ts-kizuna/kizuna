@@ -65,7 +65,7 @@ Construct it once, usually in a `k.ts` file, then import `k` wherever you define
 import { Kizuna } from '@ts-kizuna/core';
 import { tags } from './tags';
 import { user, member } from './identities';
-import { analytics } from './request-contexts';
+import { analytics } from './request-context';
 
 export const k = new Kizuna({
     identities: {
@@ -86,7 +86,7 @@ export const k = new Kizuna({
 
 `requestContext` registers declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values like analytics ids or a logger. Every handler receives them typed under `requestContext`, keyed by their name; each is resolved per request by a [`server.requestContext`](/docs/reference/server-request-context) resolver wired on `server.api`.
 
-```ts title="request-contexts.ts"
+```ts title="request-context.ts"
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 
@@ -98,7 +98,7 @@ export const analytics = Kizuna.requestContext(
 ```
 
 ```ts title="k.ts"
-import { analytics } from './request-contexts';
+import { analytics } from './request-context';
 
 export const k = new Kizuna({
     requestContext: {

@@ -29,7 +29,7 @@ export function About() {
                 everything you built standing as the API underneath it changes. One contract, bound to everything that depends on it, is
                 what keeps it standing.
             </p>
-            <p className={styles.body}>It solved a real problem for us, and there is a lot more coming. I hope it does the same for you.</p>
+            <p className={styles.body}>It solved a real problem for us. I hope it does the same for you, and there is a lot more coming.</p>
         </div>
     );
 }

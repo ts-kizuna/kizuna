@@ -254,7 +254,7 @@ export const requireMember = server.guard('member', async ({ apiKey, params, den
 });
 ```
 
-The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), use [`Kizuna.requestContext`](/docs/reference/kizuna-request-context) instead.
+The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), use [request context](/docs/request-context) instead.
 
 ## What the declaration drives
 

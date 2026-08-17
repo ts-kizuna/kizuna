@@ -3,7 +3,7 @@ title: server.requestContext
 description: Resolve a request-scoped value every handler receives.
 ---
 
-`server.requestContext(name, run)` implements a request context provider declared with [`Kizuna.requestContext`](/docs/reference/kizuna-request-context). It runs on every route, never denies, and handlers read its value under `requestContext`, keyed by the provider's name.
+`server.requestContext(name, run)` implements a request context provider declared with [`Kizuna.requestContext`](/docs/reference/kizuna-request-context). It runs on every route, never denies, and handlers read its value under `requestContext`, keyed by the provider's name. See the [Request Context guide](/docs/request-context) for the full walkthrough.
 
 ```ts title="request-context.ts"
 import { server } from './server';

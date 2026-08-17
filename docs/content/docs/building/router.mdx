@@ -73,25 +73,25 @@ You can also type a single group inline by passing its key as the first argument
 
 Each handler receives an object with the validated inputs for that route:
 
-| Property           | Available when                                                               |
-| ------------------ | ---------------------------------------------------------------------------- |
-| `params`           | Route path has `:param` placeholders                                         |
-| `query`            | Route has a `query` schema                                                   |
-| `body`             | Route has a `body` schema                                                    |
-| `headers`          | Route has a `headers` schema                                                 |
-| `throwError`       | Always                                                                       |
-| `auth`             | Route is secured by the contract's [auth map](/docs/authentication)          |
-| `requestContext`   | Contract declares [`requestContext`](/docs/reference/kizuna-request-context) |
-| `plugins`          | Contract declares [plugins](/docs/plugins)                                   |
-| `jobs`             | Contract declares [jobs](/docs/jobs)                                         |
-| `req`, `res`       | Express adapter                                                              |
-| `c`                | Hono adapter                                                                 |
-| `request`, `reply` | Fastify adapter                                                              |
-| `request`          | Next.js adapter                                                              |
+| Property           | Available when                                                      |
+| ------------------ | ------------------------------------------------------------------- |
+| `params`           | Route path has `:param` placeholders                                |
+| `query`            | Route has a `query` schema                                          |
+| `body`             | Route has a `body` schema                                           |
+| `headers`          | Route has a `headers` schema                                        |
+| `throwError`       | Always                                                              |
+| `auth`             | Route is secured by the contract's [auth map](/docs/authentication) |
+| `requestContext`   | Contract declares [request context](/docs/request-context)          |
+| `plugins`          | Contract declares [plugins](/docs/plugins)                          |
+| `jobs`             | Contract declares [jobs](/docs/jobs)                                |
+| `req`, `res`       | Express adapter                                                     |
+| `c`                | Hono adapter                                                        |
+| `request`, `reply` | Fastify adapter                                                     |
+| `request`          | Next.js adapter                                                     |
 
 ## Identity context
 
-When the contract's [auth map](/docs/authentication) secures a route, the handler receives the identity's context under `auth`, keyed by the identity's name. That context is whatever the guard returned, typed by the identity's `context` schema. Values declared under [`requestContext`](/docs/reference/kizuna-request-context) arrive the same way, under `requestContext` on every route.
+When the contract's [auth map](/docs/authentication) secures a route, the handler receives the identity's context under `auth`, keyed by the identity's name. That context is whatever the guard returned, typed by the identity's `context` schema. Values declared as [request context](/docs/request-context) arrive the same way, under `requestContext` on every route.
 
 ```ts title="members.ts"
 listMembers: ({ auth }) => ({

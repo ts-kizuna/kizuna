@@ -7,6 +7,7 @@
         "adapters",
         "clients",
         "authentication",
+        "request-context",
         "jobs",
         "---Plugins---",
         "[Overview](/docs/plugins)",
