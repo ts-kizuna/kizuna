@@ -783,9 +783,9 @@ const resolveRoute = (
 };
 
 /**
- * `await` costs a microtask hop even for plain values, and the pipeline runs on
- * every request, so sync results (most adapters' handler context, Express and
- * Fastify bodies, sync handlers) skip it.
+ * Awaiting a plain value still costs a microtask. Most of what the pipeline
+ * awaits per request is plain (handler contexts, parsed bodies, sync handler
+ * returns), so it checks before awaiting.
  */
 const isThenable = (value: unknown): value is Promise<unknown> =>
     typeof (value as { then?: unknown } | null | undefined)?.then === 'function';
@@ -1134,7 +1134,7 @@ export const renderJsonResult = (
     formatError: ErrorFormatter = defaultErrorFormatter,
     request: unknown = undefined
 ): { status: number; headers: Record<string, string>; body: unknown; raw?: boolean } => {
-    // The common case first, before anything error rendering needs.
+    // Success bodies first: they need none of the error rendering below.
     if (result.kind === 'success' && result.status < 400) {
         if (result.body === undefined) {
             return {

@@ -191,8 +191,8 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
             return result.response as Response;
         }
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, c.req.raw);
-        // A plain `Response` instead of `c.json`/`c.body`: on @hono/node-server it
-        // is a lightweight class written straight to the socket, where the context
+        // A plain `Response` rather than `c.json`/`c.body`: on @hono/node-server it
+        // is a lightweight object written straight to the socket, where the context
         // helpers build web `Headers` on every request.
         const body =
             rendered.body === undefined
