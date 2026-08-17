@@ -1,5 +1,4 @@
 import type { Context, Env, Hono, MiddlewareHandler } from 'hono';
-import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
     type AdapterRequest,
     type RouteDefinition,
@@ -192,20 +191,20 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
             return result.response as Response;
         }
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, c.req.raw);
-        if (rendered.body === undefined) {
-            return c.body(null, rendered.status as ContentfulStatusCode, rendered.headers);
-        }
-        if (rendered.raw) {
-            // Strings and binary (Uint8Array/ArrayBuffer) bodies are sent as-is, never JSON-serialized.
-            return c.body(rendered.body as ArrayBuffer | string, rendered.status as ContentfulStatusCode, rendered.headers);
-        }
-        // `c.json` sets the JSON content type itself; passing headers it does not
-        // need would take Hono off its cached-response fast path.
-        const headerNames = Object.keys(rendered.headers);
-        if (headerNames.length === 1 && rendered.headers['content-type'] === 'application/json') {
-            return c.json(rendered.body as object, rendered.status as ContentfulStatusCode);
-        }
-        return c.json(rendered.body as object, rendered.status as ContentfulStatusCode, rendered.headers);
+        // A plain `Response` instead of `c.json`/`c.body`: on @hono/node-server it
+        // is a lightweight class written straight to the socket, where the context
+        // helpers build web `Headers` on every request.
+        const body =
+            rendered.body === undefined
+                ? null
+                : rendered.raw
+                  ? // Strings and binary (Uint8Array/ArrayBuffer) bodies are sent as-is, never JSON-serialized.
+                    (rendered.body as string | Uint8Array)
+                  : JSON.stringify(rendered.body);
+        return new Response(body as BodyInit | null, {
+            status: rendered.status,
+            headers: rendered.headers,
+        });
     },
 });
 

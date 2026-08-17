@@ -782,6 +782,18 @@ const resolveRoute = (
     };
 };
 
+/**
+ * `await` costs a microtask hop even for plain values, and the pipeline runs on
+ * every request, so sync results (most adapters' handler context, Express and
+ * Fastify bodies, sync handlers) skip it.
+ */
+const isThenable = (value: unknown): value is Promise<unknown> =>
+    typeof (value as { then?: unknown } | null | undefined)?.then === 'function';
+
+const throwError = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
+    throw new ResponseError(response);
+};
+
 const isAcceptable = (acceptHeader: string | undefined): boolean => {
     if (!acceptHeader || acceptHeader.trim() === '') return true;
     for (const part of acceptHeader.split(',')) {
@@ -843,7 +855,8 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 };
             }
             try {
-                raw.body = await request.readBody(route);
+                const body = request.readBody(route);
+                raw.body = isThenable(body) ? await body : body;
             } catch {
                 return {
                     kind: 'invalid-body',
@@ -873,7 +886,8 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     }
 
     try {
-        const handlerContext = await definition.buildHandlerContext(request, responseContext);
+        const builtContext = definition.buildHandlerContext(request, responseContext);
+        const handlerContext = isThenable(builtContext) ? await builtContext : builtContext;
 
         const requestContext: Record<string, unknown> = {};
         if (contextResolvers) {
@@ -927,10 +941,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             }
         }
 
-        const throwError = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
-            throw new ResponseError(response);
-        };
-        const handlerResult = await (
+        const returned = (
             handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: Record<string, string> } | RawResponse>
         )({
             params: validation.parsed.params,
@@ -944,6 +955,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
             ...(pluginExports && Object.keys(pluginExports).length > 0 ? { plugins: pluginExports } : {}),
         });
+        const handlerResult = isThenable(returned) ? await returned : returned;
         if (isRawResponse(handlerResult)) {
             return {
                 kind: 'raw-response',
@@ -1122,6 +1134,37 @@ export const renderJsonResult = (
     formatError: ErrorFormatter = defaultErrorFormatter,
     request: unknown = undefined
 ): { status: number; headers: Record<string, string>; body: unknown; raw?: boolean } => {
+    // The common case first, before anything error rendering needs.
+    if (result.kind === 'success' && result.status < 400) {
+        if (result.body === undefined) {
+            return {
+                status: result.status,
+                headers: {
+                    ...(result.headers ?? {}),
+                },
+                body: result.body,
+            };
+        }
+        const responseSpec = result.route.responses[result.status];
+        const isBinary = responseSpec !== undefined && isBinarySchema(resolveResponseBody(responseSpec));
+        const contentType = resolveResponseContentType(responseSpec) ?? (isBinary ? 'application/octet-stream' : 'application/json');
+        const raw = isBinary || !isJsonMediaType(contentType);
+        if (raw && typeof result.body !== 'string' && !(result.body instanceof Uint8Array)) {
+            throw new Error(
+                `${result.routeKey} (status ${result.status}) is declared with content type "${contentType}", so its body must be a string or Uint8Array, but the handler returned ${describeBodyType(result.body)}.`
+            );
+        }
+        return {
+            status: result.status,
+            headers: {
+                'content-type': contentType,
+                ...(result.headers ?? {}),
+            },
+            body: result.body,
+            raw,
+        };
+    }
+
     const renderError = (
         status: number,
         detail: string,
@@ -1142,39 +1185,10 @@ export const renderJsonResult = (
 
     switch (result.kind) {
         case 'success': {
-            if (result.status >= 400) {
-                const body = result.body;
-                const extensions = body !== null && typeof body === 'object' ? (body as Record<string, unknown>) : {};
-                const detail = typeof extensions.detail === 'string' ? extensions.detail : (STATUS_TITLES[result.status] ?? 'Error');
-                return renderError(result.status, detail, extensions, result.headers);
-            }
-            if (result.body === undefined) {
-                return {
-                    status: result.status,
-                    headers: {
-                        ...(result.headers ?? {}),
-                    },
-                    body: result.body,
-                };
-            }
-            const responseSpec = result.route.responses[result.status];
-            const isBinary = responseSpec !== undefined && isBinarySchema(resolveResponseBody(responseSpec));
-            const contentType = resolveResponseContentType(responseSpec) ?? (isBinary ? 'application/octet-stream' : 'application/json');
-            const raw = isBinary || !isJsonMediaType(contentType);
-            if (raw && typeof result.body !== 'string' && !(result.body instanceof Uint8Array)) {
-                throw new Error(
-                    `${result.routeKey} (status ${result.status}) is declared with content type "${contentType}", so its body must be a string or Uint8Array, but the handler returned ${describeBodyType(result.body)}.`
-                );
-            }
-            return {
-                status: result.status,
-                headers: {
-                    'content-type': contentType,
-                    ...(result.headers ?? {}),
-                },
-                body: result.body,
-                raw,
-            };
+            const body = result.body;
+            const extensions = body !== null && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+            const detail = typeof extensions.detail === 'string' ? extensions.detail : (STATUS_TITLES[result.status] ?? 'Error');
+            return renderError(result.status, detail, extensions, result.headers);
         }
         case 'not-found':
             return renderError(404, 'Not Found');
