@@ -3,7 +3,8 @@ import { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand, type Route
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { IdentityAccess } from './identity.js';
-import { applyCoercion, coercionPlanFor } from './coercion.js';
+import { applyCoercion } from './coercion.js';
+import { routePlanFor } from './route-plan.js';
 
 type ProblemDetailsEnvelope = { type: string; title: string; status: number; detail: string };
 
@@ -356,33 +357,6 @@ export const validateRequest = (
     route: RouteDefinition,
     raw: RawInputs
 ): { ok: true; parsed: RawInputs } | { ok: false; error: ValidationFailure } => {
-    const order: ReadonlyArray<{ stage: ValidationStage; schema: z.ZodType | undefined; input: unknown; coerced: boolean }> = [
-        {
-            stage: 'params',
-            schema: route.pathParams,
-            input: raw.params,
-            coerced: true,
-        },
-        {
-            stage: 'query',
-            schema: route.query,
-            input: raw.query,
-            coerced: true,
-        },
-        {
-            stage: 'headers',
-            schema: route.headers,
-            input: raw.headers,
-            coerced: true,
-        },
-        {
-            stage: 'body',
-            schema: route.body,
-            input: raw.body,
-            coerced: false,
-        },
-    ];
-
     const parsed: RawInputs = {
         params: raw.params,
         query: raw.query,
@@ -390,9 +364,8 @@ export const validateRequest = (
         body: raw.body,
     };
 
-    for (const step of order) {
-        if (!step.schema) continue;
-        const input = step.coerced ? applyCoercion(step.input, coercionPlanFor(step.schema)) : step.input;
+    for (const step of routePlanFor(route).validationSteps) {
+        const input = applyCoercion(raw[step.stage], step.coercionPlan);
         const result = step.schema.safeParse(input);
         if (!result.success) {
             return {

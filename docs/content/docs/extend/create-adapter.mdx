@@ -109,14 +109,16 @@ interface AdapterRequest<NativeRequest> {
     method: string;
     resolution:
         | { kind: 'core-match'; path: string } // Next-style: core matches the path
-        | { kind: 'pre-resolved'; routeKey: string; route: Route; params: Record<string, string> }; // Express-style: adapter already routed
+        | { kind: 'pre-resolved'; routeKey: string; route: Route; params: Record<string, string>; handler?: unknown }; // Express-style: adapter already routed
     query: unknown;
     headers: unknown;
     readBody: (route: Route) => Promise<unknown> | unknown;
 }
 ```
 
-Use `kind: 'core-match'` for catch-all routing (one handler handles all paths). Use `kind: 'pre-resolved'` for per-route registration (Express-style, where the framework has already matched the route).
+Use `kind: 'core-match'` for catch-all routing (one handler handles all paths). Use `kind: 'pre-resolved'` for per-route registration (Express-style, where the framework has already matched the route). A pre-resolved adapter can also pass the route's `handler`, taken from `adapter.eachRoute` at mount time, which saves the pipeline a per-request lookup through the router tree.
+
+Two performance notes for `pre-resolved` adapters. `eachRoute` yields each route's handler alongside its key, so mount-time is the place to capture it. And the pipeline reads `query` only for routes that declare a query schema, so an adapter whose framework parses the query string lazily (Express 5, or a `new URL(...)` parse) should expose `query` as a getter and keep that work off every other route.
 
 ## `AdapterResult`
 

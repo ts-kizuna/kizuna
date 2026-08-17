@@ -215,9 +215,7 @@ const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
             return;
         }
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, reply.request);
-        for (const [key, value] of Object.entries(rendered.headers)) {
-            reply.header(key, value);
-        }
+        reply.headers(rendered.headers);
         if (rendered.body === undefined) {
             reply.status(rendered.status).send();
         } else if (rendered.raw) {
@@ -259,17 +257,14 @@ export const fastifyKizuna = fastifyPlugin(
             routeKey: string,
             route: RouteDefinition,
             lane: Routes,
-            resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>
+            resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>,
+            routeHandler: unknown
         ): void => {
             app.route({
                 method: route.method,
                 url: route.path,
-                preHandler: [
-                    async (request: FastifyRequest) => {
-                        request.kizunaRoute = route;
-                    },
-                ],
                 handler: async (request: FastifyRequest, reply: FastifyReply) => {
+                    request.kizunaRoute = route;
                     const adapterRequest: AdapterRequest<FastifyRequest> = {
                         request,
                         method: request.method,
@@ -278,6 +273,7 @@ export const fastifyKizuna = fastifyPlugin(
                             routeKey,
                             route,
                             params: (request.params ?? {}) as Record<string, string>,
+                            handler: routeHandler,
                         },
                         query: (request.query ?? {}) as Record<string, string>,
                         headers: request.headers,
@@ -309,8 +305,8 @@ export const fastifyKizuna = fastifyPlugin(
                 (left, right) => Number(right.route.method === 'HEAD') - Number(left.route.method === 'HEAD')
             );
 
-            for (const { routeKey, route } of declaredRoutes) {
-                mountRoute(routeKey, route, lane, resolvedRouter);
+            for (const { routeKey, route, handler } of declaredRoutes) {
+                mountRoute(routeKey, route, lane, resolvedRouter, handler);
             }
         };
 
@@ -321,7 +317,7 @@ export const fastifyKizuna = fastifyPlugin(
             const routes = jobRoutes(jobsMeta);
             const router = jobRouter<FastifyHandlerContext>(jobsMeta);
             for (const [routeKey, route] of Object.entries(routes)) {
-                mountRoute(routeKey, route as RouteDefinition, routes, router);
+                mountRoute(routeKey, route as RouteDefinition, routes, router, (router as Record<string, unknown>)[routeKey]);
             }
         }
     },

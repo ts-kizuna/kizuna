@@ -167,6 +167,21 @@ type RequestResolverFns<RequestContext extends Record<string, RequestContextSche
     ) => z.output<RequestContext[Name]['context']> | Promise<z.output<RequestContext[Name]['context']>>;
 };
 
+/**
+ * On @hono/node-server, `c.env.incoming` is the node request, whose headers are
+ * already a plain object. Reading `c.req.raw.headers` instead would build web
+ * `Headers` from them on every request. Returns `undefined` off node, where the
+ * adapter falls back to reading the web request.
+ */
+const nodeRequestHeaders = (c: Context): Record<string, string | string[] | undefined> | undefined =>
+    (
+        c.env as {
+            incoming?: {
+                headers?: Record<string, string | string[] | undefined>;
+            };
+        }
+    )?.incoming?.headers;
+
 const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { c: Context<Env>; formatError?: ErrorFormatter<Request> }>({
     buildHandlerContext: (_adapterRequest, { c }) => ({ c }),
     respond: (result, { c, formatError }) => {
@@ -183,6 +198,12 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
         if (rendered.raw) {
             // Strings and binary (Uint8Array/ArrayBuffer) bodies are sent as-is, never JSON-serialized.
             return c.body(rendered.body as ArrayBuffer | string, rendered.status as ContentfulStatusCode, rendered.headers);
+        }
+        // `c.json` sets the JSON content type itself; passing headers it does not
+        // need would take Hono off its cached-response fast path.
+        const headerNames = Object.keys(rendered.headers);
+        if (headerNames.length === 1 && rendered.headers['content-type'] === 'application/json') {
+            return c.json(rendered.body as object, rendered.status as ContentfulStatusCode);
         }
         return c.json(rendered.body as object, rendered.status as ContentfulStatusCode, rendered.headers);
     },
@@ -208,12 +229,12 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
         routeKey: string,
         route: RouteDefinition,
         lane: Routes,
-        resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>
+        resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>,
+        routeHandler: unknown
     ): void => {
         const method = route.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete' | 'options';
         const kizunaHandler = async (c: Context<E>) => {
-            const url = new URL(c.req.url);
-
+            let parsedQuery: Record<string, string> | undefined;
             const adapterRequest: AdapterRequest<Request> = {
                 request: c.req.raw,
                 method: c.req.method,
@@ -222,9 +243,12 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                     routeKey,
                     route,
                     params: c.req.param() as Record<string, string>,
+                    handler: routeHandler,
                 },
-                query: Object.fromEntries(url.searchParams),
-                headers: headersToObject(c.req.raw.headers),
+                get query() {
+                    return (parsedQuery ??= Object.fromEntries(new URL(c.req.url).searchParams));
+                },
+                headers: nodeRequestHeaders(c) ?? headersToObject(c.req.raw.headers),
                 readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),
             };
 
@@ -252,8 +276,8 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
     };
 
     const mountLane = (lane: Routes, resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>): void => {
-        for (const { routeKey, route } of honoAdapter.eachRoute(lane, resolvedRouter)) {
-            mountRoute(routeKey, route, lane, resolvedRouter);
+        for (const { routeKey, route, handler } of honoAdapter.eachRoute(lane, resolvedRouter)) {
+            mountRoute(routeKey, route, lane, resolvedRouter, handler);
         }
     };
 
@@ -264,7 +288,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
         const routes = jobRoutes(jobsMeta);
         const router = jobRouter<HonoHandlerContext<Env>>(jobsMeta);
         for (const [routeKey, route] of Object.entries(routes)) {
-            mountRoute(routeKey, route as RouteDefinition, routes, router);
+            mountRoute(routeKey, route as RouteDefinition, routes, router, (router as Record<string, unknown>)[routeKey]);
         }
     }
 }

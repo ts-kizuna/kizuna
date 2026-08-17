@@ -17,8 +17,8 @@ import { parsePath } from './path-params.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
-import { isVoidSchema, isBinarySchema } from './zod-internals.js';
-import { resolveCoercionPlans } from './coercion.js';
+import { isBinarySchema } from './zod-internals.js';
+import { routePlanFor } from './route-plan.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
 import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from './plugin.js';
 import { resolvePluginServers, type PluginImplementation } from './plugin-server.js';
@@ -242,7 +242,7 @@ export const assembleApi = <const R extends Routes>(
     const pluginRoutes = pluginRouteTree(contract.plugins);
     assertNoDuplicateRoutes(contract.routes, pluginRoutes);
     for (const { route } of [...flattenRoutes(contract.routes), ...flattenRoutes(pluginRoutes)]) {
-        resolveCoercionPlans(route);
+        routePlanFor(route);
     }
     const api = {
         routes: contract.routes,
@@ -508,6 +508,11 @@ export interface AdapterRequest<NativeRequest> {
               routeKey: string;
               route: RouteDefinition;
               params: Record<string, string>;
+              /**
+               * The route's handler, when the adapter resolved it at mount time.
+               * Saves the per-request lookup through the router tree.
+               */
+              handler?: unknown;
           };
     query: unknown;
     headers: unknown;
@@ -619,29 +624,14 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
     responseValidation?: boolean;
 }
 
-/**
- * Expand a route's resolved `security` into the concrete (scheme, scopes) pairs
- * whose guards must run before the handler.
- */
-export const resolveSecurityRequirements = (route: RouteDefinition): Array<{ scheme: string; scopes: string[] }> => {
-    const requirements: Array<{ scheme: string; scopes: string[] }> = [];
-    for (const entry of route.security ?? []) {
-        if (typeof entry === 'string') {
-            requirements.push({
-                scheme: entry,
-                scopes: [],
-            });
-            continue;
-        }
-        for (const [scheme, scopes] of Object.entries(entry)) {
-            requirements.push({
-                scheme,
-                scopes: [...(scopes ?? [])],
-            });
-        }
-    }
-    return requirements;
-};
+export {
+    resolveSecurityRequirements,
+    routePlanFor,
+    type RoutePlan,
+    type ValidationStep,
+    type SecurityRequirement,
+    type BodyPlan,
+} from './route-plan.js';
 
 /**
  * Read a raw header value as a single string: the first entry of an array
@@ -750,6 +740,10 @@ interface ResolvedRoute {
     routeKey: string;
     route: RouteDefinition;
     params: Record<string, string>;
+    /**
+     * The route's handler, when the adapter resolved it at mount time.
+     */
+    handler?: unknown;
 }
 
 const resolveRoute = (
@@ -761,11 +755,7 @@ const resolveRoute = (
     if (request.resolution.kind === 'pre-resolved') {
         return {
             ok: true,
-            resolved: {
-                routeKey: request.resolution.routeKey,
-                route: request.resolution.route,
-                params: request.resolution.params,
-            },
+            resolved: request.resolution,
         };
     }
     const matched = matcher(request.method, request.resolution.path, routes, basePath);
@@ -788,11 +778,7 @@ const resolveRoute = (
     }
     return {
         ok: true,
-        resolved: {
-            routeKey: matched.match.routeKey,
-            route: matched.match.route,
-            params: matched.match.params,
-        },
+        resolved: matched.match,
     };
 };
 
@@ -826,10 +812,12 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     const resolution = resolveRoute(request as AdapterRequest<unknown>, routes, matcher, basePath);
     if (!resolution.ok) return resolution.result;
     const { routeKey, route, params } = resolution.resolved;
+    const plan = routePlanFor(route);
 
     const raw: RawInputs = {
         params,
-        query: request.query,
+        // Read only with a query schema, so adapters can parse the query lazily.
+        query: plan.hasQuerySchema ? request.query : undefined,
         headers: request.headers,
         body: undefined,
     };
@@ -841,18 +829,16 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         };
     }
 
-    if (route.body && !isVoidSchema(route.body)) {
-        const expected = route.contentType ?? 'application/json';
+    if (plan.body) {
         const contentTypeHeader = (raw.headers as Record<string, string | undefined>)['content-type'] ?? '';
-        // No content type is no representation, not an unsupported one (RFC 9110 §15.5.16).
-        const absent = contentTypeHeader === '' && route.body.safeParse(undefined).success;
-        if (!absent) {
+        const bodyAbsent = contentTypeHeader === '' && plan.body.acceptsMissingContentType;
+        if (!bodyAbsent) {
             const [mediaType = ''] = contentTypeHeader.split(';');
             const received = mediaType.trim();
-            if (received.toLowerCase() !== expected) {
+            if (received.toLowerCase() !== plan.body.contentType) {
                 return {
                     kind: 'unsupported-media-type',
-                    expected,
+                    expected: plan.body.contentType,
                     received,
                 };
             }
@@ -878,7 +864,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         };
     }
 
-    const handler = resolveHandler(router, routeKey);
+    const handler = resolution.resolved.handler ?? resolveHandler(router, routeKey);
     if (typeof handler !== 'function') {
         return {
             kind: 'no-handler',
@@ -901,7 +887,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         }
 
         const securityContext: Record<string, unknown> = {};
-        for (const { scheme, scopes } of resolveSecurityRequirements(route)) {
+        for (const { scheme, scopes } of plan.securityRequirements) {
             const guard = guards?.[scheme];
             if (!guard) {
                 throw new Error(`No guard registered for security scheme "${scheme}" required by route "${routeKey}".`);

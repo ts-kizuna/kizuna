@@ -258,52 +258,50 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
         routeKey: string,
         route: RouteDefinition,
         routes: Routes,
-        router: CoreRouter<Routes, ExpressHandlerContext>
+        router: CoreRouter<Routes, ExpressHandlerContext>,
+        routeHandler: unknown
     ): void => {
         const method = route.method.toLowerCase() as 'get' | 'head' | 'post' | 'put' | 'patch' | 'delete' | 'options';
-        expressRouter[method](
-            route.path,
-            (req: Request, _res: Response, next: NextFunction) => {
-                req.kizunaRoute = route;
-                next();
-            },
-            async (req: Request, res: Response, next: NextFunction) => {
-                const adapterRequest: AdapterRequest<Request> = {
-                    request: req,
-                    method: req.method,
-                    resolution: {
-                        kind: 'pre-resolved',
-                        routeKey,
-                        route,
-                        params: req.params as Record<string, string>,
-                    },
-                    query: req.query,
-                    headers: req.headers,
-                    readBody: () => req.body,
-                };
-                await adapter.handle({
-                    routes,
-                    router,
-                    request: adapterRequest,
-                    responseContext: {
-                        res,
-                        next,
-                        formatError: options?.formatError,
-                    },
-                    guards,
-                    schemes,
-                    requestContext,
-                    pluginExports,
-                    jobs: jobRunner,
-                    responseValidation: options?.responseValidation,
-                });
-            }
-        );
+        expressRouter[method](route.path, async (req: Request, res: Response, next: NextFunction) => {
+            req.kizunaRoute = route;
+            const adapterRequest: AdapterRequest<Request> = {
+                request: req,
+                method: req.method,
+                resolution: {
+                    kind: 'pre-resolved',
+                    routeKey,
+                    route,
+                    params: req.params as Record<string, string>,
+                    handler: routeHandler,
+                },
+                get query() {
+                    return req.query;
+                },
+                headers: req.headers,
+                readBody: () => req.body,
+            };
+            await adapter.handle({
+                routes,
+                router,
+                request: adapterRequest,
+                responseContext: {
+                    res,
+                    next,
+                    formatError: options?.formatError,
+                },
+                guards,
+                schemes,
+                requestContext,
+                pluginExports,
+                jobs: jobRunner,
+                responseValidation: options?.responseValidation,
+            });
+        });
     };
 
     const mountLane = (routes: Routes, router: CoreRouter<Routes, ExpressHandlerContext>): void => {
-        for (const { routeKey, route } of adapter.eachRoute(routes, router)) {
-            mountRoute(routeKey, route, routes, router);
+        for (const { routeKey, route, handler } of adapter.eachRoute(routes, router)) {
+            mountRoute(routeKey, route, routes, router, handler);
         }
     };
 
@@ -314,7 +312,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
         const routes = jobRoutes(jobsMeta);
         const router = jobRouter<ExpressHandlerContext>(jobsMeta);
         for (const [routeKey, route] of Object.entries(routes)) {
-            mountRoute(routeKey, route as RouteDefinition, routes, router);
+            mountRoute(routeKey, route as RouteDefinition, routes, router, (router as Record<string, unknown>)[routeKey]);
         }
     }
 
