@@ -116,7 +116,7 @@ Every package under `packages/` publishes to npmjs as `@ts-kizuna/*`. The releas
 
 ## Adding a package
 
-A package needs everything the published twelve carry, or its npm page is the poorer for it. Copy an existing sibling's `package.json` and keep every field: `description`, `keywords` (the shared base plus a few specific), `license`, `homepage` pointing at that package's own docs page, `repository` with its `directory`, `bugs`, `sideEffects`, `engines`, and `publishConfig.access` set to `public`. A scoped package publishes **restricted** without that last one.
+A package needs everything the published thirteen carry, or its npm page is the poorer for it. Copy an existing sibling's `package.json` and keep every field: `description`, `keywords` (the shared base plus a few specific), `license`, `homepage` pointing at that package's own docs page, `repository` with its `directory`, `bugs`, `sideEffects`, `engines`, and `publishConfig.access` set to `public`. A scoped package publishes **restricted** without that last one.
 
 Also add a `README.md`, because npm renders the package's own file and nothing else. Four parts: the description, an install line, the smallest snippet that works, and a link to its docs page. Take the snippet from the docs rather than writing a fresh one. Add the package to the table in the root `README.md` too, which is where its `description` comes from.
 
@@ -125,9 +125,18 @@ Also add a `README.md`, because npm renders the package's own file and nothing e
 npm cannot configure a trusted publisher for a package that does not exist yet, and the release workflow holds no token to fall back on. So a new package cannot publish itself, and the bootstrap is manual:
 
 1. Ship it with `private: true` so `pnpm -r publish` skips it and a release cannot half-fail on it.
-2. Publish it once by hand, from a clean checkout: `pnpm --filter @ts-kizuna/<name> publish --access public`, answering the 2FA prompt. This has to be interactive, as the registry asks for a one-time password.
-3. Add the trusted publisher at `https://www.npmjs.com/package/@ts-kizuna/<name>/access`: GitHub Actions, `ts-kizuna`, `kizuna`, workflow `release.yaml`, no environment, both `publish` and `stage publish` allowed.
-4. Remove `private: true`.
+2. Let a release go out first. `pnpm publish` rewrites `workspace:*` to the exact version it finds, so the package pins its peers to sibling versions that have to be on npm already. A new package often needs exports added to a sibling in the same PR, and those reach the registry with that release.
+3. Publish it once by hand, from a clean checkout of the release tag, with the `private: true` line deleted in the working tree. pnpm and npm both refuse to publish a package marked private, and pnpm says so as `There are no new packages that should be published`. A tag checkout leaves HEAD detached, which pnpm's branch check rejects, so pass `--no-git-checks`:
+
+    ```
+    pnpm --filter @ts-kizuna/<name> build
+    pnpm --filter @ts-kizuna/<name> publish --access public --no-git-checks
+    ```
+
+    Answer the 2FA prompt. This has to be interactive, as the registry asks for a one-time password.
+
+4. Add the trusted publisher at `https://www.npmjs.com/package/@ts-kizuna/<name>/access`: GitHub Actions, `ts-kizuna`, `kizuna`, workflow `release.yaml`, no environment, both `publish` and `stage publish` allowed.
+5. Commit the removal of `private: true`, once the trusted publisher is in place. A release that runs with the flag off and no trusted publisher fails on the package.
 
 Every release after that publishes it with the rest, and the one hand-published version is the only one without a provenance attestation.
 
