@@ -13,11 +13,12 @@ description: Turn a contract into a server handle for defining guards, request c
 new KizunaServer(contract: Contract, options?: ServerOptions): Server
 ```
 
-| Parameter              | Type                                    | Description                                                  |
-| ---------------------- | --------------------------------------- | ------------------------------------------------------------ |
-| `contract`             | `Contract`                              | The contract from [`k.contract`](/docs/reference/k-contract) |
-| `options.jobTransport` | `JobTransport`                          | Where a queued job goes. See [Jobs](/docs/jobs#transports).  |
-| `options.onJobError`   | `(job: string, error: unknown) => void` | Called when a job queued without a transport rejects.        |
+| Parameter                | Type                                        | Description                                                                           |
+| ------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `contract`               | `Contract`                                  | The contract from [`k.contract`](/docs/reference/k-contract)                          |
+| `options.jobTransport`   | `JobTransport`                              | Where a queued job or webhook delivery goes. See [Jobs](/docs/jobs#transports).       |
+| `options.onJobError`     | `(job: string, error: unknown) => void`     | Called when a job queued without a transport rejects.                                 |
+| `options.onWebhookError` | `(webhook: string, error: unknown) => void` | Called when a webhook delivery fails. See [Webhooks](/docs/webhooks#set-up-delivery). |
 
 ```ts title="server.ts"
 import { KizunaServer } from '@ts-kizuna/express';
@@ -36,6 +37,7 @@ The handle, the serving surface for this contract:
 | `server.requestContext` | Resolve one declared request-context value. See [`server.requestContext`](/docs/reference/server-request-context). |
 | `server.router`         | Write typed handlers for the contract or one group. See [`server.router`](/docs/reference/server-router).          |
 | `server.jobs`           | Write a handler for each declared job. See [`server.jobs`](/docs/reference/server-jobs).                           |
+| `server.webhooks`       | Say who is subscribed to the declared events. See [`server.webhooks`](/docs/reference/server-webhooks).            |
 | `server.api`            | Assemble it all into the object you mount. See [`server.api`](/docs/reference/server-api).                         |
 
 With jobs that you queue from your own code, name a transport here. Without one, `queue` runs the job in this process and it is lost on a crash:

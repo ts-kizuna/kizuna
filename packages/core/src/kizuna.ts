@@ -13,6 +13,14 @@ import {
     type JobsArg,
     type JobsConfig,
 } from './jobs.js';
+import {
+    buildWebhooks,
+    type AuthoredWebhooks,
+    type CompiledWebhooks,
+    type Webhooks,
+    type WebhooksArg,
+    type WebhooksConfig,
+} from './webhooks.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
 import { createIdentity } from './identity.js';
 import { createRequestContext } from './request-context.js';
@@ -268,6 +276,24 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
     jobs<const J extends AuthoredJobs, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: J): CompiledJobs<J, Name>;
     jobs<const J extends AuthoredJobs>(definitions: J): CompiledJobs<J, undefined>;
     /**
+     * Declare the events your API posts out to the endpoints your customers
+     * registered.
+     *
+     * Each event carries a payload schema, is signed on the way out, and appears
+     * under `webhooks` in the OpenAPI document. Events never join
+     * `contract.routes`, so the client and the generated Swift and Kotlin
+     * surfaces do not see them.
+     *
+     * @example
+     * export const webhooks = k.webhooks({
+     *     invoicePaid: {
+     *         summary: 'Sent when an invoice is paid',
+     *         body: InvoiceSchema,
+     *     },
+     * });
+     */
+    webhooks<const W extends AuthoredWebhooks>(definitions: W): CompiledWebhooks<W>;
+    /**
      * Assemble route groups into a contract. The `auth` map assigns each group
      * (and optionally each route, via a `'*'` cascade) the identity it requires;
      * `k.contract` resolves it onto every route's `security` and `accessGate`.
@@ -280,32 +306,53 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
         const A extends AuthMap<IdentityNamesOf<Spec>, R>,
         const J extends Jobs = Record<string, never>,
+        const W extends Webhooks = Record<string, never>,
     >(definition: {
         routes: R;
         jobs?: J;
+        webhooks?: W;
         auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
     }): Contract<
-        RoutesWithHandlerContext<R, Spec['identities'], A, Spec['requestContext'], PluginArgs<PluginsOf<Spec>> & JobsArg<J>>,
+        RoutesWithHandlerContext<
+            R,
+            Spec['identities'],
+            A,
+            Spec['requestContext'],
+            PluginArgs<PluginsOf<Spec>> & JobsArg<J> & WebhooksArg<W>
+        >,
         Spec['tags'],
         Spec['codes'],
         Spec['identities'],
         A,
         Spec['requestContext'],
         PluginsOf<Spec>,
-        J
+        J,
+        W
     >;
-    contract<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>, const J extends Jobs = Record<string, never>>(definition: {
+    contract<
+        const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
+        const J extends Jobs = Record<string, never>,
+        const W extends Webhooks = Record<string, never>,
+    >(definition: {
         routes: R;
         jobs?: J;
+        webhooks?: W;
     }): Contract<
-        RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext'], PluginArgs<PluginsOf<Spec>> & JobsArg<J>>,
+        RoutesWithHandlerContext<
+            R,
+            Spec['identities'],
+            unknown,
+            Spec['requestContext'],
+            PluginArgs<PluginsOf<Spec>> & JobsArg<J> & WebhooksArg<W>
+        >,
         Spec['tags'],
         Spec['codes'],
         Spec['identities'],
         unknown,
         Spec['requestContext'],
         PluginsOf<Spec>,
-        J
+        J,
+        W
     >;
     /**
      * Emit a validation issue with a machine-readable `code`, checked against the
@@ -367,6 +414,11 @@ export interface KizunaConfig<
      * Settings shared by every job. The jobs themselves are declared with `k.jobs`.
      */
     jobs?: JobsConfig;
+    /**
+     * Settings shared by every webhook. The events themselves are declared with
+     * `k.webhooks`.
+     */
+    webhooks?: WebhooksConfig;
 }
 
 const createSurface = <
@@ -394,8 +446,10 @@ const createSurface = <
             ? buildJobs(undefined, identityOrDefinitions as AuthoredJobs)
             : buildJobs(identityOrDefinitions as string, definitions)) as K<Spec>['jobs'];
 
-    const contract = (definition: { routes: Routes; jobs?: Jobs; auth?: Record<string, GroupAuth> }) => {
-        const { routes: contractRoutes, jobs: contractJobs, auth } = definition;
+    const webhooks = ((definitions: AuthoredWebhooks) => buildWebhooks(definitions)) as K<Spec>['webhooks'];
+
+    const contract = (definition: { routes: Routes; jobs?: Jobs; webhooks?: Webhooks; auth?: Record<string, GroupAuth> }) => {
+        const { routes: contractRoutes, jobs: contractJobs, webhooks: contractWebhooks, auth } = definition;
         if (contractJobs) {
             const routePaths = new Map<string, string>();
             for (const { routeKey, route } of flattenRoutes(contractRoutes)) {
@@ -422,6 +476,8 @@ const createSurface = <
         return assembleContract({
             routes: contractRoutes as Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
             jobs: contractJobs,
+            webhooks: contractWebhooks,
+            webhooksConfig: config?.webhooks,
             auth,
             tags: config?.tags,
             securitySchemes: config?.identities,
@@ -435,6 +491,7 @@ const createSurface = <
     const k: K<Spec> = {
         routes,
         jobs,
+        webhooks,
         auth: (_routes, map) => map,
         contract: contract as K<Spec>['contract'],
         issue: addCodedIssue,
@@ -477,6 +534,7 @@ export class Kizuna<
     declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['routes'];
     declare readonly auth: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['auth'];
     declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['jobs'];
+    declare readonly webhooks: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['webhooks'];
     declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['contract'];
     declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['issue'];
 

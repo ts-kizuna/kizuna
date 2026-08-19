@@ -84,6 +84,9 @@ Applies equally to docs pages, README, JSDoc, and code comments.
 - **One idea per example.** A snippet that demonstrates two things teaches neither. Split it.
 - **Stop when it is said.** No filler ("simply", "seamlessly", "powerful", "just"), no restating the previous sentence, no explaining what the reader already worked out.
 - **Never define a thing by what it is not.** "It is not a wrapper, it is a contract", "an alternative rather than a rewrite", "this is not about performance". Naming the thing you did not mean forces the reader to hold two ideas to arrive at one. Say the thing.
+- **Describe what a thing is, not what it was.** A page is written against the current behaviour. Never carry a sentence, table, or section into a new page because an older page had it, and never shape a new page to match one that describes something else.
+- **Never catalogue absence.** No sentence or section listing where a thing does not appear, what it does not do, or what it stays out of. Say what happens and where it is served.
+- **Leave design rationale out.** A page tells the reader how to do the thing. Why the API is shaped the way it is belongs in the pull request.
 
 # Comments
 

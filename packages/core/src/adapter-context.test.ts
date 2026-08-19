@@ -118,6 +118,8 @@ const captureHandlerArgs = async (): Promise<Record<string, unknown>> => {
         pluginExports: {
             probe: {},
         },
+        jobs: {} as never,
+        webhooks: {} as never,
     });
 
     return seen;

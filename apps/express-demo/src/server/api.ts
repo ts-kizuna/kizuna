@@ -5,10 +5,12 @@ import { requireUser, requireMember, requireInviteToken, requireScheduler } from
 import { captureAnalytics } from './request-context';
 import { router } from './router/index';
 import { jobHandlers } from './jobs';
+import { webhookConfig } from './webhooks';
 
 export const api = server.api({
     router,
     jobs: jobHandlers,
+    webhooks: webhookConfig,
     guards: {
         user: requireUser,
         member: requireMember,

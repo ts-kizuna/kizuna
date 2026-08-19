@@ -1,0 +1,32 @@
+---
+title: server.webhooks
+description: Say who is subscribed to the contract's events.
+---
+
+`server.webhooks(config)` pairs the contract's [webhooks](/docs/webhooks) with the endpoints subscribed to them.
+
+```ts title="webhooks.ts"
+import { server } from './server';
+
+export const webhooks = server.webhooks({
+    subscribers: async ({ webhook }) => {
+        const rows = await db.subscriptions.findByEvent(webhook);
+        return rows.map((row) => ({
+            url: row.url,
+            secret: row.signingSecret,
+        }));
+    },
+});
+```
+
+`subscribers` runs once per `send` and returns one URL and signing secret per endpoint. Pass the result to [`server.api`](/docs/reference/server-api) under `webhooks`.
+
+Every handler then receives a `webhooks` sender shaped like the declaration:
+
+```ts title="router/invoices.ts"
+await webhooks.invoicePaid.send({
+    body: invoice,
+});
+```
+
+`send` validates the body against the event's schema and hands the delivery off. Pass `to` and the delivery goes to that one endpoint instead of asking `subscribers`.

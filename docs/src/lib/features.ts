@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Clock, FileText, Globe, KeyRound, Plug, Puzzle, TriangleAlert, Zap } from 'lucide-react';
+import { ArrowLeftRight, Clock, FileText, Globe, KeyRound, Plug, TriangleAlert, Webhook, Zap } from 'lucide-react';
 import { KotlinLogo, McpLogo, SwiftLogo, TanstackLogo } from '@/components/code/brand-icons';
 import type { ComponentType } from 'react';
 
@@ -46,9 +46,9 @@ export const features: Feature[] = [
         description: 'Identities and per-route authentication declared on the contract.',
     },
     {
-        icons: [Puzzle],
-        title: 'Plugins',
-        description: 'Extend your API with features built on the contract you already wrote, fully typed in your handlers.',
+        icons: [Webhook],
+        title: 'Webhooks',
+        description: 'Declare the events your API posts out next to its routes, then send them signed from any handler.',
     },
     {
         icons: [Clock],

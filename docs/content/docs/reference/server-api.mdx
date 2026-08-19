@@ -48,6 +48,19 @@ export const api = server.api({
 
 `api.mount` then serves the two [job endpoints](/docs/jobs#the-two-job-endpoints), and every handler receives a typed `jobs` runner so a route can run one in process.
 
+## webhooks
+
+A contract that declares [webhooks](/docs/webhooks) needs its subscribers here, bound with [`server.webhooks`](/docs/reference/server-webhooks):
+
+```ts title="api.ts"
+export const api = server.api({
+    router,
+    webhooks: webhookConfig,
+});
+```
+
+Every handler then receives a typed `webhooks` sender.
+
 ## plugins
 
 A [plugin](/docs/plugins) is declared on [`new Kizuna()`](/docs/reference/kizuna); its server half goes here under the same key:

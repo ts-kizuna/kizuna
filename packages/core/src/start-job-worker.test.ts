@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { createJobTransport, type JobMessage, type JobWorkerContext } from './job-transport.js';
-import { JOBS_META } from './adapter.js';
+import { JOBS_META, WEBHOOKS_META } from './adapter.js';
+import { createWebhookSender, WEBHOOK_DELIVERY_JOB_KEY } from './webhook-sender.js';
+import { verifyDelivery } from './webhook-signature.js';
+import { startWebhookReceiver } from './adapter-testing/webhooks.js';
 import { startJobWorker } from './start-job-worker.js';
 
 const k = new Kizuna({});
@@ -157,5 +160,119 @@ describe('startJobWorker', () => {
         const excluded = pulling();
         await startJobWorker(apiWith(excluded.transport, handlers()), { exclude: ['cleanup'], logger: silent });
         expect(excluded.subscribed().map(({ job }) => job)).toEqual(['users.indexUser']);
+    });
+});
+
+const webhookEvents = k.webhooks({
+    userCreated: {
+        body: z.object({
+            id: z.string(),
+        }),
+    },
+});
+
+describe('startJobWorker webhook deliveries', () => {
+    const subscriber = {
+        url: 'https://example.com/hooks',
+        secret: 'whsec_test',
+    };
+
+    const webhooksMetaWith = (transport: unknown) => ({
+        webhooks: webhookEvents,
+        subscribers: () => [subscriber],
+        transport,
+    });
+
+    it('subscribes to the delivery job alongside the declared jobs', async () => {
+        const queue = pulling();
+        const api = {
+            ...apiWith(queue.transport, handlers()),
+            [WEBHOOKS_META]: webhooksMetaWith(undefined),
+        };
+        await startJobWorker(api, { logger: silent });
+        expect(queue.subscribed().map(({ job }) => job)).toEqual(['cleanup', 'users.indexUser', WEBHOOK_DELIVERY_JOB_KEY]);
+    });
+
+    it('starts for an api with webhooks and no jobs', async () => {
+        const queue = pulling();
+        await startJobWorker({ [WEBHOOKS_META]: webhooksMetaWith(queue.transport) }, { logger: silent });
+        expect(queue.subscribed().map(({ job }) => job)).toEqual([WEBHOOK_DELIVERY_JOB_KEY]);
+    });
+
+    it('honours exclude for the delivery job', async () => {
+        const queue = pulling();
+        await startJobWorker(
+            { [WEBHOOKS_META]: webhooksMetaWith(queue.transport) },
+            { exclude: [WEBHOOK_DELIVERY_JOB_KEY], logger: silent }
+        );
+        expect(queue.subscribed()).toEqual([]);
+    });
+
+    it('propagates a failed delivery, which is how the transport learns to retry', async () => {
+        const queue = pulling();
+        await startJobWorker({ [WEBHOOKS_META]: webhooksMetaWith(queue.transport) }, { logger: silent });
+
+        await expect(
+            queue.deliver({
+                job: WEBHOOK_DELIVERY_JOB_KEY,
+                input: {
+                    nonsense: true,
+                },
+            })
+        ).rejects.toThrow('not a webhook delivery');
+    });
+
+    it('carries a sent event through the transport to the subscriber, signed with the current secret', async () => {
+        const receiver = await startWebhookReceiver();
+        let context: JobWorkerContext | undefined;
+        const inline = createJobTransport({
+            name: 'inline',
+            dispatch: async (message) => {
+                await context!.run(message);
+            },
+            start: (started) => {
+                context = started;
+                return Promise.resolve({
+                    stop: () => {},
+                });
+            },
+        });
+        const webhooksMeta = {
+            webhooks: webhookEvents,
+            subscribers: () => [
+                {
+                    url: receiver.url,
+                    secret: 'whsec_test',
+                },
+            ],
+            transport: inline,
+        };
+        await startJobWorker({ [WEBHOOKS_META]: webhooksMeta }, { logger: silent });
+
+        const sender = createWebhookSender(webhookEvents, {
+            subscribers: webhooksMeta.subscribers,
+            transport: inline,
+        });
+        await sender.userCreated.send({
+            body: {
+                id: 'u1',
+            },
+        });
+
+        const delivery = await receiver.delivered;
+        expect(JSON.parse(delivery.body)).toEqual({
+            id: 'u1',
+        });
+        expect(
+            await verifyDelivery({
+                scheme: 'rfc9421',
+                secret: 'whsec_test',
+                body: delivery.body,
+                url: receiver.url,
+                method: 'POST',
+                headers: delivery.headers,
+            })
+        ).toBe(true);
+        await receiver.close();
     });
 });

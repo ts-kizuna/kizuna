@@ -36,6 +36,15 @@ import {
 import { ProblemDetailsSchema } from './schemas.js';
 import type { Contract } from './contract.js';
 import type { JobTransport } from './job-transport.js';
+import {
+    flattenWebhooks,
+    type WebhookErrorHandler,
+    type WebhookSender,
+    type Webhooks,
+    type WebhooksConfig,
+    type WebhookSubscribers,
+} from './webhooks.js';
+import { createWebhookSender, runWebhookDelivery, WebhookDeliveryMessageError, WEBHOOK_DELIVERY_JOB_KEY } from './webhook-sender.js';
 
 export type { RouteDefinition, RoutePath, Routes, Method } from './types.js';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
@@ -53,6 +62,27 @@ export {
     type PluginExportsOf,
 } from './plugin.js';
 export type { CompiledJob, Jobs, JobHandler, JobHandlers, FlattenedJob } from './jobs.js';
+export type {
+    CompiledWebhook,
+    Webhooks,
+    WebhooksConfig,
+    FlattenedWebhook,
+    WebhookSender,
+    WebhookSubscriber,
+    WebhookSubscribers,
+    WebhookErrorHandler,
+    WebhookKeys,
+} from './webhooks.js';
+export {
+    createWebhookSender,
+    runWebhookDelivery,
+    WebhookBodyError,
+    WebhookDeliveryMessageError,
+    WebhookDeliveryMessageSchema,
+    WEBHOOK_DELIVERY_JOB_KEY,
+    type WebhookDeliveryMessage,
+    type WebhookDeliverySource,
+} from './webhook-sender.js';
 export { flattenJobs, isCompiledJob, jobAt } from './jobs.js';
 export {
     createJobRunner,
@@ -105,7 +135,10 @@ export const GUARDS_META: unique symbol = Symbol('ts-kizuna.guards');
 export const SCHEMES_META: unique symbol = Symbol('ts-kizuna.schemes');
 export const REQUEST_CONTEXT_META: unique symbol = Symbol('ts-kizuna.request-context');
 const CONTRACT_META: unique symbol = Symbol.for('ts-kizuna.contract');
-export const JOBS_META: unique symbol = Symbol('ts-kizuna.jobs');
+// Registry-global: `startJobWorker` reads these off the api, and a dual ESM/CJS
+// install would otherwise hold two different symbols.
+export const JOBS_META: unique symbol = Symbol.for('ts-kizuna.jobs') as symbol as typeof JOBS_META;
+export const WEBHOOKS_META: unique symbol = Symbol.for('ts-kizuna.webhooks') as symbol as typeof WEBHOOKS_META;
 
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
@@ -189,7 +222,18 @@ export const contractOf = <C = unknown>(api: unknown): C => (api as Record<symbo
 /**
  * What kizuna puts in handler args. Must agree with the spread in `runPipeline`.
  */
-export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'throwError', 'auth', 'requestContext', 'plugins'] as const;
+export const HANDLER_ARG_KEYS = [
+    'params',
+    'query',
+    'body',
+    'headers',
+    'throwError',
+    'auth',
+    'requestContext',
+    'plugins',
+    'jobs',
+    'webhooks',
+] as const;
 
 /**
  * The adapter's own context, with kizuna's arguments removed.
@@ -273,10 +317,10 @@ export const jobRoutes = (meta: JobsMeta): Routes => ({
 /**
  * Their handlers, in the {@link Router} shape the request pipeline takes.
  */
-export const jobRouter = <HandlerContext>(meta: JobsMeta): Router<Routes, HandlerContext> =>
+export const jobRouter = <HandlerContext>(meta: JobsMeta, webhooks?: WebhooksMeta): Router<Routes, HandlerContext> =>
     ({
         [DISPATCH_ROUTE_KEY]: dispatchHandler<HandlerContext>(meta),
-        [RUN_ROUTE_KEY]: runHandler<HandlerContext>(meta),
+        [RUN_ROUTE_KEY]: runHandler<HandlerContext>(meta, webhooks),
     }) as unknown as Router<Routes, HandlerContext>;
 
 /**
@@ -285,11 +329,18 @@ export const jobRouter = <HandlerContext>(meta: JobsMeta): Router<Routes, Handle
  */
 export interface ServerOptions {
     /**
-     * Carries a queued job to whatever runs it. Without one, `queue` runs the job
-     * in this process and it is lost on a crash.
+     * Carries a queued job or webhook delivery to whatever runs it. Without one,
+     * `queue` runs the job in this process and it is lost on a crash, and
+     * webhook deliveries are posted from this process.
      */
     jobTransport?: JobTransport;
     onJobError?: JobErrorHandler;
+    /**
+     * Called when a delivery fails: once, when the in-process loop gives up, or
+     * on each failed attempt when deliveries ride a transport. Without one, the
+     * failure is logged.
+     */
+    onWebhookError?: WebhookErrorHandler;
 }
 
 /**
@@ -321,6 +372,26 @@ export const warnUnsupportedJobOptions = (
 };
 
 /**
+ * Warn when an event's retry count would be ignored. Without a transport the
+ * in-process loop honours it, so only a non-retrying transport warns.
+ */
+export const warnUnsupportedWebhookOptions = (
+    webhooks: Webhooks | undefined,
+    transport: JobTransport | undefined,
+    logger: Pick<Console, 'warn'> = console
+): void => {
+    if (!webhooks || !transport || transport.supports.retry) return;
+    const retrying = flattenWebhooks(webhooks)
+        .filter(({ webhook }) => (webhook.definition.retry ?? 1) > 1)
+        .map(({ webhookKey }) => `"${webhookKey}"`);
+    if (retrying.length === 0) return;
+    logger.warn(
+        `[ts-kizuna] ${retrying.join(', ')} declare \`retry\`, but the "${transport.name}" transport does not retry, ` +
+            'so a failed delivery is attempted once.'
+    );
+};
+
+/**
  * What `JOBS_META` carries: the contract's jobs, the handler for each, and how
  * this deployment runs them.
  */
@@ -328,6 +399,18 @@ export interface JobsMeta extends JobRunnerOptions {
     jobs: Jobs;
     handlers: Record<string, unknown>;
     config?: JobsConfig;
+}
+
+/**
+ * What `WEBHOOKS_META` carries: the contract's events, who is subscribed to
+ * them, and how this deployment signs and carries a delivery.
+ */
+export interface WebhooksMeta {
+    webhooks: Webhooks;
+    subscribers?: WebhookSubscribers;
+    config?: WebhooksConfig;
+    transport?: JobTransport;
+    onError?: WebhookErrorHandler;
 }
 
 /**
@@ -418,10 +501,33 @@ export const runRoute = (meta: JobsMeta): RouteDefinition => {
  * Answers with whatever the job answered, so a queue reads its own retry
  * contract off the status.
  */
-export const runHandler = <HandlerContext>(meta: JobsMeta): RouteHandler<RouteDefinition, HandlerContext> => {
+export const runHandler = <HandlerContext>(meta: JobsMeta, webhooks?: WebhooksMeta): RouteHandler<RouteDefinition, HandlerContext> => {
     const runner = createJobRunner(meta.jobs, meta.handlers as never, meta);
     return (async (args: { body: { job: string; input?: unknown } }) => {
         const { job, input } = args.body;
+        if (job === WEBHOOK_DELIVERY_JOB_KEY && webhooks) {
+            try {
+                await runWebhookDelivery(webhooks, input);
+                return {
+                    status: 204,
+                };
+            } catch (error) {
+                if (error instanceof WebhookDeliveryMessageError) {
+                    return {
+                        status: 422,
+                        body: {
+                            detail: error.message,
+                        },
+                    };
+                }
+                return {
+                    status: 503,
+                    body: {
+                        detail: 'The webhook delivery failed; retry it.',
+                    },
+                };
+            }
+        }
         const jobFn = jobFnAt(runner, job);
         if (!jobFn) {
             return {
@@ -449,6 +555,20 @@ export const runHandler = <HandlerContext>(meta: JobsMeta): RouteHandler<RouteDe
 
 export const jobRunnerFrom = (meta: JobsMeta | undefined): JobRunner<Jobs> | undefined =>
     meta ? createJobRunner(meta.jobs, meta.handlers as never, meta) : undefined;
+
+/**
+ * The webhook sender an adapter hands to every handler, built from what
+ * `server.webhooks` stamped on the api.
+ */
+export const webhookSenderFrom = (meta: WebhooksMeta | undefined): WebhookSender<Webhooks> | undefined =>
+    meta
+        ? createWebhookSender(meta.webhooks, {
+              subscribers: meta.subscribers,
+              config: meta.config,
+              transport: meta.transport,
+              onError: meta.onError,
+          })
+        : undefined;
 
 /**
  * The dotted keys of the jobs a handler was actually bound to. A job without one
@@ -615,6 +735,11 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
      * `jobs`, so a route can run a job in process without an HTTP hop.
      */
     jobs?: JobRunner<Jobs>;
+    /**
+     * The contract's webhooks bound to their subscribers. Every handler receives
+     * it as `webhooks`, so a route can post an event out.
+     */
+    webhooks?: WebhookSender<Webhooks>;
     basePath?: string;
     responseValidation?: boolean;
 }
@@ -819,6 +944,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     contextResolvers: RequestContextMap<HandlerContext> | undefined,
     pluginExports: Record<string, unknown> | undefined,
     jobRunner: JobRunner<Jobs> | undefined,
+    webhookSender: WebhookSender<Webhooks> | undefined,
     basePath: string | undefined,
     responseValidation: boolean | undefined
 ): Promise<AdapterResult> => {
@@ -954,6 +1080,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             throwError,
             ...handlerContext,
             ...(jobRunner ? { jobs: jobRunner } : {}),
+            ...(webhookSender ? { webhooks: webhookSender } : {}),
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
             ...(pluginExports && Object.keys(pluginExports).length > 0 ? { plugins: pluginExports } : {}),
@@ -1043,6 +1170,7 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
         requestContext,
         pluginExports,
         jobs,
+        webhooks,
         basePath,
         responseValidation,
     }) => {
@@ -1057,6 +1185,7 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
             requestContext,
             pluginExports,
             jobs,
+            webhooks,
             basePath,
             responseValidation
         );

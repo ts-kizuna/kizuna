@@ -255,6 +255,31 @@ const pluginTypeK = new Kizuna({
     },
 });
 
+/**
+ * Declares webhooks and no plugins, the shape that catches an adapter gating
+ * the `webhooks` requirement of `server.api` behind installed plugins.
+ */
+export const webhookTypeContract = k.contract({
+    routes: k.routes('api', {
+        health: {
+            method: 'GET',
+            path: '/health',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+    }),
+    webhooks: k.webhooks({
+        userCreated: {
+            body: z.object({
+                id: z.string(),
+            }),
+        },
+    }),
+});
+
 export const pluginTypeContract = pluginTypeK.contract({
     routes: pluginTypeK.routes('api', {
         whichLabel: {

@@ -276,6 +276,8 @@ export const bullmq = (connection: ConnectionOptions, queueName = 'jobs') => {
 };
 ```
 
+The `jobs` list handed to `start` can include `kizuna:webhook-delivery`, kizuna's own delivery job for [webhooks](/docs/webhooks), which the worker runs like any other.
+
 `start` is called by `startJobWorker`, not on its own. `startJobWorker` does, wherever you want the work done, whether that is the same process as the API or its own:
 
 ```ts title="worker.ts"

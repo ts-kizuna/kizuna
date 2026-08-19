@@ -3,6 +3,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
+import { startWebhookReceiver } from '../../core/src/adapter-testing/webhooks.js';
 import { KizunaServer } from './server.js';
 
 const scheduler = Kizuna.identity.bearer({
@@ -389,5 +390,114 @@ describe('onJobError', () => {
         await vi.waitFor(() => expect(error).toHaveBeenCalled());
         expect(error.mock.calls[0]?.[0]).toContain('reconcile');
         error.mockRestore();
+    });
+});
+
+describe('the run endpoint delivering webhooks', () => {
+    const webhookK = new Kizuna({
+        identities: {
+            scheduler,
+        },
+    });
+
+    const webhookContract = webhookK.contract({
+        routes: webhookK.routes({
+            listUsers: {
+                method: 'GET',
+                path: '/users',
+                responses: {
+                    200: z.array(z.string()),
+                },
+            },
+        }),
+        jobs: webhookK.jobs('scheduler', {
+            cleanup: {},
+        }),
+        webhooks: webhookK.webhooks({
+            userCreated: {
+                body: z.object({
+                    id: z.string(),
+                }),
+            },
+        }),
+        auth: {
+            listUsers: false,
+        },
+    });
+
+    const appWith = (url: string) => {
+        const webhookServer = new KizunaServer(webhookContract, {
+            onWebhookError: () => {},
+        });
+        const api = webhookServer.api({
+            router: webhookServer.router({
+                listUsers: () => ({
+                    status: 200,
+                    body: [],
+                }),
+            }),
+            guards: {
+                scheduler: webhookServer.guard('scheduler', ({ bearer, deny }) =>
+                    bearer?.token === 'cron-secret' ? { invokedBy: 'platform' } : deny(401, 'Unauthorized')
+                ),
+            },
+            jobs: webhookServer.jobs({
+                cleanup: () => {},
+            }),
+            webhooks: webhookServer.webhooks({
+                subscribers: () => [
+                    {
+                        url,
+                        secret: 'whsec_test',
+                    },
+                ],
+            }),
+        });
+        const app = express();
+        app.use(express.json());
+        api.mount(app);
+        return app;
+    };
+
+    const deliver = (app: express.Express, input: unknown) =>
+        request(app).post('/jobs/run').set('authorization', 'Bearer cron-secret').send({
+            job: 'kizuna:webhook-delivery',
+            input,
+        });
+
+    it('answers 204 once the delivery lands', async () => {
+        const receiver = await startWebhookReceiver();
+        const response = await deliver(appWith(receiver.url), {
+            webhook: 'userCreated',
+            url: receiver.url,
+            body: JSON.stringify({
+                id: 'u1',
+            }),
+        });
+        expect(response.status).toBe(204);
+        const delivery = await receiver.delivered;
+        expect(JSON.parse(delivery.body)).toEqual({
+            id: 'u1',
+        });
+        await receiver.close();
+    });
+
+    it('answers 503 when the subscriber cannot be reached, so the queue retries', async () => {
+        const unreachable = 'http://127.0.0.1:9/hooks';
+        const response = await deliver(appWith(unreachable), {
+            webhook: 'userCreated',
+            url: unreachable,
+            body: JSON.stringify({
+                id: 'u1',
+            }),
+        });
+        expect(response.status).toBe(503);
+    });
+
+    it('answers 422 for a message it can never run', async () => {
+        const response = await deliver(appWith('http://127.0.0.1:9/hooks'), {
+            nonsense: true,
+        });
+        expect(response.status).toBe(422);
     });
 });

@@ -201,6 +201,34 @@ const FEATURES: Feature[] = [
 };`,
     },
     {
+        id: 'webhooks',
+        file: 'users.router.ts',
+        token: 'webhooks',
+        type: `webhooks: {
+    userCreated: {
+        send: (message: {
+            body: { id: string; email: string };
+            to?: { url: string; secret: string };
+        }) => Promise<void>;
+    };
+}`,
+        note: `Every event the contract declares, shaped like the declaration. send hands the delivery off, so the request never waits on a customer's server.`,
+        code: `export const users: Router<typeof contract.routes.users> = {
+    createUser: async ({ body, webhooks }) => {
+        const user = await db.user.create({
+            data: body,
+        });
+        await webhooks.userCreated.send({
+            body: user,
+        });
+        return {
+            status: 201,
+            body: user,
+        };
+    },
+};`,
+    },
+    {
         id: 'jobs',
         file: 'users.router.ts',
         token: 'jobs',

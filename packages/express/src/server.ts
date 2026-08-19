@@ -21,7 +21,9 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
+    WEBHOOKS_META,
     warnUnsupportedJobOptions,
+    warnUnsupportedWebhookOptions,
     type ServerOptions,
     type JobsMeta,
     pluginRoutesOf,
@@ -36,7 +38,12 @@ import {
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
+    webhookSenderFrom,
     type Jobs,
+    type Webhooks,
+    type WebhooksMeta,
+    type WebhookSubscribers,
+    type WebhookKeys,
 } from '@ts-kizuna/core/adapter';
 import type { z } from 'zod';
 import type {
@@ -47,6 +54,7 @@ import type {
     CredentialOf,
     JobHandlers,
     JobsArg,
+    WebhooksArg,
     RequestContextSchema,
     RequestContextHeaderValues,
 } from '@ts-kizuna/core';
@@ -57,6 +65,7 @@ export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
+    readonly [WEBHOOKS_META]?: unknown;
     /**
      * Register every contract route on an Express app or router.
      */
@@ -82,10 +91,10 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, Expres
  * identity's context in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C> =
-    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins, infer J>
+    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins, infer J, infer W>
         ? HandlersFromAuth<
               R,
-              ExpressHandlerContext & RequestContextValues<RequestContext> & PluginArgs<Plugins> & JobsArg<J>,
+              ExpressHandlerContext & RequestContextValues<RequestContext> & PluginArgs<Plugins> & JobsArg<J> & WebhooksArg<W>,
               Schemes,
               Auth
           >
@@ -98,8 +107,39 @@ export type Router<C> =
  * receives only the job's `input`, so the same handler can be run in process.
  */
 export type JobsRouter<C> =
-    C extends Contract<infer _R, infer _Tags, infer _Codes, infer _Schemes, infer _Auth, infer _RequestContext, infer _Plugins, infer J>
+    C extends Contract<
+        infer _R,
+        infer _Tags,
+        infer _Codes,
+        infer _Schemes,
+        infer _Auth,
+        infer _RequestContext,
+        infer _Plugins,
+        infer J,
+        infer _W
+    >
         ? JobHandlers<J>
+        : never;
+
+/**
+ * What `server.webhooks` takes: how to find the endpoints subscribed to each
+ * event. `webhook` is typed to the contract's own event keys.
+ */
+export type WebhooksConfigFor<C> =
+    C extends Contract<
+        infer _R,
+        infer _Tags,
+        infer _Codes,
+        infer _Schemes,
+        infer _Auth,
+        infer _RequestContext,
+        infer _Plugins,
+        infer _J,
+        infer W
+    >
+        ? {
+              subscribers: WebhookSubscribers<WebhookKeys<W>>;
+          }
         : never;
 
 /**
@@ -251,6 +291,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
     const pluginExports = pluginExportsOf(api);
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
     const jobRunner = jobRunnerFrom(jobsMeta);
+    const webhookSender = webhookSenderFrom(api[WEBHOOKS_META] as WebhooksMeta | undefined);
 
     const expressRouter = createExpressRouter();
 
@@ -295,6 +336,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                     requestContext,
                     pluginExports,
                     jobs: jobRunner,
+                    webhooks: webhookSender,
                     responseValidation: options?.responseValidation,
                 });
             }
@@ -312,7 +354,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
 
     if (jobsMeta) {
         const routes = jobRoutes(jobsMeta);
-        const router = jobRouter<ExpressHandlerContext>(jobsMeta);
+        const router = jobRouter<ExpressHandlerContext>(jobsMeta, api[WEBHOOKS_META] as WebhooksMeta | undefined);
         for (const [routeKey, route] of Object.entries(routes)) {
             mountRoute(routeKey, route as RouteDefinition, routes, router);
         }
@@ -330,7 +372,8 @@ type ServerContract<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J>;
+    W extends Webhooks = Webhooks,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J, W>;
 
 export interface Server<
     R extends Routes,
@@ -339,6 +382,7 @@ export interface Server<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
+    W extends Webhooks = Webhooks,
 > {
     /**
      * Define a guard for one of the contract's identities. It runs before the
@@ -363,13 +407,17 @@ export interface Server<
      * Write typed handlers for the contract or one of its route groups.
      */
     router: {
-        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>, string> | Routes>(
+        <
+            const GroupOrRoutes extends
+                | Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>>, string>
+                | Routes,
+        >(
             group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes>;
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>, GroupOrRoutes>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>, GroupOrRoutes>;
         (
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
-        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>>
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>>;
     };
     /**
      * Write a handler for each of the contract's jobs.
@@ -388,22 +436,39 @@ export interface Server<
      * });
      */
     jobs(
-        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
-    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>>
+    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>>;
     /**
-     * Assemble the router, guards, and job handlers into the api object.
+     * Say how to find the endpoints subscribed to each event.
+     *
+     * @example
+     * export const webhooks = server.webhooks({
+     *     subscribers: ({ webhook }) => db.subscriptions.findByEvent(webhook),
+     * });
+     */
+    webhooks(
+        config: WebhooksConfigFor<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>>
+    ): WebhooksConfigFor<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>>;
+    /**
+     * Assemble the router, guards, job handlers, and webhook config into the api
+     * object.
      */
     api(
         options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) &
             (string extends keyof J
                 ? { jobs?: undefined }
-                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>> }) &
+                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
                 : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<ExpressHandlerContext> }> }) &
-            (string extends keyof Plugins ? { plugins?: undefined } : { plugins: PluginImplementations<Plugins, ExpressHandlerContext> })
+            (string extends keyof Plugins ? { plugins?: undefined } : { plugins: PluginImplementations<Plugins, ExpressHandlerContext> }) &
+            (string extends keyof W
+                ? { webhooks?: undefined }
+                : {
+                      webhooks: NoInfer<WebhooksConfigFor<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>>>;
+                  })
     ): ExpressApi<R>;
 }
 
@@ -414,17 +479,24 @@ const createServerSurface = <
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
+    W extends Webhooks = Webhooks,
 >(
-    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>,
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>,
     options?: ServerOptions
-): Server<R, Schemes, Auth, RequestContext, Plugins, J> => {
+): Server<R, Schemes, Auth, RequestContext, Plugins, J, W> => {
     warnUnsupportedJobOptions(contract.jobs, options?.jobTransport);
+    warnUnsupportedWebhookOptions(contract.webhooks, options?.jobTransport);
     const server = {
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
         jobs: (handlers: unknown) => handlers,
-        api: ({ jobs, ...parts }: ApiParts & { jobs?: Record<string, unknown> }) => {
+        webhooks: (config: unknown) => config,
+        api: ({
+            jobs,
+            webhooks,
+            ...parts
+        }: ApiParts & { jobs?: Record<string, unknown>; webhooks?: { subscribers?: WebhookSubscribers } }) => {
             const api = Object.assign(assembleApi(contract, parts), {
                 [JOBS_META]: contract.jobs
                     ? {
@@ -435,13 +507,22 @@ const createServerSurface = <
                           onError: options?.onJobError,
                       }
                     : undefined,
+                [WEBHOOKS_META]: contract.webhooks
+                    ? {
+                          webhooks: contract.webhooks,
+                          subscribers: webhooks?.subscribers,
+                          config: contract.webhooksConfig,
+                          transport: options?.jobTransport,
+                          onError: options?.onWebhookError,
+                      }
+                    : undefined,
             }) as ExpressApi<R>;
             return Object.assign(api, {
                 mount: (app: AppLike, mountOptions?: ExpressOptions) => mountExpress(api, app, mountOptions),
             });
         },
     };
-    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, J>;
+    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, J, W>;
 };
 
 /**
@@ -471,14 +552,16 @@ export class KizunaServer<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
-> implements Server<R, Schemes, Auth, RequestContext, Plugins, J> {
-    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, J>['guard'];
-    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, J>['requestContext'];
-    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, J>['router'];
-    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, J>['jobs'];
-    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, J>['api'];
+    W extends Webhooks = Webhooks,
+> implements Server<R, Schemes, Auth, RequestContext, Plugins, J, W> {
+    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, J, W>['guard'];
+    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, J, W>['requestContext'];
+    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, J, W>['router'];
+    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, J, W>['jobs'];
+    declare readonly webhooks: Server<R, Schemes, Auth, RequestContext, Plugins, J, W>['webhooks'];
+    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, J, W>['api'];
 
-    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, options?: ServerOptions) {
+    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, W>, options?: ServerOptions) {
         Object.assign(this, createServerSurface(contract, options));
     }
 }

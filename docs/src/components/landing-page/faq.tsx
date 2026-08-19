@@ -78,7 +78,6 @@ export const questions: Question[] = [
                 <ul className={styles.bullets}>
                     <li>A stable v2 syntax, with the way you define and call your API locked in</li>
                     <li>SSE and streaming responses</li>
-                    <li>Webhooks, declared in the contract like routes</li>
                     <li>OpenAPI 3.2.0 output</li>
                     <li>A TanStack Start adapter</li>
                     <li>Whatever the future brings</li>

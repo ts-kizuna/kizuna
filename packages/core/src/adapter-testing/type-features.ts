@@ -85,6 +85,9 @@ export const ADAPTER_TYPE_FEATURES = {
     'plugins.absentWhenUninstalled': {
         summary: 'A contract with no plugins gives handlers no `plugins` key at all.',
     },
+    'webhooks.requiredOnApi': {
+        summary: '`server.api` requires `webhooks` when the contract declares events, plugins installed or not.',
+    },
 } as const satisfies Record<string, AdapterFeatureMeta>;
 
 export type AdapterTypeFeature = keyof typeof ADAPTER_TYPE_FEATURES;

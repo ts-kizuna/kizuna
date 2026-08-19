@@ -1,0 +1,337 @@
+---
+title: Webhooks
+description: Declare the events your API posts to your customers, sign them, and let them flow into the OpenAPI document's webhooks field.
+---
+
+<BetaNotice>
+
+Webhooks are new and still settling. The shape of `k.webhooks` and the delivery surface may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
+`k.webhooks` declares the events your API posts out, beside your routes: the payload is typed, deliveries are signed, and each event lands in your OpenAPI document.
+
+<Steps>
+
+<Step>
+
+## Declare the events
+
+```ts title="contract/webhooks.ts"
+import { z } from 'zod';
+import { k } from './k';
+import { InvoiceSchema } from './models';
+
+export const webhooks = k.webhooks({
+    invoicePaid: {
+        summary: 'Sent when an invoice is paid',
+        body: InvoiceSchema,
+    },
+    userDeleted: {
+        summary: 'Sent when a user deletes their account',
+        retry: 5,
+        body: z.object({
+            userId: z.string(),
+            deletedAt: z.iso.datetime(),
+        }),
+    },
+});
+```
+
+```ts title="contract/webhooks.ts"
+export const webhooks = k.webhooks({
+    billing: {
+        invoicePaid: {
+            body: InvoiceSchema,
+        },
+    },
+});
+```
+
+Pass them to `k.contract`:
+
+```ts title="contract/index.ts"
+export const contract = k.contract({
+    routes,
+    webhooks,
+    auth,
+});
+```
+
+</Step>
+
+<Step>
+
+## Say who receives them
+
+`subscribers` looks up who should get an event, returning one URL and signing secret per endpoint:
+
+```ts title="server/webhooks.ts"
+export const webhooks = server.webhooks({
+    subscribers: async ({ webhook }) => {
+        const rows = await db.subscriptions.findByEvent(webhook);
+        return rows.map((row) => ({
+            url: row.url,
+            secret: row.signingSecret,
+        }));
+    },
+});
+```
+
+</Step>
+
+<Step>
+
+## Register them on the api
+
+Pass the config to `server.api` next to the router:
+
+```ts title="api.ts"
+export const api = server.api({
+    router,
+    webhooks,
+});
+```
+
+</Step>
+
+<Step>
+
+## Send them
+
+Every handler receives a `webhooks` sender shaped like the declaration:
+
+```ts title="router/invoices.ts"
+export const invoices = server.router({
+    payInvoice: async ({ body, webhooks }) => {
+        const invoice = await db.invoices.pay(body.invoiceId);
+
+        await webhooks.invoicePaid.send({
+            body: invoice,
+        });
+
+        return {
+            status: 200,
+            body: invoice,
+        };
+    },
+});
+```
+
+`send` hands the delivery off and returns, so your request never waits on a customer's server. The body is validated against the event's schema first.
+
+</Step>
+
+<Step>
+
+## Set up delivery
+
+<Tabs groupId="jobs-setup" items={['In process (long running server)', 'Long running server and transport', 'Serverless and transport']}>
+
+<Tab value="In process (long running server)">
+
+Nothing to set up. `send` posts in the background of the request that sent it, honouring each event's `retry` with a doubling backoff. A restart part way through loses the deliveries in flight.
+
+A delivery that fails after the response has gone needs somewhere to report:
+
+```ts title="server.ts"
+export const server = new KizunaServer(contract, {
+    onWebhookError: (webhook, error) => Sentry.captureException(error, { tags: { webhook } }),
+});
+```
+
+</Tab>
+
+<Tab value="Long running server and transport">
+
+A delivery to be posted and retried is a job, so it rides the same transport, and a restart does not lose it:
+
+```ts title="server.ts"
+export const server = new KizunaServer(contract, {
+    jobTransport: bullmq(connection),
+});
+```
+
+Each subscriber becomes one queued message carrying the event, the URL, and the body. The signing secret stays out of the queue: it is looked back up from `subscribers` when the delivery runs. The transport honours each event's `retry`, and a failed attempt reports through `onWebhookError`.
+
+A transport that stores work is drained by the same worker that drains your jobs, and a contract that declares only webhooks drains the same way:
+
+```ts title="worker.ts"
+import { startJobWorker } from '@ts-kizuna/core/jobs';
+
+const worker = await startJobWorker(api);
+```
+
+</Tab>
+
+<Tab value="Serverless and transport">
+
+Vercel, Lambda, Cloudflare. The function is frozen the moment it answers, so a background delivery never finishes: a transport carries it out.
+
+Use a queue that delivers over HTTP, like QStash, Cloud Tasks, or SQS. It posts each delivery back to `POST /jobs/run` under kizuna's own job name, `kizuna:webhook-delivery`, which the run endpoint serves when the contract also declares jobs.
+
+```ts title="server.ts"
+export const server = new KizunaServer(contract, {
+    jobTransport: qstash({
+        token: process.env.QSTASH_TOKEN,
+        baseUrl: 'https://api.example.com',
+        schedulerSecret: process.env.CRON_SECRET,
+    }),
+});
+```
+
+</Tab>
+
+</Tabs>
+
+</Step>
+
+</Steps>
+
+## What the answer means
+
+A subscriber's status code decides what happens next:
+
+| Subscriber answers | Result         |
+| ------------------ | -------------- |
+| `2xx`              | delivered      |
+| `410 Gone`         | stops retrying |
+| anything else      | retried        |
+| nothing in time    | retried        |
+
+`retry: 5` on an event sets how many attempts a failed delivery gets.
+
+<Callout type="warn">
+    Subscribers see a delivery at least once. A retry posts the same event again, so put an id in the payload they can deduplicate on.
+</Callout>
+
+## Sending a test event
+
+Pass `to` and the delivery goes to that one URL, skipping `subscribers`. This is what a "send test event" button in your dashboard calls:
+
+```ts title="router/subscriptions.ts"
+await webhooks.invoicePaid.send({
+    body: sampleInvoice,
+    to: {
+        url: subscription.url,
+        secret: subscription.signingSecret,
+    },
+});
+```
+
+## Signing
+
+Every delivery is signed with [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html) HTTP Message Signatures, which a subscriber's library can verify without reading your docs. The signature covers the method, the URL, and a digest of the body.
+
+To sign with an HMAC over the timestamp and the body instead:
+
+```ts title="contract/k.ts"
+export const k = new Kizuna({
+    webhooks: {
+        signature: 'hmac-sha256',
+    },
+});
+```
+
+## Connecting a customer
+
+<Steps>
+
+<Step>
+
+### They give you a URL
+
+The endpoint is theirs, on their own domain. Take the URL however suits you, a settings form or a support ticket.
+
+</Step>
+
+<Step>
+
+### You store it with a secret
+
+One row per subscription: the URL, the events it wants, and a signing secret you generate. Show them the secret once.
+
+Validate the URL before you store it. Deliveries go to `http` and `https` URLs and never follow a redirect, and everything past that is yours to decide: a form taking URLs from your customers is the place to refuse private addresses your server should not post to.
+
+`subscribers` reads that row back when an event fires.
+
+</Step>
+
+<Step>
+
+### They answer `2xx` fast
+
+Their endpoint acknowledges within a few seconds and queues anything slower. A slow answer reads as a failure and gets retried.
+
+</Step>
+
+<Step>
+
+### They check the signature
+
+This is the part they cannot guess, so put it in your own docs. A TypeScript subscriber verifies with `verifyDelivery`:
+
+```ts title="their-app/hooks.ts"
+import { verifyDelivery } from '@ts-kizuna/core/webhooks';
+
+const trusted = await verifyDelivery({
+    scheme: 'rfc9421',
+    secret: process.env.WEBHOOK_SECRET,
+    body: rawBody,
+    url: 'https://their-app.example/hooks',
+    method: 'POST',
+    headers,
+});
+```
+
+Everyone else rebuilds the signed string. Every delivery carries `signature-input`, `signature`, and a `content-digest` of the body; they rebuild the string from what arrived, HMAC it with their secret, and compare against `signature`:
+
+```text
+"@method": POST
+"@target-uri": https://their-app.example/hooks
+"content-digest": sha-256=:iBYUuz6gs7vdQUBjyZN5ibfwRJYbpHL+gvwyCl+VGHs=:
+"@signature-params": ("@method" "@target-uri" "content-digest");created=1755600000;keyid="kizuna";alg="hmac-sha256"
+```
+
+That is [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html), so most languages already have a library for it.
+
+</Step>
+
+<Step>
+
+### They deduplicate
+
+A retry sends the same event again, so they key off an id in the payload.
+
+</Step>
+
+</Steps>
+
+## What lands in the document
+
+OpenAPI 3.1 has a top-level `webhooks` field, and each event becomes one entry under its dotted key:
+
+```yaml title="openapi.yaml"
+webhooks:
+    invoicePaid:
+        post:
+            summary: Sent when an invoice is paid
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/Invoice'
+            responses:
+                '200':
+                    description: OK
+```
+
+Your customers read one document for what you serve and what you will post them. Models are shared, so `Invoice` is a single schema under `components`.
+
+## Reference
+
+- [`k.webhooks`](/docs/reference/k-webhooks)
+- [`server.webhooks`](/docs/reference/server-webhooks)
+- [`server.api`](/docs/reference/server-api)
+- [`new KizunaServer()`](/docs/reference/kizuna-server)

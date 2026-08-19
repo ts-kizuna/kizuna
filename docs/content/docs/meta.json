@@ -8,6 +8,7 @@
         "clients",
         "authentication",
         "request-context",
+        "webhooks",
         "jobs",
         "---Plugins---",
         "[Overview](/docs/plugins)",

@@ -104,7 +104,7 @@ export const users: Router<typeof contract.routes.users> = {
             },
         };
     },
-    createUser: async ({ body, jobs }) => {
+    createUser: async ({ body, jobs, webhooks }) => {
         const user = await db.users.create({
             id: randomUUID(),
             name: body.name,
@@ -116,12 +116,15 @@ export const users: Router<typeof contract.routes.users> = {
                 userId: user.id,
             },
         });
+        await webhooks.users.userCreated.send({
+            body: user,
+        });
         return {
             status: 201,
             body: user,
         };
     },
-    deleteUser: async ({ params }) => {
+    deleteUser: async ({ params, webhooks }) => {
         const existed = await db.users.delete(params.id);
         if (!existed) {
             return {
@@ -131,6 +134,12 @@ export const users: Router<typeof contract.routes.users> = {
                 },
             };
         }
+        await webhooks.users.userDeleted.send({
+            body: {
+                userId: params.id,
+                deletedAt: new Date().toISOString(),
+            },
+        });
         return {
             status: 200,
             body: {

@@ -19,7 +19,7 @@ import {
     resolveResponseContentType,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
-import { getStatusText } from '@ts-kizuna/core';
+import { flattenWebhooks, getStatusText } from '@ts-kizuna/core';
 import type { Contract, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
 import { OPENAPI_PLUGIN_NAME } from './plugin.js';
 import type { GenerateOpenApiOptions, OpenApiDocument, OpenApiOperation, OpenApiParameter, OpenApiRenderer, OpenApiTag } from './types.js';
@@ -224,6 +224,41 @@ type GeneratorContext = GenerateOpenApiOptions & {
     tagLookup?: ReadonlyMap<string, TagOptions>;
 };
 
+/**
+ * The `webhooks` field of the document: one entry per declared event, under the
+ * dotted key that names it. Each is a Path Item holding the operation for the
+ * method the delivery is sent with.
+ */
+const buildWebhookItems = (contract: Contract): Record<string, Record<string, OpenApiOperation>> | undefined => {
+    if (!contract.webhooks) return undefined;
+    const items: Record<string, Record<string, OpenApiOperation>> = {};
+    for (const { webhookKey, webhook } of flattenWebhooks(contract.webhooks)) {
+        const operation: OpenApiOperation = {
+            summary: webhook.definition.summary,
+            description: webhook.definition.description,
+            responses: {
+                200: {
+                    description: getStatusText(200),
+                },
+            },
+        };
+        if (!isVoidSchema(webhook.body)) {
+            operation.requestBody = {
+                required: true,
+                content: {
+                    'application/json': {
+                        schema: toJsonSchema(webhook.body, 'output'),
+                    },
+                },
+            };
+        }
+        items[webhookKey] = {
+            [webhook.method.toLowerCase()]: operation,
+        };
+    }
+    return Object.keys(items).length > 0 ? items : undefined;
+};
+
 const openApiGenerator = createGenerator((options: GeneratorContext, contract: Contract, deprecations) => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
     const pendingFieldDeprecations: Array<{ operation: OpenApiOperation; fieldDeprecations: Map<string, string> }> = [];
@@ -420,6 +455,9 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                 info: options.info,
                 paths,
             };
+
+            const webhookItems = buildWebhookItems(contract);
+            if (webhookItems) document.webhooks = webhookItems;
 
             if (options.servers) document.servers = options.servers;
             if (options.externalDocs) document.externalDocs = options.externalDocs;

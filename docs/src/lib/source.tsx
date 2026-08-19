@@ -10,6 +10,7 @@ const badges: Record<string, string> = {
     '/docs/authentication': 'Beta',
     '/docs/jobs': 'Beta',
     '/docs/mcp': 'Beta',
+    '/docs/webhooks': 'Beta',
     '/docs/extend/create-plugin': 'Beta',
     '/docs/extend/create-job-transport': 'Beta',
     '/docs/clients/kotlin': 'Beta',

@@ -111,6 +111,16 @@
         "types": "./dist/jobs-entry.d.cts",
         "default": "./dist/jobs-entry.cjs"
       }
+    },
+    "./webhooks": {
+      "import": {
+        "types": "./dist/webhooks-entry.d.mts",
+        "default": "./dist/webhooks-entry.mjs"
+      },
+      "require": {
+        "types": "./dist/webhooks-entry.d.cts",
+        "default": "./dist/webhooks-entry.cjs"
+      }
     }
   },
   "kizuna": {
@@ -122,6 +132,7 @@
       "./generator": "client",
       "./adapter": "server",
       "./jobs": "server",
+      "./webhooks": "server",
       "./load-deprecations": "server"
     }
   },
@@ -137,7 +148,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/adapter.ts src/jobs-entry.ts src/plugin.ts src/generator.ts src/schemas.ts src/authoring-names.ts src/load-deprecations.ts --format esm,cjs --dts --clean",
+    "build": "tsdown src/index.ts src/adapter.ts src/jobs-entry.ts src/webhooks-entry.ts src/plugin.ts src/generator.ts src/schemas.ts src/authoring-names.ts src/load-deprecations.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

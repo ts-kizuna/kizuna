@@ -1,7 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { ProblemDetailsSchema } from './schemas.js';
-import { createAdapter, renderJsonResult, ResponseValidationError, type AdapterRequest, type AdapterResult } from './adapter.js';
+import {
+    createAdapter,
+    createJobTransport,
+    renderJsonResult,
+    ResponseValidationError,
+    warnUnsupportedWebhookOptions,
+    type AdapterRequest,
+    type AdapterResult,
+} from './adapter.js';
 import { Kizuna } from './kizuna.js';
 
 const k = new Kizuna({
@@ -385,5 +393,56 @@ describe('renderJsonResult: non-JSON and binary bodies', () => {
                 headers: {},
             })
         ).toThrow(/must be a string or Uint8Array/);
+    });
+});
+
+describe('warnUnsupportedWebhookOptions', () => {
+    const events = k.webhooks({
+        invoicePaid: {
+            retry: 3,
+            body: z.object({
+                id: z.string(),
+            }),
+        },
+    });
+
+    const transportWith = (retry: boolean) =>
+        createJobTransport({
+            name: 'queue',
+            supports: {
+                retry,
+            },
+            dispatch: () => {},
+        });
+
+    it('warns when the transport does not retry and an event declares retry', () => {
+        const warn = vi.fn();
+        warnUnsupportedWebhookOptions(events, transportWith(false), { warn });
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('"invoicePaid"'));
+    });
+
+    it('says nothing without a transport, because the in-process loop retries', () => {
+        const warn = vi.fn();
+        warnUnsupportedWebhookOptions(events, undefined, { warn });
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('says nothing when the transport retries', () => {
+        const warn = vi.fn();
+        warnUnsupportedWebhookOptions(events, transportWith(true), { warn });
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('says nothing when no event asks for more than one attempt', () => {
+        const singleAttempt = k.webhooks({
+            invoicePaid: {
+                body: z.object({
+                    id: z.string(),
+                }),
+            },
+        });
+        const warn = vi.fn();
+        warnUnsupportedWebhookOptions(singleAttempt, transportWith(false), { warn });
+        expect(warn).not.toHaveBeenCalled();
     });
 });

@@ -11,6 +11,7 @@ import {
     pluginTypeContract,
     requestContextContract,
     securedContract,
+    webhookTypeContract,
     type ExpectedRouteHandler,
     type ExpectedRouter,
 } from '../../core/src/adapter-testing/type-testing.js';
@@ -348,6 +349,33 @@ test('conforms to the shared adapter type catalogue', () => {
         },
         'plugins.absentWhenUninstalled': () => {
             expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).not.toHaveProperty('plugins');
+        },
+        'webhooks.requiredOnApi': () => {
+            const webhookServer = new KizunaServer(webhookTypeContract);
+            webhookServer.api({
+                router: {
+                    health: () => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    }),
+                },
+                webhooks: webhookServer.webhooks({
+                    subscribers: () => [],
+                }),
+            });
+            // @ts-expect-error webhooks is required when the contract declares events
+            webhookServer.api({
+                router: {
+                    health: () => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    }),
+                },
+            });
         },
         'standalone.routeHandlerContext': () => {
             const publicRoute: RouteHandler<typeof requestContextContract.routes.api.publicRoute> = ({ requestContext }) => {

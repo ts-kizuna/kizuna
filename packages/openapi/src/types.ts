@@ -66,6 +66,7 @@ export interface OpenApiDocument {
     info: OpenApiInfo;
     servers?: OpenApiServer[];
     paths: Record<string, Record<string, OpenApiOperation>>;
+    webhooks?: Record<string, Record<string, OpenApiOperation>>;
     tags?: OpenApiTag[];
     externalDocs?: OpenApiExternalDocs;
     components?: {

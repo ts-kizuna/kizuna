@@ -1,0 +1,47 @@
+---
+title: k.webhooks
+description: Declare the events your API posts out, with their payloads and retry counts.
+---
+
+Declares the contract's webhooks, the events your API posts to subscribers. Pass the result to `k.contract` under `webhooks`, alongside `routes`.
+
+```ts title="webhooks.ts"
+import { z } from 'zod';
+import { k } from './k';
+import { InvoiceSchema } from './models';
+
+export const webhooks = k.webhooks({
+    invoicePaid: {
+        summary: 'Sent when an invoice is paid',
+        body: InvoiceSchema,
+    },
+    billing: {
+        subscriptionCancelled: {
+            retry: 5,
+            body: InvoiceSchema,
+        },
+    },
+});
+```
+
+Webhooks nest to any depth, and a nested event is addressed by its dotted key: `billing.subscriptionCancelled`. Each event lands in the OpenAPI document's top-level `webhooks` field.
+
+See the [Webhooks guide](/docs/webhooks) for subscribers, delivery, and signing.
+
+## Event fields
+
+| Field         | Type              | Notes                                                                                                        |
+| ------------- | ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| `body`        | `z.ZodType`       | Schema for the payload. Validated on every `send`. The field that makes a node an event rather than a group. |
+| `method`      | `'POST' \| 'PUT'` | Defaults to `POST`.                                                                                          |
+| `retry`       | `number`          | How many attempts a failed delivery gets, at least `1`. Defaults to `1`.                                     |
+| `summary`     | `string`          |                                                                                                              |
+| `description` | `string`          |                                                                                                              |
+
+## Validation
+
+`k.webhooks` throws on:
+
+- a `retry` that is not a whole number, or is below `1`
+- a name containing a dot, which is how nested events are addressed
+- a node that is neither an event nor a group
