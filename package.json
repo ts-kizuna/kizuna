@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm build && concurrently -n express,hono,next -c cyan,yellow,magenta \"pnpm --filter @ts-kizuna-demo/express dev\" \"pnpm --filter @ts-kizuna-demo/hono dev\" \"pnpm --filter @ts-kizuna-demo/next dev\"",
     "build": "pnpm -r --filter \"./packages/*\" build && pnpm typecheck && pnpm generate:swift",
+    "build:demos": "pnpm -r --filter \"./apps/*\" --filter \"!@ts-kizuna-demo/swift\" --filter \"!@ts-kizuna-demo/kotlin\" build",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run && pnpm test:swift",
     "test:ts": "vitest run",
