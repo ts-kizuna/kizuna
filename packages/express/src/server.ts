@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction, Router as ExpressRouter } from 'express';
-import { Router as createExpressRouter } from 'express';
+import { Router as createExpressRouter, raw as expressRaw } from 'express';
 import { Readable } from 'node:stream';
 import {
     type AdapterRequest,
@@ -37,6 +37,15 @@ import {
     jobRouter,
     jobRunnerFrom,
     type Jobs,
+    RECEIVERS_META,
+    flattenReceivers,
+    handleReceiverDelivery,
+    warnUnimplementedReceivers,
+    type Receivers,
+    type ReceiversMeta,
+    type ReceiverImplementation,
+    type ReceiverImplementations,
+    type ReceiverVerify,
 } from '@ts-kizuna/core/adapter';
 import type { z } from 'zod';
 import type {
@@ -57,6 +66,7 @@ export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
+    readonly [RECEIVERS_META]?: unknown;
     /**
      * Register every contract route on an Express app or router.
      */
@@ -238,6 +248,87 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
 });
 
 /**
+ * A verifier checks one string, so a header Express kept as an array is joined
+ * the way it arrived.
+ */
+const flattenHeaders = (headers: Request['headers']): Record<string, string> => {
+    const flattened: Record<string, string> = {};
+    for (const [name, value] of Object.entries(headers)) {
+        if (value === undefined) continue;
+        flattened[name] = Array.isArray(value) ? value.join(', ') : value;
+    }
+    return flattened;
+};
+
+/**
+ * Move the layer just added to the front of the app's middleware stack.
+ *
+ * Most apps install a body parser before calling `api.mount`, and `app.use` only
+ * appends, so the receiver routes have to be hoisted past it or a verifier never
+ * sees the bytes the vendor signed.
+ */
+const hoistToFrontOfStack = (app: AppLike): boolean => {
+    const stack = (app as { router?: { stack?: unknown[] } }).router?.stack;
+    if (!Array.isArray(stack) || stack.length === 0) return false;
+    stack.unshift(stack.pop());
+    return true;
+};
+
+/**
+ * Register one POST route per receiver, reading the body as bytes.
+ */
+const mountReceivers = (app: AppLike, meta: ReceiversMeta, jobs: unknown, logger: Pick<Console, 'warn' | 'error'> = console): void => {
+    const receiverRouter = createExpressRouter();
+    for (const { receiverKey, receiver } of flattenReceivers(meta.receivers)) {
+        receiverRouter.post(
+            receiver.path,
+            expressRaw({
+                type: () => true,
+            }),
+            async (req: Request, res: Response) => {
+                if (!Buffer.isBuffer(req.body)) {
+                    logger.error(
+                        `[ts-kizuna] ${receiver.path} was read by another body parser before the receiver saw it, ` +
+                            'so its delivery cannot be verified. Call `api.mount(app)` before installing your body parser.'
+                    );
+                    res.status(500).json({
+                        type: 'about:blank',
+                        title: 'Internal Server Error',
+                        status: 500,
+                        detail: 'Raw body unavailable',
+                    });
+                    return;
+                }
+                const result = await handleReceiverDelivery(
+                    receiverKey,
+                    receiver,
+                    meta,
+                    {
+                        method: req.method,
+                        path: req.originalUrl.split('?')[0] ?? receiver.path,
+                        headers: flattenHeaders(req.headers),
+                        body: new Uint8Array(req.body),
+                    },
+                    jobs
+                );
+                if (result.body === undefined) {
+                    res.status(result.status).end();
+                } else {
+                    res.status(result.status).json(result.body);
+                }
+            }
+        );
+    }
+    app.use(receiverRouter);
+    if (!hoistToFrontOfStack(app)) {
+        logger.warn(
+            '[ts-kizuna] Could not place the receiver routes ahead of the app middleware. ' +
+                'Install your body parser after `api.mount(app)` so a verifier still sees the bytes that arrived.'
+        );
+    }
+};
+
+/**
  * Mount a ts-kizuna API onto an Express app.
  *
  * @example
@@ -251,6 +342,11 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
     const pluginExports = pluginExportsOf(api);
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
     const jobRunner = jobRunnerFrom(jobsMeta);
+    const receiversMeta = api[RECEIVERS_META] as ReceiversMeta | undefined;
+
+    if (receiversMeta) {
+        mountReceivers(app, receiversMeta, jobRunner);
+    }
 
     const expressRouter = createExpressRouter();
 
@@ -330,7 +426,8 @@ type ServerContract<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J>;
+    Rec extends Receivers = Receivers,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J, Rec>;
 
 export interface Server<
     R extends Routes,
@@ -339,6 +436,7 @@ export interface Server<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
+    Rec extends Receivers = Receivers,
 > {
     /**
      * Define a guard for one of the contract's identities. It runs before the
@@ -363,13 +461,17 @@ export interface Server<
      * Write typed handlers for the contract or one of its route groups.
      */
     router: {
-        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>, string> | Routes>(
+        <
+            const GroupOrRoutes extends
+                | Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>, string>
+                | Routes,
+        >(
             group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes>;
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>, GroupOrRoutes>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>, GroupOrRoutes>;
         (
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
-        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>;
     };
     /**
      * Write a handler for each of the contract's jobs.
@@ -388,21 +490,52 @@ export interface Server<
      * });
      */
     jobs(
-        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
-    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>
+    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>;
     /**
-     * Assemble the router, guards, and job handlers into the api object.
+     * Implement one of the contract's receivers. The first argument names the
+     * contract entry, which is what types `body`.
+     *
+     * @example
+     * export const payments = server.receiver('payments', {
+     *     verify: verifyPayments,
+     *     handler: async ({ body }) => {
+     *         await recordPayment(body.id);
+     *     },
+     * });
+     */
+    receiver: {
+        <const Name extends Extract<keyof Rec, string>>(
+            name: Name,
+            implementation: ReceiverImplementation<Rec[Name], J>
+        ): ReceiverImplementation<Rec[Name], J>;
+        /**
+         * Type a verifier written in its own file.
+         *
+         * @example
+         * export const verifyPayments = server.receiver.verify('payments', ({ raw, headers, deny }) => {
+         *     if (!isDigestValid(raw, headers['x-signature'])) {
+         *         deny();
+         *     }
+         * });
+         */
+        verify<const Name extends Extract<keyof Rec, string>>(name: Name, run: ReceiverVerify): ReceiverVerify;
+    };
+    /**
+     * Assemble the router, guards, job handlers, and receivers into the api
+     * object.
      */
     api(
         options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) &
             (string extends keyof J
                 ? { jobs?: undefined }
-                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>> }) &
+                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
                 : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<ExpressHandlerContext> }> }) &
+            (string extends keyof Rec ? { receivers?: undefined } : { receivers: NoInfer<ReceiverImplementations<Rec, J>> }) &
             (string extends keyof Plugins ? { plugins?: undefined } : { plugins: PluginImplementations<Plugins, ExpressHandlerContext> })
     ): ExpressApi<R>;
 }
@@ -414,17 +547,28 @@ const createServerSurface = <
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
+    Rec extends Receivers = Receivers,
 >(
-    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>,
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>,
     options?: ServerOptions
-): Server<R, Schemes, Auth, RequestContext, Plugins, J> => {
+): Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec> => {
     warnUnsupportedJobOptions(contract.jobs, options?.jobTransport);
     const server = {
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
         jobs: (handlers: unknown) => handlers,
-        api: ({ jobs, ...parts }: ApiParts & { jobs?: Record<string, unknown> }) => {
+        receiver: Object.assign((_name: string, implementation: unknown) => implementation, {
+            verify: (_name: string, run: unknown) => run,
+        }),
+        api: ({
+            jobs,
+            receivers,
+            ...parts
+        }: ApiParts & { jobs?: Record<string, unknown>; receivers?: ReceiversMeta['implementations'] }) => {
+            if (contract.receivers) {
+                warnUnimplementedReceivers(contract.receivers, receivers ?? {});
+            }
             const api = Object.assign(assembleApi(contract, parts), {
                 [JOBS_META]: contract.jobs
                     ? {
@@ -435,13 +579,20 @@ const createServerSurface = <
                           onError: options?.onJobError,
                       }
                     : undefined,
+                [RECEIVERS_META]: contract.receivers
+                    ? {
+                          receivers: contract.receivers,
+                          implementations: receivers ?? {},
+                          onError: options?.onReceiverError,
+                      }
+                    : undefined,
             }) as ExpressApi<R>;
             return Object.assign(api, {
                 mount: (app: AppLike, mountOptions?: ExpressOptions) => mountExpress(api, app, mountOptions),
             });
         },
     };
-    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, J>;
+    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>;
 };
 
 /**
@@ -471,14 +622,16 @@ export class KizunaServer<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
-> implements Server<R, Schemes, Auth, RequestContext, Plugins, J> {
-    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, J>['guard'];
-    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, J>['requestContext'];
-    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, J>['router'];
-    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, J>['jobs'];
-    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, J>['api'];
+    Rec extends Receivers = Receivers,
+> implements Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec> {
+    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['guard'];
+    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['requestContext'];
+    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['router'];
+    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['jobs'];
+    declare readonly receiver: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['receiver'];
+    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['api'];
 
-    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, options?: ServerOptions) {
+    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>, options?: ServerOptions) {
         Object.assign(this, createServerSurface(contract, options));
     }
 }

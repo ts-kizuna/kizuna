@@ -9,6 +9,7 @@
         "authentication",
         "request-context",
         "jobs",
+        "receivers",
         "---Plugins---",
         "[Overview](/docs/plugins)",
         "openapi",

@@ -82,6 +82,18 @@ export const ADAPTER_TYPE_FEATURES = {
     'plugins.exportsTyped': {
         summary: 'A handler’s `plugins` carries each installed plugin’s exports, typed and keyed by install name.',
     },
+    'receivers.bodyTyped': {
+        summary: '`server.receiver` types the handler’s `body` from the schema the named receiver declares.',
+    },
+    'receivers.verifyArgs': {
+        summary: 'A verifier receives the bytes, the text, the headers and `deny`, and `deny` never returns.',
+    },
+    'receivers.unknownName': {
+        summary: 'A receiver name the contract does not declare is refused.',
+    },
+    'receivers.requiredOnApi': {
+        summary: '`server.api` requires `receivers`, with an entry per declared receiver, when the contract declares any.',
+    },
     'plugins.absentWhenUninstalled': {
         summary: 'A contract with no plugins gives handlers no `plugins` key at all.',
     },

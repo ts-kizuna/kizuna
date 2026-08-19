@@ -61,7 +61,13 @@ const getCompiled = (routes: Routes): CompiledRoute[] => {
     return fresh;
 };
 
-const stripBasePath = (pathname: string, basePath: string | undefined): string => {
+/**
+ * Drop a mount prefix before matching. A path that does not carry the prefix is
+ * returned unchanged, which is what lets an app mounted at a `basePath` still
+ * answer on the bare path. Receivers resolve through this too, so they always
+ * agree with routes on what a path means.
+ */
+export const stripBasePath = (pathname: string, basePath: string | undefined): string => {
     if (!basePath) return pathname;
     const trimmed = basePath.replace(/\/+$/, '');
     if (pathname === trimmed) return '/';

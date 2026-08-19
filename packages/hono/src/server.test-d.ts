@@ -8,6 +8,7 @@ import {
     inferenceGroupContract,
     inferenceRoutes,
     pluginTypeContract,
+    receiverTypeContract,
     requestContextContract,
     securedContract,
     type ExpectedRouteHandler,
@@ -350,6 +351,37 @@ test('conforms to the shared adapter type catalogue', () => {
             expectTypeOf<Router<typeof pluginTypeContract>['whichLabel']>().parameter(0).toMatchTypeOf<{
                 plugins: { probe: { label: () => string } };
             }>();
+        },
+        'receivers.bodyTyped': () => {
+            new KizunaServer(receiverTypeContract).receiver('stripe', {
+                verify: () => undefined,
+                handler: ({ body }) => {
+                    expectTypeOf(body).toEqualTypeOf<{ id: string; type: string }>();
+                },
+            });
+        },
+        'receivers.verifyArgs': () => {
+            new KizunaServer(receiverTypeContract).receiver.verify('stripe', ({ raw, text, headers, method, path, deny }) => {
+                expectTypeOf(raw).toEqualTypeOf<Uint8Array>();
+                expectTypeOf(text).toEqualTypeOf<string>();
+                expectTypeOf(headers).toEqualTypeOf<Record<string, string>>();
+                expectTypeOf(method).toEqualTypeOf<string>();
+                expectTypeOf(path).toEqualTypeOf<string>();
+                expectTypeOf(deny).returns.toBeNever();
+            });
+        },
+        'receivers.unknownName': () => {
+            // @ts-expect-error 'paypal' is not a receiver on the contract.
+            new KizunaServer(receiverTypeContract).receiver('paypal', {
+                verify: () => undefined,
+                handler: () => undefined,
+            });
+        },
+        'receivers.requiredOnApi': () => {
+            // @ts-expect-error the contract declares a receiver, so `receivers` is required.
+            new KizunaServer(receiverTypeContract).api({
+                router: {},
+            });
         },
         'plugins.absentWhenUninstalled': () => {
             expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).not.toHaveProperty('plugins');

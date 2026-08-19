@@ -1,0 +1,233 @@
+---
+title: Receivers
+description: Declare an incoming webhook next to your routes, verify it against the exact bytes that arrived, and handle the event with its body typed.
+---
+
+<BetaNotice>
+
+Receivers are new and still settling. The shape of `k.receiver` and `server.receiver` may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
+`k.receiver` connects an incoming webhook: Stripe, GitHub, Svix, or anything else that posts signed events to a URL you gave it.
+
+<Steps>
+
+<Step>
+
+## Declare the receiver
+
+```ts title="contract/receivers/stripe.ts"
+import { z } from 'zod';
+import { k } from '../k';
+
+export const stripe = k.receiver({
+    path: '/webhooks/stripe',
+    body: z.object({
+        id: z.string(),
+        type: z.string(),
+        data: z.object({
+            object: z.looseObject({
+                id: z.string(),
+            }),
+        }),
+    }),
+});
+```
+
+Then add them to the contract:
+
+```ts title="contract/index.ts"
+export const contract = k.contract({
+    routes,
+    receivers: {
+        stripe,
+        github,
+    },
+    auth,
+});
+```
+
+<ContractNotice />
+
+</Step>
+
+<Step>
+
+## Verify the delivery
+
+Return nothing to accept it. Throw to turn it away, which every vendor library already does on a bad signature, so calling one is the whole of a verifier:
+
+```ts title="server/verifiers/stripe.ts"
+import Stripe from 'stripe';
+import { server } from '../server';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+export const verifyStripe = server.receiver.verify('stripe', ({ text, headers }) => {
+    stripe.webhooks.constructEvent(text, headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+});
+```
+
+</Step>
+
+<Step>
+
+## Handle the event
+
+```ts title="server/receivers/stripe.ts"
+import { db } from '../db';
+import { server } from '../server';
+import { verifyStripe } from '../verifiers/stripe';
+
+export const stripe = server.receiver('stripe', {
+    verify: verifyStripe,
+    handler: async ({ body, jobs }) => {
+        switch (body.type) {
+            case 'invoice.paid':
+                await jobs.reconcileInvoice.queue({
+                    input: {
+                        eventId: body.id,
+                    },
+                    dedupeKey: body.id,
+                });
+                break;
+            case 'customer.subscription.deleted':
+                await db.subscriptions.cancel(body.data.object.id);
+                break;
+        }
+    },
+});
+```
+
+The first argument names the contract entry, which is what types `body`.
+
+</Step>
+
+<Step>
+
+## Register them on the api
+
+```ts title="api.ts"
+export const api = server.api({
+    router,
+    receivers: {
+        stripe,
+        github,
+    },
+});
+```
+
+</Step>
+
+<Step>
+
+## Point the vendor at it
+
+`api.mount` serves each receiver at its `path`, so this one is `POST /webhooks/stripe`. Paste that into Stripe's dashboard, then put the signing secret it shows you in `STRIPE_WEBHOOK_SECRET`.
+
+</Step>
+
+</Steps>
+
+## What happens on a delivery
+
+| Step     | What happens                                                           |
+| -------- | ---------------------------------------------------------------------- |
+| Read     | keeps the body as bytes, because the signature covers those exact ones |
+| Verify   | calls your `verify` with those bytes, before anything parses them      |
+| Parse    | validates the body against `body`                                      |
+| Dispatch | calls the handler                                                      |
+
+## Verifying a delivery
+
+A verifier receives:
+
+| Argument  | Is                                                       |
+| --------- | -------------------------------------------------------- |
+| `raw`     | the exact bytes that arrived                             |
+| `text`    | those bytes as a string, which is what libraries want    |
+| `headers` | every request header, lowercased                         |
+| `method`  | the request method                                       |
+| `path`    | the path as the vendor requested it, `basePath` included |
+| `deny`    | refuses the delivery, and never returns                  |
+
+Without a library, `deny` turns away a comparison that returned `false`. Like `throwError`, it never returns, so nothing after it runs:
+
+```ts title="server/verifiers/github.ts"
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { server } from '../server';
+
+export const verifyGithub = server.receiver.verify('github', ({ raw, headers, deny }) => {
+    const expected = `sha256=${createHmac('sha256', process.env.GITHUB_WEBHOOK_SECRET).update(raw).digest('hex')}`;
+    const sent = headers['x-hub-signature-256'] ?? '';
+    if (sent.length !== expected.length || !timingSafeEqual(Buffer.from(sent), Buffer.from(expected))) {
+        deny();
+    }
+});
+```
+
+<Callout type="warn">
+    Compare with `timingSafeEqual`, not `===`. How long `===` takes depends on how many characters matched, which is enough to recover a
+    secret one character at a time.
+</Callout>
+
+`deny()` answers `401`. Pass a status for a vendor that disables an endpoint returning one:
+
+```ts title="server/verifiers/acme.ts"
+export const verifyAcme = server.receiver.verify('acme', ({ headers, deny }) => {
+    if (!isValid(headers)) deny(200, 'Ignored');
+});
+```
+
+A verifier that throws for any other reason denies the delivery too, and the error goes to `onReceiverError`.
+
+## Answering the vendor
+
+Two answers are sent before a handler runs:
+
+| Answer | Sent when                       |
+| ------ | ------------------------------- |
+| `401`  | `verify` denied, or threw       |
+| `422`  | the body did not fit its schema |
+
+Your handler decides the rest:
+
+| The handler          | Answer | The vendor then      |
+| -------------------- | ------ | -------------------- |
+| returns              | `200`  | considers it done    |
+| throws `503`         | `503`  | retries, backing off |
+| throws `422`         | `422`  | gives up on it       |
+| throws anything else | `500`  | retries, backing off |
+
+A webhook that arrives before your own write has landed is a retry, not a rejection. `throwError` never returns, so nothing after it runs:
+
+```ts title="server/receivers/stripe.ts"
+handler: async ({ body, throwError }) => {
+    const customer = await db.customers.findByStripeId(body.data.object.id);
+    if (!customer) {
+        throwError({
+            status: 503,
+            body: {
+                detail: `No customer for ${body.data.object.id} yet`,
+            },
+        });
+    }
+
+    await db.invoices.markPaid(customer.customerId);
+},
+```
+
+`422` stops the retries, so save it for a delivery that will never succeed.
+
+<Callout type="warn">
+    Answer fast. Most providers retry anything slower than a few seconds, so hand the real work to [a job](/docs/jobs#running-and-queueing)
+    and return.
+</Callout>
+
+## Reference
+
+- [`k.receiver`](/docs/reference/k-receiver)
+- [`server.receiver`](/docs/reference/server-receiver)
+- [`k.contract`](/docs/reference/k-contract#receivers)
+- [`server.api`](/docs/reference/server-api#receivers)

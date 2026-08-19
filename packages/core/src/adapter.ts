@@ -54,6 +54,25 @@ export {
 } from './plugin.js';
 export type { CompiledJob, Jobs, JobHandler, JobHandlers, FlattenedJob } from './jobs.js';
 export { flattenJobs, isCompiledJob, jobAt } from './jobs.js';
+export type {
+    CompiledReceiver,
+    Receivers,
+    ReceiverHandler,
+    ReceiverImplementation,
+    ReceiverImplementations,
+    ReceiverVerify,
+    ReceiverVerifyArgs,
+} from './receivers.js';
+export { flattenReceivers, isCompiledReceiver, receiverDeny, ReceiverDenied } from './receivers.js';
+export {
+    deliveryFromRequest,
+    handleReceiverDelivery,
+    receiverAt,
+    warnUnimplementedReceivers,
+    type Delivery,
+    type DeliveryResult,
+    type ReceiversMeta,
+} from './receiver-dispatch.js';
 export {
     createJobRunner,
     jobFnAt,
@@ -106,6 +125,7 @@ export const SCHEMES_META: unique symbol = Symbol('ts-kizuna.schemes');
 export const REQUEST_CONTEXT_META: unique symbol = Symbol('ts-kizuna.request-context');
 const CONTRACT_META: unique symbol = Symbol.for('ts-kizuna.contract');
 export const JOBS_META: unique symbol = Symbol('ts-kizuna.jobs');
+export const RECEIVERS_META: unique symbol = Symbol('ts-kizuna.receivers');
 
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
@@ -290,6 +310,11 @@ export interface ServerOptions {
      */
     jobTransport?: JobTransport;
     onJobError?: JobErrorHandler;
+    /**
+     * Called when a verifier or handler throws something that is not `deny` or
+     * `throwError`.
+     */
+    onReceiverError?: (error: unknown, receiverKey: string) => void;
 }
 
 /**
@@ -469,6 +494,7 @@ export const boundJobKeys = (meta: JobsMeta | undefined): Set<string> => {
 };
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
 export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
+export { stripBasePath } from './route-matcher.js';
 export type {
     HandlersFromAuth,
     GuardParams,

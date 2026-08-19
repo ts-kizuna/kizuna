@@ -276,3 +276,18 @@ export const pluginTypeContract = pluginTypeK.contract({
         },
     }),
 });
+
+const receiverK = new Kizuna();
+
+export const receiverTypeContract = receiverK.contract({
+    routes: {},
+    receivers: {
+        stripe: receiverK.receiver({
+            path: '/webhooks/stripe',
+            body: z.object({
+                id: z.string(),
+                type: z.string(),
+            }),
+        }),
+    },
+});

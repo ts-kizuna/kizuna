@@ -1,0 +1,54 @@
+---
+title: k.receiver
+description: Declare one incoming webhook, with the path the vendor posts to and the schema its body is validated against.
+---
+
+Declares one incoming webhook. Collect them on `k.contract` under `receivers`, keyed by vendor.
+
+```ts title="contract/receivers/stripe.ts"
+import { z } from 'zod';
+import { k } from '../k';
+
+export const stripe = k.receiver({
+    path: '/webhooks/stripe',
+    body: z.object({
+        id: z.string(),
+        type: z.string(),
+    }),
+});
+```
+
+```ts title="contract/index.ts"
+export const contract = k.contract({
+    routes,
+    receivers: {
+        stripe,
+    },
+    auth,
+});
+```
+
+A receiver carries no auth, so it never appears in the contract's `auth` map. Its verifier is what proves the delivery came from the vendor.
+
+See the [Receivers guide](/docs/receivers) for verifiers, handlers, and the statuses a vendor reads.
+
+## Fields
+
+| Field         | Type                                       | Notes                                                                                          |
+| ------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `path`        | `` `/${string}` ``                         | The URL you give the vendor. Takes no path parameters, because a vendor posts to one fixed URL |
+| `body`        | `z.ZodType`                                | Validated after the verifier accepts the delivery                                              |
+| `summary`     | `string`                                   | Optional                                                                                       |
+| `description` | `string`                                   | Optional                                                                                       |
+| `responses`   | `{ [status: number]: ResponseDefinition }` | Extra responses beyond the synthesized `200`, `401`, `422`, `500`, `503`                       |
+
+## Where a receiver is served
+
+`api.mount` serves each receiver at its `path`, resolved under `basePath` the same way a route's is. Receivers and routes share one path space, so two receivers on one path, or a receiver on a path a route already serves, throw when the contract is built.
+
+Receivers never appear in `contract.routes`, the OpenAPI document, or the generated Swift, Kotlin, and MCP surfaces.
+
+## Related
+
+- [`server.receiver`](/docs/reference/server-receiver)
+- [`k.contract`](/docs/reference/k-contract)

@@ -33,20 +33,29 @@ my-repo/
 │           │   └── index.ts    # re-exports the groups
 │           ├── auth.ts         # k.auth, who may call what
 │           ├── jobs.ts         # k.jobs
+│           ├── receivers/
+│           │   ├── stripe.ts   # k.receiver
+│           │   └── github.ts
 │           └── contract.ts     # k.contract, the object everything reads
 ├── apps/
 │   ├── api/
 │   │   └── src/
 │   │       ├── server/
-│   │       │   ├── server.ts   # new KizunaServer(contract)
-│   │       │   ├── guards.ts   # server.guard per identity
+│   │       │   ├── server.ts    # new KizunaServer(contract)
+│   │       │   ├── guards.ts    # server.guard per identity
 │   │       │   ├── router/
 │   │       │   │   ├── users.ts    # Router<typeof contract.routes.users>
 │   │       │   │   ├── events.ts
 │   │       │   │   ├── health.ts
 │   │       │   │   └── index.ts    # server.router, composes the groups
-│   │       │   ├── jobs.ts     # server.jobs
-│   │       │   └── api.ts      # server.api, what you mount
+│   │       │   ├── jobs.ts      # server.jobs
+│   │       │   ├── receivers/
+│   │       │   │   ├── stripe.ts   # server.receiver
+│   │       │   │   └── github.ts
+│   │       │   ├── verifiers/
+│   │       │   │   ├── stripe.ts   # server.receiver.verify
+│   │       │   │   └── github.ts
+│   │       │   └── api.ts       # server.api, what you mount
 │   │       └── index.ts        # api.mount(app)
 │   └── website/
 │       └── src/lib/api-client.ts   # new KizunaClient(contract)
@@ -91,17 +100,26 @@ my-repo/
     │   │   └── index.ts    # re-exports the groups
     │   ├── auth.ts         # k.auth, who may call what
     │   ├── jobs.ts         # k.jobs
+    │   ├── receivers/
+    │   │   ├── stripe.ts   # k.receiver
+    │   │   └── github.ts
     │   └── index.ts        # k.contract, the object everything reads
     ├── server/
-    │   ├── server.ts       # new KizunaServer(contract)
-    │   ├── guards.ts       # server.guard per identity
+    │   ├── server.ts    # new KizunaServer(contract)
+    │   ├── guards.ts    # server.guard per identity
     │   ├── router/
     │   │   ├── users.ts    # Router<typeof contract.routes.users>
     │   │   ├── events.ts
     │   │   ├── health.ts
     │   │   └── index.ts    # server.router, composes the groups
-    │   ├── jobs.ts         # server.jobs
-    │   └── api.ts          # server.api, what you mount
+    │   ├── jobs.ts      # server.jobs
+    │   ├── receivers/
+    │   │   ├── stripe.ts   # server.receiver
+    │   │   └── github.ts
+    │   ├── verifiers/
+    │   │   ├── stripe.ts   # server.receiver.verify
+    │   │   └── github.ts
+    │   └── api.ts       # server.api, what you mount
     ├── lib/
     │   └── api-client.ts   # new KizunaClient(contract)
     └── app/

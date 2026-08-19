@@ -21,6 +21,7 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
+    RECEIVERS_META,
     warnUnsupportedJobOptions,
     type ServerOptions,
     type JobsMeta,
@@ -36,6 +37,14 @@ import {
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
+    flattenReceivers,
+    handleReceiverDelivery,
+    warnUnimplementedReceivers,
+    type Receivers,
+    type ReceiversMeta,
+    type ReceiverImplementation,
+    type ReceiverImplementations,
+    type ReceiverVerify,
     type Jobs,
 } from '@ts-kizuna/core/adapter';
 import type { z } from 'zod';
@@ -57,6 +66,7 @@ export type FastifyApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
+    readonly [RECEIVERS_META]?: unknown;
     /**
      * Register every contract route on a Fastify instance. Calls
      * `app.register` internally, so encapsulation behaves as Fastify expects.
@@ -230,6 +240,64 @@ const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
     },
 });
 
+/**
+ * A verifier checks one string, so a header Fastify kept as an array is joined
+ * the way it arrived.
+ */
+const flattenHeaders = (headers: FastifyRequest['headers']): Record<string, string> => {
+    const flattened: Record<string, string> = {};
+    for (const [name, value] of Object.entries(headers)) {
+        if (value === undefined) continue;
+        flattened[name.toLowerCase()] = Array.isArray(value) ? value.join(', ') : String(value);
+    }
+    return flattened;
+};
+
+/**
+ * Register one POST route per receiver inside its own scope, whose only content
+ * type parser keeps the body as bytes. Parsers are encapsulated, so the
+ * contract's own routes keep parsing JSON.
+ */
+const mountReceivers = async (app: FastifyInstance, meta: ReceiversMeta, jobs: unknown): Promise<void> => {
+    await app.register(async (scope: FastifyInstance) => {
+        scope.removeAllContentTypeParsers();
+        scope.addContentTypeParser(
+            '*',
+            {
+                parseAs: 'buffer',
+            },
+            (_request, payload, done) => {
+                done(null, payload);
+            }
+        );
+        for (const { receiverKey, receiver } of flattenReceivers(meta.receivers)) {
+            scope.route({
+                method: 'POST',
+                url: receiver.path,
+                handler: async (request: FastifyRequest, reply: FastifyReply) => {
+                    const result = await handleReceiverDelivery(
+                        receiverKey,
+                        receiver,
+                        meta,
+                        {
+                            method: request.method,
+                            path: request.url.split('?')[0] ?? receiver.path,
+                            headers: flattenHeaders(request.headers),
+                            body: Buffer.isBuffer(request.body) ? new Uint8Array(request.body) : new Uint8Array(),
+                        },
+                        jobs
+                    );
+                    if (result.body === undefined) {
+                        await reply.status(result.status).send();
+                    } else {
+                        await reply.status(result.status).send(result.body);
+                    }
+                },
+            });
+        }
+    });
+};
+
 export interface KizunaPluginOptions extends FastifyOptions {
     /**
      * The API object built by `server.api`.
@@ -254,6 +322,11 @@ export const fastifyKizuna = fastifyPlugin(
         const pluginExports = pluginExportsOf(api);
         const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
         const jobRunner = jobRunnerFrom(jobsMeta);
+        const receiversMeta = api[RECEIVERS_META] as ReceiversMeta | undefined;
+
+        if (receiversMeta) {
+            await mountReceivers(app, receiversMeta, jobRunner);
+        }
 
         const mountRoute = (
             routeKey: string,
@@ -337,7 +410,8 @@ type ServerContract<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J>;
+    Rec extends Receivers = Receivers,
+> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J, Rec>;
 
 export interface Server<
     R extends Routes,
@@ -346,6 +420,7 @@ export interface Server<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
+    Rec extends Receivers = Receivers,
 > {
     /**
      * Define a guard for one of the contract's identities. It runs before the
@@ -370,13 +445,17 @@ export interface Server<
      * Write typed handlers for the contract or one of its route groups.
      */
     router: {
-        <const GroupOrRoutes extends Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>, string> | Routes>(
+        <
+            const GroupOrRoutes extends
+                | Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>, string>
+                | Routes,
+        >(
             group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes>;
+            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>, GroupOrRoutes>
+        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>, GroupOrRoutes>;
         (
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
-        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>
+        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>;
     };
     /**
      * Write a handler for each of the contract's jobs.
@@ -395,21 +474,52 @@ export interface Server<
      * });
      */
     jobs(
-        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
-    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>
+    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>;
     /**
-     * Assemble the router, guards, and job handlers into the api object.
+     * Implement one of the contract's receivers. The first argument names the
+     * contract entry, which is what types `body`.
+     *
+     * @example
+     * export const payments = server.receiver('payments', {
+     *     verify: verifyPayments,
+     *     handler: async ({ body }) => {
+     *         await recordPayment(body.id);
+     *     },
+     * });
+     */
+    receiver: {
+        <const Name extends Extract<keyof Rec, string>>(
+            name: Name,
+            implementation: ReceiverImplementation<Rec[Name], J>
+        ): ReceiverImplementation<Rec[Name], J>;
+        /**
+         * Type a verifier written in its own file.
+         *
+         * @example
+         * export const verifyPayments = server.receiver.verify('payments', ({ raw, headers, deny }) => {
+         *     if (!isDigestValid(raw, headers['x-signature'])) {
+         *         deny();
+         *     }
+         * });
+         */
+        verify<const Name extends Extract<keyof Rec, string>>(name: Name, run: ReceiverVerify): ReceiverVerify;
+    };
+    /**
+     * Assemble the router, guards, job handlers, and receivers into the api
+     * object.
      */
     api(
         options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
+            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>;
         } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes>> }) &
             (string extends keyof J
                 ? { jobs?: undefined }
-                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>> }) &
+                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>>> }) &
             (string extends keyof RequestContext
                 ? { requestContext?: undefined }
                 : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<FastifyHandlerContext> }> }) &
+            (string extends keyof Rec ? { receivers?: undefined } : { receivers: NoInfer<ReceiverImplementations<Rec, J>> }) &
             (string extends keyof Plugins ? { plugins?: undefined } : { plugins: PluginImplementations<Plugins, FastifyHandlerContext> })
     ): FastifyApi<R>;
 }
@@ -421,17 +531,28 @@ const createServerSurface = <
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
+    Rec extends Receivers = Receivers,
 >(
-    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>,
+    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>,
     options?: ServerOptions
-): Server<R, Schemes, Auth, RequestContext, Plugins, J> => {
+): Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec> => {
     warnUnsupportedJobOptions(contract.jobs, options?.jobTransport);
     const server = {
         guard: (_name: string, run: unknown) => run,
         requestContext: (_name: string, run: unknown) => run,
         router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
         jobs: (handlers: unknown) => handlers,
-        api: ({ jobs, ...parts }: ApiParts & { jobs?: Record<string, unknown> }) => {
+        receiver: Object.assign((_name: string, implementation: unknown) => implementation, {
+            verify: (_name: string, run: unknown) => run,
+        }),
+        api: ({
+            jobs,
+            receivers,
+            ...parts
+        }: ApiParts & { jobs?: Record<string, unknown>; receivers?: ReceiversMeta['implementations'] }) => {
+            if (contract.receivers) {
+                warnUnimplementedReceivers(contract.receivers, receivers ?? {});
+            }
             const api = Object.assign(assembleApi(contract, parts), {
                 [JOBS_META]: contract.jobs
                     ? {
@@ -440,6 +561,13 @@ const createServerSurface = <
                           config: contract.jobsConfig,
                           transport: options?.jobTransport,
                           onError: options?.onJobError,
+                      }
+                    : undefined,
+                [RECEIVERS_META]: contract.receivers
+                    ? {
+                          receivers: contract.receivers,
+                          implementations: receivers ?? {},
+                          onError: options?.onReceiverError,
                       }
                     : undefined,
             }) as FastifyApi<R>;
@@ -457,7 +585,7 @@ const createServerSurface = <
             });
         },
     };
-    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, J>;
+    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>;
 };
 
 /**
@@ -487,14 +615,16 @@ export class KizunaServer<
     RequestContext extends Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins,
     J extends Jobs = Jobs,
-> implements Server<R, Schemes, Auth, RequestContext, Plugins, J> {
-    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, J>['guard'];
-    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, J>['requestContext'];
-    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, J>['router'];
-    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, J>['jobs'];
-    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, J>['api'];
+    Rec extends Receivers = Receivers,
+> implements Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec> {
+    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['guard'];
+    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['requestContext'];
+    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['router'];
+    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['jobs'];
+    declare readonly receiver: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['receiver'];
+    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, J, Rec>['api'];
 
-    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, options?: ServerOptions) {
+    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J, Rec>, options?: ServerOptions) {
         Object.assign(this, createServerSurface(contract, options));
     }
 }

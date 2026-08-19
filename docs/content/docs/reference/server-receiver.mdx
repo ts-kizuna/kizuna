@@ -1,0 +1,80 @@
+---
+title: server.receiver
+description: Implement one of the contract's receivers, telling a real delivery from a forged one and handling the real one.
+---
+
+Implements one receiver the contract declares. The first argument names the contract entry, which is what types `body`.
+
+```ts title="server/receivers/stripe.ts"
+import { server } from '../server';
+import { verifyStripe } from '../verifiers/stripe';
+
+export const stripe = server.receiver('stripe', {
+    verify: verifyStripe,
+    handler: async ({ body, jobs }) => {
+        await jobs.reconcileInvoice.queue({
+            input: {
+                eventId: body.id,
+            },
+            dedupeKey: body.id,
+        });
+    },
+});
+```
+
+Pass them to `server.api` under `receivers`, keyed by the same names the contract used:
+
+```ts title="api.ts"
+export const api = server.api({
+    router,
+    receivers: {
+        stripe,
+    },
+});
+```
+
+## server.receiver.verify
+
+Types a verifier written in its own file. It carries the secret and the vendor's scheme, so it rarely belongs beside the handler.
+
+```ts title="server/verifiers/stripe.ts"
+import Stripe from 'stripe';
+import { server } from '../server';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+export const verifyStripe = server.receiver.verify('stripe', ({ text, headers }) => {
+    stripe.webhooks.constructEvent(text, headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+});
+```
+
+Return nothing to accept the delivery, and throw to turn it away. Every vendor library already throws on a bad signature.
+
+### Verifier arguments
+
+| Argument  | Type                          | Is                                                        |
+| --------- | ----------------------------- | --------------------------------------------------------- |
+| `raw`     | `Uint8Array`                  | The exact bytes that arrived, before anything parsed them |
+| `text`    | `string`                      | Those bytes as a string, which is what libraries want     |
+| `headers` | `Record<string, string>`      | Every request header, lowercased                          |
+| `method`  | `string`                      | The request method, uppercased                            |
+| `path`    | `string`                      | The path as the vendor requested it, `basePath` included  |
+| `deny`    | `(status?, detail?) => never` | Refuses the delivery. Answers `401` unless given a status |
+
+`deny` never returns, so the lines after it do not run and a forgotten `return` cannot let a forged delivery through. A verifier that throws anything else refuses the delivery too, and the error goes to `onReceiverError`.
+
+### Handler arguments
+
+| Argument     | Type                         | Is                                                          |
+| ------------ | ---------------------------- | ----------------------------------------------------------- |
+| `body`       | `z.output<Receiver['body']>` | The validated body                                          |
+| `headers`    | `Record<string, string>`     | Every request header, lowercased, where a delivery id lives |
+| `throwError` | `(response) => never`        | Answers with that status. Never returns                     |
+| `jobs`       | `JobRunner`                  | Present when the contract declares jobs                     |
+
+Returning answers `200`. `throwError({ status: 503 })` asks the vendor to retry, `422` tells it to give up, and anything else thrown answers `500`.
+
+## Related
+
+- [`k.receiver`](/docs/reference/k-receiver)
+- [`server.api`](/docs/reference/server-api)

@@ -700,3 +700,148 @@ export const createPluginRouter = <Context>(): Router<typeof pluginRoutes, Conte
             },
         }),
     }) as unknown as Router<typeof pluginRoutes, Context>;
+
+const receiverK = new Kizuna();
+
+const receiverRoutes = receiverK.routes({
+    ping: {
+        method: 'GET',
+        path: '/receiver-ping',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+
+const DeliveredEventSchema = z.object({
+    id: z.string(),
+    type: z.string(),
+});
+
+/**
+ * `hook` verifies by byte count, which fails the moment anything re-serializes
+ * the body. `quiet` denies with a status of its own, and `open` accepts
+ * everything so a handler's own answers can be tested.
+ */
+export const receiverContract = receiverK.contract({
+    routes: {
+        health: receiverRoutes,
+    },
+    receivers: {
+        hook: receiverK.receiver({
+            path: '/hooks/inbound',
+            body: DeliveredEventSchema,
+        }),
+        quiet: receiverK.receiver({
+            path: '/hooks/quiet',
+            body: DeliveredEventSchema,
+        }),
+        open: receiverK.receiver({
+            path: '/hooks/open',
+            body: DeliveredEventSchema,
+        }),
+    },
+});
+
+export const createReceiverRouter = <Context>(): Router<{ health: typeof receiverRoutes }, Context> =>
+    ({
+        health: {
+            ping: () => ({
+                status: 200,
+                body: {
+                    ok: true,
+                },
+            }),
+        },
+    }) as unknown as Router<{ health: typeof receiverRoutes }, Context>;
+
+/**
+ * One recorded delivery, so a suite can assert a handler never ran.
+ */
+export interface ReceiverCall {
+    receiverKey: string;
+    body: unknown;
+    headers: Record<string, string>;
+}
+
+export interface ReceiverProbe {
+    implementations: Record<string, unknown>;
+    calls: ReceiverCall[];
+    verified: string[];
+}
+
+/**
+ * The implementations `server.api` takes for {@link receiverContract}, plus what
+ * each one saw.
+ *
+ * @param openHandler what the `open` receiver's handler does.
+ */
+export const createReceiverProbe = (openHandler?: (args: { throwError: (response: unknown) => never }) => unknown): ReceiverProbe => {
+    const calls: ReceiverCall[] = [];
+    const verified: string[] = [];
+
+    const record =
+        (receiverKey: string) =>
+        ({ body, headers }: { body: unknown; headers: Record<string, string> }) => {
+            calls.push({
+                receiverKey,
+                body,
+                headers,
+            });
+        };
+
+    return {
+        calls,
+        verified,
+        implementations: {
+            hook: {
+                verify: ({ raw, headers, deny }: { raw: Uint8Array; headers: Record<string, string>; deny: () => never }) => {
+                    verified.push('hook');
+                    if (headers['x-expect-bytes'] !== String(raw.byteLength)) {
+                        deny();
+                    }
+                },
+                handler: record('hook'),
+            },
+            quiet: {
+                verify: ({ deny }: { deny: (status?: number, detail?: string) => never }) => {
+                    verified.push('quiet');
+                    deny(200, 'Ignored');
+                },
+                handler: record('quiet'),
+            },
+            open: {
+                verify: () => {
+                    verified.push('open');
+                },
+                handler:
+                    openHandler ??
+                    ((args: { body: unknown; headers: Record<string, string> }) => {
+                        record('open')(args);
+                    }),
+            },
+        },
+    };
+};
+
+/**
+ * A verifier that throws something that is not `deny`.
+ */
+export const createBrokenReceiverProbe = (): ReceiverProbe => {
+    const probe = createReceiverProbe();
+    probe.implementations.hook = {
+        verify: () => {
+            throw new Error('verifier is misconfigured');
+        },
+        handler: () => {
+            probe.calls.push({
+                receiverKey: 'hook',
+                body: undefined,
+                headers: {},
+            });
+        },
+    };
+    return probe;
+};

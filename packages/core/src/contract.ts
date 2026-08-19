@@ -3,6 +3,7 @@ import type { TagSet, TagOptions } from './tags.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { Jobs, JobsConfig } from './jobs.js';
+import type { Receivers } from './receivers.js';
 import type { ContractPlugins } from './plugin.js';
 
 /**
@@ -19,6 +20,7 @@ export interface Contract<
     RequestContext extends Record<string, RequestContextSchema> = Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins = ContractPlugins,
     Jobs_ extends Jobs = Jobs,
+    Receivers_ extends Receivers = Receivers,
 > {
     /**
      * The API's route groups.
@@ -38,6 +40,12 @@ export interface Contract<
      * The job settings passed to `new Kizuna()` under `jobs`.
      */
     jobsConfig?: JobsConfig;
+    /**
+     * The incoming webhooks declared with `k.receiver`, keyed by vendor. Served
+     * by `api.mount` but outside `routes`, so the client and the generators do
+     * not see them.
+     */
+    receivers?: Receivers_;
     /**
      * The `auth` map passed to `k.contract`, keyed by route group. Carried on the
      * contract so the adapters can resolve each route's required identities and
@@ -89,10 +97,12 @@ export function assembleContract<
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
     const Plugins extends ContractPlugins = Record<string, never>,
     const Jobs_ extends Jobs = Record<string, never>,
+    const Receivers_ extends Receivers = Record<string, never>,
 >(config: {
     routes: R;
     jobs?: Jobs_;
     jobsConfig?: JobsConfig;
+    receivers?: Receivers_;
     auth?: Auth;
     tags?: TagSet<Tags>;
     securitySchemes?: Schemes;
@@ -101,12 +111,13 @@ export function assembleContract<
         issueCodes?: readonly Codes[];
     };
     plugins?: Plugins;
-}): Contract<R, Tags, Codes, Schemes, Auth, RequestContext, Plugins, Jobs_> {
+}): Contract<R, Tags, Codes, Schemes, Auth, RequestContext, Plugins, Jobs_, Receivers_> {
     return {
         routes: config.routes,
         plugins: config.plugins,
         jobs: config.jobs,
         jobsConfig: config.jobsConfig,
+        receivers: config.receivers,
         auth: config.auth,
         tags: config.tags,
         securitySchemes: config.securitySchemes,

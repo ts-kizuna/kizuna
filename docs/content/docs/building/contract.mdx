@@ -224,6 +224,20 @@ export const contract = k.contract({
 
 A job carries its own identity, so it takes no entry in the `auth` map, and it stays out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. The [Jobs guide](/docs/jobs) covers declaring, handling, and triggering them.
 
+Incoming webhooks are declared the same way. [`k.receiver`](/docs/reference/k-receiver) takes the path a vendor posts to and the schema its body is validated against, and the result goes under `receivers` on `k.contract`:
+
+```ts title="contract/index.ts"
+export const contract = k.contract({
+    routes,
+    receivers: {
+        stripe,
+    },
+    auth,
+});
+```
+
+A receiver carries no auth either, because its verifier is what proves the delivery came from the vendor. The [Receivers guide](/docs/receivers) covers verifiers, handlers, and the statuses a vendor reads.
+
 ## Going further
 
 ### Naming schemas with models

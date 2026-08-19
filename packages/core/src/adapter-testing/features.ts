@@ -96,6 +96,36 @@ export const ADAPTER_FEATURES = {
     'plugins.rawResponse': {
         summary: 'A plugin route answering with `rawResponse` sends its response untouched by validation or rendering.',
     },
+    'receivers.verifiedDelivery': {
+        summary: 'A delivery its verifier accepts reaches the handler with its body validated.',
+    },
+    'receivers.rawBytes': {
+        summary: 'A verifier sees the exact bytes that arrived, not a re-serialized copy.',
+    },
+    'receivers.denied': {
+        summary: 'A delivery its verifier denies answers 401 and never reaches the handler.',
+    },
+    'receivers.denyStatus': {
+        summary: 'A verifier denying with its own status answers that status.',
+    },
+    'receivers.verifierThrows': {
+        summary: 'A verifier throwing anything other than `deny` still refuses the delivery.',
+    },
+    'receivers.bodyInvalid422': {
+        summary: 'A verified delivery whose body fails the schema is refused with 422.',
+    },
+    'receivers.headersReachHandler': {
+        summary: 'Every request header reaches the handler, which is where a delivery id lives.',
+    },
+    'receivers.handlerThrowError': {
+        summary: 'A handler calling `throwError` answers with that status.',
+    },
+    'receivers.handlerErrorIs500': {
+        summary: 'A handler throwing anything else answers 500, so the vendor retries.',
+    },
+    'receivers.routesUnaffected': {
+        summary: 'Declaring receivers leaves the contract routes serving as they did.',
+    },
     'plugins.serverRequired': {
         summary: 'A plugin declared on the contract with no server half passed to `server.api` throws, naming the module to import.',
     },

@@ -3,7 +3,7 @@ title: server.api
 description: Assemble the router, guards and request context into the api object you mount.
 ---
 
-`server.api({ router, guards, requestContext, jobs })` puts the router and guards into the API object an adapter mounts.
+`server.api({ router, guards, requestContext, jobs, receivers })` puts the router and guards into the API object an adapter mounts.
 
 ```ts title="api.ts"
 import { server } from './server';
@@ -47,6 +47,21 @@ export const api = server.api({
 ```
 
 `api.mount` then serves the two [job endpoints](/docs/jobs#the-two-job-endpoints), and every handler receives a typed `jobs` runner so a route can run one in process.
+
+## receivers
+
+A contract that declares [receivers](/docs/receivers) needs their verifiers and handlers here, bound with [`server.receiver`](/docs/reference/server-receiver):
+
+```ts title="api.ts"
+export const api = server.api({
+    router,
+    receivers: {
+        stripe,
+    },
+});
+```
+
+`api.mount` then serves each receiver at its declared path, reading the body as bytes before anything parses them.
 
 ## plugins
 

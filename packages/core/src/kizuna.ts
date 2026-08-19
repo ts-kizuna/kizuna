@@ -13,6 +13,7 @@ import {
     type JobsArg,
     type JobsConfig,
 } from './jobs.js';
+import { assertNoReceiverCollision, buildReceiver, type CompiledReceiver, type ReceiverDefinition, type Receivers } from './receivers.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
 import { createIdentity } from './identity.js';
 import { createRequestContext } from './request-context.js';
@@ -268,6 +269,22 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
     jobs<const J extends AuthoredJobs, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: J): CompiledJobs<J, Name>;
     jobs<const J extends AuthoredJobs>(definitions: J): CompiledJobs<J, undefined>;
     /**
+     * Declare one incoming webhook. Collect them on `k.contract` under
+     * `receivers`, keyed by vendor.
+     *
+     * A receiver carries no auth, because its verifier is what proves the
+     * delivery came from the vendor. Like jobs, receivers never appear in
+     * `contract.routes`, the OpenAPI document, or the generated Swift, Kotlin,
+     * and MCP surfaces.
+     *
+     * @example
+     * export const payments = k.receiver({
+     *     path: '/webhooks/payments',
+     *     body: PaymentEventSchema,
+     * });
+     */
+    receiver<const Definition extends ReceiverDefinition>(definition: Definition): CompiledReceiver<Definition>;
+    /**
      * Assemble route groups into a contract. The `auth` map assigns each group
      * (and optionally each route, via a `'*'` cascade) the identity it requires;
      * `k.contract` resolves it onto every route's `security` and `accessGate`.
@@ -280,9 +297,11 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
         const A extends AuthMap<IdentityNamesOf<Spec>, R>,
         const J extends Jobs = Record<string, never>,
+        const Receivers_ extends Receivers = Record<string, never>,
     >(definition: {
         routes: R;
         jobs?: J;
+        receivers?: Receivers_;
         auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
     }): Contract<
         RoutesWithHandlerContext<R, Spec['identities'], A, Spec['requestContext'], PluginArgs<PluginsOf<Spec>> & JobsArg<J>>,
@@ -292,11 +311,17 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         A,
         Spec['requestContext'],
         PluginsOf<Spec>,
-        J
+        J,
+        Receivers_
     >;
-    contract<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>, const J extends Jobs = Record<string, never>>(definition: {
+    contract<
+        const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
+        const J extends Jobs = Record<string, never>,
+        const Receivers_ extends Receivers = Record<string, never>,
+    >(definition: {
         routes: R;
         jobs?: J;
+        receivers?: Receivers_;
     }): Contract<
         RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext'], PluginArgs<PluginsOf<Spec>> & JobsArg<J>>,
         Spec['tags'],
@@ -305,7 +330,8 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         unknown,
         Spec['requestContext'],
         PluginsOf<Spec>,
-        J
+        J,
+        Receivers_
     >;
     /**
      * Emit a validation issue with a machine-readable `code`, checked against the
@@ -394,14 +420,21 @@ const createSurface = <
             ? buildJobs(undefined, identityOrDefinitions as AuthoredJobs)
             : buildJobs(identityOrDefinitions as string, definitions)) as K<Spec>['jobs'];
 
-    const contract = (definition: { routes: Routes; jobs?: Jobs; auth?: Record<string, GroupAuth> }) => {
-        const { routes: contractRoutes, jobs: contractJobs, auth } = definition;
-        if (contractJobs) {
+    const receiver = ((definition: ReceiverDefinition) => buildReceiver(definition)) as K<Spec>['receiver'];
+
+    const contract = (definition: { routes: Routes; jobs?: Jobs; receivers?: Receivers; auth?: Record<string, GroupAuth> }) => {
+        const { routes: contractRoutes, jobs: contractJobs, receivers: contractReceivers, auth } = definition;
+        if (contractJobs || contractReceivers) {
             const routePaths = new Map<string, string>();
             for (const { routeKey, route } of flattenRoutes(contractRoutes)) {
                 routePaths.set(`${route.method}:${route.path}`, routeKey);
             }
-            assertNoJobEndpointCollision(contractJobs, config?.jobs, routePaths);
+            if (contractJobs) {
+                assertNoJobEndpointCollision(contractJobs, config?.jobs, routePaths);
+            }
+            if (contractReceivers) {
+                assertNoReceiverCollision(contractReceivers, routePaths);
+            }
         }
         if (auth) {
             for (const groupKey of Object.keys(auth)) {
@@ -422,6 +455,7 @@ const createSurface = <
         return assembleContract({
             routes: contractRoutes as Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
             jobs: contractJobs,
+            receivers: contractReceivers,
             auth,
             tags: config?.tags,
             securitySchemes: config?.identities,
@@ -435,6 +469,7 @@ const createSurface = <
     const k: K<Spec> = {
         routes,
         jobs,
+        receiver,
         auth: (_routes, map) => map,
         contract: contract as K<Spec>['contract'],
         issue: addCodedIssue,
@@ -477,6 +512,7 @@ export class Kizuna<
     declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['routes'];
     declare readonly auth: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['auth'];
     declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['jobs'];
+    declare readonly receiver: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['receiver'];
     declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['contract'];
     declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext, Plugins>>['issue'];
 

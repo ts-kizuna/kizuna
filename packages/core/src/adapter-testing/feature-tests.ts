@@ -24,6 +24,11 @@ import {
     pluginContract,
     createPluginRouter,
     pluginImplementations,
+    receiverContract,
+    createReceiverRouter,
+    createReceiverProbe,
+    createBrokenReceiverProbe,
+    type ReceiverProbe,
 } from './fixtures.js';
 import { toMountedApi, type MountedApi, type Transport, type TestResponse } from './transport.js';
 
@@ -47,6 +52,7 @@ interface MountOptions {
     responseValidation?: boolean;
     guards?: Record<string, unknown>;
     plugins?: Record<string, unknown>;
+    receivers?: Record<string, unknown>;
 }
 
 export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void => {
@@ -59,6 +65,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 router: options.router,
                 guards: options.guards,
                 plugins: options.plugins,
+                receivers: options.receivers,
             } as never
         );
         const transport = await adapter.mount(api, {
@@ -75,6 +82,37 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             await mounted.close?.();
         }
     };
+
+    /**
+     * Mount the receiver contract with one probe.
+     */
+    const usingReceivers = async <T>(probe: ReceiverProbe, use: (mounted: MountedApi, probe: ReceiverProbe) => Promise<T>): Promise<T> => {
+        const mounted = await mount({
+            contract: receiverContract,
+            router: createReceiverRouter(),
+            receivers: probe.implementations,
+        });
+        try {
+            return await use(mounted, probe);
+        } finally {
+            await mounted.close?.();
+        }
+    };
+
+    /**
+     * A delivery carrying its own byte count, which the `hook` verifier compares
+     * against the bytes it was handed.
+     */
+    const deliver = (mounted: MountedApi, path: string, body: string, expectedBytes = body.length) =>
+        mounted.request({
+            method: 'POST',
+            path,
+            body,
+            headers: {
+                'content-type': 'application/json',
+                'x-expect-bytes': String(expectedBytes),
+            },
+        });
 
     const usingPlugins = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
@@ -603,6 +641,109 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     expect(response.status).toBe(500);
                 }
             );
+        },
+        'receivers.verifiedDelivery': async () => {
+            await usingReceivers(createReceiverProbe(), async (mounted, probe) => {
+                const response = await deliver(mounted, '/hooks/inbound', '{"id":"evt_1","type":"invoice.paid"}');
+                expect(response.status).toBe(200);
+                expect(probe.calls).toHaveLength(1);
+                expect(probe.calls[0]!.body).toEqual({
+                    id: 'evt_1',
+                    type: 'invoice.paid',
+                });
+            });
+        },
+        'receivers.rawBytes': async () => {
+            await usingReceivers(createReceiverProbe(), async (mounted, probe) => {
+                // Indented: a parser that re-serialized this would change the byte count.
+                const spaced = '{\n  "id": "evt_spaced",\n  "type": "invoice.paid"\n}';
+                const response = await deliver(mounted, '/hooks/inbound', spaced);
+                expect(response.status).toBe(200);
+                expect(probe.calls[0]!.body).toEqual({
+                    id: 'evt_spaced',
+                    type: 'invoice.paid',
+                });
+            });
+        },
+        'receivers.denied': async () => {
+            await usingReceivers(createReceiverProbe(), async (mounted, probe) => {
+                const response = await deliver(mounted, '/hooks/inbound', '{"id":"evt_1","type":"invoice.paid"}', 999);
+                expect(response.status).toBe(401);
+                expect(probe.calls).toHaveLength(0);
+            });
+        },
+        'receivers.denyStatus': async () => {
+            await usingReceivers(createReceiverProbe(), async (mounted, probe) => {
+                const response = await deliver(mounted, '/hooks/quiet', '{"id":"evt_1","type":"invoice.paid"}');
+                expect(response.status).toBe(200);
+                expect(probe.calls).toHaveLength(0);
+            });
+        },
+        'receivers.verifierThrows': async () => {
+            await usingReceivers(createBrokenReceiverProbe(), async (mounted, probe) => {
+                const response = await deliver(mounted, '/hooks/inbound', '{"id":"evt_1","type":"invoice.paid"}');
+                expect(response.status).toBe(401);
+                expect(probe.calls).toHaveLength(0);
+            });
+        },
+        'receivers.bodyInvalid422': async () => {
+            await usingReceivers(createReceiverProbe(), async (mounted, probe) => {
+                const response = await deliver(mounted, '/hooks/inbound', '{"id":"evt_1"}');
+                expect(response.status).toBe(422);
+                expect(probe.verified).toContain('hook');
+                expect(probe.calls).toHaveLength(0);
+            });
+        },
+        'receivers.headersReachHandler': async () => {
+            await usingReceivers(createReceiverProbe(), async (mounted, probe) => {
+                const body = '{"id":"evt_1","type":"invoice.paid"}';
+                const response = await mounted.request({
+                    method: 'POST',
+                    path: '/hooks/open',
+                    body,
+                    headers: {
+                        'content-type': 'application/json',
+                        'x-delivery-id': 'del_1',
+                    },
+                });
+                expect(response.status).toBe(200);
+                expect(probe.calls[0]!.headers['x-delivery-id']).toBe('del_1');
+            });
+        },
+        'receivers.handlerThrowError': async () => {
+            const probe = createReceiverProbe(({ throwError }) =>
+                throwError({
+                    status: 503,
+                    body: {
+                        detail: 'Not yet',
+                    },
+                })
+            );
+            await usingReceivers(probe, async (mounted) => {
+                const response = await deliver(mounted, '/hooks/open', '{"id":"evt_1","type":"invoice.paid"}');
+                expect(response.status).toBe(503);
+            });
+        },
+        'receivers.handlerErrorIs500': async () => {
+            const probe = createReceiverProbe(() => {
+                throw new Error('database down');
+            });
+            await usingReceivers(probe, async (mounted) => {
+                const response = await deliver(mounted, '/hooks/open', '{"id":"evt_1","type":"invoice.paid"}');
+                expect(response.status).toBe(500);
+            });
+        },
+        'receivers.routesUnaffected': async () => {
+            await usingReceivers(createReceiverProbe(), async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/receiver-ping',
+                });
+                expect(response.status).toBe(200);
+                expect(response.body).toEqual({
+                    ok: true,
+                });
+            });
         },
         'plugins.routesServed': async () => {
             await usingPlugins(async (mounted) => {
