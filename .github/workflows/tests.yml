@@ -35,6 +35,11 @@ jobs:
             - name: Build
               run: pnpm build
 
+            - name: Build demos
+              run: pnpm build:demos
+              env:
+                  NEXT_TELEMETRY_DISABLED: 1
+
             - name: Check package exports
               run: pnpm test:exports
 
