@@ -36,12 +36,12 @@ export const buildToolInputSchema = (route: RouteDefinition): ToolInputSchema =>
 
     if (route.query) {
         hasQuery = true;
-        shape['query'] = route.query;
+        shape['query'] = route.query.safeParse({}).success ? route.query.optional() : route.query;
     }
 
     if (route.body && !isVoidSchema(route.body)) {
         hasBody = true;
-        shape['body'] = route.body;
+        shape['body'] = route.body.safeParse(undefined).success ? route.body.optional() : route.body;
     }
 
     if (Object.keys(shape).length === 0) {

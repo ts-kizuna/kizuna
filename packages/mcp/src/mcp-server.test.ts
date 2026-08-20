@@ -378,6 +378,14 @@ describe('buildToolDefinitions: input schema', () => {
         expect(listUsers.inputSchema.shape!['query']).toBeDefined();
     });
 
+    it('leaves an all-optional query out of required', () => {
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const listUsers = definitions.find((definition) => definition.name === 'users.listUsers')!;
+
+        expect(z.object(listUsers.inputSchema.shape!).safeParse({}).success).toBe(true);
+        expect(z.toJSONSchema(z.object(listUsers.inputSchema.shape!)).required ?? []).not.toContain('query');
+    });
+
     it('puts path params under a params key', () => {
         const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const getUser = definitions.find((definition) => definition.name === 'users.getUser')!;
@@ -479,6 +487,33 @@ describe('buildToolDefinitions: input schema', () => {
         expect(update.inputSchema.shape!['params']).toBeDefined();
         expect(update.inputSchema.shape!['query']).toBeDefined();
         expect(update.inputSchema.shape!['body']).toBeDefined();
+    });
+
+    it('keeps a query with a required field required', () => {
+        const contractRoutesWithRequiredQuery = k.routes('api', {
+            searchItems: {
+                method: 'GET',
+                path: '/items',
+                query: z.object({
+                    term: z.string(),
+                    page: z.number().optional(),
+                }),
+                responses: {
+                    200: z.object({
+                        ids: z.array(z.string()),
+                    }),
+                },
+            },
+        });
+
+        const definitions = buildToolDefinitions(
+            k.contract({
+                routes: contractRoutesWithRequiredQuery,
+            }).routes
+        );
+        const search = definitions.find((definition) => definition.name === 'searchItems')!;
+
+        expect(z.toJSONSchema(z.object(search.inputSchema.shape!)).required).toContain('query');
     });
 });
 
@@ -670,6 +705,30 @@ describe('MCP server e2e', () => {
 
         const createUser = tools.find((tool) => tool.name === 'users.createUser')!;
         expect(createUser.inputSchema.properties).toHaveProperty('body');
+
+        await close();
+    });
+
+    it('calls a route with an all-optional query with no arguments', async () => {
+        const { client, close } = await connectMcpClient();
+
+        const result = await client.callTool({
+            name: 'users.listUsers',
+            arguments: {},
+        });
+
+        expect(result.isError).toBe(false);
+        expect(result.structuredContent).toEqual({
+            status: 200,
+            body: {
+                users: [
+                    {
+                        id: '1',
+                        name: 'Alice',
+                    },
+                ],
+            },
+        });
 
         await close();
     });
