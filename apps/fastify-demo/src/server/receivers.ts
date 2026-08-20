@@ -1,10 +1,18 @@
 import { db } from '@ts-kizuna-demo/shared';
 import { server } from './server';
-import { verifyPayments, verifySource } from './verifiers';
+import { verifyPayments } from './verifiers';
 
 export const payments = server.receiver('payments', {
     verify: verifyPayments,
-    handler: async ({ body, headers, jobs }) => {
+    handler: async ({ body, headers, jobs, throwError }) => {
+        if (body.type === 'invoice.voided') {
+            throwError({
+                status: 422,
+                body: {
+                    detail: 'A voided invoice will never settle, so this will never succeed',
+                },
+            });
+        }
         if (body.type === 'invoice.failed') {
             await jobs.users.indexUser.queue({
                 input: {
@@ -26,21 +34,6 @@ export const payments = server.receiver('payments', {
     },
 });
 
-export const source = server.receiver('source', {
-    verify: verifySource,
-    handler: ({ body, throwError }) => {
-        if (body.repository.name === 'archived') {
-            throwError({
-                status: 422,
-                body: {
-                    detail: 'That repository is archived, so this will never succeed',
-                },
-            });
-        }
-    },
-});
-
 export const receiverImplementations = {
     payments,
-    source,
 };
