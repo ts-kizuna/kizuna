@@ -14,7 +14,7 @@ import {
     extractCredential,
     gatePermits,
     resolveSecurityRequirements,
-    guardDeny,
+    guardDenyFor,
     isGuardDenial,
 } from '@ts-kizuna/core/adapter';
 import { contractOf } from '@ts-kizuna/core/adapter';
@@ -275,7 +275,7 @@ const runGuards = async (
             ...(handlerContext ?? {}),
             ...credential,
             params,
-            deny: guardDeny,
+            deny: guardDenyFor(schemeDefinition),
             scopes,
         } as Parameters<typeof guard>[0]);
         if (isGuardDenial(guardResult)) {
@@ -284,20 +284,14 @@ const runGuards = async (
                 result: toolError(guardResult.status, guardResult.detail),
             };
         }
+        for (const [field, allowed] of Object.entries(route.accessGate?.[scheme] ?? {})) {
+            if (gatePermits((guardResult ?? {})[field as never], allowed)) continue;
+            return {
+                ok: false,
+                result: toolError(403, `Forbidden: ${scheme}.${field} is not permitted on this route.`),
+            };
+        }
         if (guardResult && typeof guardResult === 'object') {
-            const gate = route.accessGate?.[scheme];
-            if (gate) {
-                for (const [field, allowed] of Object.entries(gate)) {
-                    const value = (guardResult as Record<string, unknown>)[field];
-                    const permitted = gatePermits(value, allowed);
-                    if (!permitted) {
-                        return {
-                            ok: false,
-                            result: toolError(403, `Forbidden: ${scheme}.${field} is not permitted on this route.`),
-                        };
-                    }
-                }
-            }
             securityContext[scheme] = guardResult;
         }
     }

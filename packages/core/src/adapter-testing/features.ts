@@ -72,6 +72,9 @@ export const ADAPTER_FEATURES = {
     'guards.multiIdentity': {
         summary: 'A route requiring two identities merges both contexts, and denies until both are present.',
     },
+    'guards.authFailureModes': {
+        summary: 'An unresolved credential is 401 with a challenge; a resolved one failing the gate is 403 without.',
+    },
     'responses.declaredContentType': {
         summary: 'A route declaring a non-JSON content type sends its body raw under it.',
     },

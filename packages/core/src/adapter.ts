@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { RouteDefinition, Routes, Method } from './types.js';
-import type { SecurityScheme } from './security-scheme.js';
+import type { OpenApiSecuritySchemeObject, SecurityScheme } from './security-scheme.js';
 import type { Credential, NoCredential } from './identity.js';
 import {
     type RouteHandler,
@@ -132,6 +132,10 @@ export interface GuardDenial {
     readonly [GUARD_DENY]: true;
     status: number;
     detail: string;
+    /**
+     * The `WWW-Authenticate` challenge RFC 9110 section 11.6.1 requires on a `401`.
+     */
+    headers?: Record<string, string>;
 }
 
 /**
@@ -139,11 +143,43 @@ export interface GuardDenial {
  */
 export type GuardDeny = (status: number, detail: string) => GuardDenial;
 
-export const guardDeny: GuardDeny = (status, detail) => ({
-    [GUARD_DENY]: true,
-    status,
-    detail,
-});
+type HttpScheme = Extract<OpenApiSecuritySchemeObject, { type: 'http' }>['scheme'];
+
+const HTTP_CHALLENGES: Partial<Record<HttpScheme, string>> = {
+    bearer: 'Bearer',
+    basic: 'Basic',
+};
+
+/**
+ * The authentication scheme a `401` from this identity challenges with. An
+ * `apiKey` or `custom` identity names none: neither is HTTP authentication.
+ */
+export const authenticationChallenge = (scheme: SecurityScheme | undefined): string | undefined => {
+    const openapi = scheme?.openapi;
+    if (openapi === undefined) return undefined;
+    if (openapi.type === 'http') return HTTP_CHALLENGES[openapi.scheme];
+    return openapi.type === 'oauth2' || openapi.type === 'openIdConnect' ? 'Bearer' : undefined;
+};
+
+/**
+ * The `deny` a guard for this identity receives. The challenge rides along with
+ * the denial, so a `401` cannot reach the wire without one.
+ */
+export const guardDenyFor = (scheme: SecurityScheme | undefined): GuardDeny => {
+    const challenge = authenticationChallenge(scheme);
+    return (status, detail) => ({
+        [GUARD_DENY]: true,
+        status,
+        detail,
+        ...(status === 401 && challenge !== undefined
+            ? {
+                  headers: {
+                      'www-authenticate': challenge,
+                  },
+              }
+            : {}),
+    });
+};
 
 export const isGuardDenial = (value: unknown): value is GuardDenial => typeof value === 'object' && value !== null && GUARD_DENY in value;
 
@@ -541,6 +577,10 @@ export type AdapterResult =
           kind: 'guard-denied';
           status: number;
           detail: string;
+          /**
+           * The `WWW-Authenticate` challenge RFC 9110 requires on a `401`.
+           */
+          headers?: Record<string, string>;
       }
     | {
           kind: 'handler-error';
@@ -902,7 +942,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 ...(handlerContext as Record<string, unknown>),
                 ...credential,
                 params,
-                deny: guardDeny,
+                deny: guardDenyFor(schemeDefinition),
                 scopes,
             } as Parameters<typeof guard>[0]);
             if (isGuardDenial(guardResult)) {
@@ -910,23 +950,18 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                     kind: 'guard-denied',
                     status: guardResult.status,
                     detail: guardResult.detail,
+                    headers: guardResult.headers,
+                };
+            }
+            for (const [field, allowed] of Object.entries(route.accessGate?.[scheme] ?? {})) {
+                if (gatePermits((guardResult ?? {})[field as never], allowed)) continue;
+                return {
+                    kind: 'guard-denied',
+                    status: 403,
+                    detail: `Forbidden: ${scheme}.${field} is not permitted on this route.`,
                 };
             }
             if (guardResult && typeof guardResult === 'object') {
-                const gate = route.accessGate?.[scheme];
-                if (gate) {
-                    for (const [field, allowed] of Object.entries(gate)) {
-                        const value = (guardResult as Record<string, unknown>)[field];
-                        const permitted = gatePermits(value, allowed);
-                        if (!permitted) {
-                            return {
-                                kind: 'guard-denied',
-                                status: 403,
-                                detail: `Forbidden: ${scheme}.${field} is not permitted on this route.`,
-                            };
-                        }
-                    }
-                }
                 securityContext[scheme] = guardResult;
             }
         }
@@ -980,7 +1015,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         const successHeaders =
             route.method === 'OPTIONS'
                 ? {
-                      Allow: allowedMethodsForPath(routes, route.path).join(', '),
+                      allow: allowedMethodsForPath(routes, route.path).join(', '),
                       ...(handlerResult.headers ?? {}),
                   }
                 : handlerResult.headers;
@@ -1190,7 +1225,7 @@ export const renderJsonResult = (
                     allowed: result.allowed,
                 },
                 {
-                    Allow: result.allowed.join(', '),
+                    allow: result.allowed.join(', '),
                 }
             );
         case 'invalid-body':
@@ -1206,7 +1241,7 @@ export const renderJsonResult = (
         case 'no-handler':
             return renderError(500, `Handler not implemented: ${result.routeKey}`);
         case 'guard-denied':
-            return renderError(result.status, result.detail);
+            return renderError(result.status, result.detail, undefined, result.headers);
         case 'unsupported-media-type':
             return renderError(415, `Unsupported Media Type: expected ${result.expected}, received ${result.received}`);
         case 'not-acceptable':
