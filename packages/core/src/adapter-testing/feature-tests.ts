@@ -552,6 +552,29 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
+        'guards.authFailureModes': async () => {
+            await usingSecured(async (secured) => {
+                const unresolved = await secured.request({
+                    method: 'GET',
+                    path: '/who-am-i',
+                });
+                expect(unresolved.status).toBe(401);
+                // RFC 9110 section 11.6.1: a 401 names the scheme the client should use.
+                expect(unresolved.headers.get('www-authenticate')).toBe('Bearer');
+
+                const gated = await secured.request({
+                    method: 'GET',
+                    path: '/owner-only',
+                    headers: {
+                        'x-workspace-token': adminToken,
+                    },
+                });
+                expect(gated.status).toBe(403);
+                // A resolved identity needs no challenge; the credential was fine.
+                expect(gated.headers.get('www-authenticate')).toBeNull();
+            });
+        },
+
         'responses.declaredContentType': async () => {
             await usingShapes(async (shapes) => {
                 const response = await shapes.request({

@@ -23,10 +23,10 @@ Return the identity's `context` and `access` fields to allow the request; they r
 
 ## Guard arguments
 
-| Property          | Description                                                                                                                            |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| credential        | The extracted credential, keyed by the identity's method (`bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`). `null` when absent. |
-| `params`          | The matched route's path params, for guards that check access to the resource in the URL.                                              |
-| `deny`            | `(status, detail) => GuardDenial`, rejects with a Problem Details response.                                                            |
-| `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).                                                   |
-| framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).                                                 |
+| Property          | Description                                                                                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| credential        | The extracted credential, keyed by the identity's method (`bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`). `null` when absent.                   |
+| `params`          | The matched route's path params, for guards that check access to the resource in the URL.                                                                |
+| `deny`            | `(status, detail) => GuardDenial`, rejects with a Problem Details response. A `401` also carries a `WWW-Authenticate` challenge built from the identity. |
+| `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).                                                                     |
+| framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).                                                                   |

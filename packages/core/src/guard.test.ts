@@ -192,6 +192,9 @@ describe('guard pipeline', () => {
             kind: 'guard-denied',
             status: 401,
             detail: 'Unauthorized',
+            headers: {
+                'www-authenticate': 'Bearer',
+            },
         });
     });
 

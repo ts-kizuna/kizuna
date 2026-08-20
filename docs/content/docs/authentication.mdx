@@ -254,7 +254,7 @@ export const requireMember = server.guard('member', async ({ apiKey, params, den
 });
 ```
 
-The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), use [request context](/docs/request-context) instead.
+The return is checked against the identity's schemas. `deny(status, detail)` responds with RFC 9457 Problem Details. A `401` also carries the `WWW-Authenticate` challenge RFC 9110 requires, named after the identity that denied: `Bearer`, or `Basic` for a basic one. An API key is not HTTP authentication and has no challenge to send, so `403` is the honest refusal for one. Guards also get the adapter's native request objects and oauth2 `scopes`. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), use [request context](/docs/request-context) instead.
 
 ## What the declaration drives
 
