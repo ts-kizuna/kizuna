@@ -66,6 +66,18 @@ export type {
 export { flattenReceivers, isCompiledReceiver, receiverDeny, ReceiverDenied } from './receivers.js';
 export { receiverRouteKey, receiverRoutes, receiverRouter, warnUnimplementedReceivers, type ReceiversMeta } from './receiver-dispatch.js';
 export {
+    createServerSurface,
+    type Server,
+    type ServerApiOptions,
+    type ContractRouter,
+    type ContractJobsRouter,
+    type ContractGroupRouter,
+    type RouteHandlerFor,
+    type GuardFnsFor,
+    type GuardsFor,
+    type RequestResolverFnsFor,
+} from './server-surface.js';
+export {
     createJobRunner,
     jobFnAt,
     JobInputError,

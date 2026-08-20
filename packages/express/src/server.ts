@@ -10,59 +10,33 @@ import {
     type ApiWithRouter,
     type ErrorFormatter,
     type GuardMap,
-    type GuardRun,
-    type GuardDeny,
-    type GuardDenial,
     type RequestContextMap,
-    type RequestContextRun,
-    type ApiParts,
     ROUTER_META,
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
-    warnUnsupportedJobOptions,
     type ServerOptions,
     type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
-    type PluginImplementations,
-    type PluginArgs,
     pluginRouterOf,
-    assembleApi,
     createAdapter,
     renderJsonResult,
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
     RECEIVERS_META,
+    createServerSurface,
+    type Server as CoreServer,
+    type ContractRouter,
+    type ContractJobsRouter,
     receiverRoutes,
     receiverRouter,
-    warnUnimplementedReceivers,
     problemDetails,
     type ReceiversMeta,
-    type ReceiverImplementation,
-    type ReceiverImplementations,
-    type ReceiverVerify,
 } from '@ts-kizuna/core/adapter';
-import type { z } from 'zod';
-import type {
-    Contract,
-    RoutesOf,
-    SchemesOf,
-    AuthOf,
-    RequestContextOf,
-    ContractPluginsOf,
-    JobsOf,
-    ReceiversOf,
-    SecurityScheme,
-    GuardSuccess,
-    CredentialOf,
-    JobHandlers,
-    JobsArg,
-    RequestContextSchema,
-    RequestContextHeaderValues,
-} from '@ts-kizuna/core';
+import type { Contract, RoutesOf, SecurityScheme, GuardSuccess } from '@ts-kizuna/core';
 import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
 
 export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
@@ -95,31 +69,13 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, Expres
  * secured by the contract's `auth` map additionally receive each required
  * identity's context in their handler args, under `auth`, keyed by the identity's name.
  */
-export type Router<C> = C extends Contract
-    ? HandlersFromAuth<
-          RoutesOf<C>,
-          ExpressHandlerContext & RequestContextValues<RequestContextOf<C>> & PluginArgs<ContractPluginsOf<C>> & JobsArg<JobsOf<C>>,
-          SchemesOf<C>,
-          AuthOf<C>
-      >
-    : C extends Routes
-      ? CoreRouter<C, ExpressHandlerContext>
-      : never;
+export type Router<C> = ContractRouter<C, ExpressHandlerContext>;
 
 /**
  * The handler for each of a contract's scheduled jobs, typed against it. Each
  * receives only the job's `input`, so the same handler can be run in process.
  */
-export type JobsRouter<C> = C extends Contract ? JobHandlers<JobsOf<C>> : never;
-
-/**
- * The handlers for a group named on the contract, or for a bare route group.
- * Both forms resolve through one signature: a second candidate of the same
- * arity costs zero-argument handlers their contextual type.
- */
-type GroupRouter<Source, GroupOrRoutes> = GroupOrRoutes extends string
-    ? Router<Source>[Extract<GroupOrRoutes, keyof Router<Source>>]
-    : Router<GroupOrRoutes>;
+export type JobsRouter<C> = ContractJobsRouter<C>;
 
 declare global {
     // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -154,38 +110,15 @@ export interface ExpressOptions {
  * authentication-only identity (no context, no access) returns nothing on
  * success, or `deny(...)`.
  */
-type GuardFns<Schemes extends Record<string, SecurityScheme>, Params> = {
-    [Name in keyof Schemes]: (
-        args: ExpressHandlerContext &
-            CredentialOf<Schemes[Name]> & {
-                params: Params;
-                deny: GuardDeny;
-                scopes: string[];
-            }
-    ) => [keyof GuardSuccess<Schemes[Name]>] extends [never]
-        ? void | GuardDenial | Promise<void | GuardDenial>
-        : GuardSuccess<Schemes[Name]> | GuardDenial | Promise<GuardSuccess<Schemes[Name]> | GuardDenial>;
-};
 
 /**
  * One guard per identity declared on the contract.
  */
-type GuardsForSchemes<Schemes extends Record<string, SecurityScheme>> = {
-    [Name in keyof Schemes]: GuardRun<ExpressHandlerContext>;
-};
 
 /**
  * The resolver functions for the request context schemas declared on `kizuna`,
  * keyed by name. Each runs on every route and returns its schema's value.
  */
-type RequestResolverFns<RequestContext extends Record<string, RequestContextSchema>> = {
-    [Name in keyof RequestContext]: (
-        args: ExpressHandlerContext & {
-            params: Record<string, string>;
-            headers: RequestContextHeaderValues<RequestContext[Name]>;
-        }
-    ) => z.output<RequestContext[Name]['context']> | Promise<z.output<RequestContext[Name]['context']>>;
-};
 
 export interface AppLike {
     use: (router: ExpressRouter) => unknown;
@@ -393,146 +326,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
     return expressRouter;
 }
 
-export interface Server<C extends Contract> {
-    /**
-     * Define a guard for one of the contract's identities. It runs before the
-     * handlers of every route whose `auth` entry requires the identity, and
-     * receives the credential its method extracted (`bearer`, `apiKey`, or
-     * `basic`, `null` when absent). Return the identity's context and access
-     * fields to allow the request, or call `deny(status, detail)`.
-     */
-    guard<const Name extends Extract<keyof SchemesOf<C>, string>>(
-        name: Name,
-        run: GuardFns<SchemesOf<C>, GuardParams<RoutesOf<C>, AuthOf<C>, Name>>[Name]
-    ): GuardRun<ExpressHandlerContext>;
-    /**
-     * Define a request context resolver declared on the contract. It runs on
-     * every route, public ones included, and never denies.
-     */
-    requestContext<const Name extends Extract<keyof RequestContextOf<C>, string>>(
-        name: Name,
-        run: RequestResolverFns<RequestContextOf<C>>[Name]
-    ): RequestContextRun<ExpressHandlerContext>;
-    /**
-     * Write typed handlers for the contract or one of its route groups.
-     */
-    router: {
-        <const GroupOrRoutes extends Extract<keyof Router<C>, string> | Routes>(
-            group: GroupOrRoutes,
-            router: GroupRouter<C, GroupOrRoutes>
-        ): GroupRouter<C, GroupOrRoutes>;
-        (router: Router<C>): Router<C>;
-    };
-    /**
-     * Write a handler for each of the contract's jobs.
-     *
-     * Pass a `transport` to say where a queued job goes. Without one, `queue`
-     * runs the job in this process and it is lost on a crash.
-     *
-     * @example
-     * export const jobs = server.jobs({
-     *     sendDigests: async () => ({
-     *         status: 200,
-     *         body: {
-     *             sent: await sendPendingDigests(),
-     *         },
-     *     }),
-     * });
-     */
-    jobs(handlers: JobsRouter<C>): JobsRouter<C>;
-    /**
-     * Implement one of the contract's receivers. The first argument names the
-     * contract entry, which is what types `body`.
-     *
-     * @example
-     * export const payments = server.receiver('payments', {
-     *     verify: verifyPayments,
-     *     handler: async ({ body }) => {
-     *         await recordPayment(body.id);
-     *     },
-     * });
-     */
-    receiver: {
-        <const Name extends Extract<keyof ReceiversOf<C>, string>>(
-            name: Name,
-            implementation: ReceiverImplementation<ReceiversOf<C>[Name], JobsOf<C>>
-        ): ReceiverImplementation<ReceiversOf<C>[Name], JobsOf<C>>;
-        /**
-         * Type a verifier written in its own file.
-         *
-         * @example
-         * export const verifyPayments = server.receiver.verify('payments', ({ raw, headers, deny }) => {
-         *     if (!isDigestValid(raw, headers['x-signature'])) {
-         *         deny();
-         *     }
-         * });
-         */
-        verify<const Name extends Extract<keyof ReceiversOf<C>, string>>(name: Name, run: ReceiverVerify): ReceiverVerify;
-    };
-    /**
-     * Assemble the router, guards, job handlers, and receivers into the api
-     * object.
-     */
-    api(
-        options: {
-            router: Router<C>;
-        } & (string extends keyof SchemesOf<C> ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<SchemesOf<C>>> }) &
-            (string extends keyof JobsOf<C> ? { jobs?: undefined } : { jobs: NoInfer<JobsRouter<C>> }) &
-            (string extends keyof RequestContextOf<C>
-                ? { requestContext?: undefined }
-                : { requestContext: NoInfer<{ [Name in keyof RequestContextOf<C>]: RequestContextRun<ExpressHandlerContext> }> }) &
-            (string extends keyof ReceiversOf<C>
-                ? { receivers?: undefined }
-                : { receivers: NoInfer<ReceiverImplementations<ReceiversOf<C>, JobsOf<C>>> }) &
-            (string extends keyof ContractPluginsOf<C>
-                ? { plugins?: undefined }
-                : { plugins: PluginImplementations<ContractPluginsOf<C>, ExpressHandlerContext> })
-    ): ExpressApi<RoutesOf<C>>;
-}
-
-const createServerSurface = <C extends Contract>(contract: C, options?: ServerOptions): Server<C> => {
-    warnUnsupportedJobOptions(contract.jobs, options?.jobTransport);
-    const server = {
-        guard: (_name: string, run: unknown) => run,
-        requestContext: (_name: string, run: unknown) => run,
-        router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
-        jobs: (handlers: unknown) => handlers,
-        receiver: Object.assign((_name: string, implementation: unknown) => implementation, {
-            verify: (_name: string, run: unknown) => run,
-        }),
-        api: ({
-            jobs,
-            receivers,
-            ...parts
-        }: ApiParts & { jobs?: Record<string, unknown>; receivers?: ReceiversMeta['implementations'] }) => {
-            if (contract.receivers) {
-                warnUnimplementedReceivers(contract.receivers, receivers ?? {});
-            }
-            const api = Object.assign(assembleApi(contract, parts), {
-                [JOBS_META]: contract.jobs
-                    ? {
-                          jobs: contract.jobs,
-                          handlers: jobs ?? {},
-                          config: contract.jobsConfig,
-                          transport: options?.jobTransport,
-                          onError: options?.onJobError,
-                      }
-                    : undefined,
-                [RECEIVERS_META]: contract.receivers
-                    ? {
-                          receivers: contract.receivers,
-                          implementations: receivers ?? {},
-                          onError: options?.onReceiverError,
-                      }
-                    : undefined,
-            }) as ExpressApi<RoutesOf<C>>;
-            return Object.assign(api, {
-                mount: (app: AppLike, mountOptions?: ExpressOptions) => mountExpress(api, app, mountOptions),
-            });
-        },
-    };
-    return server as unknown as Server<C>;
-};
+export interface Server<C extends Contract> extends CoreServer<C, ExpressHandlerContext, ExpressApi<RoutesOf<C>>> {}
 
 /**
  * Turn a contract into a server handle: the serving counterpart to `Kizuna`.
@@ -563,6 +357,14 @@ export class KizunaServer<C extends Contract> implements Server<C> {
     declare readonly api: Server<C>['api'];
 
     constructor(contract: C, options?: ServerOptions) {
-        Object.assign(this, createServerSurface(contract, options));
+        Object.assign(
+            this,
+            createServerSurface<C, ExpressHandlerContext, ExpressApi<RoutesOf<C>>>(contract, options, (assembled) => {
+                const api = assembled as ExpressApi<RoutesOf<C>>;
+                return Object.assign(api, {
+                    mount: (app: AppLike, mountOptions?: ExpressOptions) => mountExpress(api, app, mountOptions),
+                });
+            })
+        );
     }
 }
