@@ -50,6 +50,7 @@ jobs:
                       const validScopes = [...packageScopes, ...config.extraScopes];
 
                       // feat/fix/perf/refactor need a scope; other types may omit it. The "new scope" label (maintainers only) skips scope checks for PRs that add a package.
+                      // Only breakingTypes may carry `!`.
                       const newScopeLabel = config.newScopeLabel;
                       const hasNewScopeLabel = (pr.labels || []).some((label) => label.name === newScopeLabel);
 
@@ -59,6 +60,9 @@ jobs:
                           titleProblem = 'Use the format `type(scope): summary`.';
                       } else if (!config.types.includes(match[1])) {
                           titleProblem = `\`${match[1]}\` is not a valid type. Use one of: ${config.types.join(', ')}.`;
+                      } else if (match[3] && !config.breakingTypes.includes(match[1])) {
+                          const allowed = new Intl.ListFormat('en', { type: 'disjunction' }).format(config.breakingTypes.map((type) => '`' + type + '!`'));
+                          titleProblem = `\`${match[1]}\` cannot carry \`!\`. A change that breaks callers belongs under ${allowed}.`;
                       } else if (!hasNewScopeLabel) {
                           const type = match[1];
                           const scope = match[2];

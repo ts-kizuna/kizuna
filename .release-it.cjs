@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 /* eslint-disable no-undef */
-const { getTypes, ignoreReleaseCommits } = require('./tools/release-shared.cjs');
+const { getTypes, ignoreReleaseCommits, whatBump } = require('./tools/release-shared.cjs');
 
 const commitUrl = '{{~@root.host}}/{{@root.owner}}/{{@root.repository}}/commit/{{commit.hash}}';
 
@@ -55,8 +55,8 @@ module.exports = {
             preset: {
                 name: 'conventionalcommits',
                 types: getTypes(),
-                preMajor: true,
             },
+            whatBump,
             gitRawCommitsOpts: {
                 ignore: ignoreReleaseCommits,
             },
