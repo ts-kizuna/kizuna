@@ -114,3 +114,33 @@ export function assembleContract<
         validation: config.validation,
     };
 }
+
+/**
+ * A contract's route groups.
+ */
+export type RoutesOf<C extends Contract> = C['routes'];
+
+/**
+ * A contract's identities, or an empty map when it declares none.
+ */
+export type SchemesOf<C extends Contract> = Exclude<C['securitySchemes'], undefined>;
+
+/**
+ * The `auth` map a contract was built with.
+ */
+export type AuthOf<C extends Contract> = Exclude<C['auth'], undefined>;
+
+/**
+ * A contract's request context schemas, or an empty map when it declares none.
+ */
+export type RequestContextOf<C extends Contract> = Exclude<C['requestContext'], undefined>;
+
+/**
+ * A contract's plugins, or an empty map when it declares none.
+ */
+export type ContractPluginsOf<C extends Contract> = Exclude<C['plugins'], undefined>;
+
+/**
+ * A contract's jobs, or an empty map when it declares none.
+ */
+export type JobsOf<C extends Contract> = Exclude<C['jobs'], undefined>;

@@ -9,49 +9,30 @@ import {
     type ApiWithRouter,
     type ErrorFormatter,
     type GuardMap,
-    type GuardRun,
-    type GuardDeny,
-    type GuardDenial,
     type RequestContextMap,
-    type RequestContextRun,
-    type ApiParts,
     ROUTER_META,
     GUARDS_META,
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
-    warnUnsupportedJobOptions,
     type ServerOptions,
     type JobsMeta,
     pluginRoutesOf,
     pluginExportsOf,
-    type PluginImplementations,
-    type PluginArgs,
-    type ContractPlugins,
     pluginRouterOf,
-    assembleApi,
     createAdapter,
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
-    type Jobs,
+    createServerSurface,
+    type Server as CoreServer,
+    type ContractRouter,
+    type ContractJobsRouter,
     renderJsonResult,
     parseFetchBody,
     headersToObject,
 } from '@ts-kizuna/core/adapter';
-import type { z } from 'zod';
-import type {
-    Contract,
-    TagOptions,
-    SecurityScheme,
-    GuardSuccess,
-    CredentialOf,
-    JobHandlers,
-    JobsArg,
-    RequestContextSchema,
-    RequestContextHeaderValues,
-} from '@ts-kizuna/core';
-import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
+import type { Contract, RoutesOf, SecurityScheme, GuardSuccess } from '@ts-kizuna/core';
 
 export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;
@@ -79,35 +60,13 @@ export type RouteHandler<R extends RouteDefinition, E extends Env = Env> = CoreR
  * contract's `auth` map additionally receive each required identity's context
  * in their handler args, under `auth`, keyed by the identity's name.
  */
-export type Router<C, E extends Env = Env> =
-    C extends Contract<infer R, infer _Tags, infer _Codes, infer Schemes, infer Auth, infer RequestContext, infer Plugins, infer J>
-        ? HandlersFromAuth<
-              R,
-              HonoHandlerContext<E> & RequestContextValues<RequestContext> & PluginArgs<Plugins> & JobsArg<J>,
-              Schemes,
-              Auth
-          >
-        : C extends Routes
-          ? CoreRouter<C, HonoHandlerContext<E>>
-          : never;
+export type Router<C, E extends Env = Env> = ContractRouter<C, HonoHandlerContext<E>>;
 
 /**
  * The handler for each of a contract's scheduled jobs, typed against it. Each
  * receives only the job's `input`, so the same handler can be run in process.
  */
-export type JobsRouter<C> =
-    C extends Contract<infer _R, infer _Tags, infer _Codes, infer _Schemes, infer _Auth, infer _RequestContext, infer _Plugins, infer J>
-        ? JobHandlers<J>
-        : never;
-
-/**
- * The handlers for a group named on the contract, or for a bare route group.
- * Both forms resolve through one signature: a second candidate of the same
- * arity costs zero-argument handlers their contextual type.
- */
-type GroupRouter<Source, GroupOrRoutes, E extends Env> = GroupOrRoutes extends string
-    ? Router<Source, E>[Extract<GroupOrRoutes, keyof Router<Source, E>>]
-    : Router<GroupOrRoutes, E>;
+export type JobsRouter<C> = ContractJobsRouter<C>;
 
 export interface HonoOptions {
     /**
@@ -134,38 +93,15 @@ export interface HonoOptions {
  * authentication-only identity (no context, no access) returns nothing on
  * success, or `deny(...)`.
  */
-type GuardFns<Schemes extends Record<string, SecurityScheme>, Params, E extends Env> = {
-    [Name in keyof Schemes]: (
-        args: HonoHandlerContext<E> &
-            CredentialOf<Schemes[Name]> & {
-                params: Params;
-                deny: GuardDeny;
-                scopes: string[];
-            }
-    ) => [keyof GuardSuccess<Schemes[Name]>] extends [never]
-        ? void | GuardDenial | Promise<void | GuardDenial>
-        : GuardSuccess<Schemes[Name]> | GuardDenial | Promise<GuardSuccess<Schemes[Name]> | GuardDenial>;
-};
 
 /**
  * One guard per identity declared on the contract.
  */
-type GuardsForSchemes<Schemes extends Record<string, SecurityScheme>, E extends Env> = {
-    [Name in keyof Schemes]: GuardRun<HonoHandlerContext<E>>;
-};
 
 /**
  * The resolver functions for the request context schemas declared on `kizuna`,
  * keyed by name. Each runs on every route and returns its schema's value.
  */
-type RequestResolverFns<RequestContext extends Record<string, RequestContextSchema>, E extends Env> = {
-    [Name in keyof RequestContext]: (
-        args: HonoHandlerContext<E> & {
-            params: Record<string, string>;
-            headers: RequestContextHeaderValues<RequestContext[Name]>;
-        }
-    ) => z.output<RequestContext[Name]['context']> | Promise<z.output<RequestContext[Name]['context']>>;
-};
 
 const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { c: Context<Env>; formatError?: ErrorFormatter<Request> }>({
     buildHandlerContext: (_adapterRequest, { c }) => ({ c }),
@@ -203,7 +139,6 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
     const pluginExports = pluginExportsOf(api);
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
     const jobRunner = jobRunnerFrom(jobsMeta);
-
     const mountRoute = (
         routeKey: string,
         route: RouteDefinition,
@@ -269,169 +204,29 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
     }
 }
 
-type ServerContract<
-    R extends Routes,
-    Schemes extends Record<string, SecurityScheme>,
-    Auth,
-    RequestContext extends Record<string, RequestContextSchema>,
-    Plugins extends ContractPlugins,
-    J extends Jobs = Jobs,
-> = Contract<R, Record<string, TagOptions>, string, Schemes, Auth, RequestContext, Plugins, J>;
-
-export interface Server<
-    R extends Routes,
-    Schemes extends Record<string, SecurityScheme>,
-    Auth,
-    RequestContext extends Record<string, RequestContextSchema>,
-    Plugins extends ContractPlugins,
-    E extends Env = Env,
-    J extends Jobs = Jobs,
-> {
-    /**
-     * Define a guard for one of the contract's identities. It runs before the
-     * handlers of every route whose `auth` entry requires the identity, and
-     * receives the credential its method extracted (`bearer`, `apiKey`, or
-     * `basic`, `null` when absent). Return the identity's context and access
-     * fields to allow the request, or call `deny(status, detail)`.
-     */
-    guard<const Name extends Extract<keyof Schemes, string>>(
-        name: Name,
-        run: GuardFns<Schemes, GuardParams<R, Auth, Name>, E>[Name]
-    ): GuardRun<HonoHandlerContext<E>>;
-    /**
-     * Define a request context resolver declared on the contract. It runs on
-     * every route, public ones included, and never denies.
-     */
-    requestContext<const Name extends Extract<keyof RequestContext, string>>(
-        name: Name,
-        run: RequestResolverFns<RequestContext, E>[Name]
-    ): RequestContextRun<HonoHandlerContext<E>>;
-    /**
-     * Write typed handlers for the contract or one of its route groups.
-     */
-    router: {
-        <
-            const GroupOrRoutes extends
-                | Extract<keyof Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>, string>
-                | Routes,
-        >(
-            group: GroupOrRoutes,
-            router: GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes, E>
-        ): GroupRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, GroupOrRoutes, E>;
-        (
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>
-        ): Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>;
-    };
-    /**
-     * Write a handler for each of the contract's jobs.
-     *
-     * Pass a `transport` to say where a queued job goes. Without one, `queue`
-     * runs the job in this process and it is lost on a crash.
-     *
-     * @example
-     * export const jobs = server.jobs({
-     *     sendDigests: async () => ({
-     *         status: 200,
-     *         body: {
-     *             sent: await sendPendingDigests(),
-     *         },
-     *     }),
-     * });
-     */
-    jobs(
-        handlers: JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>
-    ): JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>;
-    /**
-     * Assemble the router, guards, and job handlers into the api object.
-     */
-    api(
-        options: {
-            router: Router<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, E>;
-        } & (string extends keyof Schemes ? { guards?: undefined } : { guards: NoInfer<GuardsForSchemes<Schemes, E>> }) &
-            (string extends keyof J
-                ? { jobs?: undefined }
-                : { jobs: NoInfer<JobsRouter<ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>>> }) &
-            (string extends keyof RequestContext
-                ? { requestContext?: undefined }
-                : { requestContext: NoInfer<{ [Name in keyof RequestContext]: RequestContextRun<HonoHandlerContext<E>> }> }) &
-            (string extends keyof Plugins ? { plugins?: undefined } : { plugins: PluginImplementations<Plugins, HonoHandlerContext<E>> })
-    ): HonoApi<R>;
-}
-
-const createServerSurface = <
-    const R extends Routes,
-    Schemes extends Record<string, SecurityScheme>,
-    Auth,
-    RequestContext extends Record<string, RequestContextSchema>,
-    Plugins extends ContractPlugins,
-    E extends Env = Env,
-    J extends Jobs = Jobs,
->(
-    contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>,
-    options?: ServerOptions
-): Server<R, Schemes, Auth, RequestContext, Plugins, E, J> => {
-    warnUnsupportedJobOptions(contract.jobs, options?.jobTransport);
-    const server = {
-        guard: (_name: string, run: unknown) => run,
-        requestContext: (_name: string, run: unknown) => run,
-        router: (groupOrRouter: unknown, groupRouter?: unknown) => groupRouter ?? groupOrRouter,
-        jobs: (handlers: unknown) => handlers,
-        api: ({ jobs, ...parts }: ApiParts & { jobs?: Record<string, unknown> }) => {
-            const api = Object.assign(assembleApi(contract, parts), {
-                [JOBS_META]: contract.jobs
-                    ? {
-                          jobs: contract.jobs,
-                          handlers: jobs ?? {},
-                          config: contract.jobsConfig,
-                          transport: options?.jobTransport,
-                          onError: options?.onJobError,
-                      }
-                    : undefined,
-            }) as HonoApi<R>;
-            return Object.assign(api, {
-                mount: <E extends Env = Env>(app: Hono<E>, mountOptions?: HonoOptions) => mountHono(api, app, mountOptions),
-            });
-        },
-    };
-    return server as unknown as Server<R, Schemes, Auth, RequestContext, Plugins, E, J>;
-};
+export interface Server<C extends Contract, E extends Env = Env> extends CoreServer<C, HonoHandlerContext<E>, HonoApi<RoutesOf<C>>> {}
 
 /**
  * Turn a contract into a server handle: the serving counterpart to `Kizuna`.
  * Keep the instance and use `server.guard` to define guards, `server.router`
  * to write typed handlers, and `server.api` to assemble them.
- *
- * @example
- * const server = new KizunaServer(contract);
- *
- * const requireUser = server.guard('user', ({ bearer, deny }) => {
- *     const session = bearer && sessions.get(bearer.token);
- *     return session ? { userId: session.userId } : deny(401, 'Unauthorized');
- * });
- *
- * export const api = server.api({
- *     router,
- *     guards: {
- *         user: requireUser,
- *     },
- * });
  */
-export class KizunaServer<
-    const R extends Routes,
-    Schemes extends Record<string, SecurityScheme>,
-    Auth,
-    RequestContext extends Record<string, RequestContextSchema>,
-    Plugins extends ContractPlugins,
-    E extends Env = Env,
-    J extends Jobs = Jobs,
-> implements Server<R, Schemes, Auth, RequestContext, Plugins, E, J> {
-    declare readonly guard: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['guard'];
-    declare readonly requestContext: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['requestContext'];
-    declare readonly router: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['router'];
-    declare readonly jobs: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['jobs'];
-    declare readonly api: Server<R, Schemes, Auth, RequestContext, Plugins, E, J>['api'];
+export class KizunaServer<C extends Contract, E extends Env = Env> implements Server<C, E> {
+    declare readonly guard: Server<C, E>['guard'];
+    declare readonly requestContext: Server<C, E>['requestContext'];
+    declare readonly router: Server<C, E>['router'];
+    declare readonly jobs: Server<C, E>['jobs'];
+    declare readonly api: Server<C, E>['api'];
 
-    constructor(contract: ServerContract<R, Schemes, Auth, RequestContext, Plugins, J>, options?: ServerOptions) {
-        Object.assign(this, createServerSurface(contract, options));
+    constructor(contract: C, options?: ServerOptions) {
+        Object.assign(
+            this,
+            createServerSurface<C, HonoHandlerContext<E>, HonoApi<RoutesOf<C>>>(contract, options, (assembled) => {
+                const api = assembled as HonoApi<RoutesOf<C>>;
+                return Object.assign(api, {
+                    mount: <Env_ extends Env = Env>(app: Hono<Env_>, mountOptions?: HonoOptions) => mountHono(api, app, mountOptions),
+                });
+            })
+        );
     }
 }
