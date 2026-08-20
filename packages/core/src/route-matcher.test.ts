@@ -67,7 +67,7 @@ describe('duplicate route detection', () => {
             },
         });
         expect(() => assembleApi({ routes: duplicateRoutes }, { router: {} })).toThrow(
-            /fetchUser.*conflicts with.*getUser|getUser.*conflicts with.*fetchUser/
+            /fetchUser.*collides with.*getUser|getUser.*collides with.*fetchUser/
         );
     });
 
@@ -84,7 +84,7 @@ describe('duplicate route detection', () => {
                 responses: { 200: z.string() },
             },
         });
-        expect(() => assembleApi({ routes: conflictingRoutes }, { router: {} })).toThrow(/conflicts with/);
+        expect(() => assembleApi({ routes: conflictingRoutes }, { router: {} })).toThrow(/collides with/);
     });
 
     it('throws on duplicate across nested sub-routes with dot-notated keys in message', () => {
