@@ -67,6 +67,10 @@ export const questions: Question[] = [
                     while before open-sourcing it, and we kept the version history rather than resetting the number. The beta label is about
                     the API surface, not about stability.
                 </p>
+                <p className={styles.body}>
+                    Read that number as 0.x. While ts-kizuna is in beta a minor version can carry a breaking change, and every release names
+                    them under <strong className={styles.strong}>&#9888; BREAKING CHANGES</strong>.
+                </p>
             </>
         ),
     },

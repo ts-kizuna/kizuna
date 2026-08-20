@@ -2,6 +2,32 @@
 /* eslint-disable no-undef */
 const { getTypes, ignoreReleaseCommits } = require('./tools/release-shared.cjs');
 
+const commitUrl = '{{~@root.host}}/{{@root.owner}}/{{@root.repository}}/commit/{{commit.hash}}';
+
+const mainTemplate = `{{> header}}
+{{#if noteGroups}}
+{{#each noteGroups}}
+
+### ⚠ {{title}}
+
+{{#each notes}}
+* {{#if commit.scope}}**{{commit.scope}}:** {{/if}}{{text}} ([{{commit.shortHash}}](${commitUrl}))
+{{/each}}
+{{/each}}
+{{/if}}
+{{#each commitGroups}}
+
+{{#if title}}
+### {{title}}
+
+{{/if}}
+{{#each commits}}
+{{> commit root=@root}}
+{{/each}}
+{{/each}}
+{{> footer}}
+`;
+
 module.exports = {
     git: {
         commit: true,
@@ -29,11 +55,13 @@ module.exports = {
             preset: {
                 name: 'conventionalcommits',
                 types: getTypes(),
+                preMajor: true,
             },
             gitRawCommitsOpts: {
                 ignore: ignoreReleaseCommits,
             },
             writerOpts: {
+                mainTemplate,
                 headerPartial:
                     '## [{{version}}]({{~@root.host}}/{{@root.owner}}/{{@root.repository}}/compare/{{previousTag}}...v{{version}})\n',
             },
