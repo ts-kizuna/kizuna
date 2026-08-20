@@ -201,7 +201,7 @@ export const contractOf = <C = unknown>(api: unknown): C => (api as Record<symbo
 /**
  * What kizuna puts in handler args. Must agree with the spread in `runPipeline`.
  */
-export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'path', 'throwError', 'auth', 'requestContext', 'plugins'] as const;
+export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'throwError', 'auth', 'requestContext', 'plugins'] as const;
 
 /**
  * The adapter's own context, with kizuna's arguments removed.
@@ -865,9 +865,6 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         };
     }
 
-    const requestPath =
-        request.resolution.kind === 'core-match' ? request.resolution.path : (request.resolution.path ?? `${basePath ?? ''}${route.path}`);
-
     if (route.rawBody) {
         try {
             raw.body = await request.readBody(route);
@@ -988,7 +985,6 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             body: validation.parsed.body,
             headers: validation.parsed.headers,
             throwError,
-            ...(route.rawBody ? { path: requestPath } : {}),
             ...handlerContext,
             ...(jobRunner ? { jobs: jobRunner } : {}),
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),

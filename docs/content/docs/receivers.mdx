@@ -143,14 +143,13 @@ export const api = server.api({
 
 A verifier receives:
 
-| Argument  | Is                                                       |
-| --------- | -------------------------------------------------------- |
-| `raw`     | the exact bytes that arrived                             |
-| `text`    | those bytes as a string, which is what libraries want    |
-| `headers` | every request header, lowercased                         |
-| `method`  | the request method                                       |
-| `path`    | the path as the vendor requested it, `basePath` included |
-| `deny`    | refuses the delivery, and never returns                  |
+| Argument  | Is                                                    |
+| --------- | ----------------------------------------------------- |
+| `raw`     | the exact bytes that arrived                          |
+| `text`    | those bytes as a string, which is what libraries want |
+| `headers` | every request header, lowercased                      |
+| `method`  | the request method                                    |
+| `deny`    | refuses the delivery, and never returns               |
 
 Without a library, `deny` turns away a comparison that returned `false`. Like `throwError`, it never returns, so nothing after it runs:
 

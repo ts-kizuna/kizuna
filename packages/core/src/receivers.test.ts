@@ -26,7 +26,6 @@ const deliveryArgs = (body: string, jobs?: unknown) => ({
     headers: {
         'x-delivery': 'del_1',
     },
-    path: '/webhooks/stripe',
     jobs,
 });
 
@@ -181,7 +180,7 @@ describe('receiverRouter', () => {
         });
     });
 
-    it('hands the verifier the bytes, the text, and the request line', async () => {
+    it('hands the verifier the bytes and the text', async () => {
         const verify = vi.fn();
         await deliver(
             metaWith({
@@ -191,7 +190,6 @@ describe('receiverRouter', () => {
         expect(verify.mock.calls[0]![0]).toMatchObject({
             text: '{"id":"evt_1","type":"invoice.paid"}',
             method: 'POST',
-            path: '/webhooks/stripe',
         });
         expect((verify.mock.calls[0]![0] as { raw: Uint8Array }).raw).toBeInstanceOf(Uint8Array);
     });

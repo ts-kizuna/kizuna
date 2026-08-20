@@ -164,7 +164,6 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                     routeKey,
                     route,
                     params: c.req.param() as Record<string, string>,
-                    path: url.pathname,
                 },
                 query: Object.fromEntries(url.searchParams),
                 headers: headersToObject(c.req.raw.headers),

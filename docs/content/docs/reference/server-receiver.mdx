@@ -58,7 +58,6 @@ Return nothing to accept the delivery, and throw to turn it away. Every vendor l
 | `text`    | `string`                      | Those bytes as a string, which is what libraries want     |
 | `headers` | `Record<string, string>`      | Every request header, lowercased                          |
 | `method`  | `string`                      | The request method, uppercased                            |
-| `path`    | `string`                      | The path as the vendor requested it, `basePath` included  |
 | `deny`    | `(status?, detail?) => never` | Refuses the delivery. Answers `401` unless given a status |
 
 `deny` never returns, so the lines after it do not run and a forgotten `return` cannot let a forged delivery through. A verifier that throws anything else refuses the delivery too, and the error goes to `onReceiverError`.

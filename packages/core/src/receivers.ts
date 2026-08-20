@@ -112,10 +112,6 @@ export interface ReceiverVerifyArgs {
      * The request method, uppercased.
      */
     method: string;
-    /**
-     * The path as the vendor requested it, including any `basePath`.
-     */
-    path: string;
     deny: ReceiverDeny;
 }
 

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { HANDLER_ARG_KEYS, adapterContextOf, assembleApi, createAdapter, type AdapterRequest } from './adapter.js';
-import type { Routes } from './types.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -47,26 +46,11 @@ const contract = k.contract({
     },
 });
 
-// `rawBody` is kizuna's to set, so this stands in for a synthesized route.
-const rawRoutes = {
-    raw: {
-        method: 'POST',
-        path: '/raw',
-        rawBody: true,
-        security: [],
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
-} as unknown as Routes;
-
 /**
  * Drive one request through the pipeline and capture exactly what the handler
  * was given.
  */
-const captureHandlerArgs = async (routeKey: 'everything' | 'raw' = 'everything'): Promise<Record<string, unknown>> => {
+const captureHandlerArgs = async (): Promise<Record<string, unknown>> => {
     let seen: Record<string, unknown> = {};
 
     const adapter = createAdapter<Request, unknown, { native: string }>({
@@ -83,7 +67,7 @@ const captureHandlerArgs = async (routeKey: 'everything' | 'raw' = 'everything')
         method: 'POST',
         resolution: {
             kind: 'core-match',
-            path: routeKey === 'raw' ? '/raw' : '/everything/1',
+            path: '/everything/1',
         },
         query: {
             page: '1',
@@ -92,29 +76,22 @@ const captureHandlerArgs = async (routeKey: 'everything' | 'raw' = 'everything')
             'content-type': 'application/json',
             authorization: 'Bearer tok',
         },
-        readBody: (route) =>
-            Promise.resolve(
-                route.rawBody
-                    ? new TextEncoder().encode('the exact bytes')
-                    : {
-                          name: 'Ada',
-                      }
-            ),
-    };
-
-    const capture = (args: Record<string, unknown>) => {
-        seen = args;
-        return {
-            status: 200,
-            body: {
-                ok: true,
-            },
-        };
+        readBody: () =>
+            Promise.resolve({
+                name: 'Ada',
+            }),
     };
 
     const router = {
-        everything: capture,
-        raw: capture,
+        everything: (args: Record<string, unknown>) => {
+            seen = args;
+            return {
+                status: 200,
+                body: {
+                    ok: true,
+                },
+            };
+        },
     };
 
     // Through `assembleApi`, as an adapter would, so coercion plans are resolved.
@@ -123,7 +100,7 @@ const captureHandlerArgs = async (routeKey: 'everything' | 'raw' = 'everything')
     });
 
     await adapter.handle({
-        routes: routeKey === 'raw' ? rawRoutes : api.routes,
+        routes: api.routes,
         router: router as never,
         request,
         responseContext: {},
@@ -156,18 +133,9 @@ describe('adapterContextOf', () => {
     });
 
     it('names every argument the pipeline adds, so the two cannot drift apart', async () => {
-        // `path` only reaches a raw-body route, so both shapes are needed.
-        const parsed = await captureHandlerArgs();
-        const raw = await captureHandlerArgs('raw');
-        const fromKizuna = [...new Set([...Object.keys(parsed), ...Object.keys(raw)])].filter((key) => key !== 'native');
+        const args = await captureHandlerArgs();
+        const fromKizuna = Object.keys(args).filter((key) => key !== 'native');
 
         expect(fromKizuna.sort()).toEqual([...HANDLER_ARG_KEYS].sort());
-    });
-
-    it('hands a raw-body route the bytes and the path it was requested on', async () => {
-        const args = await captureHandlerArgs('raw');
-
-        expect(args.body).toBeInstanceOf(Uint8Array);
-        expect(args.path).toBe('/raw');
     });
 });

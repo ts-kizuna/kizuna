@@ -221,7 +221,6 @@ export const fastifyKizuna = fastifyPlugin(
                             routeKey,
                             route,
                             params: (request.params ?? {}) as Record<string, string>,
-                            path: request.url.split('?')[0],
                         },
                         query: (request.query ?? {}) as Record<string, string>,
                         headers: request.headers,

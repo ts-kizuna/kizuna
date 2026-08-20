@@ -57,7 +57,6 @@ export const receiverRoutes = (meta: ReceiversMeta): Routes => {
 interface ReceiverRouteArgs {
     body: Uint8Array;
     headers: Record<string, string>;
-    path: string;
     jobs?: unknown;
 }
 
@@ -89,7 +88,6 @@ const runReceiver = async (
             text: new TextDecoder().decode(args.body),
             headers: args.headers,
             method: 'POST',
-            path: args.path,
             deny: receiverDeny,
         });
     } catch (error) {

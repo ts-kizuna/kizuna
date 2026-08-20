@@ -356,12 +356,11 @@ test('conforms to the shared adapter type catalogue', () => {
             });
         },
         'receivers.verifyArgs': () => {
-            new KizunaServer(receiverTypeContract).receiver.verify('stripe', ({ raw, text, headers, method, path, deny }) => {
+            new KizunaServer(receiverTypeContract).receiver.verify('stripe', ({ raw, text, headers, method, deny }) => {
                 expectTypeOf(raw).toEqualTypeOf<Uint8Array>();
                 expectTypeOf(text).toEqualTypeOf<string>();
                 expectTypeOf(headers).toEqualTypeOf<Record<string, string>>();
                 expectTypeOf(method).toEqualTypeOf<string>();
-                expectTypeOf(path).toEqualTypeOf<string>();
                 expectTypeOf(deny).returns.toBeNever();
             });
         },

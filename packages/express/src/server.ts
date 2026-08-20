@@ -260,7 +260,6 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                         routeKey,
                         route,
                         params: req.params as Record<string, string>,
-                        path: req.originalUrl.split('?')[0],
                     },
                     query: req.query,
                     headers: req.headers,
