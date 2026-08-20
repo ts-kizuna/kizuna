@@ -12,6 +12,9 @@ const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
+});
+
+const contract = k.contract({
     plugins: {
         openApi: openApiPlugin({
             info: {
@@ -21,9 +24,6 @@ const k = new Kizuna({
             docsPath: '/docs',
         }),
     },
-});
-
-const contract = k.contract({
     routes: k.routes('api', {
         getUser: {
             method: 'GET',
@@ -90,6 +90,8 @@ describe('openApiPlugin', () => {
             tags: Kizuna.tags({
                 api: 'API',
             }),
+        });
+        const servedContract = servedK.contract({
             plugins: {
                 openApi: openApiPlugin({
                     info: {
@@ -99,8 +101,6 @@ describe('openApiPlugin', () => {
                     jsonPath: '/openapi.json',
                 }),
             },
-        });
-        const servedContract = servedK.contract({
             routes: servedK.routes('api', {
                 ping: {
                     method: 'GET',
@@ -165,6 +165,8 @@ describe('openApiPlugin', () => {
             tags: Kizuna.tags({
                 api: 'API',
             }),
+        });
+        const specOnly = specOnlyK.contract({
             plugins: {
                 openApi: openApiPlugin({
                     info: {
@@ -174,8 +176,6 @@ describe('openApiPlugin', () => {
                     jsonPath: '/openapi.json',
                 }),
             },
-        });
-        const specOnly = specOnlyK.contract({
             routes: specOnlyK.routes('api', {
                 ping: {
                     method: 'GET',
@@ -215,6 +215,8 @@ describe('openApiPlugin', () => {
             tags: Kizuna.tags({
                 api: 'API',
             }),
+        });
+        const custom = customK.contract({
             plugins: {
                 openApi: openApiPlugin({
                     info: {
@@ -225,8 +227,6 @@ describe('openApiPlugin', () => {
                     yamlPath: '/spec.yaml',
                 }),
             },
-        });
-        const custom = customK.contract({
             routes: customK.routes('api', {
                 ping: {
                     method: 'GET',
@@ -268,6 +268,8 @@ describe('openApiPlugin', () => {
             tags: Kizuna.tags({
                 api: 'API',
             }),
+        });
+        const jsonOnly = jsonOnlyK.contract({
             plugins: {
                 openApi: openApiPlugin({
                     info: {
@@ -278,8 +280,6 @@ describe('openApiPlugin', () => {
                     yamlPath: '/openapi.yaml',
                 }),
             },
-        });
-        const jsonOnly = jsonOnlyK.contract({
             routes: jsonOnlyK.routes('api', {
                 ping: {
                     method: 'GET',

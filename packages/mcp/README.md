@@ -10,13 +10,15 @@ pnpm add @ts-kizuna/mcp
 
 ## Usage
 
-Declare the plugin on `new Kizuna()`:
+Declare the plugin on `k.contract`:
 
 ```ts
-import { Kizuna } from '@ts-kizuna/core';
 import { mcpPlugin } from '@ts-kizuna/mcp';
+import { k } from './k';
+import { routes } from './routes';
 
-export const k = new Kizuna({
+export const contract = k.contract({
+    routes,
     plugins: {
         mcp: mcpPlugin({
             name: 'My API',

@@ -182,7 +182,6 @@ describe('the client-safe boundary', () => {
 });
 
 const DEMO_CONTRACT = path.join(ROOT, 'apps/shared/src/contract.ts');
-const DEMO_KIZUNA = path.join(ROOT, 'apps/shared/src/k.ts');
 
 describe('a contract stays client-safe end to end', () => {
     test('apps/shared contract bundles for the browser, plugins and all', async () => {
@@ -259,8 +258,8 @@ describe('every plugin is covered', () => {
      * the classification alone.
      */
     test('the demo contract installs every plugin', () => {
-        const installed = fs.readFileSync(DEMO_KIZUNA, 'utf8');
+        const installed = fs.readFileSync(DEMO_CONTRACT, 'utf8');
         const missing = [...declarations.keys()].filter((specifier) => !installed.includes(`from '${specifier}'`));
-        expect(missing, 'install these on apps/shared/src/k.ts').toEqual([]);
+        expect(missing, 'install these on apps/shared/src/contract.ts').toEqual([]);
     });
 });

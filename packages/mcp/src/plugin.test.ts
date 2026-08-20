@@ -13,11 +13,6 @@ const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
-    plugins: {
-        mcp: mcpPlugin({
-            name: 'Test API',
-        }),
-    },
 });
 
 const routes = k.routes('api', {
@@ -35,6 +30,11 @@ const routes = k.routes('api', {
 });
 
 const contract = k.contract({
+    plugins: {
+        mcp: mcpPlugin({
+            name: 'Test API',
+        }),
+    },
     routes,
 });
 

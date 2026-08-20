@@ -649,9 +649,6 @@ const pluginK = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
-    plugins: {
-        probe: probePlugin,
-    },
 });
 
 export const pluginRoutes = pluginK.routes('api', {
@@ -677,6 +674,9 @@ export const pluginRoutes = pluginK.routes('api', {
 
 export const pluginContract = pluginK.contract({
     routes: pluginRoutes,
+    plugins: {
+        probe: probePlugin,
+    },
 });
 
 export const pluginImplementations = {

@@ -19,15 +19,17 @@ MCP support is new and still settling. The plugin options and the generated tool
 
 ## Declare the plugin
 
-MCP is a [plugin](/docs/plugins), declared on `new Kizuna()` and served by `api.mount`:
+MCP is a [plugin](/docs/plugins), declared on `k.contract` and served by `api.mount`:
 
-```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+```ts title="contract.ts"
 import { mcpPlugin } from '@ts-kizuna/mcp';
+import { k } from './k';
+import { routes } from './routes';
+import { auth } from './auth';
 
-export const k = new Kizuna({
-    tags,
-    identities,
+export const contract = k.contract({
+    routes,
+    auth,
     plugins: {
         mcp: mcpPlugin({
             name: 'My API',

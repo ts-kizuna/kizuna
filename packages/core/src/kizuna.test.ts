@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { RouteDefinition, Routes } from './types.js';
 import { Kizuna } from './kizuna.js';
+import { createPlugin } from './plugin.js';
 
 const user = Kizuna.identity.bearer({
     context: z.object({
@@ -533,5 +534,100 @@ describe('nested group auth', () => {
                 },
             })
         ).toThrow(/login/);
+    });
+});
+
+describe('k.contract: plugins', () => {
+    const k = new Kizuna({
+        tags: Kizuna.tags({
+            api: 'API',
+        }),
+    });
+
+    const routes = k.routes('api', {
+        health: {
+            method: 'GET',
+            path: '/health',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+    });
+
+    const probePlugin = (props: { skip?: Record<string, boolean> } = {}) =>
+        createPlugin({
+            name: 'probe',
+            serverModule: '@example/probe/server',
+            routes: {
+                status: {
+                    method: 'GET',
+                    path: '/probe/status',
+                    responses: {
+                        200: z.object({
+                            skipped: z.array(z.string()),
+                        }),
+                    },
+                },
+            },
+            props,
+        });
+
+    it('carries a plugin map onto the contract', () => {
+        const contract = k.contract({
+            routes,
+            plugins: {
+                probe: probePlugin(),
+            },
+        });
+
+        expect(Object.keys(contract.plugins ?? {})).toEqual(['probe']);
+    });
+
+    it('calls a plugins function with the contract routes', () => {
+        const seen: string[][] = [];
+
+        const contract = k.contract({
+            routes,
+            plugins: ({ routes: given }) => {
+                seen.push(Object.keys(given));
+                return {
+                    probe: probePlugin({
+                        skip: {
+                            health: true,
+                        },
+                    }),
+                };
+            },
+        });
+
+        expect(seen).toEqual([['health']]);
+        expect(contract.plugins?.['probe']?.props).toEqual({
+            skip: {
+                health: true,
+            },
+        });
+    });
+
+    it('checks a plugin route against the contract routes', () => {
+        expect(() =>
+            k.contract({
+                routes: k.routes('api', {
+                    status: {
+                        method: 'GET',
+                        path: '/probe/status',
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    },
+                }),
+                plugins: {
+                    probe: probePlugin(),
+                },
+            })
+        ).toThrow(/probe\/status/);
     });
 });

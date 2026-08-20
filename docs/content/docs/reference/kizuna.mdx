@@ -19,7 +19,6 @@ new Kizuna(config?: {
     requestContext?: Record<string, RequestContext>;
     tags?: TagSet;
     validation?: { issueCodes?: readonly string[] };
-    plugins?: Record<string, ContractPlugin>;
     jobs?: JobsConfig;
 }): K
 ```
@@ -30,7 +29,6 @@ new Kizuna(config?: {
 | `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values every handler receives.                |
 | `tags`                  | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                  |
 | `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                |
-| `plugins`               | `Record<string, ContractPlugin>` | Optional. The plugins this API declares. Their keys become the names `server.api` and handlers use. See [Plugins](/docs/plugins).                               |
 | `jobs`                  | `JobsConfig`                     | Optional. Settings shared by every job. The jobs themselves are declared with `k.jobs`. See [Jobs](/docs/jobs).                                                 |
 
 ### `JobsConfig`
@@ -49,13 +47,13 @@ Settings shared by every job. The jobs themselves are declared with [`k.jobs`](/
 
 The instance, the authoring surface for this API:
 
-| Method       | Signature                              | Description                                                  |
-| ------------ | -------------------------------------- | ------------------------------------------------------------ |
-| `k.routes`   | `(tag, defs) => Routes`                | Define a route group under one of the tag set's keys.        |
-| `k.auth`     | `(routes, map) => AuthMap`             | Build the auth map, typed against the routes and identities. |
-| `k.jobs`     | `(identity, definitions) => Jobs`      | Declare scheduled jobs and the identity they require.        |
-| `k.contract` | `({ routes, jobs, auth }) => Contract` | Assemble route groups into the contract shared everywhere.   |
-| `k.issue`    | `(ctx, issue) => void`                 | Raise a typed validation issue code inside a Zod refinement. |
+| Method       | Signature                                       | Description                                                                  |
+| ------------ | ----------------------------------------------- | ---------------------------------------------------------------------------- |
+| `k.routes`   | `(tag, defs) => Routes`                         | Define a route group under one of the tag set's keys.                        |
+| `k.auth`     | `(routes, map) => AuthMap`                      | Build the auth map, typed against the routes and identities.                 |
+| `k.jobs`     | `(identity, definitions) => Jobs`               | Declare scheduled jobs and the identity they require.                        |
+| `k.contract` | `({ routes, jobs, auth, plugins }) => Contract` | Assemble route groups, plugins and all, into the contract shared everywhere. |
+| `k.issue`    | `(ctx, issue) => void`                          | Raise a typed validation issue code inside a Zod refinement.                 |
 
 ## Example
 

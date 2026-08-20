@@ -3,7 +3,7 @@ title: mcpPlugin
 description: Install an MCP (Model Context Protocol) endpoint so AI assistants can call your API as tools.
 ---
 
-Serve an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint as part of your API. Declare it on [`new Kizuna()`](/docs/reference/kizuna), pass `mcpPluginServer()` to [`server.api`](/docs/reference/server-api), and `api.mount` serves it, on every adapter.
+Serve an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint as part of your API. Declare it on [`k.contract`](/docs/reference/k-contract), pass `mcpPluginServer()` to [`server.api`](/docs/reference/server-api), and `api.mount` serves it, on every adapter.
 
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
@@ -38,13 +38,15 @@ Props are pure data. `mcpPluginServer()` takes nothing: declaring the plugin is 
 
 ## Example
 
-```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+```ts title="contract.ts"
 import { mcpPlugin } from '@ts-kizuna/mcp';
+import { k } from './k';
+import { routes } from './routes';
+import { auth } from './auth';
 
-export const k = new Kizuna({
-    tags,
-    identities,
+export const contract = k.contract({
+    routes,
+    auth,
     plugins: {
         mcp: mcpPlugin({
             name: 'My API',

@@ -17,12 +17,15 @@ description: Generate an OpenAPI 3.1.0 document from your contract, and serve it
 
 ## Declare the plugin
 
-```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+```ts title="contract.ts"
 import { openApiPlugin } from '@ts-kizuna/openapi';
+import { k } from './k';
+import { routes } from './routes';
+import { auth } from './auth';
 
-export const k = new Kizuna({
-    tags,
+export const contract = k.contract({
+    routes,
+    auth,
     plugins: {
         openApi: openApiPlugin({
             info: {
@@ -123,7 +126,7 @@ Point `cdnUrl` at a self-hosted copy for air-gapped deployments or a strict CSP.
 
 ## `generateOpenApi`
 
-`generateOpenApi` returns a renderer. Call it with `'json'` for the document object or `'yaml'` for a YAML string. Everything it needs, `info` included, comes off the contract, declared once on [`openApiPlugin`](#declare-the-plugin) in `k.ts`.
+`generateOpenApi` returns a renderer. Call it with `'json'` for the document object or `'yaml'` for a YAML string. Everything it needs, `info` included, comes off the contract, declared once on [`openApiPlugin`](#declare-the-plugin).
 
 ```ts title="generate-openapi.ts"
 import { generateOpenApi } from '@ts-kizuna/openapi/server';
@@ -141,9 +144,9 @@ Routes and fields marked `/** @deprecated */` get `deprecated: true` in the gene
 
 ## Options
 
-They go on `openApiPlugin` in `k.ts`, and `generateOpenApi` reads them from there.
+They go on `openApiPlugin` on the contract, and `generateOpenApi` reads them from there.
 
-```ts title="k.ts"
+```ts title="contract.ts"
 openApiPlugin({
     info: {
         title: 'My API',

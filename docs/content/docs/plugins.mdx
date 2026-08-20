@@ -7,15 +7,17 @@ A plugin adds endpoints, helpers your handlers can call, or both. It gets your c
 
 ## Installing one
 
-A plugin ships as two modules. The declaration goes on `new Kizuna()`:
+A plugin ships as two modules. The declaration goes on `k.contract`:
 
-```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+```ts title="contract.ts"
 import { mcpPlugin } from '@ts-kizuna/mcp';
+import { k } from './k';
+import { routes } from './routes';
+import { auth } from './auth';
 
-export const k = new Kizuna({
-    tags,
-    identities,
+export const contract = k.contract({
+    routes,
+    auth,
     plugins: {
         mcp: mcpPlugin({
             name: 'My API',
@@ -79,9 +81,29 @@ A plugin's routes run through the same pipeline as yours, with the same validati
 | in your fetch client      | yes         | **no**            |
 | in OpenAPI, Swift, Kotlin | yes         | **no**            |
 
-If a plugin claims a path your contract already uses, `server.api` throws and names both.
+If a plugin claims a path your routes already use, `k.contract` throws and names both.
+
+## Props that name routes
+
+Some plugins take config keyed by route: which routes to expose, which to rate-limit, which to skip. Write `plugins` as a function to get the routes, typed:
+
+```ts title="contract.ts"
+export const contract = k.contract({
+    routes,
+    auth,
+    plugins: ({ routes }) => ({
+        audit: auditPlugin(routes, {
+            skip: {
+                health: true,
+            },
+        }),
+    }),
+});
+```
+
+`k.contract` calls it with a context carrying the contract's own routes, so a route name that does not exist is a compile error. Passing `routes` to the plugin is what types its keys, and it cannot be forgotten the way an explicit type argument can. The context is an object, so it can carry more later without changing every plugin.
 
 ## Next
 
 - [Create a Plugin](/docs/extend/create-plugin) to write your own
-- [MCP](/docs/mcp), a plugin that turns every route into an AI-callable tool
+- [MCP](/docs/mcp), a plugin that turns your routes into AI-callable tools

@@ -37,7 +37,7 @@ Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typ
 
 ### Define your API routes
 
-Export a `k` instance once. It takes optional tags, identities, request contexts, validation settings, and plugins.
+Export a `k` instance once. It takes optional tags, identities, request contexts, and validation settings.
 
 ```ts
 // k.ts
