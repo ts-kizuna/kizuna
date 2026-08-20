@@ -3,7 +3,8 @@ import { adapterContextOf, implementPlugin, rawResponse, type ApiWithRouter } fr
 import { createMcpServer } from './mcp-server.js';
 import { mcpPlugin } from './plugin.js';
 
-export { createMcpServer, buildToolDefinitions, type McpServerOptions, type ToolDefinition } from './mcp-server.js';
+export { createMcpServer, buildToolDefinitions, buildInstructions, type McpServerOptions, type ToolDefinition } from './mcp-server.js';
+export type { ToolMap, ToolEntry, ToolSelection } from './tool-selection.js';
 
 type HandlerArgs = {
     body: unknown;

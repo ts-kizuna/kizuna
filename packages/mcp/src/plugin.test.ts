@@ -136,3 +136,133 @@ describe('mcpPlugin', () => {
         });
     });
 });
+
+const selective = k.routes('api', {
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        summary: 'List users',
+        responses: {
+            200: z.array(z.string()),
+        },
+    },
+    health: {
+        method: 'GET',
+        path: '/health',
+        summary: 'Health check',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+
+const selectiveContract = k.contract({
+    routes: selective,
+    plugins: ({ routes: contractRoutes }) => ({
+        mcp: mcpPlugin(contractRoutes, {
+            name: 'Selective API',
+            tools: {
+                health: false,
+            },
+        }),
+    }),
+});
+
+describe('mcpPlugin: tool selection', () => {
+    let running: Server | undefined;
+    let client: Client | undefined;
+
+    afterEach(async () => {
+        await client?.close();
+        await new Promise<void>((resolve) => {
+            if (running) running.close(() => resolve());
+            else resolve();
+        });
+        running = undefined;
+        client = undefined;
+    });
+
+    it('serves only the routes the declaration exposes', async () => {
+        const selectiveApi = new KizunaServer(selectiveContract).api({
+            router: {
+                listUsers: () => ({
+                    status: 200,
+                    body: ['Ada'],
+                }),
+                health: () => ({
+                    status: 200,
+                    body: {
+                        ok: true,
+                    },
+                }),
+            },
+            plugins: {
+                mcp: mcpPluginServer(),
+            },
+        });
+
+        const app = express();
+        app.use(express.json());
+        selectiveApi.mount(app);
+        const started = await new Promise<{ port: number; server: Server }>((resolve) => {
+            const listening = app.listen(0, () => {
+                resolve({
+                    port: (listening.address() as { port: number }).port,
+                    server: listening,
+                });
+            });
+        });
+        running = started.server;
+
+        const connected = new Client({
+            name: 'test-client',
+            version: '1.0.0',
+        });
+        await connected.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${started.port}/mcp`)));
+        client = connected;
+
+        const { tools } = await connected.listTools();
+        expect(tools.map((tool) => tool.name)).toEqual(['listUsers']);
+    });
+
+    it('still serves an excluded route over HTTP', async () => {
+        const selectiveApi = new KizunaServer(selectiveContract).api({
+            router: {
+                listUsers: () => ({
+                    status: 200,
+                    body: ['Ada'],
+                }),
+                health: () => ({
+                    status: 200,
+                    body: {
+                        ok: true,
+                    },
+                }),
+            },
+            plugins: {
+                mcp: mcpPluginServer(),
+            },
+        });
+
+        const app = express();
+        app.use(express.json());
+        selectiveApi.mount(app);
+        const started = await new Promise<{ port: number; server: Server }>((resolve) => {
+            const listening = app.listen(0, () => {
+                resolve({
+                    port: (listening.address() as { port: number }).port,
+                    server: listening,
+                });
+            });
+        });
+        running = started.server;
+
+        const response = await fetch(`http://127.0.0.1:${started.port}/health`);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            ok: true,
+        });
+    });
+});

@@ -1,6 +1,8 @@
 import type { z } from 'zod';
 
-export type Method = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS';
+export const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
+
+export type Method = (typeof METHODS)[number];
 
 /**
  * The `Content-Type` of a response body. The listed values are suggestions;

@@ -9,9 +9,18 @@ export const contract = k.contract({
     routes,
     jobs,
     auth,
-    plugins: {
-        mcp: mcpPlugin({
+    plugins: ({ routes }) => ({
+        mcp: mcpPlugin(routes, {
             name: 'ts-kizuna demo',
+            tools: {
+                health: false,
+                users: {
+                    exportUsers: false,
+                },
+                notifications: {
+                    webhook: false,
+                },
+            },
         }),
         openApi: openApiPlugin({
             info: {
@@ -23,5 +32,5 @@ export const contract = k.contract({
             docsPath: '/docs',
             jsonPath: '/openapi.json',
         }),
-    },
+    }),
 });
