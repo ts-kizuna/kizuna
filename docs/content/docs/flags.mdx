@@ -1,0 +1,397 @@
+---
+title: Feature Flags
+description: Declare typed flags next to your routes, evaluate them against any provider, and read them on every client.
+---
+
+<BetaNotice>
+
+Feature flags are new and still settling. The shape of `k.flags` and the flag endpoints may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
+`k.flags` puts flags in the contract, beside the routes. A flag says what it is about, what it returns, and what to answer when nothing else can.
+
+<Steps>
+
+<Step>
+
+## Declare the entities
+
+A flag is about a thing, not about whoever happens to be asking. A feature is on for one user and off for another, whether they are reading their own record or an admin is reading theirs.
+
+Your [identities](/docs/reference/kizuna-identity) are already entities, so a flag about a user needs nothing declared. Declare only the things that are not callers:
+
+```ts title="flag-entities.ts"
+import { z } from 'zod';
+import { Kizuna } from '@ts-kizuna/core';
+
+export const workspace = Kizuna.flagEntity({
+    context: z.object({
+        workspaceId: z.uuid(),
+    }),
+});
+```
+
+`context` is what a provider needs to tell one from another. Register it on `new Kizuna()`:
+
+```ts title="k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { identities } from './identities';
+import { workspace } from './flag-entities';
+
+export const k = new Kizuna({
+    identities,
+    flags: {
+        entities: {
+            workspace,
+        },
+    },
+});
+```
+
+A contract whose flags are all about its callers skips this step.
+
+</Step>
+
+<Step>
+
+## Declare the flags
+
+`k.flags(entity, defs)` declares one group, the way `k.routes` declares one group of routes, so each entity's flags live in their own file:
+
+```ts title="contract/flags/users.ts"
+import { z } from 'zod';
+import { k } from '../k';
+
+export const userFlags = k.flags('user', {
+    uploadLimit: {
+        value: z.int(),
+        default: 20,
+    },
+    newCheckout: {
+        value: z.boolean(),
+        default: false,
+    },
+});
+```
+
+The first argument is the entity, and TypeScript completes it from what you declared under `entities`. `always` is the one every contract has, for flags about nothing in particular:
+
+```ts title="contract/flags/always.ts"
+export const alwaysFlags = k.flags('always', {
+    paymentsEnabled: {
+        value: z.boolean(),
+        default: true,
+    },
+});
+```
+
+Then add them to the contract:
+
+```ts title="contract/index.ts"
+export const contract = k.contract({
+    routes,
+    flags: {
+        userFlags,
+        alwaysFlags,
+    },
+    auth,
+});
+```
+
+<ContractNotice />
+
+</Step>
+
+<Step>
+
+## Connect a provider
+
+kizuna decides nothing itself. Name a source and it answers your flags:
+
+```ts title="server.ts"
+import { KizunaServer } from '@ts-kizuna/express';
+import { openFeature } from '@ts-kizuna/openfeature';
+import { contract } from './contract';
+import { provider } from './flag-provider';
+
+export const server = new KizunaServer(contract, {
+    flagSource: openFeature(provider),
+});
+```
+
+`@ts-kizuna/openfeature` takes any [OpenFeature](https://openfeature.dev) provider, which is how LaunchDarkly, Unleash, Flagsmith, PostHog and flagd connect. Write your own against [Create a flag source](/docs/extend/create-flag-source).
+
+With no source configured every flag answers its `default`, so this step can wait.
+
+</Step>
+
+<Step>
+
+## Read a flag
+
+Every handler receives `flags`, shaped like the declaration. A flag is a value you fetch, so reading one is a call, and it takes the entity it is about:
+
+```ts title="router/users.ts"
+export const router = server.router({
+    createUpload: async ({ body, flags, throwError }) => {
+        const limit = await flags.user.uploadLimit();
+        if (body.files.length > limit) {
+            throwError({
+                status: 422,
+                body: {
+                    detail: `At most ${limit} files per upload`,
+                },
+            });
+        }
+
+        return {
+            status: 201,
+            body: await db.uploads.create(body),
+        };
+    },
+});
+```
+
+`uploadLimit` is typed `number`, because that is what its `value` schema says. Nothing says who is asking, because the `user` guard already did.
+
+An entity whose `context` is a schema takes it at the call, typed by what it declared:
+
+```ts title="router/workspaces.ts"
+const enabled = await flags.workspace.newBilling({
+    workspaceId: params.id,
+});
+```
+
+An identity-backed entity accepts one too, which is how you ask about somebody other than the caller:
+
+```ts title="router/users.ts"
+const limit = await flags.user.uploadLimit({
+    userId: params.id,
+});
+```
+
+The guard is the default and a context given at the call wins, which is the order [OpenFeature](https://openfeature.dev/specification/sections/evaluation-context) merges in.
+
+A flag under `always` is about nothing, so it takes nothing, which is what a kill switch on a public route needs:
+
+```ts title="router/checkout.ts"
+if (!(await flags.always.paymentsEnabled())) {
+    throwError({
+        status: 503,
+        body: {
+            detail: 'Payments are paused',
+        },
+    });
+}
+```
+
+| Call                                      | Answers                             |
+| ----------------------------------------- | ----------------------------------- |
+| `flags.user.uploadLimit()`                | the value                           |
+| `flags.user.uploadLimit.detail()`         | the value, and why it is that value |
+| `flags.user.uploadLimit.recordExposure()` | nothing, and marks the flag seen    |
+| `flags.user.uploadLimit({ userId })`      | the value, for somebody else        |
+| `flags.user.all()`                        | every flag the caller has           |
+| `flags.user.forEach(contexts)`            | one set of flags per context        |
+
+An entity backed by an identity needs no context and accepts one. Everything else requires what it declared. `always` takes none, so it works on public routes.
+
+Reading the same flag twice in one request resolves it once.
+
+</Step>
+
+</Steps>
+
+## Values
+
+A flag's `value` is a Zod schema, so a flag returns what it says it returns.
+
+```ts
+value: z.boolean();
+```
+
+```ts
+value: z.int();
+```
+
+```ts
+value: z.enum(['control', 'treatment']);
+```
+
+Whatever a provider answers is parsed against that schema before your handler sees it. A provider that answers `'contorl'` for the enum above is a `TYPE_MISMATCH`, and the flag falls back to its default rather than handing a typo to your code.
+
+<Callout>
+    Reach for a value before reaching for a second flag. Two flags named `allow50Uploads` and `allow100Uploads` are one `z.int()` wearing a
+    disguise, and only one of them can be read wrong.
+</Callout>
+
+### Sharing a value
+
+Most flags are a boolean that starts off, and every experiment in a codebase tends to share one variant set. `Kizuna.flag` names that pair once, the way [`Kizuna.model`](/docs/reference/kizuna-model) names a schema used by many routes:
+
+```ts title="flag-values.ts"
+import { z } from 'zod';
+import { Kizuna } from '@ts-kizuna/core';
+
+export const experiment = Kizuna.flag({
+    value: z.enum(['control', 'treatment']),
+    default: 'control',
+});
+```
+
+```ts title="contract/flags/users.ts"
+export const userFlags = k.flags('user', {
+    checkoutExperiment: experiment,
+    searchExperiment: experiment,
+});
+```
+
+Both flags are typed `'control' | 'treatment'`, and changing the variant set changes both. Declaring a flag inline is the same thing written in place, so reach for `Kizuna.flag` when a pair repeats and not before.
+
+## Three defaults, and which one is yours
+
+The word means three things, and mixing them up is how a flag looks broken.
+
+| Default       | Lives in      | Means                           |
+| ------------- | ------------- | ------------------------------- |
+| Fallback      | your contract | Nothing answered, so use this   |
+| Fallthrough   | your provider | Nobody matched a targeting rule |
+| Off variation | your provider | The flag is switched off        |
+
+`default` in `k.flags` is the **fallback** only. It is what a caller gets when the provider is unreachable, does not know the flag, or answers something the `value` schema rejects.
+
+<Callout type="warn">
+    `default: false` does not switch a flag off. Turning it off is your provider's job, and it will answer `false` itself. The default is
+    only reached when nothing answers at all.
+</Callout>
+
+Evaluating a flag never throws. A provider that is down serves defaults, which is the difference between a degraded feature and a failed request.
+
+## Knowing why
+
+A bare value cannot tell a flag that is switched off from a provider that is unreachable. Both are `false`. `detail` answers the difference:
+
+```ts title="router/users.ts"
+const detail = await flags.user.newCheckout.detail();
+
+if (detail.reason === 'ERROR') {
+    logger.warn('checkout flag fell back', {
+        code: detail.errorCode,
+    });
+}
+```
+
+| `reason`          | Means                                      |
+| ----------------- | ------------------------------------------ |
+| `TARGETING_MATCH` | A rule matched this entity                 |
+| `SPLIT`           | A percentage rollout decided it            |
+| `STATIC`          | The provider answers this for everyone     |
+| `CACHED`          | Served from the source's own cache         |
+| `DISABLED`        | The flag is switched off                   |
+| `DEFAULT`         | Nothing answered, so the fallback was used |
+| `ERROR`           | Something failed, so the fallback was used |
+
+On `ERROR` an `errorCode` says what: `FLAG_NOT_FOUND`, `TYPE_MISMATCH`, `PROVIDER_NOT_READY`, `TARGETING_KEY_MISSING`, `INVALID_CONTEXT`, `PARSE_ERROR`, `PROVIDER_FATAL`, or `GENERAL`.
+
+Reading a flag does not record that anyone saw it. Say so when they did, and your provider's experiment data means something:
+
+```ts title="router/users.ts"
+await flags.user.newCheckout.recordExposure();
+```
+
+## Flags on your own responses
+
+A list of fifty users needs fifty evaluations, and asking the flag endpoint fifty times is not the answer. Put the flags on the model they belong to:
+
+```ts title="contract/models/user.ts"
+import { z } from 'zod';
+import { k } from '../k';
+import { userFlags } from '../flags/users';
+
+export const UserSchema = k.model({
+    title: 'User',
+    schema: z.object({
+        id: z.uuid(),
+        email: z.email(),
+        flags: userFlags.schema,
+    }),
+});
+```
+
+Fill it once for the whole page. `forEach` takes one context per row, typed by the entity's own schema:
+
+```ts title="router/users.ts"
+listUsers: async ({ flags }) => {
+    const users = await db.users.list();
+    const resolved = await flags.user.forEach(
+        users.map(({ id }) => ({
+            userId: id,
+        }))
+    );
+
+    return {
+        status: 200,
+        body: users.map((user, index) => ({
+            ...user,
+            flags: resolved[index],
+        })),
+    };
+},
+```
+
+`userFlags.schema` is an ordinary Zod object, so it travels to the fetch client and to the generated Swift and Kotlin clients like any other field, and it is cached exactly as well as the user it sits on.
+
+## The two endpoints
+
+`api.mount` serves [OFREP](https://openfeature.dev/specification/appendix-c), the OpenFeature protocol for evaluating flags over HTTP, so any OpenFeature client can read your flags without knowing kizuna is behind them. Both mount as ordinary routes, so failures render as Problem Details.
+
+| Endpoint                              | Answers                               |
+| ------------------------------------- | ------------------------------------- |
+| `POST /ofrep/v1/evaluate/flags`       | every flag for the entity in the body |
+| `POST /ofrep/v1/evaluate/flags/{key}` | the one flag the path names           |
+
+Both answer per flag, so one flag failing leaves the rest intact. Both honour `If-None-Match` and answer `304` when nothing changed. `path` on `new Kizuna()` under `flags` moves the pair; it defaults to `/ofrep/v1`.
+
+The typed clients read them under `flags`, shaped like the contract, so the two endpoints are the two things you can already say:
+
+```ts title="client.ts"
+const { uploadLimit } = await apiClient.flags.user.all();
+
+const enabled = await apiClient.flags.user.newCheckout();
+```
+
+`all()` is the bulk endpoint and a single flag is the other one, so reading one flag costs one flag.
+
+## Local development
+
+No source, no setup. Every flag answers its `default`, so `pnpm dev` and your tests run against the values in the contract.
+
+To try a value, hand `flagSource` a source that holds flags in memory:
+
+```ts title="server.ts"
+import { createMemoryFlagSource } from '@ts-kizuna/core';
+
+export const server = new KizunaServer(contract, {
+    flagSource: createMemoryFlagSource({
+        newCheckout: true,
+    }),
+});
+```
+
+## What kizuna does not do
+
+kizuna owns no flag store, so it does not:
+
+- **Decide anything.** Targeting rules, percentage rollouts, and bucketing belong to your source.
+- **Remember a flag.** There is no database, no dashboard, and no admin UI.
+- **Record exposure on its own.** Reading a flag is not seeing it, so say when someone saw it.
+- **Hide a flag's key.** Keys reach every client, mobile bundles included.
+
+## Reference
+
+- [`k.flags`](/docs/reference/k-flags)
+- [`Kizuna.flag`](/docs/reference/kizuna-flag)
+- [`Kizuna.flagEntity`](/docs/reference/kizuna-flag-entity)
+- [`k.contract`](/docs/reference/k-contract#flags)
+- [Create a flag source](/docs/extend/create-flag-source)
