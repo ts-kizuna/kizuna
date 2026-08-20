@@ -63,24 +63,165 @@ export const api = server.api({
 
 The endpoint answers at `/mcp` by default. On Next.js it is served by the catch-all route file that already serves your contract, so with `basePath: '/api'` it lands at `/api/mcp`.
 
-The endpoint is a [plugin route](/docs/plugins#plugin-routes), so your fetch client, OpenAPI document, and generated Swift and Kotlin clients never list it.
+## Choosing which routes become tools
 
-## How it works
+Every tool's name, description, and input schema sits in the model's context on every turn, called or not, and the more tools there are the more often the model picks the wrong one. So trim the list.
 
-Each route becomes an MCP tool:
+Pass the routes to `mcpPlugin` and name the ones to leave out. Write `plugins` as a function and `k.contract` hands the routes over:
 
-- **Tool name**: the dotted route key from the routes (e.g. `users.getUser`)
-- **Tool description**: from the route's `summary` and `description`, falling back to `METHOD /path`
-- **Tool input**: structured as `{ params, query, body }` matching the route's schemas
-- **Tool execution**: invokes the corresponding handler directly and returns `{ status, body }`
+```ts title="contract.ts"
+export const contract = k.contract({
+    routes,
+    auth,
+    plugins: ({ routes }) => ({
+        mcp: mcpPlugin(routes, {
+            name: 'My API',
+            tools: {
+                health: false,
+            },
+        }),
+    }),
+});
+```
 
-Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-urlencoded'` are excluded by default since MCP tools receive JSON.
+A route the map never mentions is a tool, so the map only says what differs, and `false` on a group drops all of it.
+
+Set a group's own default with `'*'` to turn that around and name what to keep:
+
+```ts title="contract.ts"
+mcp: mcpPlugin(routes, {
+    tools: {
+        users: {
+            '*': false,
+            getUser: true,
+            searchUsers: true,
+        },
+    },
+}),
+```
+
+`onlyReadOnly` keeps only the safe methods, so nothing an assistant calls can change data:
+
+```ts title="contract.ts"
+mcp: mcpPlugin(routes, {
+    onlyReadOnly: true,
+}),
+```
+
+Keys are checked against those routes, so a name that does not exist is a compile error naming the one you meant:
+
+```text
+Object literal may only specify known properties, but 'helth' does not
+exist in type ToolMap<...>. Did you mean to write 'health'?
+```
+
+Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, because MCP tool input is JSON.
+
+### What to cut first
+
+- **Ones an assistant cannot use.** File uploads, CSV exports, anything returning bytes.
+- **Ones that exist for your own infrastructure.** Health checks, readiness probes, webhook receivers.
+- **Ones you do not want reached by inference.** Deleting a workspace is a person's decision, guard or no guard.
+
+## What each tool looks like
+
+| Part            | Where it comes from                                                                 |
+| --------------- | ----------------------------------------------------------------------------------- |
+| **Name**        | The dotted route key, for example `users.getUser`                                   |
+| **Title**       | The route's `summary`                                                               |
+| **Description** | The route's `summary` and `description`, its method and path, and what it requires  |
+| **Input**       | `{ params, query, body }`, holding only the keys the route declares                 |
+| **Output**      | The success response's schema, so an assistant knows the shape before it calls      |
+| **Annotations** | The method's HTTP semantics, per [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) |
+
+Tool names are capped at 128 characters, per the MCP specification, and clients prefix their own `mcp__<server>__` on top of that. A key over the cap throws at startup.
+
+The annotations tell a client how careful to be with a tool before calling it:
+
+| Method                   | Hints set                           |
+| ------------------------ | ----------------------------------- |
+| `GET`, `HEAD`, `OPTIONS` | `readOnlyHint`, `idempotentHint`    |
+| `PUT`                    | `idempotentHint`                    |
+| `DELETE`                 | `idempotentHint`, `destructiveHint` |
+| `POST`, `PATCH`          | none                                |
+
+An absent hint is not a neutral one. MCP defaults `destructiveHint` and `openWorldHint` to true and `readOnlyHint` to false, so a client already treats `POST` and `PATCH` as destructive calls against an open world. The hints worth setting are the ones that make a tool safer than that, which is why `GET` gets `readOnlyHint` and `POST` gets nothing.
 
 Handlers receive the same framework context they do over HTTP, passed through from the transport request, so one reading `req` or `c` keeps working as a tool.
+
+## What the model reads
+
+### From each route
+
+A route's `summary` and `description` are the tool's title and description:
+
+```ts title="routes/users.ts"
+searchUsers: {
+    method: 'GET',
+    path: '/users/search',
+    summary: 'Search users by name or email',
+    description: 'Matches a name or email substring, case insensitive. Returns at most 25 users, best match first.',
+    query: z.object({
+        term: z.string(),
+    }),
+    responses: {
+        200: z.array(UserSchema),
+    },
+},
+```
+
+The tool that reaches the model carries both, followed by the request line and the identities the route requires:
+
+```text
+Search users by name or email
+Matches a name or email substring, case insensitive. Returns at most 25 users, best match first.
+
+HTTP: GET /users/search
+Requires: user
+```
+
+These are the same two fields that become `operation.summary` and `operation.description` in your OpenAPI document, and the doc comment on your generated Swift and Kotlin methods, which uses the summary and falls back to the description. Write them once for every reader. OpenAPI wants a short summary and a verbose account of the behaviour, which is what a model wants too, so naming the limit, the ordering, and the matching rule costs nothing and serves all three:
+
+```ts title="routes/notifications.ts"
+listEvents: {
+    method: 'GET',
+    path: '/events',
+    summary: 'List session events, newest first',
+    description: 'Returns one page of events, 50 per page. Timestamps are RFC 3339 in UTC.',
+    query: z.object({
+        page: z.int().min(1).default(1),
+    }),
+    responses: {
+        200: z.array(EventRecord),
+    },
+},
+```
+
+### From the whole server
+
+`instructions` is a single string clients put in front of the model before it picks any tool. kizuna builds one from your [tags](/docs/reference/kizuna-tags), so the groups in your contract arrive with their titles and descriptions, and your own text is appended to it:
+
+```ts title="k.ts"
+mcp: mcpPlugin({
+    name: 'My API',
+    instructions: 'Resolve a workspace before creating members. Every timestamp is UTC.',
+}),
+```
+
+Use it for what belongs to no single route: the order operations happen in, the conventions every route shares, which tool to reach for when two look alike. That last one is worth keeping out of a route's own `description`, where it would read oddly in your API reference.
 
 ## Authentication
 
 Secured tools authenticate via the headers of the MCP transport request. The endpoint runs the [guards](/docs/authentication) registered on `server.api`, exactly like the HTTP pipeline: the credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context.
+
+A route's identities appear in its tool description, along with the scopes and access constraints that go with them, so an assistant can tell it will be refused without spending a call to find out:
+
+```text
+Delete the workspace
+
+HTTP: DELETE /workspace
+Requires: member (role: owner)
+```
 
 Configure the MCP client to send the credential as a header on the connection. For example, with Claude Code:
 
@@ -105,12 +246,16 @@ Public routes (`false` in the auth map) run without guards, credentials or not.
 
 ## Options
 
-| Option        | Default                                | Description                                   |
-| ------------- | -------------------------------------- | --------------------------------------------- |
-| `path`        | `'/mcp'`                               | Path the endpoint is served from              |
-| `name`        | `'MCP Server'`                         | Human-readable name shown to AI assistants    |
-| `version`     | `'1.0.0'`                              | Semantic version string                       |
-| `routeFilter` | excludes multipart and form-urlencoded | Predicate to filter which routes become tools |
+All of them go on `mcpPlugin`. `mcpPluginServer()` takes nothing.
+
+| Option         | Default              | Description                                    |
+| -------------- | -------------------- | ---------------------------------------------- |
+| `path`         | `'/mcp'`             | Path the endpoint is served from               |
+| `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants     |
+| `version`      | `'1.0.0'`            | Semantic version string                        |
+| `instructions` | built from your tags | Appended to the generated overview             |
+| `tools`        | every route          | Which routes become tools, keyed by route tree |
+| `onlyReadOnly` | `false`              | Keep only `GET`, `HEAD`, and `OPTIONS`         |
 
 ## Connecting clients
 
@@ -173,6 +318,8 @@ Every tool returns a JSON text block with the HTTP status and parsed response bo
     }
 }
 ```
+
+The same body is attached as `structuredContent`, matching the output schema the tool advertised, so a client can read the response as data rather than parsing the text.
 
 Responses with status >= 400 set `isError: true` on the MCP result so the AI knows the call failed.
 

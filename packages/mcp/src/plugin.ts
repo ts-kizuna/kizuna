@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
-import type { McpServerOptions } from './mcp-server.js';
+import type { Routes } from '@ts-kizuna/core';
+import type { ToolSelection } from './tool-selection.js';
 
-export interface McpPluginProps {
+export interface McpPluginProps<R extends Routes = Routes> extends ToolSelection<R> {
     /**
      * Path the endpoint is served from.
      *
@@ -25,39 +26,13 @@ export interface McpPluginProps {
     version?: string;
 
     /**
-     * Predicate to filter which routes become MCP tools. Return `false` to
-     * exclude a route. By default, `multipart/form-data` and
-     * `application/x-www-form-urlencoded` routes are excluded.
+     * Guidance for the model, appended to the overview built from the
+     * contract's tags.
      */
-    routeFilter?: McpServerOptions['routeFilter'];
+    instructions?: string;
 }
 
-/**
- * Let AI assistants use the API. Serves an MCP (Model Context Protocol)
- * endpoint where every route is a tool an assistant can discover and call,
- * behind the same guards as the HTTP endpoints.
- *
- * The endpoint is an ordinary kizuna route, so `api.mount` serves it on any
- * adapter, and it stays out of `contract.routes` so the client and the
- * generators do not see it.
- *
- * Pass `mcpPluginServer()` from `@ts-kizuna/mcp/server` to `server.api({ plugins })`
- * to serve it.
- *
- * @example
- * ```ts
- * export const k = new Kizuna({
- *     tags,
- *     identities,
- *     plugins: {
- *         mcp: mcpPlugin({
- *             name: 'My API',
- *         }),
- *     },
- * });
- * ```
- */
-export const mcpPlugin = (props: McpPluginProps = {}) =>
+const declare = (props: McpPluginProps) =>
     createPlugin({
         name: 'mcp',
         serverModule: '@ts-kizuna/mcp/server',
@@ -74,3 +49,55 @@ export const mcpPlugin = (props: McpPluginProps = {}) =>
         },
         props,
     });
+
+/**
+ * Let AI assistants use the API. Serves an MCP (Model Context Protocol)
+ * endpoint where every route is a tool an assistant can discover and call,
+ * behind the same guards as the HTTP endpoints.
+ *
+ * The endpoint is an ordinary kizuna route, so `api.mount` serves it on any
+ * adapter, and it stays out of `contract.routes` so the client and the
+ * generators do not see it.
+ *
+ * Pass `mcpPluginServer()` from `@ts-kizuna/mcp/server` to `server.api({ plugins })`
+ * to serve it.
+ *
+ * @example
+ * ```ts
+ * export const contract = k.contract({
+ *     routes,
+ *     plugins: {
+ *         mcp: mcpPlugin({
+ *             name: 'My API',
+ *         }),
+ *     },
+ * });
+ * ```
+ */
+export function mcpPlugin(props?: McpPluginProps): ReturnType<typeof declare>;
+
+/**
+ * Pass the contract's routes to have `tools` checked against them, so a name
+ * the routes do not have is a compile error. Write `plugins` as a function and
+ * `k.contract` hands the routes over.
+ *
+ * @example
+ * ```ts
+ * export const contract = k.contract({
+ *     routes,
+ *     plugins: ({ routes }) => ({
+ *         mcp: mcpPlugin(routes, {
+ *             name: 'My API',
+ *             tools: {
+ *                 health: false,
+ *             },
+ *         }),
+ *     }),
+ * });
+ * ```
+ */
+export function mcpPlugin<const R extends Routes>(routes: R, props?: McpPluginProps<R>): ReturnType<typeof declare>;
+
+export function mcpPlugin(routesOrProps: Routes | McpPluginProps = {}, props?: McpPluginProps): ReturnType<typeof declare> {
+    return declare(props ?? (routesOrProps as McpPluginProps));
+}

@@ -136,6 +136,7 @@ export { ResponseError } from './response-error.js';
 export { STATUS_TITLES, getStatusText } from './status-titles.js';
 export { getHeaderValue } from './adapter.js';
 
+export { METHODS } from './types.js';
 export {
     type Method,
     type ResponseContentType,

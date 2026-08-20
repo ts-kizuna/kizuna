@@ -4,7 +4,7 @@ import { Kizuna } from '@ts-kizuna/core';
 import { assembleApi, type GuardDeny } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/client';
-import { buildToolDefinitions, createMcpServer } from './mcp-server.js';
+import { buildInstructions, buildToolDefinitions, createMcpServer } from './mcp-server.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -252,28 +252,117 @@ describe('buildToolDefinitions', () => {
         expect(names).not.toContain('uploadAvatar');
     });
 
-    it('includes multipart routes when routeFilter allows them', () => {
-        const definitions = buildToolDefinitions(contract.routes, {
-            routeFilter: () => true,
-        });
-        const names = definitions.map((definition) => definition.name);
-
-        expect(names).toContain('uploadAvatar');
-    });
-
-    it('builds tool descriptions from route summary', () => {
+    it('carries the summary as the tool title', () => {
         const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const listUsers = definitions.find((definition) => definition.name === 'users.listUsers')!;
-
-        expect(listUsers.description).toContain('List users with pagination');
-        expect(listUsers.description).toContain('HTTP: GET /users');
-    });
-
-    it('falls back to METHOD /path when no summary', () => {
-        const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const health = definitions.find((definition) => definition.name === 'health')!;
 
-        expect(health.description).toContain('GET /health');
+        expect(listUsers.title).toBe('List users with pagination');
+        expect(health.title).toBeUndefined();
+    });
+});
+
+describe('buildToolDefinitions: selection', () => {
+    const names = (options: Parameters<typeof buildToolDefinitions>[1]) =>
+        buildToolDefinitions(contract.routes, options).map((definition) => definition.name);
+
+    it('takes every route when nothing is selected', () => {
+        expect(names(baseOptions)).toEqual(
+            expect.arrayContaining(['users.listUsers', 'users.getUser', 'users.createUser', 'health', 'deleteUser'])
+        );
+    });
+
+    it('drops a route the map sets to false', () => {
+        const selected = names({
+            tools: {
+                deleteUser: false,
+            },
+        });
+
+        expect(selected).not.toContain('deleteUser');
+        expect(selected).toContain('users.getUser');
+    });
+
+    it('drops a whole group set to false', () => {
+        const selected = names({
+            tools: {
+                users: false,
+            },
+        });
+
+        expect(selected).not.toContain('users.getUser');
+        expect(selected).not.toContain('users.createUser');
+        expect(selected).toContain('health');
+    });
+
+    it('lets a route override its group default', () => {
+        const selected = names({
+            tools: {
+                users: {
+                    '*': false,
+                    getUser: true,
+                },
+            },
+        });
+
+        expect(selected).toContain('users.getUser');
+        expect(selected).not.toContain('users.createUser');
+        expect(selected).toContain('health');
+    });
+
+    it('curates down to a few tools with a top level star', () => {
+        const selected = names({
+            tools: {
+                '*': false,
+                users: {
+                    getUser: true,
+                },
+            },
+        });
+
+        expect(selected).toEqual(['users.getUser']);
+    });
+
+    it('exposes a route the map never mentions', () => {
+        const selected = names({
+            tools: {
+                deleteUser: false,
+            },
+        });
+
+        expect(selected).toContain('health');
+    });
+
+    it('keeps multipart routes out whatever the map says', () => {
+        const selected = names({
+            tools: {
+                uploadAvatar: true,
+            },
+        });
+
+        expect(selected).not.toContain('uploadAvatar');
+    });
+
+    it('keeps multipart routes out even when the map asks for them', () => {
+        const selected = names({
+            tools: {
+                uploadAvatar: true,
+            },
+        });
+
+        expect(selected).not.toContain('uploadAvatar');
+    });
+
+    it('keeps only safe methods under onlyReadOnly', () => {
+        const selected = names({
+            onlyReadOnly: true,
+        });
+
+        expect(selected).toContain('users.getUser');
+        expect(selected).toContain('health');
+        expect(selected).not.toContain('users.createUser');
+        expect(selected).not.toContain('deleteUser');
+        expect(selected).not.toContain('updateUser');
     });
 });
 
@@ -431,6 +520,28 @@ describe('tool annotations', () => {
         await close();
     });
 
+    it('marks safe methods idempotent too, per RFC 9110', async () => {
+        const { client, close } = await connectMcpClient();
+
+        const { tools } = await client.listTools();
+        const getUser = tools.find((tool) => tool.name === 'users.getUser')!;
+
+        expect(getUser.annotations?.idempotentHint).toBe(true);
+
+        await close();
+    });
+
+    it('marks DELETE idempotent, which RFC 9110 says it is', async () => {
+        const { client, close } = await connectMcpClient();
+
+        const { tools } = await client.listTools();
+        const deleteUser = tools.find((tool) => tool.name === 'deleteUser')!;
+
+        expect(deleteUser.annotations?.idempotentHint).toBe(true);
+
+        await close();
+    });
+
     it('POST routes have no special annotations', async () => {
         const { client, close } = await connectMcpClient();
 
@@ -440,6 +551,81 @@ describe('tool annotations', () => {
         expect(createUser.annotations?.readOnlyHint).toBeUndefined();
         expect(createUser.annotations?.destructiveHint).toBeUndefined();
         expect(createUser.annotations?.idempotentHint).toBeUndefined();
+
+        await close();
+    });
+});
+
+describe('buildToolDefinitions: output schema', () => {
+    it('describes the status and body envelope', async () => {
+        const { client, close } = await connectMcpClient();
+
+        const { tools } = await client.listTools();
+        const getUser = tools.find((tool) => tool.name === 'users.getUser')!;
+
+        expect(getUser.outputSchema).toBeDefined();
+        expect(getUser.outputSchema!.properties).toHaveProperty('status');
+        expect(getUser.outputSchema!.properties).toHaveProperty('body');
+
+        await close();
+    });
+
+    it('takes the body from the success response, not the error one', async () => {
+        const { client, close } = await connectMcpClient();
+
+        const { tools } = await client.listTools();
+        const getUser = tools.find((tool) => tool.name === 'users.getUser')!;
+        const body = (getUser.outputSchema!.properties as Record<string, { properties?: Record<string, unknown> }>)['body']!;
+
+        expect(body.properties).toHaveProperty('id');
+        expect(body.properties).not.toHaveProperty('message');
+
+        await close();
+    });
+
+    it('describes status alone when the success body is void', async () => {
+        const { client, close } = await connectMcpClient();
+
+        const { tools } = await client.listTools();
+        const ping = tools.find((tool) => tool.name === 'pingUser')!;
+
+        expect(ping.outputSchema!.properties).toHaveProperty('status');
+        expect(ping.outputSchema!.properties).not.toHaveProperty('body');
+
+        await close();
+    });
+});
+
+describe('instructions', () => {
+    it('lists the contract tag groups', () => {
+        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), undefined);
+
+        expect(instructions).toContain('{ status, body }');
+        expect(instructions).toContain('- API');
+    });
+
+    it('appends the authored text after the generated overview', () => {
+        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), 'Every timestamp is UTC.');
+
+        expect(instructions.indexOf('- API')).toBeLessThan(instructions.indexOf('Every timestamp is UTC.'));
+    });
+
+    it('leaves out a group whose every route was excluded', () => {
+        const trimmed = buildToolDefinitions(contract.routes, {
+            tools: {
+                '*': false,
+            },
+        });
+
+        expect(buildInstructions(contract, trimmed, undefined)).not.toContain('- API');
+    });
+
+    it('reaches the client over the protocol', async () => {
+        const { client, close } = await connectMcpClient(api, {
+            instructions: 'Every timestamp is UTC.',
+        });
+
+        expect(client.getInstructions()).toContain('Every timestamp is UTC.');
 
         await close();
     });
@@ -484,6 +670,47 @@ describe('MCP server e2e', () => {
 
         const createUser = tools.find((tool) => tool.name === 'users.createUser')!;
         expect(createUser.inputSchema.properties).toHaveProperty('body');
+
+        await close();
+    });
+
+    it('returns the envelope as structured content on success', async () => {
+        const { client, close } = await connectMcpClient();
+
+        const result = await client.callTool({
+            name: 'users.getUser',
+            arguments: {
+                params: {
+                    id: '42',
+                },
+            },
+        });
+
+        expect(result.structuredContent).toEqual({
+            status: 200,
+            body: {
+                id: '42',
+                name: 'Alice',
+            },
+        });
+
+        await close();
+    });
+
+    it('leaves structured content off a failed call', async () => {
+        const { client, close } = await connectMcpClient();
+
+        const result = await client.callTool({
+            name: 'users.getUser',
+            arguments: {
+                params: {
+                    id: '999',
+                },
+            },
+        });
+
+        expect(result.isError).toBe(true);
+        expect(result.structuredContent).toBeUndefined();
 
         await close();
     });
@@ -659,6 +886,9 @@ describe('MCP server: guards', () => {
         context: z.object({
             userId: z.string(),
         }),
+        access: z.object({
+            role: z.enum(['owner', 'admin', 'member']),
+        }),
     });
 
     const securedK = new Kizuna({
@@ -686,6 +916,15 @@ describe('MCP server: guards', () => {
                 }),
             },
         },
+        ownerOnly: {
+            method: 'GET',
+            path: '/owner-only',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
     });
 
     const securedContract = securedK.contract({
@@ -696,6 +935,11 @@ describe('MCP server: guards', () => {
             api: {
                 '*': false,
                 whoAmI: 'user',
+                ownerOnly: {
+                    user: {
+                        role: ['owner', 'admin'],
+                    },
+                },
             },
         },
     });
@@ -735,6 +979,21 @@ describe('MCP server: guards', () => {
         const names = tools.map((tool) => tool.name);
         expect(names).toContain('api.whoAmI');
         expect(names).toContain('api.publicRoute');
+        await close();
+    });
+
+    it('names the required identities in the tool description', async () => {
+        const { client, close } = await connectMcpClient(makeSecuredApi());
+        const { tools } = await client.listTools();
+
+        const whoAmI = tools.find((tool) => tool.name === 'api.whoAmI')!;
+        const gated = tools.find((tool) => tool.name === 'api.ownerOnly')!;
+        const publicRoute = tools.find((tool) => tool.name === 'api.publicRoute')!;
+
+        expect(whoAmI.description).toContain('Requires: user');
+        expect(gated.description).toContain('Requires: user (role: owner, admin)');
+        expect(publicRoute.description).not.toContain('Requires:');
+
         await close();
     });
 

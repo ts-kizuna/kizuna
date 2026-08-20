@@ -26,15 +26,19 @@ createMcpServer(api: Api, options?: McpServerOptions): McpServer
 
 ## Options
 
-| Option              | Default          | Description                                                               |
-| ------------------- | ---------------- | ------------------------------------------------------------------------- |
-| `name`              | `'MCP Server'`   | Human-readable name shown to AI assistants                                |
-| `version`           | `'1.0.0'`        | Semantic version string                                                   |
-| `routeFilter`       | JSON routes only | Predicate to filter which routes become tools                             |
-| `handlerContext`    | none             | Extra context spread into every handler call                              |
-| `credentialHeaders` | none             | Headers of the MCP transport request, used to run guards on secured tools |
+| Option              | Default              | Description                                                               |
+| ------------------- | -------------------- | ------------------------------------------------------------------------- |
+| `name`              | `'MCP Server'`       | Human-readable name shown to AI assistants                                |
+| `version`           | `'1.0.0'`            | Semantic version string                                                   |
+| `tools`             | every route          | Which routes become tools, keyed by route tree                            |
+| `onlyReadOnly`      | `false`              | Keep only `GET`, `HEAD`, and `OPTIONS`                                    |
+| `instructions`      | built from your tags | Appended to the generated overview                                        |
+| `handlerContext`    | none                 | Extra context spread into every handler call                              |
+| `credentialHeaders` | none                 | Headers of the MCP transport request, used to run guards on secured tools |
 
-The default `routeFilter` keeps routes whose `contentType` is `application/json` or unset, so multipart and form-urlencoded routes are left out.
+`tools` is keyed by the route tree: a route it never mentions is a tool, `false` drops one or a whole group, and `'*'` sets a group default. See [Choosing which routes become tools](/docs/mcp#choosing-which-routes-become-tools).
+
+Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, because MCP tool input is JSON.
 
 ## Secured routes
 

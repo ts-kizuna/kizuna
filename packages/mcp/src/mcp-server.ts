@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/server';
 import { flattenRoutes, validateRequest } from '@ts-kizuna/core/adapter';
 import {
@@ -16,9 +17,12 @@ import {
     guardDeny,
     isGuardDenial,
 } from '@ts-kizuna/core/adapter';
-import type { Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
+import { contractOf } from '@ts-kizuna/core/adapter';
+import type { Contract, Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
+import { isIdempotentMethod, isSafeMethod } from './method.js';
 import { deriveToolNames } from './tool-name.js';
-import { buildToolInputSchema, type ToolInputSchema } from './schema.js';
+import { buildToolInputSchema, buildToolOutputSchema, type ToolInputSchema } from './schema.js';
+import { selectToolRoutes, type ToolMap, type ToolSelection } from './tool-selection.js';
 
 export interface McpServerOptions {
     /**
@@ -36,11 +40,25 @@ export interface McpServerOptions {
     version?: string;
 
     /**
-     * Predicate to filter which routes become MCP tools.
-     * Return false to exclude a route.
-     * By default, multipart/form-data and application/x-www-form-urlencoded routes are excluded.
+     * Which routes become tools. Pass the contract's routes to `mcpPlugin` to
+     * have the keys checked against them.
      */
-    routeFilter?: (route: RouteDefinition, routeKey: string) => boolean;
+    tools?: ToolMap;
+
+    /**
+     * Keep only the methods RFC 9110 calls safe, so no tool an assistant calls
+     * can change data.
+     *
+     * @default false
+     */
+    onlyReadOnly?: boolean;
+
+    /**
+     * Guidance for the model, appended to the overview built from the
+     * contract's tags. Use it for what belongs to no single route: the order
+     * operations happen in, the conventions every route shares.
+     */
+    instructions?: string;
 
     /**
      * Extra context spread into every handler call.
@@ -60,10 +78,6 @@ export interface McpServerOptions {
     credentialHeaders?: Record<string, string | string[] | undefined>;
 }
 
-const defaultRouteFilter = (route: RouteDefinition): boolean => {
-    return route.contentType === undefined || route.contentType === 'application/json';
-};
-
 interface Annotations {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;
@@ -71,25 +85,26 @@ interface Annotations {
     openWorldHint?: boolean;
 }
 
-const buildToolAnnotations = (route: RouteDefinition): Annotations => {
-    switch (route.method) {
-        case 'GET':
-        case 'HEAD':
-        case 'OPTIONS':
-            return {
-                readOnlyHint: true,
-            };
-        case 'DELETE':
-            return {
-                destructiveHint: true,
-            };
-        case 'PUT':
-            return {
-                idempotentHint: true,
-            };
-        default:
-            return {};
+/**
+ * Hints from the method's HTTP semantics, per RFC 9110. MCP already defaults
+ * `destructiveHint` and `openWorldHint` to true, so only the hints that make a
+ * tool safer than that are worth setting.
+ */
+const buildToolAnnotations = (route: RouteDefinition): Annotations => ({
+    ...(isSafeMethod(route.method) ? { readOnlyHint: true } : {}),
+    ...(isIdempotentMethod(route.method) ? { idempotentHint: true } : {}),
+    ...(route.method === 'DELETE' ? { destructiveHint: true } : {}),
+});
+
+const describeRequirement = (route: RouteDefinition, scheme: string, scopes: readonly string[]): string => {
+    const constraints = scopes.length > 0 ? [`scopes: ${scopes.join(', ')}`] : [];
+
+    for (const [field, allowed] of Object.entries(route.accessGate?.[scheme] ?? {})) {
+        const values = Array.isArray(allowed) ? allowed : [allowed];
+        constraints.push(`${field}: ${values.join(', ')}`);
     }
+
+    return constraints.length > 0 ? `${scheme} (${constraints.join('; ')})` : scheme;
 };
 
 const buildToolDescription = (route: RouteDefinition): string => {
@@ -98,37 +113,73 @@ const buildToolDescription = (route: RouteDefinition): string => {
     if (route.description) parts.push(route.description);
     if (parts.length === 0) parts.push(`${route.method} ${route.path}`);
     parts.push(`\nHTTP: ${route.method} ${route.path}`);
+
+    const requirements = resolveSecurityRequirements(route);
+    if (requirements.length > 0) {
+        parts.push(`Requires: ${requirements.map(({ scheme, scopes }) => describeRequirement(route, scheme, scopes)).join(', ')}`);
+    }
+
     return parts.join('\n');
 };
 
 export interface ToolDefinition {
     name: string;
+    title: string | undefined;
     description: string;
     inputSchema: ToolInputSchema;
+    outputSchema: z.ZodType;
     route: RouteDefinition;
     routeKey: string;
+    tags: string[];
 }
 
 export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions): ToolDefinition[] => {
-    const filter = options?.routeFilter ?? defaultRouteFilter;
-    const flatRoutes = flattenRoutes(routes).filter(({ route, routeKey }: { route: RouteDefinition; routeKey: string }) =>
-        filter(route, routeKey)
-    );
-    const names = deriveToolNames(flatRoutes);
+    const selected = selectToolRoutes(flattenRoutes(routes), options);
+    const names = deriveToolNames(selected);
     const definitions: ToolDefinition[] = [];
 
-    for (const { routeKey, route } of flatRoutes) {
+    for (const { routeKey, route, routeTags } of selected) {
         const name = names.get(routeKey)!;
         definitions.push({
             name,
+            title: route.summary,
             description: buildToolDescription(route),
             inputSchema: buildToolInputSchema(route),
+            outputSchema: buildToolOutputSchema(route),
             route,
             routeKey,
+            tags: routeTags,
         });
     }
 
     return definitions;
+};
+
+/**
+ * What a client puts in front of the model before it picks a tool.
+ */
+export const buildInstructions = (
+    contract: Contract | undefined,
+    definitions: readonly ToolDefinition[],
+    authored: string | undefined
+): string => {
+    const sections: string[] = [
+        'Every tool calls one HTTP route and returns `{ status, body }`. A status of 400 or more means the call failed.',
+    ];
+
+    const tags = contract?.tags?.tags;
+    if (tags !== undefined) {
+        // A group whose every route was excluded is not a group the model has.
+        const exposed = new Set(definitions.flatMap((definition) => definition.tags));
+        const groups = Object.entries(tags)
+            .filter(([key]) => exposed.has(key))
+            .map(([, tag]) => (tag.description ? `- ${tag.title}: ${tag.description}` : `- ${tag.title}`));
+        if (groups.length > 0) sections.push(`Groups:\n${groups.join('\n')}`);
+    }
+
+    if (authored) sections.push(authored);
+
+    return sections.join('\n\n');
 };
 
 const resolveHandler = (router: Record<string, unknown>, routeKey: string): unknown => {
@@ -141,7 +192,34 @@ const resolveHandler = (router: Record<string, unknown>, routeKey: string): unkn
     return current;
 };
 
-type ToolCallResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
+type ToolCallResult = { content: Array<{ type: 'text'; text: string }>; structuredContent?: Record<string, unknown>; isError?: boolean };
+
+/**
+ * The `{ status, body }` envelope every tool returns. A success also rides
+ * along as `structuredContent`, matching the advertised output schema.
+ */
+const toolEnvelope = (status: number, body: unknown): ToolCallResult => {
+    const envelope = {
+        status,
+        body,
+    };
+    const isError = status >= 400;
+
+    return {
+        content: [
+            {
+                type: 'text' as const,
+                text: JSON.stringify(envelope, null, 2),
+            },
+        ],
+        ...(isError
+            ? {}
+            : {
+                  structuredContent: envelope,
+              }),
+        isError,
+    };
+};
 
 const toolError = (status: number, detail: string): ToolCallResult => ({
     content: [
@@ -328,42 +406,10 @@ const executeToolCall = async (
             ...(Object.keys(guardOutcome.securityContext).length > 0 ? { auth: guardOutcome.securityContext } : {}),
         });
 
-        const isError = result.status >= 400;
-
-        return {
-            content: [
-                {
-                    type: 'text' as const,
-                    text: JSON.stringify(
-                        {
-                            status: result.status,
-                            body: result.body,
-                        },
-                        null,
-                        2
-                    ),
-                },
-            ],
-            isError,
-        };
+        return toolEnvelope(result.status, result.body);
     } catch (error) {
         if (error instanceof ResponseError) {
-            return {
-                content: [
-                    {
-                        type: 'text' as const,
-                        text: JSON.stringify(
-                            {
-                                status: error.status,
-                                body: error.body,
-                            },
-                            null,
-                            2
-                        ),
-                    },
-                ],
-                isError: error.status >= 400,
-            };
+            return toolEnvelope(error.status, error.body);
         }
 
         return {
@@ -406,19 +452,30 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
     const schemes = (api as unknown as Record<typeof SCHEMES_META, Record<string, SecurityScheme> | undefined>)[SCHEMES_META];
     const contextResolvers = (api as unknown as Record<typeof REQUEST_CONTEXT_META, RequestContextMap | undefined>)[REQUEST_CONTEXT_META];
 
-    const server = new McpServer({
-        name: options?.name ?? 'MCP Server',
-        version: options?.version ?? '1.0.0',
-    });
-
     const definitions = buildToolDefinitions(api.routes, options);
+
+    const server = new McpServer(
+        {
+            name: options?.name ?? 'MCP Server',
+            version: options?.version ?? '1.0.0',
+        },
+        {
+            instructions: buildInstructions(contractOf<Contract | undefined>(api), definitions, options?.instructions),
+        }
+    );
 
     for (const definition of definitions) {
         server.registerTool(
             definition.name,
             {
+                ...(definition.title === undefined
+                    ? {}
+                    : {
+                          title: definition.title,
+                      }),
                 description: definition.description,
-                inputSchema: definition.inputSchema.shape,
+                inputSchema: definition.inputSchema.shape === undefined ? undefined : z.object(definition.inputSchema.shape),
+                outputSchema: definition.outputSchema,
                 annotations: buildToolAnnotations(definition.route),
             },
             async (args: Record<string, unknown>) =>

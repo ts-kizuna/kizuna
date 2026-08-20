@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { parsePath } from '@ts-kizuna/core/adapter';
-import { isVoidSchema, readObjectShape } from '@ts-kizuna/core/generator';
+import {
+    isJsonMediaType,
+    isSuccessStatus,
+    isVoidSchema,
+    readObjectShape,
+    resolveResponseBody,
+    resolveResponseContentType,
+} from '@ts-kizuna/core/generator';
 import type { RouteDefinition } from '@ts-kizuna/core';
 
 export interface ToolInputSchema {
@@ -52,4 +59,47 @@ export const buildToolInputSchema = (route: RouteDefinition): ToolInputSchema =>
         hasQuery,
         hasBody,
     };
+};
+
+/**
+ * The `{ status, body }` envelope a tool returns, with `body` carrying the
+ * route's JSON success bodies. A route with none gets `status` alone.
+ */
+export const buildToolOutputSchema = (route: RouteDefinition): z.ZodType => {
+    const bodies: z.ZodType[] = [];
+    let someSuccessHasNoBody = false;
+
+    for (const status of Object.keys(route.responses)
+        .map(Number)
+        .sort((left, right) => left - right)) {
+        if (!isSuccessStatus(status)) continue;
+        const response = route.responses[status];
+        if (response === undefined) continue;
+        const contentType = resolveResponseContentType(response);
+        if (contentType !== undefined && !isJsonMediaType(contentType)) {
+            someSuccessHasNoBody = true;
+            continue;
+        }
+        const body = resolveResponseBody(response);
+        if (isVoidSchema(body)) {
+            someSuccessHasNoBody = true;
+            continue;
+        }
+        bodies.push(body);
+    }
+
+    const status = z.int().describe('The HTTP status the route answered with');
+
+    if (bodies.length === 0) {
+        return z.object({
+            status,
+        });
+    }
+
+    const body = bodies.length === 1 ? bodies[0]! : z.union(bodies);
+
+    return z.object({
+        status,
+        body: someSuccessHasNoBody ? body.optional() : body,
+    });
 };
