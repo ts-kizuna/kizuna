@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/hono",
-  "version": "1.50.0",
+  "version": "1.51.0",
   "description": "Hono adapter for ts-kizuna",
   "keywords": [
     "ts-kizuna",
