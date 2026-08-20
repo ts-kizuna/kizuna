@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
-import { handleReceiverDelivery, receiverAt, warnUnimplementedReceivers, type ReceiversMeta } from './receiver-dispatch.js';
+import { receiverRouteKey, receiverRoutes, receiverRouter, warnUnimplementedReceivers, type ReceiversMeta } from './receiver-dispatch.js';
+import { ResponseError } from './response-error.js';
+import type { RouteDefinition } from './types.js';
 
 const k = new Kizuna();
 
@@ -19,13 +21,13 @@ const receivers = {
     stripe,
 };
 
-const delivery = (body: string) => ({
-    method: 'POST',
-    path: '/webhooks/stripe',
+const deliveryArgs = (body: string, jobs?: unknown) => ({
+    body: new TextEncoder().encode(body),
     headers: {
         'x-delivery': 'del_1',
     },
-    body: new TextEncoder().encode(body),
+    path: '/webhooks/stripe',
+    jobs,
 });
 
 const metaWith = (
@@ -42,8 +44,27 @@ const metaWith = (
     onError,
 });
 
+/**
+ * Run one delivery through the synthesized route handler, catching `throwError`
+ * the way the pipeline does.
+ */
+const deliverTo = async (meta: ReceiversMeta, receiverKey: string, body: string, jobs?: unknown) => {
+    const router = receiverRouter(meta) as unknown as Record<string, (args: unknown) => Promise<{ status: number; body?: unknown }>>;
+    try {
+        return await router[receiverRouteKey(receiverKey)]!(deliveryArgs(body, jobs));
+    } catch (error) {
+        if (error instanceof ResponseError) {
+            return {
+                status: error.status,
+                body: error.body,
+            };
+        }
+        throw error;
+    }
+};
+
 const deliver = (meta: ReceiversMeta, body = '{"id":"evt_1","type":"invoice.paid"}', jobs?: unknown) =>
-    handleReceiverDelivery('stripe', stripe, meta, delivery(body), jobs);
+    deliverTo(meta, 'stripe', body, jobs);
 
 describe('k.receiver', () => {
     it('compiles a receiver with its path and body', () => {
@@ -141,7 +162,7 @@ describe('k.receiver', () => {
     });
 });
 
-describe('handleReceiverDelivery', () => {
+describe('receiverRouter', () => {
     it('runs the handler on an accepted delivery and answers 200', async () => {
         const handler = vi.fn();
         const result = await deliver(
@@ -329,30 +350,49 @@ describe('handleReceiverDelivery', () => {
     });
 
     it('answers 500 when a declared receiver has no implementation', async () => {
-        const result = await handleReceiverDelivery(
-            'stripe',
-            stripe,
+        const result = await deliverTo(
             {
                 receivers,
                 implementations: {},
             },
-            delivery('{"id":"evt_1","type":"invoice.paid"}')
+            'stripe',
+            '{"id":"evt_1","type":"invoice.paid"}'
         );
         expect(result.status).toBe(500);
     });
 });
 
-describe('receiverAt', () => {
-    it('finds the receiver serving a path', () => {
-        expect(receiverAt(receivers, 'POST', '/webhooks/stripe')?.receiverKey).toBe('stripe');
+describe('receiverRoutes', () => {
+    const routes = receiverRoutes({
+        receivers,
+        implementations: {},
+    }) as unknown as Record<string, RouteDefinition>;
+    const route = routes[receiverRouteKey('stripe')]!;
+
+    it('serves POST on the receiver path', () => {
+        expect(route.method).toBe('POST');
+        expect(route.path).toBe('/webhooks/stripe');
     });
 
-    it('ignores another path', () => {
-        expect(receiverAt(receivers, 'POST', '/webhooks/other')).toBeUndefined();
+    it('reads the body as bytes, so a verifier sees what the vendor signed', () => {
+        expect(route.rawBody).toBe(true);
+        expect(route.body).toBeUndefined();
     });
 
-    it('ignores another method, because a receiver only ever answers POST', () => {
-        expect(receiverAt(receivers, 'GET', '/webhooks/stripe')).toBeUndefined();
+    it('carries no security, because the verifier is the authentication', () => {
+        expect(route.security).toEqual([]);
+    });
+
+    it('answers the retry contract the receiver declared', () => {
+        expect(
+            Object.keys(route.responses)
+                .map(Number)
+                .sort((left, right) => left - right)
+        ).toEqual([200, 401, 422, 500, 503]);
+    });
+
+    it('namespaces its route key so it cannot collide with a route of your own', () => {
+        expect(receiverRouteKey('stripe')).toBe('kizuna:receiver:stripe');
     });
 });
 

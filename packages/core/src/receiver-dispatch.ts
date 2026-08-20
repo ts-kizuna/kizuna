@@ -1,4 +1,6 @@
-import { getStatusText } from './status-titles.js';
+import type { RouteDefinition, Routes } from './types.js';
+import type { Router } from './handler-pipeline.js';
+import { formatValidationError } from './handler-pipeline.js';
 import { ResponseError } from './response-error.js';
 import {
     DEFAULT_DENY_STATUS,
@@ -25,42 +27,39 @@ export interface ReceiversMeta {
 }
 
 /**
- * One delivery, as each adapter reads it off its own request.
+ * Namespaced so it cannot collide with a route key of your own.
  */
-export interface Delivery {
-    method: string;
-    /**
-     * The path as the vendor requested it, including any `basePath`.
-     */
-    path: string;
-    /**
-     * Every request header, lowercased.
-     */
-    headers: Record<string, string>;
-    /**
-     * The exact bytes that arrived, before anything parsed them.
-     */
-    body: Uint8Array;
-}
+export const receiverRouteKey = (receiverKey: string): string => `kizuna:receiver:${receiverKey}`;
 
 /**
- * What the dispatcher answers with.
+ * The endpoints receivers are served on, in the {@link Routes} shape the request
+ * pipeline takes. `security` is empty because the verifier is the authentication.
  */
-export interface DeliveryResult {
-    status: number;
-    body?: unknown;
-}
+export const receiverRoutes = (meta: ReceiversMeta): Routes => {
+    const routes: Record<string, RouteDefinition> = {};
+    for (const { receiverKey, receiver } of flattenReceivers(meta.receivers)) {
+        routes[receiverRouteKey(receiverKey)] = {
+            method: 'POST',
+            path: receiver.path,
+            summary: receiver.definition.summary ?? `Receive a ${receiverKey} delivery`,
+            description: receiver.definition.description,
+            security: [],
+            rawBody: true,
+            responses: receiver.responses,
+        } as unknown as RouteDefinition;
+    }
+    return routes as unknown as Routes;
+};
 
-const problem = (status: number, detail: string, extra?: Record<string, unknown>): DeliveryResult => ({
-    status,
-    body: {
-        type: 'about:blank',
-        title: getStatusText(status),
-        status,
-        detail,
-        ...extra,
-    },
-});
+/**
+ * What the pipeline hands a receiver route's handler.
+ */
+interface ReceiverRouteArgs {
+    body: Uint8Array;
+    headers: Record<string, string>;
+    path: string;
+    jobs?: unknown;
+}
 
 /**
  * Verify one delivery, validate its body, and run the receiver's handler.
@@ -68,113 +67,122 @@ const problem = (status: number, detail: string, extra?: Record<string, unknown>
  * Nothing parses the body until the verifier has accepted it, because a
  * signature covers the exact bytes that arrived.
  */
-export const handleReceiverDelivery = async (
+const runReceiver = async (
     receiverKey: string,
     receiver: CompiledReceiver,
     meta: ReceiversMeta,
-    delivery: Delivery,
-    jobs?: unknown
-): Promise<DeliveryResult> => {
+    args: ReceiverRouteArgs
+): Promise<{ status: number; body?: unknown }> => {
     const implementation = meta.implementations[receiverKey];
     if (!implementation) {
-        return problem(500, `Receiver "${receiverKey}" has no implementation.`);
+        return {
+            status: 500,
+            body: {
+                detail: `Receiver "${receiverKey}" has no implementation.`,
+            },
+        };
     }
 
     try {
         await implementation.verify({
-            raw: delivery.body,
-            text: new TextDecoder().decode(delivery.body),
-            headers: delivery.headers,
-            method: delivery.method.toUpperCase(),
-            path: delivery.path,
+            raw: args.body,
+            text: new TextDecoder().decode(args.body),
+            headers: args.headers,
+            method: 'POST',
+            path: args.path,
             deny: receiverDeny,
         });
     } catch (error) {
         if (error instanceof ReceiverDenied) {
-            return problem(error.status, error.detail);
+            return {
+                status: error.status,
+                body: {
+                    detail: error.detail,
+                },
+            };
         }
         // Fail closed: a verifier that throws for any other reason still refuses.
         meta.onError?.(error, receiverKey);
-        return problem(DEFAULT_DENY_STATUS, 'Unauthorized');
+        return {
+            status: DEFAULT_DENY_STATUS,
+            body: {
+                detail: 'Unauthorized',
+            },
+        };
     }
 
     let parsed: unknown;
     try {
-        parsed = JSON.parse(new TextDecoder().decode(delivery.body));
+        parsed = JSON.parse(new TextDecoder().decode(args.body));
     } catch {
-        return problem(422, 'Body is not valid JSON');
+        return {
+            status: 422,
+            body: {
+                detail: 'Body is not valid JSON',
+            },
+        };
     }
 
     const validation = receiver.body.safeParse(parsed);
     if (!validation.success) {
-        return problem(422, 'Body does not match the receiver schema', {
-            errors: validation.error.issues.map((issue) => ({
-                code: issue.code ?? 'custom',
-                path: issue.path,
-                message: issue.message,
-            })),
+        const formatted = formatValidationError({
+            stage: 'body',
+            issues: validation.error.issues,
         });
+        return {
+            status: 422,
+            body: {
+                detail: formatted.detail,
+                errors: formatted.issues.map((issue) => ({
+                    code: issue.code ?? 'custom',
+                    path: issue.path,
+                    message: issue.message,
+                })),
+            },
+        };
     }
 
     try {
         const returned = await implementation.handler({
             body: validation.data,
-            headers: delivery.headers,
+            headers: args.headers,
             throwError: (response) => {
                 throw new ResponseError(response as never);
             },
-            ...(jobs === undefined
+            ...(args.jobs === undefined
                 ? {}
                 : {
-                      jobs,
+                      jobs: args.jobs,
                   }),
         } as Parameters<ReceiverImplementation['handler']>[0]);
         if (returned && typeof returned === 'object' && 'status' in returned) {
-            return returned as DeliveryResult;
+            return returned as { status: number; body?: unknown };
         }
         return {
             status: 200,
         };
     } catch (error) {
-        if (error instanceof ResponseError) {
-            return {
-                status: error.status,
-                body: error.body,
-            };
-        }
+        // `throwError`, which the pipeline renders.
+        if (error instanceof ResponseError) throw error;
         meta.onError?.(error, receiverKey);
-        return problem(500, 'Internal Server Error');
+        return {
+            status: 500,
+            body: {
+                detail: 'Internal Server Error',
+            },
+        };
     }
 };
 
 /**
- * Read one delivery off a web `Request`, which is what every adapter but Express
- * and Fastify already has.
+ * Their handlers, in the {@link Router} shape the request pipeline takes.
  */
-export const deliveryFromRequest = async (request: Request, path: string): Promise<Delivery> => {
-    const headers: Record<string, string> = {};
-    request.headers.forEach((value, name) => {
-        headers[name.toLowerCase()] = value;
-    });
-    return {
-        method: request.method,
-        path,
-        headers,
-        body: new Uint8Array(await request.arrayBuffer()),
-    };
-};
-
-/**
- * Find the receiver serving one path. Used by the adapters that route centrally
- * rather than registering per path.
- */
-export const receiverAt = (
-    receivers: Receivers,
-    method: string,
-    path: string
-): { receiverKey: string; receiver: CompiledReceiver } | undefined => {
-    if (method.toUpperCase() !== 'POST') return undefined;
-    return flattenReceivers(receivers).find(({ receiver }) => receiver.path === path);
+export const receiverRouter = <HandlerContext>(meta: ReceiversMeta): Router<Routes, HandlerContext> => {
+    const router: Record<string, unknown> = {};
+    for (const { receiverKey, receiver } of flattenReceivers(meta.receivers)) {
+        router[receiverRouteKey(receiverKey)] = (args: ReceiverRouteArgs) => runReceiver(receiverKey, receiver, meta, args);
+    }
+    return router as unknown as Router<Routes, HandlerContext>;
 };
 
 /**

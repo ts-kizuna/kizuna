@@ -48,6 +48,11 @@ test('path must start with /', () => {
     tagRoutes({ bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } } });
 });
 
+test("rawBody is kizuna's to set, not an author's", () => {
+    // @ts-expect-error rawBody is not authorable
+    new Kizuna().routes({ bad: { method: 'POST', path: '/hook', rawBody: true, responses: { 200: z.void() } } });
+});
+
 const tags = Kizuna.tags({
     users: {
         title: 'Users',

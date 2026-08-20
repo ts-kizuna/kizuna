@@ -111,6 +111,11 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
         description?: string;
     };
     contentType?: 'application/json' | 'multipart/form-data' | 'application/x-www-form-urlencoded';
+    /**
+     * Hand the handler the bytes as a `Uint8Array`, enforcing no `Content-Type`
+     * and running no `body` schema. Set only on kizuna's synthesized routes.
+     */
+    rawBody?: boolean;
     body?: z.ZodType;
     query?: z.ZodType;
     pathParams?: z.ZodType;
@@ -163,12 +168,16 @@ export interface Routes<TagKeys extends string = string, SchemeNames extends str
 
 /**
  * A route as authored in `k.routes`: the route shape minus `security` and
- * `accessGate`, which the `auth` map owns and `k.contract` resolves. Writing
- * either on a route is a type error.
+ * `accessGate`, which the `auth` map owns and `k.contract` resolves, and minus
+ * `rawBody`. Writing any of them on a route is a type error.
  */
-export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<RouteDefinition<TagKeys>, 'security' | 'accessGate'> & {
+export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<
+    RouteDefinition<TagKeys>,
+    'security' | 'accessGate' | 'rawBody'
+> & {
     security?: never;
     accessGate?: never;
+    rawBody?: never;
 };
 
 /**

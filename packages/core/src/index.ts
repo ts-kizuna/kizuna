@@ -10,7 +10,16 @@ export {
     type AuthValue,
     type AccessConstraint,
 } from './kizuna.js';
-export { type Contract } from './contract.js';
+export {
+    type Contract,
+    type RoutesOf,
+    type SchemesOf,
+    type AuthOf,
+    type RequestContextOf,
+    type ContractPluginsOf,
+    type JobsOf,
+    type ReceiversOf,
+} from './contract.js';
 export {
     createPlugin,
     type PluginDeclaration,

@@ -64,15 +64,7 @@ export type {
     ReceiverVerifyArgs,
 } from './receivers.js';
 export { flattenReceivers, isCompiledReceiver, receiverDeny, ReceiverDenied } from './receivers.js';
-export {
-    deliveryFromRequest,
-    handleReceiverDelivery,
-    receiverAt,
-    warnUnimplementedReceivers,
-    type Delivery,
-    type DeliveryResult,
-    type ReceiversMeta,
-} from './receiver-dispatch.js';
+export { receiverRouteKey, receiverRoutes, receiverRouter, warnUnimplementedReceivers, type ReceiversMeta } from './receiver-dispatch.js';
 export {
     createJobRunner,
     jobFnAt,
@@ -209,7 +201,7 @@ export const contractOf = <C = unknown>(api: unknown): C => (api as Record<symbo
 /**
  * What kizuna puts in handler args. Must agree with the spread in `runPipeline`.
  */
-export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'throwError', 'auth', 'requestContext', 'plugins'] as const;
+export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'path', 'throwError', 'auth', 'requestContext', 'plugins'] as const;
 
 /**
  * The adapter's own context, with kizuna's arguments removed.
@@ -534,6 +526,11 @@ export interface AdapterRequest<NativeRequest> {
               routeKey: string;
               route: RouteDefinition;
               params: Record<string, string>;
+              /**
+               * The path as it was requested, including any `basePath`. A
+               * `rawBody` route's handler is given it as `path`.
+               */
+              path?: string;
           };
     query: unknown;
     headers: unknown;
@@ -867,7 +864,19 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         };
     }
 
-    if (route.body && !isVoidSchema(route.body)) {
+    const requestPath =
+        request.resolution.kind === 'core-match' ? request.resolution.path : (request.resolution.path ?? `${basePath ?? ''}${route.path}`);
+
+    if (route.rawBody) {
+        try {
+            raw.body = await request.readBody(route);
+        } catch {
+            return {
+                kind: 'invalid-body',
+                detail: 'Bad Request',
+            };
+        }
+    } else if (route.body && !isVoidSchema(route.body)) {
         const expected = route.contentType ?? 'application/json';
         const contentTypeHeader = (raw.headers as Record<string, string | undefined>)['content-type'] ?? '';
         // No content type is no representation, not an unsupported one (RFC 9110 §15.5.16).
@@ -978,6 +987,7 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             body: validation.parsed.body,
             headers: validation.parsed.headers,
             throwError,
+            ...(route.rawBody ? { path: requestPath } : {}),
             ...handlerContext,
             ...(jobRunner ? { jobs: jobRunner } : {}),
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
@@ -1274,6 +1284,7 @@ const formDataToObject = (form: FormData): Record<string, unknown> => {
  *
  * */
 export const parseFetchBody = async (request: Request, route: RouteDefinition): Promise<unknown> => {
+    if (route.rawBody) return new Uint8Array(await request.arrayBuffer());
     switch (route.contentType) {
         case 'multipart/form-data':
             return formDataToObject(await request.formData());
