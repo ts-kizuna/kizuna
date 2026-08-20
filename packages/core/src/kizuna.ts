@@ -1,18 +1,11 @@
 import type { z } from 'zod';
 import { tagRoutes } from './routes.js';
 import { assembleContract, type Contract } from './contract.js';
-import type { ContractPlugins, PluginArgs } from './plugin.js';
+import { pluginRouteTree, type ContractPlugins, type PluginArgs } from './plugin.js';
+import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
-import { flattenRoutes, isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
-import {
-    assertNoJobEndpointCollision,
-    buildJobs,
-    type AuthoredJobs,
-    type CompiledJobs,
-    type Jobs,
-    type JobsArg,
-    type JobsConfig,
-} from './jobs.js';
+import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
+import { jobClaims, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, type JobsArg, type JobsConfig } from './jobs.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
 import { createIdentity } from './identity.js';
 import { createRequestContext } from './request-context.js';
@@ -396,13 +389,11 @@ const createSurface = <
 
     const contract = (definition: { routes: Routes; jobs?: Jobs; auth?: Record<string, GroupAuth> }) => {
         const { routes: contractRoutes, jobs: contractJobs, auth } = definition;
-        if (contractJobs) {
-            const routePaths = new Map<string, string>();
-            for (const { routeKey, route } of flattenRoutes(contractRoutes)) {
-                routePaths.set(`${route.method}:${route.path}`, routeKey);
-            }
-            assertNoJobEndpointCollision(contractJobs, config?.jobs, routePaths);
-        }
+        assertNoPathCollisions([
+            ...routeClaims(contractRoutes),
+            ...routeClaims(pluginRouteTree(config?.plugins), 'Plugin route'),
+            ...jobClaims(contractJobs, config?.jobs),
+        ]);
         if (auth) {
             for (const groupKey of Object.keys(auth)) {
                 if (!(groupKey in contractRoutes)) {

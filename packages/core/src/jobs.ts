@@ -4,6 +4,7 @@ import { assertValidSchedule, type JobSchedule } from './schedule.js';
 import type { ResponseDefinition } from './types.js';
 import type { HandlerReturn } from './handler-pipeline.js';
 import type { JobRunner as JobRunnerOf } from './job-runner.js';
+import type { PathClaim } from './path-claims.js';
 
 /**
  * The namespace the job endpoints are mounted under when `jobs.path` says
@@ -370,10 +371,10 @@ export const isCompiledJob = (value: unknown): value is CompiledJob => {
  * Throws when either job endpoint lands on a path an API route already serves.
  * Called by `k.contract`, the one place that sees both.
  */
-export const assertNoJobEndpointCollision = (jobs: Jobs, config: JobsConfig | undefined, routePaths: ReadonlyMap<string, string>): void => {
-    if (flattenJobs(jobs).length === 0) return;
+export const jobClaims = (jobs: Jobs | undefined, config: JobsConfig | undefined): PathClaim[] => {
+    if (!jobs || flattenJobs(jobs).length === 0) return [];
     const base = config?.path ?? DEFAULT_JOBS_PATH;
-    const endpoints = [
+    return [
         {
             method: config?.method ?? 'POST',
             path: `${base}/dispatch`,
@@ -382,14 +383,10 @@ export const assertNoJobEndpointCollision = (jobs: Jobs, config: JobsConfig | un
             method: 'POST',
             path: `${base}/run`,
         },
-    ];
-    for (const { method, path } of endpoints) {
-        const conflict = routePaths.get(`${method}:${path}`);
-        if (conflict) {
-            throw new Error(
-                `The jobs ${method} ${path} endpoint collides with route "${conflict}", which already serves it. ` +
-                    `Move them with \`jobs.path\` on \`new Kizuna()\`.`
-            );
-        }
-    }
+    ].map((endpoint) => ({
+        kind: 'Jobs endpoint',
+        key: endpoint.path,
+        method: endpoint.method,
+        path: endpoint.path,
+    }));
 };

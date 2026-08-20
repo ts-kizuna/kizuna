@@ -131,22 +131,11 @@ describe('plugin lane', () => {
                 collide: collidingPlugin,
             },
         });
-        const colliding = collidingK.contract({
-            routes,
-        });
-
-        const server = new KizunaServer(colliding);
+        // Contract time, because the plugins are on the kizuna instance that built it.
         expect(() =>
-            server.api({
-                router: {
-                    indexUser: () => ({
-                        status: 200,
-                        body: {
-                            queued: 'x',
-                        },
-                    }),
-                },
-            } as never)
-        ).toThrow(/Duplicate route/);
+            collidingK.contract({
+                routes,
+            })
+        ).toThrow(/collides with/);
     });
 });

@@ -14,6 +14,7 @@ import {
 } from './handler-pipeline.js';
 import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes } from './route-matcher.js';
 import { parsePath } from './path-params.js';
+import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
@@ -203,19 +204,7 @@ export const adapterContextOf = (args: Record<string, unknown>): Record<string, 
 export type RequestContextMap<HandlerContext = unknown> = Record<string, RequestContextRun<HandlerContext>>;
 
 const assertNoDuplicateRoutes = (routes: Routes, pluginRoutes: Routes = {}): void => {
-    const seen = new Map<string, { routeKey: string; path: string }>();
-    for (const { routeKey, route } of [...flattenRoutes(routes), ...flattenRoutes(pluginRoutes)]) {
-        const { segments } = parsePath(route.path);
-        const normalizedPath = segments.map((segment) => (segment.kind === 'param' ? ':*' : segment.value)).join('');
-        const key = `${route.method}:${normalizedPath}`;
-        const conflict = seen.get(key);
-        if (conflict) {
-            throw new Error(
-                `Duplicate route: "${routeKey}" (${route.method} ${route.path}) conflicts with "${conflict.routeKey}" (${route.method} ${conflict.path})`
-            );
-        }
-        seen.set(key, { routeKey, path: route.path });
-    }
+    assertNoPathCollisions([...routeClaims(routes), ...routeClaims(pluginRoutes, 'Plugin route')]);
 };
 
 export interface ApiParts {
