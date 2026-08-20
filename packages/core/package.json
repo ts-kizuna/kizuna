@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/core",
-  "version": "1.51.0",
+  "version": "1.51.1",
   "description": "Contract and route definition, validation, and the adapter API for ts-kizuna",
   "keywords": [
     "ts-kizuna",

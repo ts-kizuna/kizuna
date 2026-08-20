@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/fastify",
-  "version": "1.51.0",
+  "version": "1.51.1",
   "description": "Fastify adapter for ts-kizuna",
   "keywords": [
     "ts-kizuna",
