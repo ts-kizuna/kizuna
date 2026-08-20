@@ -36,7 +36,6 @@ import {
     type ReceiversMeta,
 } from '@ts-kizuna/core/adapter';
 import type { Contract, RoutesOf, SecurityScheme, GuardSuccess } from '@ts-kizuna/core';
-import type { HandlersFromAuth, GuardParams, RequestContextValues } from '@ts-kizuna/core/adapter';
 
 export type FastifyApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;

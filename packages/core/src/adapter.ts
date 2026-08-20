@@ -66,18 +66,6 @@ export type {
 export { flattenReceivers, isCompiledReceiver, receiverDeny, ReceiverDenied } from './receivers.js';
 export { receiverRouteKey, receiverRoutes, receiverRouter, warnUnimplementedReceivers, type ReceiversMeta } from './receiver-dispatch.js';
 export {
-    createServerSurface,
-    type Server,
-    type ServerApiOptions,
-    type ContractRouter,
-    type ContractJobsRouter,
-    type ContractGroupRouter,
-    type RouteHandlerFor,
-    type GuardFnsFor,
-    type GuardsFor,
-    type RequestResolverFnsFor,
-} from './server-surface.js';
-export {
     createJobRunner,
     jobFnAt,
     JobInputError,
@@ -518,6 +506,7 @@ export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';
 export { matchRoute } from './route-matcher.js';
+export { createServerSurface, type Server, type ServerApiOptions, type ContractRouter, type ContractJobsRouter } from './server-surface.js';
 
 export type RouteMatcher = (method: string, path: string, routes: Routes, basePath?: string) => MatchResult;
 

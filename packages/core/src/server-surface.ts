@@ -10,15 +10,7 @@ import type { PluginImplementations } from './plugin-server.js';
 import type { ReceiverImplementation, ReceiverImplementations, ReceiverVerify } from './receivers.js';
 import type { ReceiversMeta } from './receiver-dispatch.js';
 import { warnUnimplementedReceivers } from './receiver-dispatch.js';
-import type {
-    GuardSuccess,
-    HandlersFromAuth,
-    GuardParams,
-    RequestContextValues,
-    Router as CoreRouter,
-    RouteHandler as CoreRouteHandler,
-} from './handler-pipeline.js';
-import type { RouteDefinition } from './types.js';
+import type { GuardSuccess, HandlersFromAuth, GuardParams, RequestContextValues, Router as CoreRouter } from './handler-pipeline.js';
 import {
     assembleApi,
     warnUnsupportedJobOptions,
@@ -32,11 +24,6 @@ import {
     type RequestContextRun,
     type ServerOptions,
 } from './adapter.js';
-
-/**
- * The handler for a single route, typed against its contract definition.
- */
-export type RouteHandlerFor<R extends RouteDefinition, HandlerContext> = CoreRouteHandler<R, HandlerContext>;
 
 /**
  * The handler tree for a contract or route group, typed against it. Routes
