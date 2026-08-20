@@ -18,7 +18,7 @@ A plugin ships as two modules:
 | the declaration | your package's main entry | the contract, so everybody | whatever a browser bundles |
 | the server      | `your-package/server`     | the server app only        | anything                   |
 
-A plugin is declared on `new Kizuna()`, so whatever its declaration module imports lands in the contract's import graph, browser bundles included. Keep `node:fs`, a database driver, or a heavy SDK in the server half.
+A plugin is declared on `k.contract`, so whatever its declaration module imports lands in the contract's import graph, browser bundles included. Keep `node:fs`, a database driver, or a heavy SDK in the server half.
 
 ## The declaration
 
@@ -96,10 +96,24 @@ The callback also receives `api`, for plugins that read the contract's routes. M
 
 ## What the app writes
 
-```ts title="k.ts"
+```ts title="contract.ts"
 plugins: {
-    audit: auditPlugin({ path: '/internal/audit' }),
+    audit: auditPlugin({
+        path: '/internal/audit',
+    }),
 }
+```
+
+A plugin whose props name routes takes them from the `plugins` function instead, and `k.contract` types them:
+
+```ts title="contract.ts"
+plugins: ({ routes }) => ({
+    audit: auditPlugin(routes, {
+        skip: {
+            health: true,
+        },
+    }),
+}),
 ```
 
 ```ts title="api.ts"

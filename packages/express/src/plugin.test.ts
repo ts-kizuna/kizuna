@@ -41,9 +41,6 @@ const k = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
-    plugins: {
-        probe: probePlugin,
-    },
 });
 
 const routes = k.routes('api', {
@@ -59,6 +56,9 @@ const routes = k.routes('api', {
 });
 
 const contract = k.contract({
+    plugins: {
+        probe: probePlugin,
+    },
     routes,
 });
 
@@ -127,13 +127,13 @@ describe('plugin lane', () => {
             tags: Kizuna.tags({
                 api: 'API',
             }),
-            plugins: {
-                collide: collidingPlugin,
-            },
         });
         // Contract time, because the plugins are on the kizuna instance that built it.
         expect(() =>
             collidingK.contract({
+                plugins: {
+                    collide: collidingPlugin,
+                },
                 routes,
             })
         ).toThrow(/collides with/);

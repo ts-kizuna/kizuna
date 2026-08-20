@@ -26,7 +26,7 @@ It lives on `@ts-kizuna/openapi/server` because it reads your deprecations file 
 
 ## Options
 
-Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin) in `k.ts`, and `generateOpenApi` reads them off the contract, so a build step cannot write a document that differs from the one your server serves. Pass `overrides` for what only a build step knows, such as the public `servers` list.
+Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin), and `generateOpenApi` reads them off the contract, so a build step cannot write a document that differs from the one your server serves. Pass `overrides` for what only a build step knows, such as the public `servers` list.
 
 | Option            | Type                                  | Default   | Description                                                                             |
 | ----------------- | ------------------------------------- | --------- | --------------------------------------------------------------------------------------- |
@@ -50,11 +50,12 @@ renderer('yaml'); // YAML string
 
 ## Example
 
-```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+```ts title="contract.ts"
 import { openApiPlugin } from '@ts-kizuna/openapi';
+import { k } from './k';
 
-export const k = new Kizuna({
+export const contract = k.contract({
+    routes,
     plugins: {
         openApi: openApiPlugin({
             info: {

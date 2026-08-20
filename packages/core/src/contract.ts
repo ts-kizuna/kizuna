@@ -25,7 +25,7 @@ export interface Contract<
      */
     routes: Routes_;
     /**
-     * The plugins passed to `new Kizuna()`. Their routes are served by
+     * The plugins installed on `k.contract`. Their routes are served by
      * `api.mount` but stay outside `routes`, so the client and the generators
      * do not see them.
      */

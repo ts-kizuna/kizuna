@@ -3,7 +3,7 @@ title: openApiPlugin
 description: Serve your OpenAPI document and an API reference UI for it, on any adapter.
 ---
 
-Serve a reference UI for the OpenAPI document generated from your contract, and the document itself if you want it public. Declare it on [`new Kizuna()`](/docs/reference/kizuna), pass `openApiPluginServer()` to [`server.api`](/docs/reference/server-api), and `api.mount` serves the routes. See the [OpenAPI guide](/docs/openapi).
+Serve a reference UI for the OpenAPI document generated from your contract, and the document itself if you want it public. Declare it on [`k.contract`](/docs/reference/k-contract), pass `openApiPluginServer()` to [`server.api`](/docs/reference/server-api), and `api.mount` serves the routes. See the [OpenAPI guide](/docs/openapi).
 
 <InstallTabs packageName="@ts-kizuna/openapi" />
 
@@ -45,12 +45,13 @@ Each path prop is off until you give it a path. The document paths carry their e
 
 ## Example
 
-```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+```ts title="contract.ts"
 import { openApiPlugin } from '@ts-kizuna/openapi';
+import { k } from './k';
 
-export const k = new Kizuna({
-    tags,
+export const contract = k.contract({
+    routes,
+    auth,
     plugins: {
         openApi: openApiPlugin({
             info: {

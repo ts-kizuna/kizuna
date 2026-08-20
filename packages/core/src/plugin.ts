@@ -93,10 +93,29 @@ export const createPlugin = ((definition?: PluginDefinition<PluginRoutes, unknow
     definition === undefined ? declare : declare(definition)) as CreatePlugin;
 
 /**
- * Plugins keyed by the name they were installed under on `new Kizuna()`. That
- * key is what `plugins.*` in handler args resolves against.
+ * Plugins keyed by the name they were installed under on `k.contract`. That key
+ * is what `plugins.*` in handler args resolves against.
  */
 export type ContractPlugins = Record<string, PluginDeclaration<PluginRoutes, unknown, unknown>>;
+
+/**
+ * What `k.contract` hands the `plugins` function. An object so it can carry more
+ * later without changing every call.
+ */
+export interface PluginContext<R extends Routes = Routes> {
+    /**
+     * The contract's routes, typed. Pass them to a plugin whose props name
+     * routes, so those names are checked.
+     */
+    routes: R;
+}
+
+/**
+ * The plugins a contract installs: the map, or a function of
+ * {@link PluginContext} returning it. Written as a function, its parameter is
+ * contextually typed with the contract's own routes.
+ */
+export type ContractPluginsArg<R extends Routes, P extends ContractPlugins> = P | ((context: PluginContext<R>) => P);
 
 export type PluginRoutesOf<Declaration> = Declaration extends PluginDeclaration<infer R, unknown, unknown> ? R : never;
 

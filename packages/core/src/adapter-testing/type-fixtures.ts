@@ -250,12 +250,12 @@ const pluginTypeK = new Kizuna({
     tags: Kizuna.tags({
         api: 'API',
     }),
-    plugins: {
-        probe: typedProbePlugin,
-    },
 });
 
 export const pluginTypeContract = pluginTypeK.contract({
+    plugins: {
+        probe: typedProbePlugin,
+    },
     routes: pluginTypeK.routes('api', {
         whichLabel: {
             method: 'GET',

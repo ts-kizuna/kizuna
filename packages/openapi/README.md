@@ -10,13 +10,15 @@ pnpm add @ts-kizuna/openapi
 
 ## Usage
 
-Declare the plugin on `new Kizuna()`:
+Declare the plugin on `k.contract`:
 
 ```ts
-import { Kizuna } from '@ts-kizuna/core';
 import { openApiPlugin } from '@ts-kizuna/openapi';
+import { k } from './k';
+import { routes } from './routes';
 
-export const k = new Kizuna({
+export const contract = k.contract({
+    routes,
     plugins: {
         openApi: openApiPlugin({
             info: {
