@@ -1,4 +1,4 @@
-import type { RouteDefinition, Routes } from './types.js';
+import type { Routes } from './types.js';
 import type { Router } from './handler-pipeline.js';
 import { formatValidationError } from './handler-pipeline.js';
 import { ResponseError } from './response-error.js';
@@ -35,21 +35,10 @@ export const receiverRouteKey = (receiverKey: string): string => `kizuna:receive
  * The endpoints receivers are served on, in the {@link Routes} shape the request
  * pipeline takes. `security` is empty because the verifier is the authentication.
  */
-export const receiverRoutes = (meta: ReceiversMeta): Routes => {
-    const routes: Record<string, RouteDefinition> = {};
-    for (const { receiverKey, receiver } of flattenReceivers(meta.receivers)) {
-        routes[receiverRouteKey(receiverKey)] = {
-            method: 'POST',
-            path: receiver.path,
-            summary: receiver.definition.summary ?? `Receive a ${receiverKey} delivery`,
-            description: receiver.definition.description,
-            security: [],
-            rawBody: true,
-            responses: receiver.responses,
-        } as unknown as RouteDefinition;
-    }
-    return routes as unknown as Routes;
-};
+export const receiverRoutes = (meta: ReceiversMeta): Routes =>
+    Object.fromEntries(
+        flattenReceivers(meta.receivers).map(({ receiverKey, receiver }) => [receiverRouteKey(receiverKey), receiver])
+    ) as unknown as Routes;
 
 /**
  * What the pipeline hands a receiver route's handler.
@@ -121,7 +110,7 @@ const runReceiver = async (
         };
     }
 
-    const validation = receiver.body.safeParse(parsed);
+    const validation = receiver.delivery.safeParse(parsed);
     if (!validation.success) {
         const formatted = formatValidationError({
             stage: 'body',

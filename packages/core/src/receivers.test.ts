@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { receiverRouteKey, receiverRoutes, receiverRouter, warnUnimplementedReceivers, type ReceiversMeta } from './receiver-dispatch.js';
 import { ResponseError } from './response-error.js';
-import type { RouteDefinition } from './types.js';
 
 const k = new Kizuna();
 
@@ -66,9 +65,23 @@ const deliver = (meta: ReceiversMeta, body = '{"id":"evt_1","type":"invoice.paid
     deliverTo(meta, 'stripe', body, jobs);
 
 describe('k.receiver', () => {
-    it('compiles a receiver with its path and body', () => {
+    it('compiles to the route it is served on, carrying the delivery schema', () => {
+        expect(stripe.method).toBe('POST');
         expect(stripe.path).toBe('/webhooks/stripe');
-        expect(stripe.body).toBe(EventSchema);
+        // Read as bytes, so a verifier sees what the vendor signed.
+        expect(stripe.rawBody).toBe(true);
+        expect(stripe.body).toBeUndefined();
+        expect(stripe.delivery).toBe(EventSchema);
+        // The verifier is the authentication.
+        expect(stripe.security).toEqual([]);
+    });
+
+    it('answers the retry contract every receiver declares', () => {
+        expect(
+            Object.keys(stripe.responses)
+                .map(Number)
+                .sort((left, right) => left - right)
+        ).toEqual([200, 401, 422, 500, 503]);
     });
 
     it('rejects a path that does not start with a slash', () => {
@@ -361,36 +374,13 @@ describe('receiverRouter', () => {
 });
 
 describe('receiverRoutes', () => {
-    const routes = receiverRoutes({
-        receivers,
-        implementations: {},
-    }) as unknown as Record<string, RouteDefinition>;
-    const route = routes[receiverRouteKey('stripe')]!;
-
-    it('serves POST on the receiver path', () => {
-        expect(route.method).toBe('POST');
-        expect(route.path).toBe('/webhooks/stripe');
-    });
-
-    it('reads the body as bytes, so a verifier sees what the vendor signed', () => {
-        expect(route.rawBody).toBe(true);
-        expect(route.body).toBeUndefined();
-    });
-
-    it('carries no security, because the verifier is the authentication', () => {
-        expect(route.security).toEqual([]);
-    });
-
-    it('answers the retry contract the receiver declared', () => {
-        expect(
-            Object.keys(route.responses)
-                .map(Number)
-                .sort((left, right) => left - right)
-        ).toEqual([200, 401, 422, 500, 503]);
-    });
-
-    it('namespaces its route key so it cannot collide with a route of your own', () => {
-        expect(receiverRouteKey('stripe')).toBe('kizuna:receiver:stripe');
+    it('keys each receiver so it cannot collide with a route of your own', () => {
+        const routes = receiverRoutes({
+            receivers,
+            implementations: {},
+        });
+        expect(Object.keys(routes)).toEqual(['kizuna:receiver:stripe']);
+        expect(routes['kizuna:receiver:stripe']).toBe(stripe);
     });
 });
 

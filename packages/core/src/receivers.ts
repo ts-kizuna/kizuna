@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ProblemDetailsSchema } from './error-response.js';
-import type { ResponseDefinition } from './types.js';
+import type { ResponseDefinition, RouteDefinition } from './types.js';
 import type { HandlerReturn } from './handler-pipeline.js';
 import type { Jobs, JobsArg } from './jobs.js';
 
@@ -44,14 +44,18 @@ export type ReceiverResponses = {
 };
 
 /**
- * A receiver after `k.receiver` compiles it.
+ * A receiver after `k.receiver` compiles it: the route it is served on, plus the
+ * schema its delivery is validated against once the verifier accepts it.
+ *
+ * `delivery` is not the route's `body`, because the pipeline would then validate
+ * it against bytes the verifier has not seen yet.
  */
-export interface CompiledReceiver<Definition extends ReceiverDefinition = ReceiverDefinition> {
-    definition: Definition;
-    path: `/${string}`;
-    body: Definition['body'];
+export type CompiledReceiver<Definition extends ReceiverDefinition = ReceiverDefinition> = RouteDefinition & {
+    method: 'POST';
+    rawBody: true;
     responses: ReceiverResponses;
-}
+    delivery: Definition['body'];
+};
 
 /**
  * A contract's receivers, keyed by vendor.
@@ -128,11 +132,11 @@ export type ReceiverHandlerReturn = HandlerReturn<{
 /**
  * The single object a receiver handler receives.
  */
-export interface ReceiverHandlerArgs<Definition extends ReceiverDefinition> {
+export interface ReceiverHandlerArgs<Receiver extends CompiledReceiver> {
     /**
      * The validated body.
      */
-    body: z.output<Definition['body']>;
+    body: z.output<Receiver['delivery']>;
     /**
      * Every request header, lowercased, which is where a delivery id lives.
      */
@@ -150,7 +154,7 @@ export interface ReceiverHandlerArgs<Definition extends ReceiverDefinition> {
  * A receiver's handler. Returning answers `200`.
  */
 export type ReceiverHandler<Receiver extends CompiledReceiver = CompiledReceiver, Jobs_ extends Jobs = Jobs> = (
-    args: ReceiverHandlerArgs<Receiver['definition']> & JobsArg<Jobs_>
+    args: ReceiverHandlerArgs<Receiver> & JobsArg<Jobs_>
 ) => Promise<ReceiverHandlerReturn | void> | ReceiverHandlerReturn | void;
 
 /**
@@ -197,18 +201,22 @@ const assertValidReceiver = (definition: ReceiverDefinition): void => {
 export const buildReceiver = <const Definition extends ReceiverDefinition>(definition: Definition): CompiledReceiver<Definition> => {
     assertValidReceiver(definition);
     return {
-        definition,
+        method: 'POST',
         path: definition.path,
-        body: definition.body,
-        responses: buildResponses(definition) as ReceiverResponses,
-    };
+        summary: definition.summary,
+        description: definition.description,
+        security: [],
+        rawBody: true,
+        delivery: definition.body,
+        responses: buildResponses(definition),
+    } as unknown as CompiledReceiver<Definition>;
 };
 
 /**
  * Whether a value is a compiled receiver.
  */
 export const isCompiledReceiver = (value: unknown): value is CompiledReceiver =>
-    !!value && typeof value === 'object' && 'path' in value && 'body' in value && 'responses' in value;
+    !!value && typeof value === 'object' && 'path' in value && 'delivery' in value && 'responses' in value;
 
 /**
  * Every receiver, keyed by name.
