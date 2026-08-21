@@ -13,7 +13,7 @@ import {
 } from '@ts-kizuna/core/adapter';
 import { buildToolDefinitions, createMcpServer, type ToolDefinition } from './mcp-server.js';
 import { mcpPlugin } from './plugin.js';
-import { protectedResourceMetadataUrl, type McpOAuthProps } from './oauth.js';
+import { assertCanonicalResource, protectedResourceMetadataUrl, type McpOAuthProps } from './oauth.js';
 import { denialResponse, enforceOAuth } from './oauth-enforcement.js';
 
 export { createMcpServer, buildToolDefinitions, buildInstructions, type McpServerOptions, type ToolDefinition } from './mcp-server.js';
@@ -50,6 +50,7 @@ const prepareOAuth = (
     api: ApiWithRouter,
     selection: Parameters<typeof buildToolDefinitions>[1]
 ): OAuthEnforcement => {
+    assertCanonicalResource(oauth, endpointPath);
     const guards = (api as unknown as Record<typeof GUARDS_META, GuardMap | undefined>)[GUARDS_META];
     const schemes = (api as unknown as Record<typeof SCHEMES_META, Record<string, SecurityScheme> | undefined>)[SCHEMES_META];
     const guard = guards?.[oauth.scheme];

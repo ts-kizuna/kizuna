@@ -3,7 +3,7 @@ import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
 import { ProtectedResourceMetadataSchema } from '@ts-kizuna/core/schemas';
 import type { Routes } from '@ts-kizuna/core';
 import type { ToolSelection } from './tool-selection.js';
-import { assertCanonicalResource, protectedResourceMetadataPath, type McpOAuthProps } from './oauth.js';
+import { protectedResourceMetadataPath, type McpOAuthProps } from './oauth.js';
 
 export interface McpPluginProps<R extends Routes = Routes> extends ToolSelection<R> {
     /**
@@ -43,7 +43,6 @@ export interface McpPluginProps<R extends Routes = Routes> extends ToolSelection
 
 const declare = (props: McpPluginProps) => {
     const endpointPath = props.path ?? '/mcp';
-    if (props.oauth !== undefined) assertCanonicalResource(props.oauth, endpointPath);
     return createPlugin({
         name: 'mcp',
         serverModule: '@ts-kizuna/mcp/server',
