@@ -446,12 +446,77 @@ describe('mcpPlugin: oauth declaration', () => {
         ).toEqual(['endpoint', 'protectedResourceMetadata']);
     });
 
-    it('rejects an invalid resource at declaration time', () => {
+    it('accepts any resource at declaration time, so contracts evaluate without deployment env', () => {
         expect(() =>
             mcpPlugin({
                 oauth: {
-                    resource: '/mcp',
+                    resource: 'undefined/mcp',
                     scheme: 'user',
+                },
+            })
+        ).not.toThrow();
+    });
+
+    it('rejects an invalid resource when the server half serves it', () => {
+        const brokenContract = k.contract({
+            routes: {
+                api: apiRoutes,
+            },
+            auth: {
+                api: 'user',
+            },
+            plugins: {
+                mcp: mcpPlugin({
+                    oauth: {
+                        resource: '/mcp',
+                        scheme: 'user',
+                    },
+                }),
+            },
+        });
+        const server = new KizunaServer(brokenContract);
+        const requireUser = server.guard('user', () => ({
+            userId: 'u',
+            role: 'employee',
+        }));
+        const requireMember = server.guard('member', () => undefined);
+        expect(() =>
+            server.api({
+                guards: {
+                    user: requireUser,
+                    member: requireMember,
+                },
+                router: {
+                    api: {
+                        getUser: () => ({
+                            status: 200,
+                            body: {
+                                id: '1',
+                                viewer: 'u',
+                            },
+                        }),
+                        createUser: () => ({
+                            status: 201,
+                            body: {
+                                id: '1',
+                            },
+                        }),
+                        adminReport: () => ({
+                            status: 200,
+                            body: {
+                                total: 0,
+                            },
+                        }),
+                        memberFacts: () => ({
+                            status: 200,
+                            body: {
+                                ok: true,
+                            },
+                        }),
+                    },
+                },
+                plugins: {
+                    mcp: mcpPluginServer(),
                 },
             })
         ).toThrow('not an absolute URI');
