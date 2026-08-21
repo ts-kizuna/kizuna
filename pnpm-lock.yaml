@@ -834,6 +834,12 @@ importers:
         specifier: 'catalog:'
         version: 4.3.6
 
+  packages/vscode:
+    dependencies:
+      '@ts-kizuna/typescript-plugin':
+        specifier: workspace:*
+        version: link:../typescript-plugin
+
 packages:
 
   '@alloc/quick-lru@5.2.0':

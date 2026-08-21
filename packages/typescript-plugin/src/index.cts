@@ -149,12 +149,29 @@ function init(modules: { typescript: TypeScriptModule }): {
         }
         const proxy = members as unknown as TypeScriptNamespace.LanguageService;
 
+        /**
+         * Whether this project uses ts-kizuna, decided once per project so the
+         * plugin is inert everywhere else when loaded globally by the VS Code
+         * extension. Adding ts-kizuna to a running project needs a TS server
+         * restart to be picked up.
+         */
+        let kizunaProject: boolean | undefined;
+        const isKizunaProject = (program: TypeScriptNamespace.Program): boolean => {
+            if (kizunaProject === undefined) {
+                kizunaProject = program
+                    .getSourceFiles()
+                    .some((file) => file.fileName.includes('@ts-kizuna/') || file.text.includes('ts-kizuna'));
+            }
+            return kizunaProject;
+        };
+
         const fileContext = (
             fileName: string
         ): { sourceFile: TypeScriptNamespace.SourceFile; checker: TypeScriptNamespace.TypeChecker } | undefined => {
             const program = languageService.getProgram();
             const sourceFile = program?.getSourceFile(fileName);
             if (!program || !sourceFile) return undefined;
+            if (!isKizunaProject(program)) return undefined;
             return {
                 sourceFile,
                 checker: program.getTypeChecker(),
@@ -186,7 +203,12 @@ function init(modules: { typescript: TypeScriptModule }): {
                 typescript.forEachChild(node, visit);
             };
             visit(context.sourceFile);
-            return [...prior, ...extra];
+            // When the plugin is loaded twice (workspace tsconfig plus the VS
+            // Code extension), the inner instance already reported these.
+            const fresh = extra.filter(
+                (candidate) => !prior.some((existing) => existing.start === candidate.start && existing.code === candidate.code)
+            );
+            return [...prior, ...fresh];
         };
 
         proxy.getQuickInfoAtPosition = (fileName, position) => {
@@ -198,6 +220,7 @@ function init(modules: { typescript: TypeScriptModule }): {
             if (!typescript.isIdentifier(node)) return prior;
             const deprecation = symbolDeprecation(context.checker.getSymbolAtLocation(node));
             if (!deprecation) return prior;
+            if (prior.tags?.some((candidate) => candidate.name === 'deprecated')) return prior;
             const tag: TypeScriptNamespace.JSDocTagInfo = {
                 name: 'deprecated',
                 text: deprecation.message
@@ -224,6 +247,7 @@ function init(modules: { typescript: TypeScriptModule }): {
             if (!access) return prior;
             const receiverType = context.checker.getTypeAtLocation(access.expression);
             for (const entry of prior.entries) {
+                if (entry.kindModifiers?.includes('deprecated')) continue;
                 const deprecation = symbolDeprecation(receiverType.getProperty(entry.name));
                 if (!deprecation) continue;
                 entry.kindModifiers = entry.kindModifiers ? `${entry.kindModifiers},deprecated` : 'deprecated';
