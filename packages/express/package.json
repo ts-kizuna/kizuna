@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/express",
-  "version": "1.52.1",
+  "version": "1.53.0",
   "description": "Express adapter for ts-kizuna",
   "keywords": [
     "ts-kizuna",
