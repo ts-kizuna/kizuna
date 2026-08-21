@@ -140,7 +140,7 @@ spec('yaml'); // YAML string
 
 ## Deprecation
 
-Routes and fields marked `/** @deprecated */` get `deprecated: true` in the generated spec, with no extra options here. `generateOpenApi(contract)` reads them straight off the contract, once you've added the one-time build step. See [Deprecations](/docs/deprecations) for setup.
+Routes with `deprecated` and fields with `.meta({ deprecated: ... })` get `deprecated: true` in the generated spec, with no extra options here. `generateOpenApi(contract)` reads them straight off the contract. See [Deprecations](/docs/deprecations).
 
 ## Options
 

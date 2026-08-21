@@ -17,10 +17,8 @@ export const UserSchema = Kizuna.model({
             description: 'Display name',
             example: 'Alice Johnson',
         }),
-        /**
-         * @deprecated use `email_address` instead.
-         */
         email: z.email().meta({
+            deprecated: 'use `email_address` instead.',
             description: 'Email address',
             example: 'alice@example.com',
         }),
@@ -202,12 +200,10 @@ export const usersRoutes = k.routes('users', {
         },
         summary: 'Create a user',
     },
-    /**
-     * @deprecated
-     */
     deleteUser: {
         method: 'DELETE',
         path: '/users/:id',
+        deprecated: true,
         responses: {
             200: z.object({
                 success: z.boolean(),

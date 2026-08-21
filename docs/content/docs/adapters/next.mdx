@@ -13,23 +13,6 @@ description: Mount a ts-kizuna API on a Next.js App Router catch-all route.
 
 <Step>
 
-## Wrap the Next config
-
-```ts title="next.config.ts"
-import type { NextConfig } from 'next';
-import { withKizuna } from '@ts-kizuna/next/config';
-
-const nextConfig: NextConfig = {
-    // your config
-};
-
-export default withKizuna(nextConfig);
-```
-
-</Step>
-
-<Step>
-
 ## Create the server
 
 ```ts title="server.ts"

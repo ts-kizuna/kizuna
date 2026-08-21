@@ -234,39 +234,7 @@ If you are upgrading from ts-rest and Zod 3, migrate to Zod 4 alongside this cha
 
 ## Deprecation
 
-ts-rest supports `deprecated: true` on route definitions and `.meta({ deprecated: true })` on Zod schemas. Neither exists in ts-kizuna.
-
-```ts title="ts-rest"
-// ts-rest
-deleteUser: {
-    method: 'DELETE',
-    path: '/users/:id',
-    deprecated: true,
-    responses: {
-        200: z.object({
-            success: z.boolean(),
-        }),
-    },
-},
-```
-
-```ts title="ts-kizuna"
-// ts-kizuna: JSDoc only
-/**
- * @deprecated
- */
-deleteUser: {
-    method: 'DELETE',
-    path: '/users/:id',
-    responses: {
-        200: z.object({
-            success: z.boolean(),
-        }),
-    },
-},
-```
-
-One `/** @deprecated */` JSDoc tag drives IDE strikethrough, the OpenAPI `deprecated` flag, and the Swift `@available(*, deprecated)` attribute.
+Deprecation carries over unchanged: `deprecated: true` on route definitions and `.meta({ deprecated: true })` on Zod schemas work in ts-kizuna exactly as they do in ts-rest. ts-kizuna also accepts a string as the migration message, `deprecated: 'use archiveUser instead'`, which reaches the Swift `@available` and Kotlin `@Deprecated` annotations. See [Deprecations](/docs/deprecations).
 
 ## Error responses
 

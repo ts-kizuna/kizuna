@@ -318,15 +318,13 @@ cancelAccount: {
 
 ### Deprecating routes and fields
 
-Add a `/** @deprecated */` JSDoc tag above a route or a response field, optionally with a message, `/** @deprecated use createUser instead */`.
+Set `deprecated` on a route, either `true` or a migration message:
 
 ```ts
-/**
- * @deprecated
- */
 deleteUser: {
     method: 'DELETE',
     path: '/users/:id',
+    deprecated: 'use archiveUser instead',
     responses: {
         200: z.object({
             success: z.boolean(),
@@ -334,6 +332,8 @@ deleteUser: {
     },
 },
 ```
+
+Fields declare it in their Zod metadata, with the same `true | string` shape:
 
 ```ts
 getUser: {
@@ -343,16 +343,15 @@ getUser: {
         200: z.object({
             id: z.string(),
             name: z.string(),
-            /**
-             * @deprecated
-             */
-            legacyUsername: z.string().optional(),
+            legacyUsername: z.string().optional().meta({
+                deprecated: 'use name instead',
+            }),
         }),
     },
 },
 ```
 
-IDEs show a strikethrough on deprecated routes and fields right away. To carry the tags into the OpenAPI spec and Swift client, add the one-time build step in [Deprecations](/docs/deprecations).
+The OpenAPI spec and the Swift and Kotlin clients pick both up directly from the contract. For strikethrough in editors, see [Deprecations](/docs/deprecations).
 
 ### Exporting types
 

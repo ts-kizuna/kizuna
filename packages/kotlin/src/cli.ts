@@ -2,7 +2,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { writeKizunaDeprecations, loadContract } from '@ts-kizuna/cli';
+import { loadContract } from '@ts-kizuna/cli';
 import { generateKotlinClient } from './generator.js';
 
 const usage = `Usage: ts-kizuna-kotlin generate --contract <path> --out <path> --namespace-name <name>
@@ -70,7 +70,6 @@ const main = async (): Promise<void> => {
     const contractPath = resolve(process.cwd(), pathPart!);
     const contract =
         (await loadContract(contractPath, exportName)) ?? die(`No \`${exportName}\` (or default) export found at ${contractPath}`);
-    writeKizunaDeprecations([{ contract, contractPath }], resolve(process.cwd(), '.kizuna'));
     const kotlinSource = generateKotlinClient(contract, {
         namespaceName,
         packageName: values.package,

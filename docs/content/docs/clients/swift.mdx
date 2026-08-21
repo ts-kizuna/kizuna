@@ -173,7 +173,7 @@ public final class APIClient: Sendable {
 
 ## Deprecation
 
-Routes and fields marked `/** @deprecated */` in the routes emit `@available(*, deprecated)` in the generated Swift code:
+Routes with `deprecated` and fields with `.meta({ deprecated: ... })` emit `@available(*, deprecated)` in the generated Swift code, with the message when one is set:
 
 ```swift title="APIClient.swift"
 @available(*, deprecated)

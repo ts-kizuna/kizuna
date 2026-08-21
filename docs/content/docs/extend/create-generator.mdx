@@ -14,7 +14,7 @@ You provide a factory function that receives your options and returns two method
 - `processRoute` is called once for every route in the contract
 - `finalize` is called after all routes are processed and returns your output
 
-`createGenerator` handles walking the contract, flattening nested route groups, and resolving `/** @deprecated */` annotations automatically.
+`createGenerator` handles walking the contract, flattening nested route groups, and resolving each route's `deprecated` declaration automatically.
 
 ## `createGenerator`
 
@@ -50,15 +50,25 @@ const list = generateRouteList(contract, {
 
 Each `processRoute` call receives:
 
-| Property             | Type                               | Description                                                             |
-| -------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
-| `routeKey`           | `string`                           | Dot-separated key path, e.g. `users.getUser`                            |
-| `route`              | `RouteDefinition`                  | The full route definition                                               |
-| `routeTags`          | `string[]`                         | OpenAPI tags inherited from the sub-routes                              |
-| `deprecated`         | `boolean`                          | `true` if the route is marked `/** @deprecated */`                      |
-| `deprecationMessage` | `string \| undefined`              | The text after `@deprecated`, if any                                    |
-| `fieldDeprecations`  | `Map<string, string> \| undefined` | Field-path → deprecation message for body/query/headers/response fields |
+| Property             | Type                  | Description                                   |
+| -------------------- | --------------------- | --------------------------------------------- |
+| `routeKey`           | `string`              | Dot-separated key path, e.g. `users.getUser`  |
+| `route`              | `RouteDefinition`     | The full route definition                     |
+| `routeTags`          | `string[]`            | OpenAPI tags inherited from the sub-routes    |
+| `deprecated`         | `boolean`             | `true` if the route declares `deprecated`     |
+| `deprecationMessage` | `string \| undefined` | The route's `deprecated` string, if it is one |
 
 ## Deprecation
 
-Deprecation data resolves automatically. When `.kizuna/deprecations.json` exists, produced by `kizuna deprecations` (see [Deprecations](/docs/deprecations)), each `processRoute` call gets `deprecated`, `deprecationMessage`, and `fieldDeprecations` filled in for the matching route. With no such file, `deprecated` is `false` and `fieldDeprecations` is `undefined`.
+Route deprecation arrives on the context, read from the route's `deprecated` declaration. Fields declare theirs in Zod metadata; read it off any schema you walk with `readDeprecation` from `@ts-kizuna/core/generator`:
+
+```ts
+import { readDeprecation } from '@ts-kizuna/core/generator';
+
+const deprecation = readDeprecation(fieldSchema);
+if (deprecation) {
+    // deprecation.message is the string form's message, or undefined
+}
+```
+
+See [Deprecations](/docs/deprecations) for the authoring side.

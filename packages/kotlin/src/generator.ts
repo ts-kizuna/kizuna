@@ -1,6 +1,5 @@
 import type { z } from 'zod';
 import {
-    contractFingerprint,
     createGenerator,
     parsePath,
     resolveResponseBody,
@@ -17,7 +16,6 @@ import {
     mergeHeaderFields,
     type RouteDefinition,
 } from '@ts-kizuna/core/generator';
-import { loadDeprecations } from '@ts-kizuna/core/load-deprecations';
 import type { Contract } from '@ts-kizuna/core';
 import { KotlinWriter, stringLiteral } from './emit.js';
 import {
@@ -128,8 +126,6 @@ const buildRouteMethod = (
     registry: TypeRegistry,
     deprecated: boolean,
     deprecationMessage: string | undefined,
-    fieldPaths: Map<string, string> | undefined,
-    deprecationSchemas: Map<string, Map<string, string>> | undefined,
     methodNameOverride?: string
 ): RouteMethod => {
     const fullJoinedName = routeKey.includes('.')
@@ -143,15 +139,13 @@ const buildRouteMethod = (
     const pathParams = parsePath(route.path).paramNames;
 
     const declaredPathParams: KotlinField[] = route.pathParams
-        ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`, fieldPaths, 'pathParams', deprecationSchemas)
+        ? collectObjectFields(route.pathParams as z.ZodType, registry, `${baseHint}Params`)
         : [];
 
-    const queryFields: KotlinField[] = route.query
-        ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`, fieldPaths, 'query', deprecationSchemas)
-        : [];
+    const queryFields: KotlinField[] = route.query ? collectObjectFields(route.query as z.ZodType, registry, `${baseHint}Query`) : [];
 
     const headerFields: KotlinField[] = route.headers
-        ? collectObjectFields(route.headers as z.ZodType, registry, `${baseHint}Headers`, fieldPaths, 'headers', deprecationSchemas)
+        ? collectObjectFields(route.headers as z.ZodType, registry, `${baseHint}Headers`)
         : [];
 
     const bodyDefType =
@@ -164,7 +158,7 @@ const buildRouteMethod = (
         const isUnion = isDiscriminatedUnionSchema(route.body as z.ZodType);
 
         if (isUnion) {
-            const result = mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
+            const result = mapType(route.body as z.ZodType, registry, bodyHint);
             bodyDescriptor = {
                 kind: 'union',
                 structName: result.expression,
@@ -172,8 +166,8 @@ const buildRouteMethod = (
                 multipartFields: [],
             };
         } else if (isMultipart) {
-            mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
-            const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
+            mapType(route.body as z.ZodType, registry, bodyHint);
+            const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint);
             const multipartFields = objectShapeKeys(route.body as z.ZodType, registry.camelCaseProperties);
             bodyDescriptor = {
                 kind: 'multipart',
@@ -192,7 +186,7 @@ const buildRouteMethod = (
                 };
             } else {
                 const useStruct = !isObject || fieldCount > BODY_FLATTEN_MAX_FIELDS;
-                const result = mapType(route.body as z.ZodType, registry, bodyHint, fieldPaths, 'body', deprecationSchemas);
+                const result = mapType(route.body as z.ZodType, registry, bodyHint);
                 const structName = result.expression;
 
                 if (useStruct) {
@@ -203,14 +197,7 @@ const buildRouteMethod = (
                         multipartFields: [],
                     };
                 } else {
-                    const flattened = collectObjectFields(
-                        route.body as z.ZodType,
-                        registry,
-                        bodyHint,
-                        fieldPaths,
-                        'body',
-                        deprecationSchemas
-                    );
+                    const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint);
                     bodyDescriptor = {
                         kind: 'json-flat',
                         structName,
@@ -229,19 +216,12 @@ const buildRouteMethod = (
         const status = Number(statusKey);
         const responseHint = `${baseHint}Response${status === 200 ? '' : status}`;
         const bodySchema = resolveResponseBody(responseValue);
-        const result = mapType(bodySchema as z.ZodType, registry, responseHint, fieldPaths, `responses.${statusKey}`, deprecationSchemas);
+        const result = mapType(bodySchema as z.ZodType, registry, responseHint);
         const typeExpression = result.expression;
         if (isSuccessStatus(status)) {
             const headersSchema = resolveResponseHeaders(responseValue);
             const perStatusHeaderFields: KotlinField[] = headersSchema
-                ? collectObjectFields(
-                      headersSchema as z.ZodType,
-                      registry,
-                      `${baseHint}ResponseHeaders`,
-                      fieldPaths,
-                      'responseHeaders',
-                      deprecationSchemas
-                  )
+                ? collectObjectFields(headersSchema as z.ZodType, registry, `${baseHint}ResponseHeaders`)
                 : [];
             successResponses.push({
                 status,
@@ -308,13 +288,12 @@ const buildRouteMethod = (
     };
 };
 
-const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, contract: Contract, deprecations) => {
+const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, contract: Contract) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
-    const deprecationSchemas = deprecations?.schemas;
 
     return {
-        processRoute({ routeKey, route, deprecated, deprecationMessage, fieldDeprecations }) {
+        processRoute({ routeKey, route, deprecated, deprecationMessage }) {
             const dotIndex = routeKey.indexOf('.');
             if (dotIndex !== -1) {
                 const groupKey = routeKey.slice(0, dotIndex);
@@ -325,30 +304,9 @@ const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: Typ
                     .join('');
                 const methods = groupMap.get(groupKey) ?? [];
                 if (methods.length === 0) groupMap.set(groupKey, methods);
-                methods.push(
-                    buildRouteMethod(
-                        routeKey,
-                        route,
-                        options.registry,
-                        deprecated,
-                        deprecationMessage,
-                        fieldDeprecations,
-                        deprecationSchemas,
-                        leafName
-                    )
-                );
+                methods.push(buildRouteMethod(routeKey, route, options.registry, deprecated, deprecationMessage, leafName));
             } else {
-                flatMethods.push(
-                    buildRouteMethod(
-                        routeKey,
-                        route,
-                        options.registry,
-                        deprecated,
-                        deprecationMessage,
-                        fieldDeprecations,
-                        deprecationSchemas
-                    )
-                );
+                flatMethods.push(buildRouteMethod(routeKey, route, options.registry, deprecated, deprecationMessage));
             }
         },
 
@@ -1574,14 +1532,10 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     const { namespaceName, packageName, camelCaseProperties = false, unknownEnumCase = false } = config;
 
     const registry = new TypeRegistry(camelCaseProperties, unknownEnumCase);
-    const partition = kotlinGenerator(
-        contract,
-        {
-            namespaceName,
-            registry,
-        },
-        loadDeprecations(contractFingerprint(contract))
-    );
+    const partition = kotlinGenerator(contract, {
+        namespaceName,
+        registry,
+    });
     const allMethods = [...partition.flatMethods, ...partition.groups.flatMap((group: RouteGroup) => group.methods)];
 
     const operationTypeMap = buildOperationTypeMap(allMethods, registry);
@@ -1661,7 +1615,7 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     for (const declaration of Object.values(contract.requestContext ?? {})) {
         const headersSchema = (declaration as { headers?: z.ZodType }).headers;
         if (!headersSchema) continue;
-        requestContextFields.push(...collectObjectFields(headersSchema, registry, 'RequestContext', undefined, 'headers', undefined));
+        requestContextFields.push(...collectObjectFields(headersSchema, registry, 'RequestContext'));
     }
 
     const context: EmitContext = {
