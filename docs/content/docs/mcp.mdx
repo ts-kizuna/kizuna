@@ -244,18 +244,44 @@ When a guard denies the call, or an access gate fails, the tool call returns an 
 
 Public routes (`false` in the auth map) run without guards, credentials or not.
 
+## OAuth
+
+Point `oauth` at your [oauth2 identity](/docs/authentication#oauth) and the endpoint serves the discovery and challenges the MCP authorization specification asks of an OAuth 2.1 resource server. MCP clients log in through your authorization server (better-auth, Auth0, Keycloak) on their own.
+
+```ts title="contract.ts"
+plugins: {
+    mcp: mcpPlugin({
+        oauth: {
+            resource: 'https://api.example.com/mcp',
+            scheme: 'user',
+        },
+    }),
+},
+```
+
+`resource` is the canonical URI of the endpoint as clients reach it, and the audience your guard checks tokens against. `scheme` names the identity whose guard verifies the token on every request. The identity's `issuer` and flow scopes become the RFC 9728 metadata document, served at `/.well-known/oauth-protected-resource/mcp`.
+
+With `oauth` configured, denials from that identity move to the HTTP level, where the specification puts them:
+
+- No token, or a bad one, answers `401` with `WWW-Authenticate: Bearer resource_metadata="..."`.
+- A `deny(403)` from the guard on a tool call answers `403` with `error="insufficient_scope"` and the scopes the route declares in the auth map.
+- An access-gate failure answers a plain `403`.
+
+The guard runs once per request, its context reaches handlers under `auth.<scheme>` as always, and every other identity keeps the in-band tool errors above.
+
 ## Options
 
 All of them go on `mcpPlugin`. `mcpPluginServer()` takes nothing.
 
-| Option         | Default              | Description                                    |
-| -------------- | -------------------- | ---------------------------------------------- |
-| `path`         | `'/mcp'`             | Path the endpoint is served from               |
-| `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants     |
-| `version`      | `'1.0.0'`            | Semantic version string                        |
-| `instructions` | built from your tags | Appended to the generated overview             |
-| `tools`        | every route          | Which routes become tools, keyed by route tree |
-| `onlyReadOnly` | `false`              | Keep only `GET`, `HEAD`, and `OPTIONS`         |
+| Option         | Default              | Description                                                          |
+| -------------- | -------------------- | -------------------------------------------------------------------- |
+| `path`         | `'/mcp'`             | Path the endpoint is served from                                     |
+| `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                           |
+| `version`      | `'1.0.0'`            | Semantic version string                                              |
+| `instructions` | built from your tags | Appended to the generated overview                                   |
+| `tools`        | every route          | Which routes become tools, keyed by route tree                       |
+| `onlyReadOnly` | `false`              | Keep only `GET`, `HEAD`, and `OPTIONS`                               |
+| `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([OAuth](#oauth)) |
 
 ## Connecting clients
 

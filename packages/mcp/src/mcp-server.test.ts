@@ -1089,6 +1089,28 @@ describe('MCP server: guards', () => {
         await close();
     });
 
+    it('skips the transport-verified scheme and hands its context to the handler', async () => {
+        const { client, close } = await connectMcpClient(makeSecuredApi(), {
+            transportAuth: {
+                scheme: 'user',
+                context: {
+                    userId: '7',
+                },
+            },
+        });
+        const result = await client.callTool({
+            name: 'api.whoAmI',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(parsed.status).toBe(200);
+        expect(parsed.body).toEqual({
+            userId: '7',
+        });
+        await close();
+    });
+
     it('serves public tools without guards', async () => {
         const { client, close } = await connectMcpClient(makeSecuredApi());
         const result = await client.callTool({

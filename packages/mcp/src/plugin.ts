@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
+import { ProtectedResourceMetadataSchema } from '@ts-kizuna/core/schemas';
 import type { Routes } from '@ts-kizuna/core';
 import type { ToolSelection } from './tool-selection.js';
+import { assertCanonicalResource, protectedResourceMetadataPath, type McpOAuthProps } from './oauth.js';
 
 export interface McpPluginProps<R extends Routes = Routes> extends ToolSelection<R> {
     /**
@@ -30,25 +32,47 @@ export interface McpPluginProps<R extends Routes = Routes> extends ToolSelection
      * contract's tags.
      */
     instructions?: string;
+
+    /**
+     * Serve the endpoint as an OAuth 2.1 resource server, per the MCP
+     * authorization specification: RFC 9728 metadata on a well-known route,
+     * and HTTP `401`/`403` challenges built from the named identity.
+     */
+    oauth?: McpOAuthProps;
 }
 
-const declare = (props: McpPluginProps) =>
-    createPlugin({
+const declare = (props: McpPluginProps) => {
+    const endpointPath = props.path ?? '/mcp';
+    if (props.oauth !== undefined) assertCanonicalResource(props.oauth, endpointPath);
+    return createPlugin({
         name: 'mcp',
         serverModule: '@ts-kizuna/mcp/server',
         routes: {
             endpoint: {
                 method: 'POST',
-                path: props.path ?? '/mcp',
+                path: endpointPath,
                 summary: 'MCP (Model Context Protocol) endpoint',
                 body: z.unknown(),
                 responses: {
                     200: z.unknown(),
                 },
             },
+            ...(props.oauth === undefined
+                ? {}
+                : {
+                      protectedResourceMetadata: {
+                          method: 'GET',
+                          path: protectedResourceMetadataPath(endpointPath),
+                          summary: 'OAuth protected resource metadata',
+                          responses: {
+                              200: ProtectedResourceMetadataSchema,
+                          },
+                      },
+                  }),
         },
         props,
     });
+};
 
 /**
  * Let AI assistants use the API. Serves an MCP (Model Context Protocol)

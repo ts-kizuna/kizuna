@@ -27,14 +27,15 @@ mcpPluginServer(): PluginImplementation
 
 ## Props
 
-| Option         | Default              | Description                                    |
-| -------------- | -------------------- | ---------------------------------------------- |
-| `path`         | `'/mcp'`             | Path the endpoint is served from               |
-| `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants     |
-| `version`      | `'1.0.0'`            | Semantic version string                        |
-| `instructions` | built from your tags | Appended to the generated overview             |
-| `tools`        | every route          | Which routes become tools, keyed by route tree |
-| `onlyReadOnly` | `false`              | Keep only `GET`, `HEAD`, and `OPTIONS`         |
+| Option         | Default              | Description                                                                   |
+| -------------- | -------------------- | ----------------------------------------------------------------------------- |
+| `path`         | `'/mcp'`             | Path the endpoint is served from                                              |
+| `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                                    |
+| `version`      | `'1.0.0'`            | Semantic version string                                                       |
+| `instructions` | built from your tags | Appended to the generated overview                                            |
+| `tools`        | every route          | Which routes become tools, keyed by route tree                                |
+| `onlyReadOnly` | `false`              | Keep only `GET`, `HEAD`, and `OPTIONS`                                        |
+| `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([guide](/docs/mcp#oauth)) |
 
 Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, whatever `tools` says, because tool input is JSON.
 
@@ -113,7 +114,7 @@ With the default `path`, the endpoint is at `/api/mcp`.
 
 ## Secured routes
 
-Each tool call runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request, reading credentials from the MCP transport request's headers. A `deny(...)` becomes a tool error result. See the [MCP guide](/docs/mcp) for configuring clients to send credentials.
+Each tool call runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request, reading credentials from the MCP transport request's headers. A `deny(...)` becomes a tool error result; with [`oauth`](/docs/mcp#oauth) configured, denials from that identity answer at the HTTP level instead. See the [MCP guide](/docs/mcp) for configuring clients to send credentials.
 
 ## Plugin route
 
