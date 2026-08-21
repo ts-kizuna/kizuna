@@ -1,0 +1,81 @@
+---
+title: ProtectedResourceMetadataSchema
+description: RFC 9728 Protected Resource Metadata schema, builder, and challenge formatting.
+---
+
+The [RFC 9728 Protected Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728) document an OAuth 2.0 protected resource serves at `/.well-known/oauth-protected-resource`. It tells clients which authorization servers issue tokens for the resource.
+
+```ts
+import { ProtectedResourceMetadataSchema } from '@ts-kizuna/core/schemas';
+```
+
+## Shape
+
+```json
+{
+    "resource": "https://api.example.com",
+    "authorization_servers": ["https://auth.example.com"],
+    "scopes_supported": ["users:read"],
+    "bearer_methods_supported": ["header"]
+}
+```
+
+| Field                      | Description                                                               |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `resource`                 | Canonical URI of the resource, the RFC 8707 audience tokens are bound to. |
+| `authorization_servers`    | Issuer URLs of the authorization servers that mint tokens for it.         |
+| `scopes_supported`         | Baseline scopes a client requests before any per-operation challenge.     |
+| `bearer_methods_supported` | How the resource accepts bearer tokens. Kizuna always answers `header`.   |
+
+It is a plain Zod object schema. To name it in a generated OpenAPI spec, wrap it in [`Kizuna.model`](/docs/reference/kizuna-model).
+
+## buildProtectedResourceMetadata
+
+Builds the document from the resource's canonical URI and the identity whose authorization server it advertises. The `authorization_servers` entry is the identity's issuer (`issuer` on an `oauth2` identity, derived from `openIdConnectUrl` on an `openIdConnect` one) and `scopes_supported` is the flows' scope catalogue. Throws when the identity names no authorization server.
+
+```ts
+import { buildProtectedResourceMetadata } from '@ts-kizuna/core';
+import { user } from './identities';
+
+const metadata = buildProtectedResourceMetadata({
+    resource: 'https://api.example.com',
+    scheme: user,
+});
+```
+
+## assertCanonicalResourceUri
+
+Throws unless the value is a canonical resource URI per RFC 8707 section 2: absolute, no fragment. A query component is allowed.
+
+```ts
+import { assertCanonicalResourceUri } from '@ts-kizuna/core';
+
+assertCanonicalResourceUri('https://api.example.com');
+assertCanonicalResourceUri('/v1'); // throws
+```
+
+## authorizationServerIssuer and declaredScopes
+
+The derivations behind the builder, exported for reading the identity directly. `authorizationServerIssuer` returns an `oauth2` identity's `issuer`, or derives it from an `openIdConnect` identity's `openIdConnectUrl`; `declaredScopes` collects the scopes an `oauth2` identity's flows declare. Both return `undefined` when the identity has nothing to say.
+
+```ts
+import { authorizationServerIssuer, declaredScopes } from '@ts-kizuna/core';
+
+authorizationServerIssuer(user); // 'https://auth.example.com'
+declaredScopes(user); // ['users:read', 'users:write']
+```
+
+## bearerChallenge
+
+Formats the `WWW-Authenticate` header a resource server answers `401` and `403` with. Parameter values become RFC 9110 quoted strings, `undefined` parameters are omitted, and with none left the bare scheme remains.
+
+```ts
+import { bearerChallenge } from '@ts-kizuna/core/adapter';
+
+bearerChallenge({
+    error: 'insufficient_scope',
+    scope: 'users:write',
+    resource_metadata: 'https://api.example.com/.well-known/oauth-protected-resource',
+});
+// Bearer error="insufficient_scope", scope="users:write", resource_metadata="..."
+```

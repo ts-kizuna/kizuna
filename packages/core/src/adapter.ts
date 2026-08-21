@@ -139,9 +139,10 @@ export interface GuardDenial {
 }
 
 /**
- * Reject the request from inside a guard.
+ * Reject the request from inside a guard. Extra `headers` ride on the
+ * response; a `www-authenticate` among them replaces the default challenge.
  */
-export type GuardDeny = (status: number, detail: string) => GuardDenial;
+export type GuardDeny = (status: number, detail: string, headers?: Record<string, string>) => GuardDenial;
 
 type HttpScheme = Extract<OpenApiSecuritySchemeObject, { type: 'http' }>['scheme'];
 
@@ -162,23 +163,53 @@ export const authenticationChallenge = (scheme: SecurityScheme | undefined): str
 };
 
 /**
+ * Make a value safe inside an RFC 9110 quoted string: only printable ASCII
+ * survives, `\` and `"` become quoted pairs.
+ */
+const quotedStringValue = (value: string): string =>
+    value
+        .replaceAll(/[^ -~]/gu, '')
+        .replaceAll('\\', '\\\\')
+        .replaceAll('"', '\\"');
+
+/**
+ * Format a `Bearer` challenge for a `WWW-Authenticate` header, with auth
+ * parameters as RFC 9110 quoted strings (`error`, `scope`, `resource_metadata`,
+ * ...). `undefined` values are omitted; with none left, the bare scheme remains.
+ */
+export const bearerChallenge = (parameters: Record<string, string | undefined>): string => {
+    const formatted = Object.entries(parameters)
+        .filter((entry): entry is [string, string] => entry[1] !== undefined)
+        .map(([name, value]) => `${name}="${quotedStringValue(value)}"`);
+    return formatted.length === 0 ? 'Bearer' : `Bearer ${formatted.join(', ')}`;
+};
+
+/**
  * The `deny` a guard for this identity receives. The challenge rides along with
  * the denial, so a `401` cannot reach the wire without one.
  */
 export const guardDenyFor = (scheme: SecurityScheme | undefined): GuardDeny => {
     const challenge = authenticationChallenge(scheme);
-    return (status, detail) => ({
-        [GUARD_DENY]: true,
-        status,
-        detail,
-        ...(status === 401 && challenge !== undefined
-            ? {
-                  headers: {
+    return (status, detail, headers) => {
+        const merged = {
+            ...(status === 401 && challenge !== undefined
+                ? {
                       'www-authenticate': challenge,
-                  },
-              }
-            : {}),
-    });
+                  }
+                : {}),
+            ...Object.fromEntries(Object.entries(headers ?? {}).map(([name, value]) => [name.toLowerCase(), value])),
+        };
+        return {
+            [GUARD_DENY]: true,
+            status,
+            detail,
+            ...(Object.keys(merged).length > 0
+                ? {
+                      headers: merged,
+                  }
+                : {}),
+        };
+    };
 };
 
 export const isGuardDenial = (value: unknown): value is GuardDenial => typeof value === 'object' && value !== null && GUARD_DENY in value;

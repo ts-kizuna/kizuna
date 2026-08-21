@@ -21,6 +21,7 @@
         "kizuna-tanstack-query",
         "problem-details-schema",
         "binary-and-file-schemas",
+        "protected-resource-metadata-schema",
         "is-validation-error",
         "is-undeclared-response-error",
         "generate-openapi",
