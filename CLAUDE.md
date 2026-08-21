@@ -7,6 +7,11 @@ ts-kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RF
 - **RFC 9110** (HTTP Semantics, June 2022): methods, status codes, headers, content negotiation
 - **RFC 5789** (PATCH Method, April 2010): PATCH semantics
 - **OpenAPI 3.1.0**: spec generation
+- **Model Context Protocol**: the MCP endpoint, its tools, and their names
+
+### MCP tool names
+
+`users.getUser` publishes as `users_get_user`. The [spec](https://modelcontextprotocol.io/specification/latest/server/tools) allows the dot, but Claude Code rewrites it to `_` before the model sees the name, so publishing the dot means the tool is called something kizuna never chose.
 
 ### Deliberate omissions
 

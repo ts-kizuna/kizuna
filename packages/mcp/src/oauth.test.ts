@@ -349,7 +349,7 @@ describe('mcpPlugin: oauth', () => {
 
         guardRuns = 0;
         const result = await connected.callTool({
-            name: 'api.getUser',
+            name: 'api_get_user',
             arguments: {
                 params: {
                     id: '42',
@@ -372,7 +372,7 @@ describe('mcpPlugin: oauth', () => {
         const response = await jsonRpc(
             port,
             'reader',
-            toolCall('api.createUser', {
+            toolCall('api_create_user', {
                 body: {
                     name: 'Ada',
                 },
@@ -389,7 +389,7 @@ describe('mcpPlugin: oauth', () => {
         const port = await start();
         const connected = await connect(port, 'writer');
         const result = await connected.callTool({
-            name: 'api.createUser',
+            name: 'api_create_user',
             arguments: {
                 body: {
                     name: 'Ada',
@@ -402,7 +402,7 @@ describe('mcpPlugin: oauth', () => {
 
     it('answers an access-gate failure with a plain 403', async () => {
         const port = await start();
-        const response = await jsonRpc(port, 'writer', toolCall('api.adminReport', {}));
+        const response = await jsonRpc(port, 'writer', toolCall('api_admin_report', {}));
         expect(response.status).toBe(403);
         expect(response.headers.get('www-authenticate')).toBeNull();
     });
@@ -411,7 +411,7 @@ describe('mcpPlugin: oauth', () => {
         const port = await start();
         const connected = await connect(port, 'admin');
         const result = await connected.callTool({
-            name: 'api.adminReport',
+            name: 'api_admin_report',
             arguments: {},
         });
         const parsed = JSON.parse((result.content as Array<{ text: string }>)[0]!.text);
@@ -422,7 +422,7 @@ describe('mcpPlugin: oauth', () => {
         const port = await start();
         const connected = await connect(port, 'writer');
         const result = await connected.callTool({
-            name: 'api.memberFacts',
+            name: 'api_member_facts',
             arguments: {},
         });
         expect(result.isError).toBe(true);

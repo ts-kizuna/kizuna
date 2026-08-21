@@ -127,14 +127,14 @@ Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-u
 
 | Part            | Where it comes from                                                                 |
 | --------------- | ----------------------------------------------------------------------------------- |
-| **Name**        | The dotted route key, for example `users.getUser`                                   |
+| **Name**        | The route key in snake_case, so `users.getUser` becomes `users_get_user`            |
 | **Title**       | The route's `summary`                                                               |
 | **Description** | The route's `summary` and `description`, its method and path, and what it requires  |
 | **Input**       | `{ params, query, body }`, holding only the keys the route declares                 |
 | **Output**      | The success response's schema, so an assistant knows the shape before it calls      |
 | **Annotations** | The method's HTTP semantics, per [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) |
 
-Tool names are capped at 128 characters, per the MCP specification, and clients prefix their own `mcp__<server>__` on top of that. A key over the cap throws at startup.
+The [specification](https://modelcontextprotocol.io/specification/latest/server/tools) allows the dot, but Claude Code and VS Code rewrite it before the name reaches the model, so publishing the rewritten form is what keeps your docs and the model's tool name the same. Names are capped at 128 characters. A key over that throws at startup, as do two keys that converge on one name.
 
 The annotations tell a client how careful to be with a tool before calling it:
 

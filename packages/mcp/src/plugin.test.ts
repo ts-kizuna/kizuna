@@ -98,13 +98,13 @@ describe('mcpPlugin', () => {
     it('serves MCP from api.mount, with no endpoint wired by hand', async () => {
         const connected = await connect();
         const { tools } = await connected.listTools();
-        expect(tools.map((tool) => tool.name)).toContain('getUser');
+        expect(tools.map((tool) => tool.name)).toContain('get_user');
     });
 
     it('calls a tool, which runs the contract handler', async () => {
         const connected = await connect();
         const result = await connected.callTool({
-            name: 'getUser',
+            name: 'get_user',
             arguments: {
                 params: {
                     id: '42',
@@ -224,7 +224,7 @@ describe('mcpPlugin: tool selection', () => {
         client = connected;
 
         const { tools } = await connected.listTools();
-        expect(tools.map((tool) => tool.name)).toEqual(['listUsers']);
+        expect(tools.map((tool) => tool.name)).toEqual(['list_users']);
     });
 
     it('still serves an excluded route over HTTP', async () => {

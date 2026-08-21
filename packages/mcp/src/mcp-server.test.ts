@@ -238,23 +238,23 @@ describe('buildToolDefinitions', () => {
         const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const names = definitions.map((definition) => definition.name);
 
-        expect(names).toContain('users.listUsers');
-        expect(names).toContain('users.getUser');
-        expect(names).toContain('users.createUser');
+        expect(names).toContain('users_list_users');
+        expect(names).toContain('users_get_user');
+        expect(names).toContain('users_create_user');
         expect(names).toContain('health');
-        expect(names).toContain('pingUser');
+        expect(names).toContain('ping_user');
     });
 
     it('excludes multipart/form-data routes by default', () => {
         const definitions = buildToolDefinitions(contract.routes, baseOptions);
         const names = definitions.map((definition) => definition.name);
 
-        expect(names).not.toContain('uploadAvatar');
+        expect(names).not.toContain('upload_avatar');
     });
 
     it('carries the summary as the tool title', () => {
         const definitions = buildToolDefinitions(contract.routes, baseOptions);
-        const listUsers = definitions.find((definition) => definition.name === 'users.listUsers')!;
+        const listUsers = definitions.find((definition) => definition.name === 'users_list_users')!;
         const health = definitions.find((definition) => definition.name === 'health')!;
 
         expect(listUsers.title).toBe('List users with pagination');
@@ -268,7 +268,7 @@ describe('buildToolDefinitions: selection', () => {
 
     it('takes every route when nothing is selected', () => {
         expect(names(baseOptions)).toEqual(
-            expect.arrayContaining(['users.listUsers', 'users.getUser', 'users.createUser', 'health', 'deleteUser'])
+            expect.arrayContaining(['users_list_users', 'users_get_user', 'users_create_user', 'health', 'delete_user'])
         );
     });
 
@@ -279,8 +279,8 @@ describe('buildToolDefinitions: selection', () => {
             },
         });
 
-        expect(selected).not.toContain('deleteUser');
-        expect(selected).toContain('users.getUser');
+        expect(selected).not.toContain('delete_user');
+        expect(selected).toContain('users_get_user');
     });
 
     it('drops a whole group set to false', () => {
@@ -290,8 +290,8 @@ describe('buildToolDefinitions: selection', () => {
             },
         });
 
-        expect(selected).not.toContain('users.getUser');
-        expect(selected).not.toContain('users.createUser');
+        expect(selected).not.toContain('users_get_user');
+        expect(selected).not.toContain('users_create_user');
         expect(selected).toContain('health');
     });
 
@@ -305,8 +305,8 @@ describe('buildToolDefinitions: selection', () => {
             },
         });
 
-        expect(selected).toContain('users.getUser');
-        expect(selected).not.toContain('users.createUser');
+        expect(selected).toContain('users_get_user');
+        expect(selected).not.toContain('users_create_user');
         expect(selected).toContain('health');
     });
 
@@ -320,7 +320,7 @@ describe('buildToolDefinitions: selection', () => {
             },
         });
 
-        expect(selected).toEqual(['users.getUser']);
+        expect(selected).toEqual(['users_get_user']);
     });
 
     it('exposes a route the map never mentions', () => {
@@ -340,7 +340,7 @@ describe('buildToolDefinitions: selection', () => {
             },
         });
 
-        expect(selected).not.toContain('uploadAvatar');
+        expect(selected).not.toContain('upload_avatar');
     });
 
     it('keeps multipart routes out even when the map asks for them', () => {
@@ -350,7 +350,7 @@ describe('buildToolDefinitions: selection', () => {
             },
         });
 
-        expect(selected).not.toContain('uploadAvatar');
+        expect(selected).not.toContain('upload_avatar');
     });
 
     it('keeps only safe methods under onlyReadOnly', () => {
@@ -358,18 +358,18 @@ describe('buildToolDefinitions: selection', () => {
             onlyReadOnly: true,
         });
 
-        expect(selected).toContain('users.getUser');
+        expect(selected).toContain('users_get_user');
         expect(selected).toContain('health');
-        expect(selected).not.toContain('users.createUser');
-        expect(selected).not.toContain('deleteUser');
-        expect(selected).not.toContain('updateUser');
+        expect(selected).not.toContain('users_create_user');
+        expect(selected).not.toContain('delete_user');
+        expect(selected).not.toContain('update_user');
     });
 });
 
 describe('buildToolDefinitions: input schema', () => {
     it('puts query under a query key', () => {
         const definitions = buildToolDefinitions(contract.routes, baseOptions);
-        const listUsers = definitions.find((definition) => definition.name === 'users.listUsers')!;
+        const listUsers = definitions.find((definition) => definition.name === 'users_list_users')!;
 
         expect(listUsers.inputSchema.shape).toBeDefined();
         expect(listUsers.inputSchema.hasQuery).toBe(true);
@@ -380,7 +380,7 @@ describe('buildToolDefinitions: input schema', () => {
 
     it('leaves an all-optional query out of required', () => {
         const definitions = buildToolDefinitions(contract.routes, baseOptions);
-        const listUsers = definitions.find((definition) => definition.name === 'users.listUsers')!;
+        const listUsers = definitions.find((definition) => definition.name === 'users_list_users')!;
 
         expect(z.object(listUsers.inputSchema.shape!).safeParse({}).success).toBe(true);
         expect(z.toJSONSchema(z.object(listUsers.inputSchema.shape!)).required ?? []).not.toContain('query');
@@ -388,7 +388,7 @@ describe('buildToolDefinitions: input schema', () => {
 
     it('puts path params under a params key', () => {
         const definitions = buildToolDefinitions(contract.routes, baseOptions);
-        const getUser = definitions.find((definition) => definition.name === 'users.getUser')!;
+        const getUser = definitions.find((definition) => definition.name === 'users_get_user')!;
 
         expect(getUser.inputSchema.shape).toBeDefined();
         expect(getUser.inputSchema.hasParams).toBe(true);
@@ -397,7 +397,7 @@ describe('buildToolDefinitions: input schema', () => {
 
     it('puts body under a body key', () => {
         const definitions = buildToolDefinitions(contract.routes, baseOptions);
-        const createUser = definitions.find((definition) => definition.name === 'users.createUser')!;
+        const createUser = definitions.find((definition) => definition.name === 'users_create_user')!;
 
         expect(createUser.inputSchema.shape).toBeDefined();
         expect(createUser.inputSchema.hasBody).toBe(true);
@@ -413,7 +413,7 @@ describe('buildToolDefinitions: input schema', () => {
 
     it('excludes void body from the input schema', () => {
         const definitions = buildToolDefinitions(contract.routes, baseOptions);
-        const ping = definitions.find((definition) => definition.name === 'pingUser')!;
+        const ping = definitions.find((definition) => definition.name === 'ping_user')!;
 
         expect(ping.inputSchema.hasParams).toBe(true);
         expect(ping.inputSchema.hasBody).toBe(false);
@@ -449,7 +449,7 @@ describe('buildToolDefinitions: input schema', () => {
         });
 
         const definitions = buildToolDefinitions(unionContract.routes);
-        const send = definitions.find((definition) => definition.name === 'sendNotification')!;
+        const send = definitions.find((definition) => definition.name === 'send_notification')!;
 
         expect(send.inputSchema.hasBody).toBe(true);
         expect(send.inputSchema.shape!['body']).toBeDefined();
@@ -479,7 +479,7 @@ describe('buildToolDefinitions: input schema', () => {
         });
 
         const definitions = buildToolDefinitions(complexContract.routes);
-        const update = definitions.find((definition) => definition.name === 'updateItem')!;
+        const update = definitions.find((definition) => definition.name === 'update_item')!;
 
         expect(update.inputSchema.hasParams).toBe(true);
         expect(update.inputSchema.hasQuery).toBe(true);
@@ -511,7 +511,7 @@ describe('buildToolDefinitions: input schema', () => {
                 routes: contractRoutesWithRequiredQuery,
             }).routes
         );
-        const search = definitions.find((definition) => definition.name === 'searchItems')!;
+        const search = definitions.find((definition) => definition.name === 'search_items')!;
 
         expect(z.toJSONSchema(z.object(search.inputSchema.shape!)).required).toContain('query');
     });
@@ -522,7 +522,7 @@ describe('tool annotations', () => {
         const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
-        const getUser = tools.find((tool) => tool.name === 'users.getUser')!;
+        const getUser = tools.find((tool) => tool.name === 'users_get_user')!;
 
         expect(getUser.annotations?.readOnlyHint).toBe(true);
         expect(getUser.annotations?.destructiveHint).toBeUndefined();
@@ -534,7 +534,7 @@ describe('tool annotations', () => {
         const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
-        const deleteUser = tools.find((tool) => tool.name === 'deleteUser')!;
+        const deleteUser = tools.find((tool) => tool.name === 'delete_user')!;
 
         expect(deleteUser.annotations?.destructiveHint).toBe(true);
         expect(deleteUser.annotations?.readOnlyHint).toBeUndefined();
@@ -546,7 +546,7 @@ describe('tool annotations', () => {
         const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
-        const updateUser = tools.find((tool) => tool.name === 'updateUser')!;
+        const updateUser = tools.find((tool) => tool.name === 'update_user')!;
 
         expect(updateUser.annotations?.idempotentHint).toBe(true);
         expect(updateUser.annotations?.destructiveHint).toBeUndefined();
@@ -559,7 +559,7 @@ describe('tool annotations', () => {
         const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
-        const getUser = tools.find((tool) => tool.name === 'users.getUser')!;
+        const getUser = tools.find((tool) => tool.name === 'users_get_user')!;
 
         expect(getUser.annotations?.idempotentHint).toBe(true);
 
@@ -570,7 +570,7 @@ describe('tool annotations', () => {
         const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
-        const deleteUser = tools.find((tool) => tool.name === 'deleteUser')!;
+        const deleteUser = tools.find((tool) => tool.name === 'delete_user')!;
 
         expect(deleteUser.annotations?.idempotentHint).toBe(true);
 
@@ -581,7 +581,7 @@ describe('tool annotations', () => {
         const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
-        const createUser = tools.find((tool) => tool.name === 'users.createUser')!;
+        const createUser = tools.find((tool) => tool.name === 'users_create_user')!;
 
         expect(createUser.annotations?.readOnlyHint).toBeUndefined();
         expect(createUser.annotations?.destructiveHint).toBeUndefined();
@@ -596,7 +596,7 @@ describe('buildToolDefinitions: output schema', () => {
         const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
-        const getUser = tools.find((tool) => tool.name === 'users.getUser')!;
+        const getUser = tools.find((tool) => tool.name === 'users_get_user')!;
 
         expect(getUser.outputSchema).toBeDefined();
         expect(getUser.outputSchema!.properties).toHaveProperty('status');
@@ -609,7 +609,7 @@ describe('buildToolDefinitions: output schema', () => {
         const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
-        const getUser = tools.find((tool) => tool.name === 'users.getUser')!;
+        const getUser = tools.find((tool) => tool.name === 'users_get_user')!;
         const body = (getUser.outputSchema!.properties as Record<string, { properties?: Record<string, unknown> }>)['body']!;
 
         expect(body.properties).toHaveProperty('id');
@@ -622,7 +622,7 @@ describe('buildToolDefinitions: output schema', () => {
         const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
-        const ping = tools.find((tool) => tool.name === 'pingUser')!;
+        const ping = tools.find((tool) => tool.name === 'ping_user')!;
 
         expect(ping.outputSchema!.properties).toHaveProperty('status');
         expect(ping.outputSchema!.properties).not.toHaveProperty('body');
@@ -673,12 +673,12 @@ describe('MCP server e2e', () => {
         const { tools } = await client.listTools();
         const names = tools.map((tool) => tool.name);
 
-        expect(names).toContain('users.listUsers');
-        expect(names).toContain('users.getUser');
-        expect(names).toContain('users.createUser');
+        expect(names).toContain('users_list_users');
+        expect(names).toContain('users_get_user');
+        expect(names).toContain('users_create_user');
         expect(names).toContain('health');
-        expect(names).toContain('pingUser');
-        expect(names).not.toContain('uploadAvatar');
+        expect(names).toContain('ping_user');
+        expect(names).not.toContain('upload_avatar');
 
         await close();
     });
@@ -687,7 +687,7 @@ describe('MCP server e2e', () => {
         const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
-        const listUsers = tools.find((tool) => tool.name === 'users.listUsers')!;
+        const listUsers = tools.find((tool) => tool.name === 'users_list_users')!;
 
         expect(listUsers.description).toContain('List users with pagination');
         expect(listUsers.description).toContain('HTTP: GET /users');
@@ -699,11 +699,11 @@ describe('MCP server e2e', () => {
         const { client, close } = await connectMcpClient();
 
         const { tools } = await client.listTools();
-        const getUser = tools.find((tool) => tool.name === 'users.getUser')!;
+        const getUser = tools.find((tool) => tool.name === 'users_get_user')!;
 
         expect(getUser.inputSchema.properties).toHaveProperty('params');
 
-        const createUser = tools.find((tool) => tool.name === 'users.createUser')!;
+        const createUser = tools.find((tool) => tool.name === 'users_create_user')!;
         expect(createUser.inputSchema.properties).toHaveProperty('body');
 
         await close();
@@ -713,7 +713,7 @@ describe('MCP server e2e', () => {
         const { client, close } = await connectMcpClient();
 
         const result = await client.callTool({
-            name: 'users.listUsers',
+            name: 'users_list_users',
             arguments: {},
         });
 
@@ -737,7 +737,7 @@ describe('MCP server e2e', () => {
         const { client, close } = await connectMcpClient();
 
         const result = await client.callTool({
-            name: 'users.getUser',
+            name: 'users_get_user',
             arguments: {
                 params: {
                     id: '42',
@@ -760,7 +760,7 @@ describe('MCP server e2e', () => {
         const { client, close } = await connectMcpClient();
 
         const result = await client.callTool({
-            name: 'users.getUser',
+            name: 'users_get_user',
             arguments: {
                 params: {
                     id: '999',
@@ -778,7 +778,7 @@ describe('MCP server e2e', () => {
         const { client, close } = await connectMcpClient();
 
         const result = await client.callTool({
-            name: 'users.getUser',
+            name: 'users_get_user',
             arguments: {
                 params: {
                     id: '42',
@@ -799,7 +799,7 @@ describe('MCP server e2e', () => {
         const { client, close } = await connectMcpClient();
 
         const result = await client.callTool({
-            name: 'users.createUser',
+            name: 'users_create_user',
             arguments: {
                 body: {
                     name: 'Bob',
@@ -821,7 +821,7 @@ describe('MCP server e2e', () => {
         const { client, close } = await connectMcpClient();
 
         const result = await client.callTool({
-            name: 'users.listUsers',
+            name: 'users_list_users',
             arguments: {
                 query: {
                     page: 2,
@@ -842,7 +842,7 @@ describe('MCP server e2e', () => {
         const { client, close } = await connectMcpClient();
 
         const result = await client.callTool({
-            name: 'users.getUser',
+            name: 'users_get_user',
             arguments: {
                 params: {
                     id: '999',
@@ -863,7 +863,7 @@ describe('MCP server e2e', () => {
         const { client, close } = await connectMcpClient();
 
         const result = await client.callTool({
-            name: 'pingUser',
+            name: 'ping_user',
             arguments: {
                 params: {
                     id: '42',
@@ -1036,8 +1036,8 @@ describe('MCP server: guards', () => {
         const { client, close } = await connectMcpClient(makeSecuredApi());
         const { tools } = await client.listTools();
         const names = tools.map((tool) => tool.name);
-        expect(names).toContain('api.whoAmI');
-        expect(names).toContain('api.publicRoute');
+        expect(names).toContain('api_who_am_i');
+        expect(names).toContain('api_public_route');
         await close();
     });
 
@@ -1045,9 +1045,9 @@ describe('MCP server: guards', () => {
         const { client, close } = await connectMcpClient(makeSecuredApi());
         const { tools } = await client.listTools();
 
-        const whoAmI = tools.find((tool) => tool.name === 'api.whoAmI')!;
-        const gated = tools.find((tool) => tool.name === 'api.ownerOnly')!;
-        const publicRoute = tools.find((tool) => tool.name === 'api.publicRoute')!;
+        const whoAmI = tools.find((tool) => tool.name === 'api_who_am_i')!;
+        const gated = tools.find((tool) => tool.name === 'api_owner_only')!;
+        const publicRoute = tools.find((tool) => tool.name === 'api_public_route')!;
 
         expect(whoAmI.description).toContain('Requires: user');
         expect(gated.description).toContain('Requires: user (role: owner, admin)');
@@ -1059,7 +1059,7 @@ describe('MCP server: guards', () => {
     it('denies a secured tool call without a credential', async () => {
         const { client, close } = await connectMcpClient(makeSecuredApi());
         const result = await client.callTool({
-            name: 'api.whoAmI',
+            name: 'api_who_am_i',
             arguments: {},
         });
         const content = result.content as Array<{ type: string; text: string }>;
@@ -1077,7 +1077,7 @@ describe('MCP server: guards', () => {
             },
         });
         const result = await client.callTool({
-            name: 'api.whoAmI',
+            name: 'api_who_am_i',
             arguments: {},
         });
         const content = result.content as Array<{ type: string; text: string }>;
@@ -1099,7 +1099,7 @@ describe('MCP server: guards', () => {
             },
         });
         const result = await client.callTool({
-            name: 'api.whoAmI',
+            name: 'api_who_am_i',
             arguments: {},
         });
         const content = result.content as Array<{ type: string; text: string }>;
@@ -1114,7 +1114,7 @@ describe('MCP server: guards', () => {
     it('serves public tools without guards', async () => {
         const { client, close } = await connectMcpClient(makeSecuredApi());
         const result = await client.callTool({
-            name: 'api.publicRoute',
+            name: 'api_public_route',
             arguments: {},
         });
         const content = result.content as Array<{ type: string; text: string }>;
@@ -1144,7 +1144,7 @@ describe('MCP server: guards', () => {
         }) as Parameters<typeof createMcpServer>[0];
         const { client, close } = await connectMcpClient(apiWithoutGuards);
         const result = await client.callTool({
-            name: 'api.whoAmI',
+            name: 'api_who_am_i',
             arguments: {},
         });
         const content = result.content as Array<{ type: string; text: string }>;
