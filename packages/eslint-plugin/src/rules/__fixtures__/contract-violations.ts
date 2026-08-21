@@ -1,5 +1,5 @@
 import { Kizuna } from '@ts-kizuna/core';
-import { CoercedQuery, DeprecatedLinkSchema, DuplicateDeprecatedSchema, NestedCoerced } from './shared-schemas.js';
+import { CoercedQuery, NestedCoerced } from './shared-schemas.js';
 
 const k = new Kizuna();
 
@@ -8,18 +8,6 @@ export const routes = k.routes({
         method: 'GET',
         path: '/a',
         query: CoercedQuery,
-        responses: {},
-    },
-    b: {
-        method: 'POST',
-        path: '/b',
-        body: DeprecatedLinkSchema,
-        responses: {},
-    },
-    c: {
-        method: 'POST',
-        path: '/c',
-        body: DuplicateDeprecatedSchema,
         responses: {},
     },
     d: {

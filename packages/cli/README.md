@@ -1,6 +1,6 @@
 # @ts-kizuna/cli
 
-The `kizuna` CLI extracts the deprecations declared on your contract into `.kizuna/deprecations.json`, which the OpenAPI and client generators read at generate time.
+`loadContract` imports a contract module from TypeScript source, no build step needed. The Swift and Kotlin generators use it to load the contract they generate from.
 
 ## Installation
 
@@ -10,12 +10,12 @@ pnpm add -D @ts-kizuna/cli
 
 ## Usage
 
-Prepend it to your dev and build scripts, so the generators always read current data:
+```ts
+import { loadContract } from '@ts-kizuna/cli';
 
-```sh
-kizuna deprecations src/contract/index.ts
+const contract = await loadContract('./src/contract.ts');
 ```
 
 ## Documentation
 
-[Deprecations](https://ts-kizuna.com/docs/deprecations)
+[ts-kizuna docs](https://ts-kizuna.com/docs)

@@ -65,39 +65,6 @@ query: z.object({
 });
 ```
 
-### JSDoc tags in `@deprecated`
-
-kizuna serializes the text after `@deprecated` verbatim and surfaces it to every generated client. Native and mobile clients can't parse JSDoc inline tags (`{@link}`, `{@linkcode}`, any `{@…}`), so they'd show the raw markup. Write plain text, and backticks are fine:
-
-```ts
-// flagged
-/**
- * @deprecated Use {@link createUser} instead.
- */
-
-// good
-/**
- * @deprecated Use `createUser` instead.
- */
-```
-
-### Duplicate `@deprecated`
-
-kizuna serializes only the **first** `@deprecated` message. Any later one is silently dropped and never reaches a client, so collapse them into one:
-
-```ts
-// flagged, clients never see the second line
-/**
- * @deprecated Use `createUser` instead.
- * @deprecated Numeric ids are no longer accepted.
- */
-
-// good
-/**
- * @deprecated Use `createUser` instead. Numeric ids are no longer accepted.
- */
-```
-
 ### Across files
 
 A schema defined elsewhere, such as a shared `PaginationQuery` in its own `zod`-only module, is still caught, and the error lands on the reference:

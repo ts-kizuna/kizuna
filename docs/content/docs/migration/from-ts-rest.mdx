@@ -232,42 +232,6 @@ If you are upgrading from ts-rest and Zod 3, migrate to Zod 4 alongside this cha
 | `z.ZodTypeAny`            | `z.ZodType`                        |
 | `ZodIssue` (from `'zod'`) | `z.core.$ZodIssue`                 |
 
-## Deprecation
-
-ts-rest supports `deprecated: true` on route definitions and `.meta({ deprecated: true })` on Zod schemas. Neither exists in ts-kizuna.
-
-```ts title="ts-rest"
-// ts-rest
-deleteUser: {
-    method: 'DELETE',
-    path: '/users/:id',
-    deprecated: true,
-    responses: {
-        200: z.object({
-            success: z.boolean(),
-        }),
-    },
-},
-```
-
-```ts title="ts-kizuna"
-// ts-kizuna: JSDoc only
-/**
- * @deprecated
- */
-deleteUser: {
-    method: 'DELETE',
-    path: '/users/:id',
-    responses: {
-        200: z.object({
-            success: z.boolean(),
-        }),
-    },
-},
-```
-
-One `/** @deprecated */` JSDoc tag drives IDE strikethrough, the OpenAPI `deprecated` flag, and the Swift `@available(*, deprecated)` attribute.
-
 ## Error responses
 
 ts-kizuna returns [RFC 9457 Problem Details](/docs/reference/problem-details-schema) (`application/problem+json`) for every error response. Error responses in a contract must use `ProblemDetailsSchema` (or `ProblemDetailsSchema.extend({...})` for extra fields), not an arbitrary shape. Validation errors are Problem Details with a `detail` string and an `errors` array (instead of ts-rest's `{ message, issues }`). If you're porting an API whose clients expect the old shape, see [Migrating an existing API](/docs/migration/existing-api) for how to keep old clients working during the transition.

@@ -252,7 +252,7 @@ result.onSuccess { println(it.body) }.onFailure { println("failed: ${it.message}
 
 ## Deprecation
 
-Routes and fields marked `/** @deprecated */` in the contract emit `@Deprecated` in the generated Kotlin code:
+Routes with `deprecated` and fields with `.meta({ deprecated: ... })` emit `@Deprecated` in the generated Kotlin code, with the message when one is set:
 
 ```kotlin title="APIClient.kt"
 @Deprecated("use newRoute instead")

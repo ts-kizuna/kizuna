@@ -1,17 +1,9 @@
-import {
-    contractFingerprint,
-    serializeDeprecationMap,
-    deserializeDeprecationMap,
-    type DeprecationMap,
-    type SerializedDeprecationMap,
-} from './deprecation.js';
 import { flattenRoutes } from './handler-pipeline.js';
 import { flattenJobs, isCompiledJob, jobAt, type CompiledJob, type FlattenedJob, type Jobs } from './jobs.js';
 import { parsePath } from './path-params.js';
 import type { Routes, RouteDefinition } from './types.js';
 import type { Contract } from './contract.js';
 
-export { contractFingerprint, serializeDeprecationMap, deserializeDeprecationMap, type DeprecationMap, type SerializedDeprecationMap };
 export type { Routes, RouteDefinition };
 export { flattenJobs, isCompiledJob, jobAt };
 export type { CompiledJob, FlattenedJob, Jobs };
@@ -32,6 +24,7 @@ export {
     readMeta,
     readMetaId,
     readMetaDescription,
+    readDeprecation,
     readDiscriminatorLiteral,
     readDiscriminatorStringLiteral,
     globalRegistrySchemas,
@@ -62,28 +55,22 @@ export interface GeneratorRouteContext {
     route: RouteDefinition;
     routeTags: string[];
     /**
-     * Whether this route is marked `@deprecated` in the routes source.
+     * Whether the route is deprecated.
      */
     deprecated: boolean;
     /**
-     * The text after `@deprecated`, or `undefined` for a bare tag or non-deprecated route.
+     * The route's `deprecated` string, or `undefined` for `deprecated: true` or
+     * a non-deprecated route.
      */
     deprecationMessage: string | undefined;
-    /**
-     * Field-path → deprecation message for body/query/headers/responses fields
-     * on this route. `undefined` when the route has no deprecated fields.
-     */
-    fieldDeprecations: Map<string, string> | undefined;
 }
 
 /**
  * Factory for building type-safe routes generators.
  *
  * Centralises routes walking and deprecation resolution so generator authors
- * only need to implement `processRoute` and `finalize`.
- *
- * Deprecations are passed in, not read here, so this module keeps out of
- * `node:fs`. Callers load them with `loadDeprecations`.
+ * only need to implement `processRoute` and `finalize`. Field-level deprecation
+ * lives on the schemas themselves, read with `readDeprecation`.
  *
  * ```ts
  * const generateRouteList = createGenerator(() => {
@@ -98,31 +85,28 @@ export interface GeneratorRouteContext {
  *     };
  * });
  *
- * const list = generateRouteList(contract, {}, loadDeprecations(contractFingerprint(contract)));
+ * const list = generateRouteList(contract, {});
  * ```
  */
 export const createGenerator =
     <Options, Output>(
         factory: (
             options: Options,
-            contract: Contract,
-            deprecations: DeprecationMap | undefined
+            contract: Contract
         ) => {
             processRoute: (context: GeneratorRouteContext) => void;
             finalize: () => Output;
         }
-    ): ((contract: Contract, options: Options, deprecations?: DeprecationMap) => Output) =>
-    (contract, options, deprecation) => {
-        const { processRoute, finalize } = factory(options, contract, deprecation);
+    ): ((contract: Contract, options: Options) => Output) =>
+    (contract, options) => {
+        const { processRoute, finalize } = factory(options, contract);
         for (const { routeKey, route, routeTags } of flattenRoutes(contract.routes)) {
-            const rawMessage = deprecation?.routes.get(routeKey);
             processRoute({
                 routeKey,
                 route,
                 routeTags,
-                deprecated: rawMessage !== undefined,
-                deprecationMessage: rawMessage || undefined,
-                fieldDeprecations: deprecation?.fields.get(routeKey),
+                deprecated: route.deprecated !== undefined && route.deprecated !== false,
+                deprecationMessage: typeof route.deprecated === 'string' ? route.deprecated : undefined,
             });
         }
         return finalize();

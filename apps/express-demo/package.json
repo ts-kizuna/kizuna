@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "kizuna deprecations ../shared/src/contract.ts && concurrently -n server,client -c cyan,magenta \"tsx watch src/index.ts\" \"sleep 1.5 && tsx src/scripts/run-client.ts\"",
-    "server": "kizuna deprecations ../shared/src/contract.ts && tsx watch src/index.ts",
-    "server:once": "kizuna deprecations ../shared/src/contract.ts && tsx src/index.ts",
+    "dev": "concurrently -n server,client -c cyan,magenta \"tsx watch src/index.ts\" \"sleep 1.5 && tsx src/scripts/run-client.ts\"",
+    "server": "tsx watch src/index.ts",
+    "server:once": "tsx src/index.ts",
     "client": "tsx src/scripts/run-client.ts",
     "typecheck": "tsc --noEmit",
     "openapi": "tsx scripts/generate-openapi.ts"
@@ -22,7 +22,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ts-kizuna/cli": "workspace:*",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "concurrently": "catalog:",
