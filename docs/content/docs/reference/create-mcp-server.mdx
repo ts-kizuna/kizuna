@@ -26,15 +26,16 @@ createMcpServer(api: Api, options?: McpServerOptions): McpServer
 
 ## Options
 
-| Option              | Default              | Description                                                               |
-| ------------------- | -------------------- | ------------------------------------------------------------------------- |
-| `name`              | `'MCP Server'`       | Human-readable name shown to AI assistants                                |
-| `version`           | `'1.0.0'`            | Semantic version string                                                   |
-| `tools`             | every route          | Which routes become tools, keyed by route tree                            |
-| `onlyReadOnly`      | `false`              | Keep only `GET`, `HEAD`, and `OPTIONS`                                    |
-| `instructions`      | built from your tags | Appended to the generated overview                                        |
-| `handlerContext`    | none                 | Extra context spread into every handler call                              |
-| `credentialHeaders` | none                 | Headers of the MCP transport request, used to run guards on secured tools |
+| Option              | Default              | Description                                                                                                                    |
+| ------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `name`              | `'MCP Server'`       | Human-readable name shown to AI assistants                                                                                     |
+| `version`           | `'1.0.0'`            | Semantic version string                                                                                                        |
+| `tools`             | every route          | Which routes become tools, keyed by route tree                                                                                 |
+| `onlyReadOnly`      | `false`              | Keep only `GET`, `HEAD`, and `OPTIONS`                                                                                         |
+| `instructions`      | built from your tags | Appended to the generated overview                                                                                             |
+| `handlerContext`    | none                 | Extra context spread into every handler call                                                                                   |
+| `credentialHeaders` | none                 | Headers of the MCP transport request, used to run guards on secured tools                                                      |
+| `transportAuth`     | none                 | A scheme the transport already verified: its guard and gates are skipped, and `context` reaches handlers under `auth.<scheme>` |
 
 `tools` is keyed by the route tree: a route it never mentions is a tool, `false` drops one or a whole group, and `'*'` sets a group default. See [Choosing which routes become tools](/docs/mcp#choosing-which-routes-become-tools).
 

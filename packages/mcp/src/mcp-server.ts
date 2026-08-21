@@ -76,6 +76,16 @@ export interface McpServerOptions {
      * the credential (e.g. an `Authorization` header) on its connection.
      */
     credentialHeaders?: Record<string, string | string[] | undefined>;
+
+    /**
+     * A scheme the transport has already verified for this request. Its guard
+     * and access gates are skipped per tool call, and `context` reaches
+     * handlers under `auth.<scheme>`.
+     */
+    transportAuth?: {
+        scheme: string;
+        context?: Record<string, unknown>;
+    };
 }
 
 interface Annotations {
@@ -253,7 +263,8 @@ const runGuards = async (
     guards: GuardMap | undefined,
     schemes: Record<string, SecurityScheme> | undefined,
     handlerContext: Record<string, unknown> | undefined,
-    credentialHeaders: Record<string, string | string[] | undefined> | undefined
+    credentialHeaders: Record<string, string | string[] | undefined> | undefined,
+    transportAuth: McpServerOptions['transportAuth']
 ): Promise<{ ok: true; securityContext: Record<string, unknown> } | { ok: false; result: ToolCallResult }> => {
     const securityContext: Record<string, unknown> = {};
     const credentialRequest = {
@@ -262,6 +273,10 @@ const runGuards = async (
     } as unknown as AdapterRequest<unknown>;
 
     for (const { scheme, scopes } of resolveSecurityRequirements(route)) {
+        if (scheme === transportAuth?.scheme) {
+            if (transportAuth.context !== undefined) securityContext[scheme] = transportAuth.context;
+            continue;
+        }
         const guard = guards?.[scheme];
         if (!guard) {
             return {
@@ -311,7 +326,8 @@ const executeToolCall = async (
     guards?: GuardMap,
     schemes?: Record<string, SecurityScheme>,
     credentialHeaders?: Record<string, string | string[] | undefined>,
-    contextResolvers?: RequestContextMap
+    contextResolvers?: RequestContextMap,
+    transportAuth?: McpServerOptions['transportAuth']
 ): Promise<ToolCallResult> => {
     const params = (args.params ?? {}) as Record<string, string>;
     const query = (args.query ?? {}) as Record<string, unknown>;
@@ -379,7 +395,7 @@ const executeToolCall = async (
         }
     }
 
-    const guardOutcome = await runGuards(route, routeKey, params, guards, schemes, handlerContext, credentialHeaders);
+    const guardOutcome = await runGuards(route, routeKey, params, guards, schemes, handlerContext, credentialHeaders, transportAuth);
     if (!guardOutcome.ok) {
         return guardOutcome.result;
     }
@@ -482,7 +498,8 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     guards,
                     schemes,
                     options?.credentialHeaders,
-                    contextResolvers
+                    contextResolvers,
+                    options?.transportAuth
                 )
         );
     }

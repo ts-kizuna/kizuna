@@ -347,7 +347,7 @@ export const auth = k.auth(routes, {
 
 ### Verify in the guard
 
-The guard receives the token as `oauth2` and the route's required `scopes`. Verification is your authorization server's job to make cheap: with better-auth or any JWT-issuing server, check the signature against its JWKS, the issuer, and the audience, which must be your API, not just any holder of a valid signature. Deny a missing scope with the `insufficient_scope` challenge ([RFC 6750](https://www.rfc-editor.org/rfc/rfc6750)), so OAuth clients know to re-authorize with more scopes:
+The guard receives the token as `oauth2` and the route's required `scopes`. Check the signature against the authorization server's JWKS, the issuer, and the audience. Deny a missing scope with the `insufficient_scope` challenge ([RFC 6750](https://www.rfc-editor.org/rfc/rfc6750)):
 
 ```ts title="guards.ts"
 import { createRemoteJWKSet, jwtVerify } from 'jose';
