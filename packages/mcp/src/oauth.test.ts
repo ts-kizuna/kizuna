@@ -446,11 +446,11 @@ describe('mcpPlugin: oauth declaration', () => {
         ).toEqual(['endpoint', 'protectedResourceMetadata']);
     });
 
-    it('accepts any resource at declaration time, so contracts evaluate without deployment env', () => {
+    it('accepts an invalid resource at declaration time, so a contract loads without server env', () => {
         expect(() =>
             mcpPlugin({
                 oauth: {
-                    resource: 'undefined/mcp',
+                    resource: '/mcp',
                     scheme: 'user',
                 },
             })
