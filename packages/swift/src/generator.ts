@@ -1312,7 +1312,7 @@ const bodyParamType = (method: RouteMethod, context: EmitContext): string | unde
 type MethodGroup = { varName: string; type: string; factory: string; required: boolean };
 
 // The request groups of a method, required ones first. A group is required when it has any required field
-// (path params and object bodies always do); optional groups sort last so they can carry trailing defaults.
+// (path params always do); optional groups sort last so they can carry trailing defaults.
 const methodGroups = (method: RouteMethod, context: EmitContext): MethodGroup[] => {
     const operationName = method.operationName;
     const groups: MethodGroup[] = [];
@@ -1322,7 +1322,14 @@ const methodGroups = (method: RouteMethod, context: EmitContext): MethodGroup[] 
     }
     const bodyType = bodyParamType(method, context);
     if (bodyType) {
-        groups.push({ varName: 'body', type: bodyType, factory: 'body', required: true });
+        // A union or non-object body is one value the factory has to be handed, so it stays required.
+        const takesFields = method.body!.kind === 'json-flat' || method.body!.kind === 'multipart';
+        groups.push({
+            varName: 'body',
+            type: bodyType,
+            factory: 'body',
+            required: !takesFields || method.body!.flattened.some((field) => !field.optional),
+        });
     }
     if (method.query.length > 0) {
         groups.push({

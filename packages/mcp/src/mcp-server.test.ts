@@ -116,6 +116,20 @@ const contractRoutes = k.routes('api', {
             }),
         },
     },
+    patchUser: {
+        method: 'PATCH',
+        path: '/users/:id',
+        body: z.object({
+            name: z.string().optional(),
+            email: z.string().optional(),
+        }),
+        responses: {
+            200: z.object({
+                id: z.string(),
+                name: z.string(),
+            }),
+        },
+    },
 });
 
 const contract = k.contract({
@@ -194,6 +208,13 @@ const router = {
         body: {
             id: params.id,
             name: body.name,
+        },
+    }),
+    patchUser: ({ params, body }: { params: { id: string }; body: { name?: string; email?: string } }) => ({
+        status: 200,
+        body: {
+            id: params.id,
+            name: body.name ?? 'Alice',
         },
     }),
 };
@@ -384,6 +405,20 @@ describe('buildToolDefinitions: input schema', () => {
 
         expect(z.object(listUsers.inputSchema.shape!).safeParse({}).success).toBe(true);
         expect(z.toJSONSchema(z.object(listUsers.inputSchema.shape!)).required ?? []).not.toContain('query');
+    });
+
+    it('leaves an all-optional body out of required', () => {
+        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const patchUser = definitions.find((definition) => definition.name === 'patch_user')!;
+
+        expect(
+            z.object(patchUser.inputSchema.shape!).safeParse({
+                params: {
+                    id: '1',
+                },
+            }).success
+        ).toBe(true);
+        expect(z.toJSONSchema(z.object(patchUser.inputSchema.shape!)).required ?? []).not.toContain('body');
     });
 
     it('puts path params under a params key', () => {

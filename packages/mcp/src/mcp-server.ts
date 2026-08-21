@@ -21,7 +21,7 @@ import { contractOf } from '@ts-kizuna/core/adapter';
 import type { Contract, Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
 import { deriveToolNames } from './tool-name.js';
-import { buildToolInputSchema, buildToolOutputSchema, type ToolInputSchema } from './schema.js';
+import { buildToolInputSchema, buildToolOutputSchema, emptyBodyStandsIn, type ToolInputSchema } from './schema.js';
 import { selectToolRoutes, type ToolMap, type ToolSelection } from './tool-selection.js';
 
 export interface McpServerOptions {
@@ -331,7 +331,7 @@ const executeToolCall = async (
 ): Promise<ToolCallResult> => {
     const params = (args.params ?? {}) as Record<string, string>;
     const query = (args.query ?? {}) as Record<string, unknown>;
-    const body = args.body;
+    const body = args.body ?? (emptyBodyStandsIn(route) ? {} : undefined);
 
     const validation = validateRequest(route, {
         params,

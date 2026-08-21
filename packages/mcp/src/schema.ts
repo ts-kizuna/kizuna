@@ -17,6 +17,16 @@ export interface ToolInputSchema {
     hasBody: boolean;
 }
 
+/**
+ * True when the tool can leave the key out: the schema takes `{}` or `undefined`.
+ */
+const isOmittable = (schema: z.ZodType): boolean => schema.safeParse({}).success || schema.safeParse(undefined).success;
+
+/**
+ * The empty body a tool call stands in when it leaves `body` out.
+ */
+export const emptyBodyStandsIn = (route: RouteDefinition): boolean => route.body !== undefined && route.body.safeParse({}).success;
+
 export const buildToolInputSchema = (route: RouteDefinition): ToolInputSchema => {
     const shape: Record<string, z.ZodType> = {};
     let hasParams = false;
@@ -41,7 +51,7 @@ export const buildToolInputSchema = (route: RouteDefinition): ToolInputSchema =>
 
     if (route.body && !isVoidSchema(route.body)) {
         hasBody = true;
-        shape['body'] = route.body.safeParse(undefined).success ? route.body.optional() : route.body;
+        shape['body'] = isOmittable(route.body) ? route.body.optional() : route.body;
     }
 
     if (Object.keys(shape).length === 0) {

@@ -51,7 +51,13 @@ type IsOmittable<Payload> = {} extends Payload ? true : [undefined] extends [Pay
  * optional when its input accepts `{}` or `undefined`.
  */
 export type ClientArgs<R extends RouteDefinition> = (HasPathParams<R['path']> extends true ? { params: ClientParams<R> } : {}) &
-    (R extends { body: z.ZodType } ? (ClientPayload<R['body']> extends void ? {} : { body: ClientPayload<R['body']> }) : {}) &
+    (R extends { body: z.ZodType }
+        ? ClientPayload<R['body']> extends void
+            ? {}
+            : IsOmittable<ClientPayload<R['body']>> extends true
+              ? { body?: ClientPayload<R['body']> }
+              : { body: ClientPayload<R['body']> }
+        : {}) &
     (R extends { query: z.ZodType }
         ? IsOmittable<ClientPayload<R['query']>> extends true
             ? { query?: ClientPayload<R['query']> }
@@ -165,6 +171,10 @@ const buildQueryString = (query: Record<string, unknown>): string => {
 };
 
 const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
+    // An omitted body still sends the empty one when the schema takes it, so the
+    // caller never writes `body: {}`.
+    const emptyBodyStandsIn = route.body !== undefined && route.body.safeParse({}).success;
+
     return async (
         args: {
             params?: Record<string, string | number | bigint | Date>;
@@ -179,20 +189,21 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
             ...(config.baseHeaders ?? {}),
             ...(args.headers ?? {}),
         };
+        const payload = args.body ?? (emptyBodyStandsIn ? {} : undefined);
         let body: string | FormData | URLSearchParams | undefined;
-        if (args.body !== undefined) {
+        if (payload !== undefined) {
             const hasContentTypeHeader = 'Content-Type' in headers || 'content-type' in headers;
             switch (route.contentType) {
                 case 'multipart/form-data':
-                    body = args.body instanceof FormData ? args.body : buildFormData(args.body as Record<string, unknown>);
+                    body = payload instanceof FormData ? payload : buildFormData(payload as Record<string, unknown>);
                     break;
                 case 'application/x-www-form-urlencoded':
                     if (!hasContentTypeHeader) headers['Content-Type'] = 'application/x-www-form-urlencoded';
-                    body = new URLSearchParams(args.body as Record<string, string>);
+                    body = new URLSearchParams(payload as Record<string, string>);
                     break;
                 default:
                     if (!hasContentTypeHeader) headers['Content-Type'] = 'application/json';
-                    body = JSON.stringify(args.body);
+                    body = JSON.stringify(payload);
             }
         }
         const requestHeaders = new Headers(headers);

@@ -2,6 +2,6 @@
     "types": ["feat", "fix", "docs", "chore", "refactor", "perf", "test", "build", "ci", "style", "revert"],
     "scopedTypes": ["feat", "fix", "perf", "refactor"],
     "breakingTypes": ["feat", "fix"],
-    "extraScopes": ["deps", "adapters", "native-clients"],
+    "extraScopes": ["deps", "adapters", "clients", "native-clients"],
     "newScopeLabel": "new scope"
 }

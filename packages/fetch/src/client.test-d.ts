@@ -222,6 +222,37 @@ test('route with body: z.void() rejects a non-void body', () => {
     voidBodyClient.deleteItem({ params: { id: '1' }, body: { foo: 'bar' } });
 });
 
+const optionalBodyContractRoutes = k.routes('api', {
+    patchItem: {
+        method: 'PATCH',
+        path: '/items/:id',
+        body: z.object({
+            name: z.string().optional(),
+        }),
+        responses: {
+            200: z.object({
+                success: z.boolean(),
+            }),
+        },
+    },
+});
+
+const optionalBodyContract = k.contract({
+    routes: optionalBodyContractRoutes,
+});
+
+const optionalBodyClient = new KizunaClient(optionalBodyContract, {
+    baseUrl: 'http://localhost:3000',
+});
+
+test('a body whose every field is optional can be left out', async () => {
+    await optionalBodyClient.patchItem({
+        params: {
+            id: '1',
+        },
+    });
+});
+
 const nestedContractRoutes = k.routes('api', {
     users: {
         getUser: {

@@ -1012,7 +1012,7 @@ const methodChannels = (method: RouteMethod): MethodChannel[] => {
         channels.push({
             varName: 'body',
             className: 'Body',
-            required: true,
+            required: fields.some((field) => !field.optional),
             fields,
         });
     }
