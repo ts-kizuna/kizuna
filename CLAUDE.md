@@ -6,8 +6,15 @@ ts-kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RF
 
 - **RFC 9110** (HTTP Semantics, June 2022): methods, status codes, headers, content negotiation
 - **RFC 5789** (PATCH Method, April 2010): PATCH semantics
+- **RFC 9457** (Problem Details for HTTP APIs, July 2023): error response bodies
+- **RFC 3986** (URI Syntax, January 2005): paths match exactly, so `/users/1` and `/users/1/` differ
 - **OpenAPI 3.1.0**: spec generation
-- **Model Context Protocol**: the MCP endpoint, its tools, and their names
+- **OAuth 2.1**: the resource server model, for an API that verifies tokens rather than issuing them
+- **RFC 9728** (OAuth 2.0 Protected Resource Metadata, April 2025): the discovery document
+- **RFC 8414** (OAuth 2.0 Authorization Server Metadata, June 2018): an identity's `issuer`
+- **RFC 8707** (Resource Indicators for OAuth 2.0, February 2020): the canonical `resource` URI and the audience a guard checks
+- **RFC 6750** (OAuth 2.0 Bearer Token Usage, October 2012): the `WWW-Authenticate` challenge, including `insufficient_scope`
+- **Model Context Protocol**: the MCP endpoint, its tools, their names, and its authorization
 
 ### MCP tool names
 
