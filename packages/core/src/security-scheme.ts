@@ -82,6 +82,13 @@ export interface SecurityScheme<ContextSchema extends z.ZodType | undefined = z.
      * identity, a pure gate with no data to hand the handler.
      */
     readonly context: ContextSchema;
+    /**
+     * Issuer identifier of the authorization server that mints this scheme's
+     * tokens (RFC 8414). Consumers that advertise the authorization server,
+     * such as RFC 9728 metadata, read it via `authorizationServerIssuer`,
+     * which derives it from `openIdConnectUrl` for `openIdConnect` identities.
+     */
+    readonly issuer?: string;
 }
 
 /**
@@ -97,3 +104,30 @@ export type ContextOf<S> =
  */
 export const isSecurityScheme = (value: unknown): value is SecurityScheme =>
     typeof value === 'object' && value !== null && '__brand' in value && (value as SecurityScheme).__brand === 'SecurityScheme';
+
+/**
+ * Issuer identifier of the authorization server behind a scheme: the declared
+ * `issuer`, or for an `openIdConnect` identity the `openIdConnectUrl` with its
+ * `/.well-known/openid-configuration` segment removed (both RFC 8414 forms).
+ */
+export const authorizationServerIssuer = (scheme: SecurityScheme | undefined): string | undefined => {
+    if (scheme?.issuer !== undefined) return scheme.issuer;
+    const openapi = scheme?.openapi;
+    if (openapi?.type !== 'openIdConnect') return undefined;
+    const issuer = openapi.openIdConnectUrl.replace('/.well-known/openid-configuration', '');
+    return issuer === openapi.openIdConnectUrl ? undefined : issuer;
+};
+
+/**
+ * The scopes an `oauth2` scheme's flows declare, for consumers that advertise
+ * them (e.g. RFC 9728 `scopes_supported`). `undefined` for other scheme types.
+ */
+export const declaredScopes = (scheme: SecurityScheme | undefined): string[] | undefined => {
+    const openapi = scheme?.openapi;
+    if (openapi?.type !== 'oauth2') return undefined;
+    const names = new Set<string>();
+    for (const flow of Object.values(openapi.flows)) {
+        for (const name of Object.keys(flow.scopes)) names.add(name);
+    }
+    return [...names];
+};

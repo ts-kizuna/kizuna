@@ -24,12 +24,12 @@ import { Kizuna } from '@ts-kizuna/core';
 
 Every builder takes `context` (optional), `access` (optional), `description` (optional), and `scheme` (optional, where identities sharing one credential set the same `scheme` name and emit a single OpenAPI scheme). Method-specific fields:
 
-| Builder                         | Extra fields                                  |
-| ------------------------------- | --------------------------------------------- |
-| `Kizuna.identity.bearer`        | `bearerFormat?` (e.g. `'JWT'`)                |
-| `Kizuna.identity.apiKey`        | `name`, `in: 'header' \| 'query' \| 'cookie'` |
-| `Kizuna.identity.oauth2`        | `flows` (OpenAPI OAuth Flows object)          |
-| `Kizuna.identity.openIdConnect` | `openIdConnectUrl`                            |
+| Builder                         | Extra fields                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `Kizuna.identity.bearer`        | `bearerFormat?` (e.g. `'JWT'`)                                                                          |
+| `Kizuna.identity.apiKey`        | `name`, `in: 'header' \| 'query' \| 'cookie'`                                                           |
+| `Kizuna.identity.oauth2`        | `flows` (OpenAPI OAuth Flows object), `issuer?` (the authorization server's RFC 8414 issuer identifier) |
+| `Kizuna.identity.openIdConnect` | `openIdConnectUrl`                                                                                      |
 
 ## Example
 

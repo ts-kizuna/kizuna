@@ -198,6 +198,39 @@ describe('guard pipeline', () => {
         });
     });
 
+    it('carries the headers a denial passes and lets them replace the default challenge', async () => {
+        const contract = makeContract();
+        const { adapter, results } = makeAdapter();
+        await adapter.handle({
+            routes: contract.routes,
+            router: {
+                items: {
+                    listItems: okHandler,
+                    getSecret: okHandler,
+                    ownerOnly: okHandler,
+                    scoped: okHandler,
+                },
+            },
+            request: makeRequest('/secret'),
+            responseContext: {},
+            guards: {
+                user: ({ deny }) =>
+                    deny(403, 'Missing scope', {
+                        'www-authenticate': 'Bearer error="insufficient_scope", scope="items:read"',
+                    }),
+            } as GuardMap<Record<string, never>>,
+            schemes: contract.securitySchemes,
+        });
+        expect(results[0]).toEqual({
+            kind: 'guard-denied',
+            status: 403,
+            detail: 'Missing scope',
+            headers: {
+                'www-authenticate': 'Bearer error="insufficient_scope", scope="items:read"',
+            },
+        });
+    });
+
     it('rejects with 403 when the access gate does not permit the guard result', async () => {
         const contract = makeContract();
         const { adapter, results } = makeAdapter();

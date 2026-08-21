@@ -21,12 +21,27 @@ export const requireUser = server.guard('user', ({ bearer, deny }) => {
 
 Return the identity's `context` and `access` fields to allow the request; they reach handlers under `auth`, keyed by the identity's name. An [authentication-only identity](/docs/reference/kizuna-identity#authentication-only-identities) returns nothing on success.
 
+## Denying with extra headers
+
+`deny` takes optional response headers as a third argument. A `www-authenticate` among them replaces the default challenge, which is how a guard sends the RFC 6750 `insufficient_scope` challenge [OAuth resource servers](/docs/authentication#oauth-resource-servers) answer scope shortfalls with:
+
+```ts title="guards.ts"
+import { bearerChallenge } from '@ts-kizuna/core/adapter';
+
+return deny(403, 'The token is missing a required scope', {
+    'www-authenticate': bearerChallenge({
+        error: 'insufficient_scope',
+        scope: scopes.join(' '),
+    }),
+});
+```
+
 ## Guard arguments
 
-| Property          | Description                                                                                                                                              |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| credential        | The extracted credential, keyed by the identity's method (`bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`). `null` when absent.                   |
-| `params`          | The matched route's path params, for guards that check access to the resource in the URL.                                                                |
-| `deny`            | `(status, detail) => GuardDenial`, rejects with a Problem Details response. A `401` also carries a `WWW-Authenticate` challenge built from the identity. |
-| `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).                                                                     |
-| framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).                                                                   |
+| Property          | Description                                                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| credential        | The extracted credential, keyed by the identity's method (`bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`). `null` when absent.                             |
+| `params`          | The matched route's path params, for guards that check access to the resource in the URL.                                                                          |
+| `deny`            | `(status, detail, headers?) => GuardDenial`, rejects with a Problem Details response. A `401` also carries a `WWW-Authenticate` challenge built from the identity. |
+| `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).                                                                               |
+| framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).                                                                             |

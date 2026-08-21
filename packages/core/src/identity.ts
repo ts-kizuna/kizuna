@@ -102,6 +102,23 @@ export type AccessOf<Id> =
  */
 export type IdentityAccess<Id> = [AccessOf<Id>] extends [never] ? {} : AccessOf<Id>;
 
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+const assertValidIssuer = (issuer: string): void => {
+    let parsed: URL;
+    try {
+        parsed = new URL(issuer);
+    } catch {
+        throw new Error(`The issuer "${issuer}" is not an absolute URL.`);
+    }
+    if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && LOOPBACK_HOSTNAMES.has(parsed.hostname))) {
+        throw new Error(`The issuer "${issuer}" must be https. http is only allowed on localhost.`);
+    }
+    if (parsed.search !== '' || parsed.hash !== '') {
+        throw new Error(`The issuer "${issuer}" has a query or fragment.`);
+    }
+};
+
 const make = <
     ContextSchema extends z.ZodType | undefined,
     AccessSchema extends z.ZodType | undefined,
@@ -110,13 +127,15 @@ const make = <
     openapi: OpenApiSecuritySchemeObject | undefined,
     context: ContextSchema,
     access: AccessSchema,
-    scheme: string | undefined
+    scheme: string | undefined,
+    issuer?: string
 ): Identity<ContextSchema, AccessSchema, CredentialType> => ({
     __brand: 'SecurityScheme',
     openapi,
     context,
     access,
     scheme,
+    issuer,
 });
 
 export interface BearerConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
@@ -150,6 +169,12 @@ export interface BasicConfig<ContextSchema extends z.ZodType | undefined, Access
 
 export interface OAuth2Config<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
     flows: OAuthFlows;
+    /**
+     * Issuer identifier of the authorization server (RFC 8414), for consumers
+     * that advertise it, such as RFC 9728 metadata. The flow URLs cannot stand
+     * in for it: an issuer may carry a path the endpoint URLs do not reveal.
+     */
+    issuer?: string;
     context?: ContextSchema;
     access?: AccessSchema;
     description?: string;
@@ -232,13 +257,16 @@ export const createIdentity = {
         ),
     oauth2: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
         config: OAuth2Config<ContextSchema, AccessSchema>
-    ): Identity<ContextSchema, AccessSchema, { oauth2: BearerCredential | null }> =>
-        make<ContextSchema, AccessSchema, { oauth2: BearerCredential | null }>(
+    ): Identity<ContextSchema, AccessSchema, { oauth2: BearerCredential | null }> => {
+        if (config.issuer !== undefined) assertValidIssuer(config.issuer);
+        return make<ContextSchema, AccessSchema, { oauth2: BearerCredential | null }>(
             { type: 'oauth2', flows: config.flows, description: config.description },
             config.context as ContextSchema,
             config.access as AccessSchema,
-            config.scheme
-        ),
+            config.scheme,
+            config.issuer
+        );
+    },
     openIdConnect: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
         config: OpenIdConnectConfig<ContextSchema, AccessSchema>
     ): Identity<ContextSchema, AccessSchema, { openIdConnect: BearerCredential | null }> =>

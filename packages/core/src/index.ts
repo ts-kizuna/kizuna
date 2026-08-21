@@ -47,6 +47,8 @@ export {
 export { type RequestContextSchema, type RequestContextHeaderInputs, type RequestContextHeaderValues } from './request-context.js';
 export {
     isSecurityScheme,
+    authorizationServerIssuer,
+    declaredScopes,
     type SecurityScheme,
     type ContextOf,
     type OpenApiSecuritySchemeObject,
@@ -132,6 +134,12 @@ export {
     cron,
 } from './schedule.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
+export {
+    buildProtectedResourceMetadata,
+    assertCanonicalResourceUri,
+    type ProtectedResourceMetadata,
+    type ProtectedResourceConfig,
+} from './protected-resource-metadata.js';
 export { ResponseError } from './response-error.js';
 export { STATUS_TITLES, getStatusText } from './status-titles.js';
 export { getHeaderValue } from './adapter.js';
