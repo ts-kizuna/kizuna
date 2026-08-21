@@ -92,6 +92,11 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
     summary?: string;
     description?: string;
     /**
+     * Marks the route deprecated. A string is the migration message, surfaced
+     * in generated output.
+     */
+    deprecated?: true | string;
+    /**
      * Tag keys grouping this route in the OpenAPI spec. Keys come from the tag set
      * declared with `Kizuna.tags`; `k.routes` stamps the group's tag onto every
      * route, and the generator resolves each key to its `title` for the spec.

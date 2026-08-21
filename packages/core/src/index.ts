@@ -1,3 +1,5 @@
+import './zod-meta.js';
+
 export {
     Kizuna,
     type K,

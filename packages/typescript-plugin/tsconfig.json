@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "Preserve",
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "plugins": [
+      {
+        "name": "@ts-kizuna/typescript-plugin"
+      }
+    ]
+  },
+  "include": ["src"]
+}
