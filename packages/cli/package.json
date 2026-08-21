@@ -13,7 +13,7 @@
     "api",
     "cli",
     "codegen",
-    "deprecations"
+    "dts"
   ],
   "license": "MIT",
   "homepage": "https://ts-kizuna.com/docs",

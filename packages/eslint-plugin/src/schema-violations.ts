@@ -7,16 +7,9 @@ import ts from 'typescript';
 export type SchemaResolver = (identifier: ts.Identifier) => ts.Expression | undefined;
 
 /**
- * A JSDoc inline tag, `{@link …}`, `{@linkcode …}`, any `{@tag}`.
+ * The ways a kizuna schema can be illegal: `coerce` (uses `z.coerce`).
  */
-const JSDOC_INLINE_TAG = /\{@[a-zA-Z][\w-]*/;
-
-/**
- * The ways a kizuna schema can be illegal: `coerce` (uses `z.coerce`), `jsdoc-tag`
- * (a `@deprecated` message with an inline tag), `duplicate-deprecated` (a field with
- * more than one `@deprecated` tag).
- */
-export type SchemaIssue = 'coerce' | 'jsdoc-tag' | 'duplicate-deprecated';
+export type SchemaIssue = 'coerce';
 
 /**
  * An issue and the exact node that carries it, the `z.coerce` access or the offending
@@ -46,14 +39,6 @@ export const collectSchemaIssues = (root: ts.Node, resolve: SchemaResolver): Sch
         violations.push({ issue, node, viaReference });
     };
 
-    const checkFieldJsDoc = (property: ts.Node, viaReference: boolean): void => {
-        const deprecatedTags = ts.getJSDocTags(property).filter((tag) => tag.tagName.text === 'deprecated');
-        if (deprecatedTags.length > 1) add('duplicate-deprecated', property, viaReference);
-        for (const tag of deprecatedTags) {
-            if (JSDOC_INLINE_TAG.test(ts.getTextOfJSDocComment(tag.comment) ?? '')) add('jsdoc-tag', property, viaReference);
-        }
-    };
-
     const walk = (node: ts.Node, viaReference: boolean): void => {
         if (
             ts.isPropertyAccessExpression(node) &&
@@ -62,13 +47,6 @@ export const collectSchemaIssues = (root: ts.Node, resolve: SchemaResolver): Sch
             node.expression.text === 'z'
         ) {
             add('coerce', node, viaReference);
-        }
-
-        if (ts.isObjectLiteralExpression(node)) {
-            for (const property of node.properties) {
-                if (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property))
-                    checkFieldJsDoc(property, viaReference);
-            }
         }
 
         if (ts.isIdentifier(node)) {

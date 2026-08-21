@@ -1,9 +1,7 @@
 import { z } from 'zod';
 import { stringify as stringifyYaml } from 'yaml';
-import { loadDeprecations } from '@ts-kizuna/core/load-deprecations';
 import {
     createGenerator,
-    contractFingerprint,
     isFileSchema,
     isBinarySchema,
     isVoidSchema,
@@ -17,7 +15,6 @@ import {
     resolveResponseBody,
     resolveResponseHeaders,
     resolveResponseContentType,
-    type RouteDefinition,
 } from '@ts-kizuna/core/generator';
 import { getStatusText } from '@ts-kizuna/core';
 import type { Contract, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
@@ -99,6 +96,22 @@ const buildDiscriminatorBlock = (
           };
 };
 
+/**
+ * JSON Schema and OpenAPI declare `deprecated` as a boolean, while kizuna's
+ * metadata allows a message string. Emit `deprecated: true`; the message stays
+ * in outputs with a place for it, like Swift's `@available`.
+ */
+const normalizeDeprecated = (value: unknown): void => {
+    if (Array.isArray(value)) {
+        for (const entry of value) normalizeDeprecated(entry);
+        return;
+    }
+    if (!value || typeof value !== 'object') return;
+    const record = value as Record<string, unknown>;
+    if (typeof record.deprecated === 'string') record.deprecated = true;
+    for (const child of Object.values(record)) normalizeDeprecated(child);
+};
+
 const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Record<string, unknown> => {
     const id = readMetaId(schema);
     if (id) {
@@ -111,6 +124,7 @@ const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Rec
         const raw = rewriteRefs(
             omit(z.toJSONSchema(schema, { unrepresentable: 'any', io }) as Record<string, unknown>, ['$defs', '$schema'])
         ) as Record<string, unknown>;
+        normalizeDeprecated(raw);
         return {
             ...raw,
             discriminator: buildDiscriminatorBlock(discriminated.discriminator, discriminated.options),
@@ -119,6 +133,7 @@ const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Rec
     const raw = z.toJSONSchema(schema, { unrepresentable: 'any', io }) as Record<string, unknown>;
     const result = rewriteRefs(omit(raw, ['$defs', '$schema'])) as Record<string, unknown>;
     applyFileBinary(schema, result);
+    normalizeDeprecated(result);
     return result;
 };
 
@@ -142,6 +157,7 @@ const buildComponentSchemas = (): Record<string, unknown> | undefined => {
     const cleaned: Record<string, unknown> = {};
     for (const [id, schema] of Object.entries(schemas)) {
         const base = rewriteRefs(omit(schema, ['$schema', '$defs', '$id'])) as Record<string, unknown>;
+        normalizeDeprecated(base);
         const discriminator = discriminators.get(id);
         cleaned[id] = discriminator
             ? {
@@ -153,69 +169,6 @@ const buildComponentSchemas = (): Record<string, unknown> | undefined => {
     return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 };
 
-const COMPONENT_REF_PREFIX = '#/components/schemas/';
-
-const applyDeprecatedToSchema = (
-    schema: Record<string, unknown> | undefined,
-    pathRest: string[],
-    components: Record<string, Record<string, unknown>> | undefined
-): void => {
-    if (!schema) return;
-    if (pathRest.length === 0) {
-        schema.deprecated = true;
-        return;
-    }
-    if (typeof schema.$ref === 'string') {
-        if (!components) return;
-        const ref = schema.$ref;
-        if (!ref.startsWith(COMPONENT_REF_PREFIX)) return;
-        const id = ref.slice(COMPONENT_REF_PREFIX.length);
-        const target = components[id];
-        applyDeprecatedToSchema(target, pathRest, components);
-        return;
-    }
-    const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
-    if (!properties) return;
-    const head = pathRest[0];
-    const rest = pathRest.slice(1);
-    if (head === undefined) return;
-    applyDeprecatedToSchema(properties[head], rest, components);
-};
-
-const applyDeprecatedToOperation = (
-    operation: OpenApiOperation,
-    path: string,
-    components: Record<string, Record<string, unknown>> | undefined
-): void => {
-    const segments = path.split('.');
-    const head = segments[0];
-    const rest = segments.slice(1);
-    if (head === 'body') {
-        const content = operation.requestBody?.content;
-        if (!content) return;
-        for (const entry of Object.values(content)) {
-            applyDeprecatedToSchema(entry.schema, rest, components);
-        }
-        return;
-    }
-    if (head === 'query' || head === 'headers') {
-        if (rest.length !== 1) return;
-        const direction = head === 'query' ? 'query' : 'header';
-        const target = operation.parameters?.find((parameter) => parameter.in === direction && parameter.name === rest[0]);
-        if (target) target.schema.deprecated = true;
-        return;
-    }
-    if (head === 'responses') {
-        const status = rest[0];
-        if (status === undefined) return;
-        const responseRest = rest.slice(1);
-        const response = operation.responses[status];
-        const responseContent = response?.content?.['application/json'] ?? response?.content?.['application/problem+json'];
-        if (!responseContent) return;
-        applyDeprecatedToSchema(responseContent.schema, responseRest, components);
-    }
-};
-
 /**
  * Internal generator options: the public options plus a `key → TagOptions`
  * lookup built from the contract's tag set, used to resolve tag keys to titles.
@@ -224,13 +177,11 @@ type GeneratorContext = GenerateOpenApiOptions & {
     tagLookup?: ReadonlyMap<string, TagOptions>;
 };
 
-const openApiGenerator = createGenerator((options: GeneratorContext, contract: Contract, deprecations) => {
+const openApiGenerator = createGenerator((options: GeneratorContext, contract: Contract) => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
-    const pendingFieldDeprecations: Array<{ operation: OpenApiOperation; fieldDeprecations: Map<string, string> }> = [];
-    const schemaDeprecations = deprecations?.schemas;
 
     return {
-        processRoute({ routeKey, route, routeTags, deprecated, fieldDeprecations }) {
+        processRoute({ routeKey, route, routeTags, deprecated }) {
             const openApiPath = convertPath(route.path);
             const method = route.method.toLowerCase();
 
@@ -403,13 +354,6 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                 operation = options.operationMapper(operation, route, routeKey);
             }
 
-            if (fieldDeprecations && fieldDeprecations.size > 0) {
-                pendingFieldDeprecations.push({
-                    operation,
-                    fieldDeprecations,
-                });
-            }
-
             if (!paths[openApiPath]) paths[openApiPath] = {};
             paths[openApiPath][method] = operation;
         },
@@ -431,23 +375,6 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                     ...(securitySchemes ? { securitySchemes } : {}),
                     ...(componentSchemas ? { schemas: componentSchemas } : {}),
                 };
-            }
-
-            const componentSchemasForLookup = componentSchemas as Record<string, Record<string, unknown>> | undefined;
-            for (const { operation, fieldDeprecations: deprecatedPaths } of pendingFieldDeprecations) {
-                for (const fieldPath of deprecatedPaths.keys()) {
-                    applyDeprecatedToOperation(operation, fieldPath, componentSchemasForLookup);
-                }
-            }
-
-            if (schemaDeprecations && componentSchemasForLookup) {
-                for (const [metaId, fields] of schemaDeprecations) {
-                    const component = componentSchemasForLookup[metaId];
-                    if (!component) continue;
-                    for (const fieldPath of fields.keys()) {
-                        applyDeprecatedToSchema(component, fieldPath.split('.'), componentSchemasForLookup);
-                    }
-                }
             }
 
             const renderer = (format: 'json' | 'yaml'): OpenApiDocument | string => {
@@ -556,14 +483,10 @@ const optionsFromInstalledPlugin = (contract: Contract): GenerateOpenApiOptions 
  * Render from options held directly, for `openApiPluginServer`.
  */
 export function renderOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer {
-    const renderer = openApiGenerator(
-        contract,
-        {
-            ...options,
-            tagLookup: buildTagLookup(contract),
-        },
-        loadDeprecations(contractFingerprint(contract))
-    );
+    const renderer = openApiGenerator(contract, {
+        ...options,
+        tagLookup: buildTagLookup(contract),
+    });
     const tags = tagsFromContract(contract);
     if (tags.length > 0) {
         (renderer('json') as OpenApiDocument).tags = tags;

@@ -1,177 +1,48 @@
 ---
 title: Deprecations
-description: Mark routes and fields @deprecated and have it reach your IDE, OpenAPI, and Swift client.
+description: Declare deprecations on the contract and have them reach OpenAPI, Swift, and Kotlin.
 ---
 
-<BetaNotice>
+| Where  | Declaration                  | Type                |
+| ------ | ---------------------------- | ------------------- |
+| Routes | `deprecated` on the route    | `boolean \| string` |
+| Fields | `.meta({ deprecated: ... })` | `boolean \| string` |
 
-Deprecations are new and still settling. What the CLI reads and how deprecations reach each generated client may change before v2, so pin your version if you depend on them.
+## Routes
 
-</BetaNotice>
-
-A `/** @deprecated */` JSDoc tag on a route or field produces a strikethrough in editors, `deprecated: true` in the OpenAPI spec, and `@available(*, deprecated)` in the Swift client. Text after `@deprecated` becomes the Swift `@available` message.
+Set `deprecated` on the route, either `true` or a migration message:
 
 ```ts title="contract/index.ts"
 export const usersRoutes = k.routes('users', {
-    /**
-     * @deprecated use `archiveUser` instead
-     */
     deleteUser: {
         method: 'DELETE',
         path: '/users/:id',
+        deprecated: 'use archiveUser instead',
         responses: {
             200: z.object({
                 ok: z.boolean(),
             }),
         },
     },
-    getUser: {
-        method: 'GET',
-        path: '/users/:id',
-        responses: {
-            200: z.object({
-                id: z.string(),
-                /**
-                 * @deprecated use `email_address`
-                 */
-                email: z.string(),
-            }),
-        },
-    },
 });
 ```
 
-## Setup
+## Fields
 
-The `kizuna` CLI ships in `@ts-kizuna/cli`, a build-time dev dependency:
-
-<InstallTabs packageName="@ts-kizuna/cli" dev />
-
-Generate the deprecation data into `.kizuna/deprecations.json`:
-
-```bash title="Terminal"
-kizuna deprecations src/contract/index.ts
-```
-
-`generateOpenApi(contract)` reads it:
+Fields declare it in their [Zod metadata](https://zod.dev/metadata), with the same `true | string` shape:
 
 ```ts
-const spec = generateOpenApi(contract);
+const UserSchema = z.object({
+    id: z.string(),
+    email: z.string().meta({
+        deprecated: 'use email_address instead',
+    }),
+    email_address: z.string(),
+});
 ```
 
-Prepend it to your existing dev and build scripts. For example, with Next.js:
+`deprecated` is Zod's own metadata key, typed as a boolean to match JSON Schema. `@ts-kizuna/core` widens it through declaration merging to accept the message string, so the string form type-checks in any project that has kizuna installed. `false` reads as not deprecated.
 
-```json title="package.json"
-{
-    "scripts": {
-        "dev": "kizuna deprecations src/contract/index.ts && next dev",
-        "build": "kizuna deprecations src/contract/index.ts && next build"
-    }
-}
-```
+## What each output emits
 
-Gitignore the output:
-
-```text title=".gitignore"
-.kizuna/
-```
-
-Generators read `.kizuna/deprecations.json` from the working directory.
-
-## Multiple contracts
-
-Pass each contract. They are merged into one `deprecations.json`; each generator applies only the entries whose routes exist in the contract it is generating.
-
-```bash title="Terminal"
-kizuna deprecations src/app.ts src/workspace.ts src/admin.ts
-```
-
-## Published packages
-
-When you publish your contract or schemas as a package, the JSDoc you wrote on Zod fields is lost: declaration emit serializes the inferred `z.ZodObject<{...}>`, whose properties carry no comments. Consumers in other repos using `z.infer<typeof Schema>` get no field docs and no strikethrough.
-
-Pass `--dts <dir>` to re-inject each field's full JSDoc block back into the emitted `.d.ts` after your build, including descriptions, `@example`, and `@deprecated`.
-
-Run `--dts` if consumers resolve your built `.d.ts`. If they read your `.ts` source directly, the JSDoc is already there.
-
-```json title="package.json"
-{
-    "scripts": {
-        "build": "tsdown src/index.ts --dts && kizuna deprecations src/index.ts --dts dist"
-    }
-}
-```
-
-## Deployment
-
-When your app starts, `generateOpenApi` reads the `.kizuna/` folder from wherever the app runs. Your build's `kizuna deprecations` step creates it; it has to still be there at runtime.
-
-On most hosts it already is: a VM, a single container, `next start`, or Railway/Render (Nixpacks) all run from the same files the build produced, so `.kizuna/` comes along.
-
-### Docker (multi-stage)
-
-If your Dockerfile builds in one stage and then copies the result into a smaller final image, `.kizuna/` gets left behind, just like `dist/` would. Copy it across too:
-
-```dockerfile title="Dockerfile"
-COPY --from=builder /app/.kizuna ./.kizuna
-```
-
-### Turborepo
-
-If you cache builds with Turborepo, add `.kizuna/**` to the build task's `outputs`, otherwise a cached build leaves it out:
-
-```json title="turbo.json"
-{
-    "tasks": {
-        "build": {
-            "outputs": ["dist/**", ".kizuna/**"]
-        }
-    }
-}
-```
-
-### Vercel and serverless
-
-Vercel functions and Next's `output: 'standalone'` bundle only the files the tracer sees, not your whole project, and the tracer can't see a `process.cwd()` read. Wrap your config with `withKizuna` to trace `.kizuna/` in:
-
-```ts title="next.config.ts"
-import type { NextConfig } from 'next';
-import { withKizuna } from '@ts-kizuna/next/config';
-
-const nextConfig: NextConfig = {
-    // your config
-};
-
-export default withKizuna(nextConfig);
-```
-
-It merges into `outputFileTracingIncludes`, so it composes with other config wrappers. Run `kizuna deprecations` from the same directory as `next build` so `.kizuna/` sits at the project root.
-
-<Callout type="info">
-    The route that serves the OpenAPI spec must run on the Node runtime, not Edge. The Edge runtime has no filesystem to read `.kizuna/`
-    from.
-</Callout>
-
-### Next.js monorepos
-
-`.kizuna/` lands wherever you run `kizuna deprecations`. If you run it from the repo root instead of the app, set `outputFileTracingRoot` to that root. `withKizuna` derives the include path from it:
-
-```ts title="next.config.ts"
-import path from 'node:path';
-import type { NextConfig } from 'next';
-import { withKizuna } from '@ts-kizuna/next/config';
-
-const nextConfig: NextConfig = {
-    outputFileTracingRoot: path.join(import.meta.dirname, '../..'),
-};
-
-export default withKizuna(nextConfig);
-```
-
-## Swift
-
-The Swift CLI reads the contract source directly, with no separate step.
-
-```bash title="Terminal"
-ts-kizuna-swift generate --contract src/contract/index.ts --output APIClient.swift --namespace-name API
-```
+OpenAPI marks the operation and the field's schema with `deprecated: true` (the spec has no message field). Swift emits `@available(*, deprecated, message: "use email_address instead")` and Kotlin `@Deprecated("use email_address instead")`, so the message reaches autocomplete and compiler warnings in both mobile clients.

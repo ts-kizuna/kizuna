@@ -249,6 +249,29 @@ export const readMetaId = (schema: z.core.$ZodType): string | undefined => {
 };
 
 /**
+ * Reads a schema's `deprecated` metadata, with its message when one was set.
+ * Returns undefined when the schema is not deprecated. Looks through optional
+ * wrappers, so `z.string().meta({ deprecated: ... }).optional()` still reads as
+ * deprecated.
+ */
+export const readDeprecation = (schema: z.core.$ZodType): { message: string | undefined } | undefined => {
+    for (const candidate of [schema, unwrapOptionalWrappers(schema).inner]) {
+        const deprecated = readMeta(candidate)?.deprecated;
+        if (deprecated === true) {
+            return {
+                message: undefined,
+            };
+        }
+        if (typeof deprecated === 'string') {
+            return {
+                message: deprecated || undefined,
+            };
+        }
+    }
+    return undefined;
+};
+
+/**
  * Returns a schema's `description` metadata, or undefined.
  */
 export const readMetaDescription = (schema: z.core.$ZodType): string | undefined => {

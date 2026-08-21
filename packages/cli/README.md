@@ -1,6 +1,6 @@
 # @ts-kizuna/cli
 
-The `kizuna` CLI extracts the deprecations declared on your contract into `.kizuna/deprecations.json`, which the OpenAPI and client generators read at generate time.
+The `kizuna` CLI re-injects schema-field JSDoc into the `.d.ts` files your build emits, so docs survive publishing and reach `z.infer` consumers. It also ships `loadContract`, which the Swift and Kotlin generators use to load a contract from source.
 
 ## Installation
 
@@ -10,12 +10,12 @@ pnpm add -D @ts-kizuna/cli
 
 ## Usage
 
-Prepend it to your dev and build scripts, so the generators always read current data:
+Run it after your build, pointing at the emitted declarations:
 
 ```sh
-kizuna deprecations src/contract/index.ts
+kizuna dts src/index.ts --out dist
 ```
 
 ## Documentation
 
-[Deprecations](https://ts-kizuna.com/docs/deprecations)
+[kizuna dts](https://ts-kizuna.com/docs/reference/kizuna-dts)

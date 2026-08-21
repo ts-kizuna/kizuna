@@ -1,0 +1,35 @@
+---
+title: kizuna dts
+description: Re-inject schema-field JSDoc into the .d.ts files a build emits, so docs survive publishing.
+---
+
+When you publish your contract or schemas as a package, the JSDoc you wrote on Zod fields is lost: declaration emit serializes the inferred `z.ZodObject<{...}>`, whose properties carry no comments. Consumers in other repos using `z.infer<typeof Schema>` get no field docs.
+
+`kizuna dts` re-injects each field's JSDoc block, descriptions and `@example`, into the emitted `.d.ts` after your build.
+
+<InstallTabs packageName="@ts-kizuna/cli" dev />
+
+## Usage
+
+```bash title="Terminal"
+kizuna dts src/index.ts --out dist
+```
+
+Run it after declaration emit, pointing at your entry file(s) and the output directory:
+
+```json title="package.json"
+{
+    "scripts": {
+        "build": "tsdown src/index.ts --dts && kizuna dts src/index.ts --out dist"
+    }
+}
+```
+
+## Arguments
+
+| Argument         | Description                                                                                                    |
+| ---------------- | -------------------------------------------------------------------------------------------------------------- |
+| `<contract.ts…>` | One or more entry files. Every exported schema reachable from each one, including imported ones, is collected. |
+| `--out <dir>`    | The directory holding the emitted `.d.ts` files.                                                               |
+
+Run `kizuna dts` if consumers resolve your built `.d.ts`. If they read your `.ts` source directly, the JSDoc is already there.

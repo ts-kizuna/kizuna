@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ts from 'typescript';
-import { buildFileScope, collectFieldDocs, makeResolverWithCache, resolveImportPath } from './deprecation-parser.js';
+import { buildFileScope, collectFieldDocs, makeResolverWithCache, resolveImportPath } from './schema-walker.js';
 
 /**
  * Maps every exported schema reachable from `entryPath` to the verbatim JSDoc

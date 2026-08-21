@@ -29,6 +29,7 @@
         "generate-swift-client",
         "generate-kotlin-client",
         "mcp-plugin",
-        "create-mcp-server"
+        "create-mcp-server",
+        "kizuna-dts"
     ]
 }
