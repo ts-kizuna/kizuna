@@ -1,0 +1,53 @@
+---
+title: Standards
+description: The specifications ts-kizuna follows. RFC 9110 HTTP semantics, RFC 9457 Problem Details, OpenAPI 3.1.0, OAuth 2.1 resource servers, and the Model Context Protocol.
+---
+
+ts-kizuna is spec-driven. It follows these specifications as closely as it can.
+
+## HTTP
+
+| Standard                                                           | What it governs                                                                                                    |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) HTTP Semantics  | Methods, status codes, headers, content negotiation, and which methods are safe and idempotent                     |
+| [RFC 5789](https://www.rfc-editor.org/rfc/rfc5789) PATCH Method    | The `PATCH` method, which RFC 9110 does not define, and its unsafe and non-idempotent semantics                    |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details | The body of every error response, as `type`, `title`, `status`, `detail`, and `instance`                           |
+| [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) URI Syntax      | Percent-encoding of path parameters, and exact path matching, so `/users/1` and `/users/1/` are distinct resources |
+
+## OpenAPI
+
+| Standard                                              | What it governs                                             |
+| ----------------------------------------------------- | ----------------------------------------------------------- |
+| [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) | The document `@ts-kizuna/openapi` generates from a contract |
+
+See [OpenAPI](/docs/openapi) for the generator and the reference UI it serves.
+
+## Authentication
+
+An API that verifies tokens rather than issuing them is a resource server, and kizuna serves the documents and challenges one owes its clients.
+
+| Standard                                                                         | What it governs                                                               |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| [OAuth 2.1](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)         | The resource server model kizuna implements                                   |
+| [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) Protected Resource Metadata   | The discovery document served at `/.well-known/oauth-protected-resource`      |
+| [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) Authorization Server Metadata | An identity's `issuer`                                                        |
+| [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707) Resource Indicators           | The canonical `resource` URI, and the audience a guard checks a token against |
+| [RFC 6750](https://www.rfc-editor.org/rfc/rfc6750) Bearer Token Usage            | The `WWW-Authenticate` challenge, including `insufficient_scope`              |
+
+See [authentication](/docs/authentication) for identities, guards, and access gates.
+
+## Model Context Protocol
+
+| Standard                                                                                      | What it governs                                                 |
+| --------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [Model Context Protocol](https://modelcontextprotocol.io/specification/latest)                | The MCP endpoint, its tools, and their input and output schemas |
+| [MCP authorization](https://modelcontextprotocol.io/specification/latest/basic/authorization) | Serving the endpoint as an OAuth 2.1 resource server            |
+
+See [MCP](/docs/mcp) for the plugin and the tools it generates.
+
+## Deliberate omissions
+
+| Omission                                                   | Why                                                                                         |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `TRACE` is absent from `Method`                            | Disabled in production everywhere, and unsupported by the frameworks kizuna mounts on       |
+| A `HEAD` route answers only when the contract declares one | A contract-first API has the routes it describes, so `HEAD` is declared rather than derived |
