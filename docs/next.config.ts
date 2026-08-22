@@ -7,6 +7,21 @@ const config: NextConfig = {
     devIndicators: false,
     serverExternalPackages: ['typescript', 'twoslash'],
     reactStrictMode: true,
+    turbopack: {
+        rules: {
+            '*.svg': {
+                loaders: [
+                    {
+                        loader: '@svgr/webpack',
+                        options: {
+                            svgo: false,
+                        },
+                    },
+                ],
+                as: '*.js',
+            },
+        },
+    },
 };
 
 export default withMDX(config);

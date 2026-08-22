@@ -1,5 +1,5 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { Logo } from '@/components/shared/logo';
+import Logo from '@/icons/Logo.svg';
 import logoStyles from '@/components/shared/logo.module.css';
 import { NavTitle } from '@/components/shared/nav-title';
 

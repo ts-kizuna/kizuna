@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Logo } from '@/components/shared/logo';
+import Logo from '@/icons/Logo.svg';
 import { ThemeToggle } from './theme-toggle';
 import styles from './site-footer.module.css';
 

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { CodeWindow } from '@/components/code/code-window';
 import type { CodeCompletion } from '@/components/code/code-completion';
-import { TsLogo } from '@/components/code/brand-icons';
+import TsLogo from '@/icons/TypeScript.svg';
 import styles from './faq.module.css';
 
 const TRPC_EXAMPLE = `import { KizunaClient } from '@ts-kizuna/fetch';

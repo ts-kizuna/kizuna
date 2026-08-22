@@ -1,5 +1,8 @@
-import { ArrowLeftRight, Clock, FileText, Globe, KeyRound, Plug, Puzzle, TriangleAlert, Zap } from 'lucide-react';
-import { KotlinLogo, McpLogo, SwiftLogo, TanstackLogo } from '@/components/code/brand-icons';
+import { ArrowLeftRight, Clock, FileText, KeyRound, Plug, Puzzle, Section, TriangleAlert, Zap } from 'lucide-react';
+import KotlinLogo from '@/icons/Kotlin.svg';
+import McpLogo from '@/icons/Mcp.svg';
+import SwiftLogo from '@/icons/Swift.svg';
+import TanstackLogo from '@/icons/TanStack.svg';
 import type { ComponentType } from 'react';
 
 type FeatureIcon = ComponentType<{ className?: string }>;
@@ -61,9 +64,9 @@ export const features: Feature[] = [
         description: 'Call your API like a function, get fully typed responses back.',
     },
     {
-        icons: [Globe],
-        title: 'HTTP/REST',
-        description: 'Follows HTTP and REST standards. RFC 9110 semantics, RFC 9457 Problem Details.',
+        icons: [Section],
+        title: 'Spec-driven everything',
+        description: 'HTTP, OpenAPI, OAuth, and MCP: every status code, error body, and header sits where the spec says it should.',
     },
     {
         icons: [ArrowLeftRight],
