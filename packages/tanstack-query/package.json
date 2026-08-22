@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/tanstack-query",
-  "version": "1.53.0",
+  "version": "1.54.0",
   "description": "TanStack Query client for ts-kizuna",
   "keywords": [
     "ts-kizuna",

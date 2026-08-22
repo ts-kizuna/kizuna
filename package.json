@@ -1,7 +1,7 @@
 {
   "name": "kizuna",
   "private": true,
-  "version": "1.53.0",
+  "version": "1.54.0",
   "scripts": {
     "dev": "pnpm build && concurrently -n express,hono,next -c cyan,yellow,magenta \"pnpm --filter @ts-kizuna-demo/express dev\" \"pnpm --filter @ts-kizuna-demo/hono dev\" \"pnpm --filter @ts-kizuna-demo/next dev\"",
     "build": "pnpm -r --filter \"./packages/*\" build && pnpm typecheck && pnpm generate:swift",
