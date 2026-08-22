@@ -7,6 +7,7 @@ import {
     readDefType,
     readDiscriminatedUnion,
     readDiscriminatorStringLiteral,
+    readDeprecation,
     readMetaDescription,
     readMetaId,
     readObjectShape,
@@ -138,22 +139,14 @@ const propertyName = (key: string, camelCase: boolean): string => {
     return /^[0-9]/.test(camel) ? `_${camel}` : camel;
 };
 
-const objectFields = (
-    schema: z.core.$ZodType,
-    registry: TypeRegistry,
-    hint: string,
-    deprecatedPaths?: ReadonlyMap<string, string>,
-    pathPrefix?: string,
-    deprecationSchemas?: ReadonlyMap<string, Map<string, string>>,
-    schemaDeprecations?: ReadonlyMap<string, string>
-): SwiftField[] => {
+const objectFields = (schema: z.core.$ZodType, registry: TypeRegistry, hint: string): SwiftField[] => {
     const shape = readObjectShape(schema) ?? {};
     const fields: SwiftField[] = [];
     const seen = new Map<string, string>();
     for (const [key, value] of Object.entries(shape)) {
         const childHint = `${hint}${toPascalCase(key)}`;
-        const fieldPath = pathPrefix ? `${pathPrefix}.${key}` : key;
-        const result = mapType(value, registry, childHint, deprecatedPaths, fieldPath, deprecationSchemas);
+        const result = mapType(value, registry, childHint);
+        const deprecation = readDeprecation(value);
         const swiftName = propertyName(key, registry.camelCaseProperties);
         const previousWireName = seen.get(swiftName);
         if (previousWireName !== undefined && previousWireName !== key) {
@@ -169,8 +162,8 @@ const objectFields = (
             optional: result.optional,
             description: readMetaDescription(value),
             isFile: result.isFile,
-            deprecated: deprecatedPaths?.has(fieldPath) === true || schemaDeprecations?.has(key) === true,
-            deprecationMessage: deprecatedPaths?.get(fieldPath) || schemaDeprecations?.get(key) || undefined,
+            deprecated: deprecation !== undefined,
+            deprecationMessage: deprecation?.message,
         });
     }
     return fields;
@@ -178,14 +171,7 @@ const objectFields = (
 
 const stringify = (value: string): string => JSON.stringify(value);
 
-export const mapType = (
-    schema: z.core.$ZodType,
-    registry: TypeRegistry,
-    hint: string,
-    deprecatedPaths?: ReadonlyMap<string, string>,
-    pathPrefix?: string,
-    deprecationSchemas?: ReadonlyMap<string, Map<string, string>>
-): MapResult => {
+export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: string): MapResult => {
     if (isFileSchema(schema)) {
         return {
             expression: 'MultipartFile',
@@ -223,7 +209,7 @@ export const mapType = (
                 const variantId = readMetaId(option);
                 const literal = readDiscriminatorStringLiteral(option, discriminated.discriminator);
                 const variantHint = variantId ?? `${enumName}${toPascalCase(literal ?? 'Variant')}`;
-                const variantResult = mapType(option, registry, variantHint, undefined, undefined, deprecationSchemas);
+                const variantResult = mapType(option, registry, variantHint);
                 if (literal !== undefined) {
                     variants.push({
                         caseName: sanitizeCaseName(literal),
@@ -259,7 +245,7 @@ export const mapType = (
                 fields: [],
                 description: readMetaDescription(schema),
             });
-            const fields = objectFields(schema, registry, id, deprecatedPaths, pathPrefix, deprecationSchemas, deprecationSchemas?.get(id));
+            const fields = objectFields(schema, registry, id);
             registry.replace({
                 kind: 'struct',
                 name: id,
@@ -275,7 +261,7 @@ export const mapType = (
 
     const { inner, optional } = unwrapOptionalWrappers(schema);
     if (optional) {
-        const innerResult = mapType(inner, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+        const innerResult = mapType(inner, registry, hint);
         return {
             expression: innerResult.expression.endsWith('?') ? innerResult.expression : `${innerResult.expression}?`,
             optional: true,
@@ -293,9 +279,9 @@ export const mapType = (
         case 'pipe': {
             const outType = def.out ? readDefType(def.out) : undefined;
             if (def.out && outType !== 'transform') {
-                return mapType(def.out, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+                return mapType(def.out, registry, hint);
             }
-            if (def.in) return mapType(def.in, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+            if (def.in) return mapType(def.in, registry, hint);
             registry.warnAnyCodable(hint, 'pipe schema missing resolvable type');
             return {
                 expression: 'AnyCodable',
@@ -340,7 +326,7 @@ export const mapType = (
                     optional: false,
                 };
             }
-            const elementResult = mapType(element, registry, `${hint}Item`, deprecatedPaths, pathPrefix, deprecationSchemas);
+            const elementResult = mapType(element, registry, `${hint}Item`);
             return {
                 expression: `[${elementResult.expression.replace(/\?$/, '')}]`,
                 optional: false,
@@ -355,7 +341,7 @@ export const mapType = (
                     fields: [],
                     description: readMetaDescription(schema),
                 });
-                const fields = objectFields(schema, registry, structName, deprecatedPaths, pathPrefix, deprecationSchemas);
+                const fields = objectFields(schema, registry, structName);
                 registry.replace({
                     kind: 'struct',
                     name: structName,
@@ -425,7 +411,7 @@ export const mapType = (
                 };
             }
             const resolved = options
-                .map((option) => mapType(option, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas))
+                .map((option) => mapType(option, registry, hint))
                 .filter((result): result is MapResult => result !== undefined && result.expression !== 'AnyCodable');
             if (resolved.length === 0) {
                 registry.warnAnyCodable(hint, 'non-discriminated union');
@@ -491,15 +477,8 @@ const sanitizeCaseName = (literal: string): string => {
     return cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
 };
 
-export const collectObjectFields = (
-    schema: z.core.$ZodType,
-    registry: TypeRegistry,
-    hint: string,
-    deprecatedPaths?: ReadonlyMap<string, string>,
-    pathPrefix?: string,
-    deprecationSchemas?: ReadonlyMap<string, Map<string, string>>
-): SwiftField[] => {
-    return objectFields(schema, registry, hint, deprecatedPaths, pathPrefix, deprecationSchemas);
+export const collectObjectFields = (schema: z.core.$ZodType, registry: TypeRegistry, hint: string): SwiftField[] => {
+    return objectFields(schema, registry, hint);
 };
 
 export const objectFieldCount = (schema: z.core.$ZodType): number => {

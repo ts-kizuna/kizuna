@@ -6,13 +6,6 @@ import { renderDocsHtml } from './docs-html.js';
 
 export { generateOpenApi, renderOpenApi } from './generator.js';
 export { renderDocsHtml, type DocsProvider, type DocsHtmlOptions } from './docs-html.js';
-export {
-    type DeprecationMap,
-    type SerializedDeprecationMap,
-    serializeDeprecationMap,
-    deserializeDeprecationMap,
-} from '@ts-kizuna/core/generator';
-
 const HTML = 'text/html; charset=utf-8';
 const JSON_TYPE = 'application/json';
 const YAML = 'text/yaml; charset=utf-8';

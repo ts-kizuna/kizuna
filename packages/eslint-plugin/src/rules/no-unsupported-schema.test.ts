@@ -32,12 +32,7 @@ describe.each([
     ['without type information', { jsDocParsingMode: 'all' }],
 ])('no-unsupported-schema (%s)', (_label, parserOptions) => {
     it('flags imported schemas with the reference-variant messages, on the reference', async () => {
-        expect(await messageIdsFor('contract-violations.ts', parserOptions)).toEqual([
-            'coerceReference',
-            'jsdocTagReference',
-            'duplicateDeprecatedReference',
-            'coerceReference',
-        ]);
+        expect(await messageIdsFor('contract-violations.ts', parserOptions)).toEqual(['coerceReference', 'coerceReference']);
     });
 
     it('leaves a clean referenced schema alone', async () => {
@@ -53,6 +48,6 @@ describe.each([
     });
 
     it('uses the direct variant on Kizuna.model fields', async () => {
-        expect(await messageIdsFor('contract-model.ts', parserOptions)).toEqual(['coerce', 'jsdocTag', 'duplicateDeprecated']);
+        expect(await messageIdsFor('contract-model.ts', parserOptions)).toEqual(['coerce']);
     });
 });

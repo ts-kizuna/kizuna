@@ -1,15 +1,9 @@
-import * as path from 'node:path';
-import * as os from 'node:os';
-import * as fs from 'node:fs';
-import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
-import { contractFingerprint } from '@ts-kizuna/core/generator';
-import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateOpenApi, renderOpenApi } from './generator.js';
 import type { GenerateOpenApiOptions } from './types.js';
-import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -293,11 +287,17 @@ describe('Zod meta() in OpenAPI output', () => {
 });
 
 describe('operation metadata passthrough', () => {
-    const annotatedRoutes = k.routes('api', {
+    const kTagged = new Kizuna({
+        tags: Kizuna.tags({
+            api: 'API',
+            users: 'Users',
+        }),
+    });
+    const annotatedRoutes = kTagged.routes('api', {
         getUser: {
             method: 'GET',
             path: '/users/:id',
-            tags: ['api'],
+            tags: ['users'],
             externalDocs: {
                 url: 'https://example.com/docs/getUser',
                 description: 'Reference docs',
@@ -310,7 +310,7 @@ describe('operation metadata passthrough', () => {
         },
     });
 
-    const annotated = k.contract({
+    const annotated = kTagged.contract({
         routes: annotatedRoutes,
     });
 
@@ -320,8 +320,8 @@ describe('operation metadata passthrough', () => {
     });
 
     it('emits route-level tags and externalDocs on the operation', () => {
-        const spec = generateJson(deprecatedContract, baseConfig);
-        const operation = spec.paths['/users/by-id/{id}']?.get;
+        const spec = generateJson(annotated, baseConfig);
+        const operation = spec.paths['/users/{id}']?.get;
         expect(operation?.tags).toEqual(['API', 'Users']);
         expect(operation?.externalDocs).toEqual({
             url: 'https://example.com/docs/getUser',
@@ -339,6 +339,9 @@ describe('operation metadata passthrough', () => {
         expect(spec.tags).toEqual([
             {
                 name: 'API',
+            },
+            {
+                name: 'Users',
             },
         ]);
         expect(spec.externalDocs).toEqual({
@@ -1151,23 +1154,25 @@ describe('automatic validation error response', () => {
     });
 });
 
-describe('deprecation on a component reached via the schemas map', () => {
+describe('deprecation from metadata', () => {
     const UserSchema = Kizuna.model({
-        title: 'User',
+        title: 'DeprecationUser',
         schema: z.object({
             id: z.string(),
-            email: z.string(),
+            email: z.string().meta({
+                deprecated: 'use `email_address`',
+            }),
         }),
     });
     const AccountSchema = Kizuna.model({
-        title: 'Account',
+        title: 'DeprecationAccount',
         schema: z.object({
             owner: z.object({
                 user: UserSchema,
             }),
         }),
     });
-    const contractWithRefRoutes = k.routes('api', {
+    const deprecationRoutes = k.routes('api', {
         getAccount: {
             method: 'GET',
             path: '/account',
@@ -1175,64 +1180,58 @@ describe('deprecation on a component reached via the schemas map', () => {
                 200: AccountSchema,
             },
         },
+        oldRoute: {
+            method: 'GET',
+            path: '/old',
+            deprecated: 'use newRoute instead',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+        inlineField: {
+            method: 'GET',
+            path: '/inline',
+            responses: {
+                200: z.object({
+                    name: z.string().meta({
+                        deprecated: true,
+                    }),
+                    fullName: z.string(),
+                }),
+            },
+        },
     });
 
-    const contractWithRef = k.contract({
-        routes: contractWithRefRoutes,
+    const deprecationContract = k.contract({
+        routes: deprecationRoutes,
     });
+    const spec = generateJson(deprecationContract, baseConfig);
 
-    it('deprecates a field on a component only reachable through the schemas map', () => {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-openapi-ref-'));
-        fs.mkdirSync(path.join(dir, '.kizuna'), { recursive: true });
-        fs.writeFileSync(
-            path.join(dir, '.kizuna', 'deprecations.json'),
-            JSON.stringify({
-                [contractFingerprint(contractWithRef)]: {
-                    routes: {},
-                    fields: {},
-                    schemas: { User: { email: 'use `email_address`' } },
-                },
-            })
-        );
-        const previousCwd = process.cwd();
-        process.chdir(dir);
-        try {
-            const spec = generateJson(contractWithRef, baseConfig);
-            const userSchema = spec.components?.schemas?.User as Record<string, Record<string, Record<string, unknown>>> | undefined;
-            expect(userSchema?.properties?.['email']?.deprecated).toBe(true);
-        } finally {
-            process.chdir(previousCwd);
-            fs.rmSync(dir, { recursive: true, force: true });
-        }
-    });
-});
-
-describe('deprecation from .kizuna', () => {
-    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-openapi-'));
-    const previousCwd = process.cwd();
-
-    beforeAll(() => {
-        writeKizunaDeprecations(
-            [{ contract: deprecatedContract, contractPath: path.resolve(import.meta.dirname, '../../cli/src/deprecation.fixture.ts') }],
-            path.join(workDir, '.kizuna')
-        );
-        process.chdir(workDir);
-    });
-
-    afterAll(() => {
-        process.chdir(previousCwd);
-    });
-
-    it('marks a deprecated field on its component schema', () => {
-        const spec = generateJson(deprecatedContract, baseConfig);
-        const userSchema = spec.components?.schemas?.User as Record<string, unknown> | undefined;
-        const properties = (userSchema?.properties ?? {}) as Record<string, Record<string, unknown>>;
-        expect(properties['email']?.deprecated).toBe(true);
+    it('marks a deprecated field on its component schema, normalising a string message to true', () => {
+        const userSchema = spec.components?.schemas?.DeprecationUser as Record<string, Record<string, Record<string, unknown>>> | undefined;
+        expect(userSchema?.properties?.['email']?.deprecated).toBe(true);
     });
 
     it('marks a deprecated route operation', () => {
-        const spec = generateJson(deprecatedContract, baseConfig);
-        expect(spec.paths['/users/by-id/{id}']?.get?.deprecated).toBe(true);
+        expect(spec.paths['/old']?.get?.deprecated).toBe(true);
+    });
+
+    it('leaves non-deprecated routes unmarked', () => {
+        expect(spec.paths['/account']?.get?.deprecated).toBeUndefined();
+    });
+
+    it('marks a deprecated inline response field and leaves its siblings unmarked', () => {
+        const responseSchema = spec.paths['/inline']?.get?.responses['200']?.content?.['application/json']?.schema as
+            | Record<string, Record<string, Record<string, unknown>>>
+            | undefined;
+        expect(responseSchema?.properties?.['name']?.deprecated).toBe(true);
+        expect(responseSchema?.properties?.['fullName']?.deprecated).toBeUndefined();
+    });
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
     });
 });
 
@@ -1282,28 +1281,35 @@ describe('error response media type (RFC 9457)', () => {
     });
 
     it('still applies field-level deprecation to an error response under application/problem+json', () => {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-openapi-err-'));
-        fs.mkdirSync(path.join(dir, '.kizuna'), { recursive: true });
-        fs.writeFileSync(
-            path.join(dir, '.kizuna', 'deprecations.json'),
-            JSON.stringify({
-                [contractFingerprint(contractWithErrors)]: {
-                    routes: {},
-                    fields: { getUser: { 'responses.404.detail': '' } },
+        const errorFieldRoutes = k.routes('api', {
+            getUser: {
+                method: 'GET',
+                path: '/users/{id}',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                    404: z.object({
+                        type: z.string(),
+                        title: z.string(),
+                        status: z.number().int(),
+                        detail: z.string().meta({
+                            deprecated: true,
+                        }),
+                    }),
                 },
-            })
+            },
+        });
+        const deprecatedSpec = generateJson(
+            k.contract({
+                routes: errorFieldRoutes,
+            }),
+            baseConfig
         );
-        const previousCwd = process.cwd();
-        process.chdir(dir);
-        try {
-            const deprecatedSpec = generateJson(contractWithErrors, baseConfig);
-            const errorSchema = deprecatedSpec.paths['/users/{id}']?.get?.responses?.['404']?.content?.['application/problem+json']
-                ?.schema as Record<string, Record<string, Record<string, unknown>>> | undefined;
-            expect(errorSchema?.properties?.['detail']?.deprecated).toBe(true);
-        } finally {
-            process.chdir(previousCwd);
-            fs.rmSync(dir, { recursive: true, force: true });
-        }
+        const errorSchema = deprecatedSpec.paths['/users/{id}']?.get?.responses?.['404']?.content?.['application/problem+json']?.schema as
+            | Record<string, Record<string, Record<string, unknown>>>
+            | undefined;
+        expect(errorSchema?.properties?.['detail']?.deprecated).toBe(true);
     });
 });
 

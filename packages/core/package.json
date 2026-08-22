@@ -72,16 +72,6 @@
         "default": "./dist/plugin.cjs"
       }
     },
-    "./load-deprecations": {
-      "import": {
-        "types": "./dist/load-deprecations.d.mts",
-        "default": "./dist/load-deprecations.mjs"
-      },
-      "require": {
-        "types": "./dist/load-deprecations.d.cts",
-        "default": "./dist/load-deprecations.cjs"
-      }
-    },
     "./adapter": {
       "import": {
         "types": "./dist/adapter.d.mts",
@@ -121,8 +111,7 @@
       "./plugin": "client",
       "./generator": "client",
       "./adapter": "server",
-      "./jobs": "server",
-      "./load-deprecations": "server"
+      "./jobs": "server"
     }
   },
   "files": [
@@ -137,7 +126,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/adapter.ts src/jobs-entry.ts src/plugin.ts src/generator.ts src/schemas.ts src/authoring-names.ts src/load-deprecations.ts --format esm,cjs --dts --clean",
+    "build": "tsdown src/index.ts src/adapter.ts src/jobs-entry.ts src/plugin.ts src/generator.ts src/schemas.ts src/authoring-names.ts --format esm,cjs --dts --clean",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {

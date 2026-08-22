@@ -1,12 +1,7 @@
-import * as path from 'node:path';
-import * as os from 'node:os';
-import * as fs from 'node:fs';
-import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
-import { writeKizunaDeprecations } from '../../cli/src/deprecation-parser.js';
 import { generateKotlinClient } from './generator.js';
-import { contract as deprecatedContract } from '../../cli/src/deprecation.fixture.js';
 
 const k = new Kizuna();
 
@@ -683,23 +678,56 @@ describe('Kotlin generator: owned type nesting', () => {
 });
 
 describe('Kotlin generator: @Deprecated', () => {
-    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kizuna-kotlin-'));
-    const previousCwd = process.cwd();
-    const fixturePath = path.resolve(import.meta.dirname, '../../cli/src/deprecation.fixture.ts');
-
-    beforeAll(() => {
-        process.chdir(workDir);
+    const DeprecatedFieldSchema = z.object({
+        id: z.string(),
+        email: z.string().meta({
+            deprecated: true,
+        }),
+    });
+    const deprecationRoutes = k.routes({
+        getUserById: {
+            method: 'GET',
+            path: '/users/by-id/:id',
+            deprecated: true,
+            responses: {
+                200: DeprecatedFieldSchema,
+            },
+        },
+        oldRoute: {
+            method: 'GET',
+            path: '/old',
+            deprecated: 'use newRoute instead',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+        getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: DeprecatedFieldSchema,
+            },
+        },
+        getUserByIdV2: {
+            method: 'GET',
+            path: '/users/v2/:id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                    email: z.string().meta({
+                        deprecated: 'use email_address instead',
+                    }),
+                }),
+            },
+        },
+    });
+    const deprecatedContract = k.contract({
+        routes: deprecationRoutes,
     });
 
-    afterAll(() => {
-        process.chdir(previousCwd);
-    });
-
-    const generate = (routes: Contract['routes']): string => {
-        const contract = { routes } as Contract;
-        writeKizunaDeprecations([{ contract, contractPath: fixturePath }], path.join(workDir, '.kizuna'));
-        return generateKotlinClient(contract, baseConfig);
-    };
+    const generate = (routes: Contract['routes']): string => generateKotlinClient({ routes } as Contract, baseConfig);
 
     it('emits @Deprecated on a deprecated route method', () => {
         const output = generate({ getUserById: deprecatedContract.routes.getUserById });

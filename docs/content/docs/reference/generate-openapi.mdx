@@ -22,7 +22,7 @@ generateOpenApi(contract: Contract, overrides?: Partial<GenerateOpenApiOptions>)
 | `contract`  | `Contract`                        | The contract from [`k.contract`](/docs/reference/k-contract)    |
 | `overrides` | `Partial<GenerateOpenApiOptions>` | Merged over the contract's options, for what only a build knows |
 
-It lives on `@ts-kizuna/openapi/server` because it reads your deprecations file from disk. The contract-facing entry, `@ts-kizuna/openapi`, holds [`openApiPlugin`](/docs/reference/openapi-plugin) and the document types.
+It lives on `@ts-kizuna/openapi/server`, beside the plugin server. The contract-facing entry, `@ts-kizuna/openapi`, holds [`openApiPlugin`](/docs/reference/openapi-plugin) and the document types.
 
 ## Options
 

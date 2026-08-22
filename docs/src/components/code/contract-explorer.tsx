@@ -257,12 +257,13 @@ Content-Type: application/problem+json
         file: 'routes.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
-        code: `/** @deprecated */
-deleteUser: { ... }
-
-// → editor strikethrough
+        code: `deleteUser: {
+    deprecated: true,
+    ...
+}
 // → OpenAPI deprecated: true
-// → Swift @available · Kotlin @Deprecated`,
+// → Swift @available
+// → Kotlin @Deprecated`,
     },
 ];
 
