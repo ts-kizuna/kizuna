@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/swift",
-  "version": "1.54.0",
+  "version": "1.55.0",
   "description": "Swift client generation for ts-kizuna contracts",
   "keywords": [
     "ts-kizuna",
