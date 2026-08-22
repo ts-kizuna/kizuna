@@ -340,36 +340,38 @@ export function HandlerExplorer({ className }: { className?: string }) {
                 ))}
             </div>
 
-            <CodeWindow
-                lang="ts"
-                code={feature.code}
-                dots
-                title={feature.file}
-                icon={<TsLogo key="ts" className={styles.brandIcon} />}
-                options={{
-                    themes: {
-                        light: 'github-light',
-                        dark: 'github-dark',
-                    },
-                    transformers: [TRANSFORMERS.get(feature.id)!],
-                }}
-            />
-
-            <div className={styles.types}>
+            <div className={styles.card}>
                 <CodeWindow
                     lang="ts"
-                    code={feature.type}
-                    size="small"
+                    code={feature.code}
+                    dots
+                    title={feature.file}
+                    icon={<TsLogo key="ts" className={styles.brandIcon} />}
                     options={{
                         themes: {
                             light: 'github-light',
                             dark: 'github-dark',
                         },
+                        transformers: [TRANSFORMERS.get(feature.id)!],
                     }}
                 />
-            </div>
 
-            <p className={styles.note}>{feature.note}</p>
+                <div className={styles.types}>
+                    <CodeWindow
+                        lang="ts"
+                        code={feature.type}
+                        size="small"
+                        options={{
+                            themes: {
+                                light: 'github-light',
+                                dark: 'github-dark',
+                            },
+                        }}
+                    />
+                </div>
+
+                <p className={styles.note}>{feature.note}</p>
+            </div>
         </div>
     );
 }

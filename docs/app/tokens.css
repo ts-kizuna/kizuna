@@ -13,6 +13,8 @@
     --kizuna-head-gap: 22px;
     --kizuna-footer-gap: 32px;
 
+    --kizuna-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
     --kizuna-text-ui: 1.0625rem;
     --kizuna-text-button: 1rem;
     --kizuna-text-nav: 1rem;

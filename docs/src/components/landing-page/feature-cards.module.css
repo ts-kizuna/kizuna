@@ -5,8 +5,8 @@
 }
 
 .card {
+    border: var(--kizuna-hairline) solid var(--kizuna-line);
     border-radius: var(--kizuna-radius-card);
-    background-color: var(--kizuna-surface);
     padding: 24px;
 }
 

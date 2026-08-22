@@ -9,6 +9,15 @@
     --handler-toolbar-line: #3a3a3a;
 }
 
+.card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    border: var(--kizuna-hairline) solid var(--kizuna-line);
+    border-radius: var(--kizuna-radius-card);
+    padding: 20px;
+}
+
 .tabs {
     display: flex;
     overflow-x: auto;
