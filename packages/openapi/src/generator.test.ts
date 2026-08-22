@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { generateOpenApi, renderOpenApi } from './generator.js';
 import type { GenerateOpenApiOptions } from './types.js';
 
@@ -1228,6 +1229,89 @@ describe('deprecation from metadata', () => {
             | undefined;
         expect(responseSchema?.properties?.['name']?.deprecated).toBe(true);
         expect(responseSchema?.properties?.['fullName']?.deprecated).toBeUndefined();
+    });
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+});
+
+describe('deprecation and sunset headers', () => {
+    const headerRoutes = k.routes('api', {
+        deleteUser: {
+            method: 'DELETE',
+            path: '/users/:id',
+            deprecated: {
+                message: 'use archiveUser instead',
+                date: '2026-03-01T00:00:00Z',
+                link: 'https://example.com/changelog/delete-user',
+            },
+            sunset: {
+                date: '2027-01-01T00:00:00Z',
+                link: 'https://example.com/retirement-policy',
+            },
+            query: z.object({
+                force: z.boolean().default(false),
+            }),
+            responses: {
+                200: z.object({
+                    success: z.boolean(),
+                }),
+                404: ProblemDetailsSchema,
+            },
+        },
+        exportReport: {
+            method: 'GET',
+            path: '/report',
+            sunset: '2027-01-01T00:00:00Z',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+    });
+
+    const headerContract = k.contract({
+        routes: headerRoutes,
+    });
+    const spec = generateJson(headerContract, baseConfig);
+
+    it('marks the object form deprecated operation', () => {
+        expect(spec.paths['/users/{id}']?.delete?.deprecated).toBe(true);
+    });
+
+    it('documents the Deprecation, Sunset, and Link headers on every response', () => {
+        const responses = spec.paths['/users/{id}']?.delete?.responses ?? {};
+        expect(Object.keys(responses).sort()).toEqual(['200', '400', '404']);
+        for (const response of Object.values(responses)) {
+            expect(Object.keys(response.headers ?? {})).toEqual(['Deprecation', 'Sunset', 'Link']);
+        }
+    });
+
+    it('documents only the Sunset header on a route with a bare sunset', () => {
+        const response = spec.paths['/report']?.get?.responses['200'];
+        expect(Object.keys(response?.headers ?? {})).toEqual(['Sunset']);
+    });
+
+    it('documents no headers on a route with neither', () => {
+        const plain = generateJson(
+            k.contract({
+                routes: k.routes('api', {
+                    getUser: {
+                        method: 'GET',
+                        path: '/users/:id',
+                        responses: {
+                            200: z.object({
+                                id: z.string(),
+                            }),
+                        },
+                    },
+                }),
+            }),
+            baseConfig
+        );
+        expect(plain.paths['/users/{id}']?.get?.responses['200']?.headers).toBeUndefined();
     });
 
     it('is a valid OpenAPI 3.1 document', async () => {

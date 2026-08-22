@@ -63,6 +63,8 @@ export const usersRoutes = k.routes('users', {
 | `description`  | No       | Longer description shown in OpenAPI                                                            |
 | `externalDocs` | No       | `{ url, description? }`, emitted on the operation                                              |
 | `tags`         | No       | OpenAPI tag keys (from the tag set), resolved to titles in the spec                            |
+| `deprecated`   | No       | `boolean \| string \| { message?, date?, link? }`, see [Deprecations](/docs/deprecations)      |
+| `sunset`       | No       | `string \| { date, link? }`, see [Deprecations](/docs/deprecations)                            |
 
 Use the `{ body, headers?, contentType? }` form of a response to declare [typed response headers](/docs/building/contract#response-schemas) or a [binary body](/docs/reference/binary-and-file-schemas).
 

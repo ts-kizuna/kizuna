@@ -1368,7 +1368,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
     }
 
     /** Delete a user */
-    @Deprecated("Deprecated")
+    @Deprecated("use `archiveUser` instead")
     @Throws(OpenEnumAPIClient.UsersDeleteUser.Failure::class)
     suspend fun deleteUser(build: OpenEnumAPIClient.UsersDeleteUser.Scope.() -> OpenEnumAPIClient.UsersDeleteUser.Args): OpenEnumAPIClient.UsersDeleteUser.Result {
         val args = OpenEnumAPIClient.UsersDeleteUser.Scope.build()

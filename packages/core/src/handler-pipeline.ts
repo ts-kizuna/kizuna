@@ -1,5 +1,13 @@
 import type { z } from 'zod';
-import { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand, type RouteDefinition, type Routes, type Method } from './types.js';
+import {
+    ROUTES_TAG,
+    HANDLER_CONTEXT_BRAND,
+    type HandlerContextBrand,
+    type ResponseHeaders,
+    type RouteDefinition,
+    type Routes,
+    type Method,
+} from './types.js';
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { IdentityAccess } from './identity.js';
@@ -43,7 +51,7 @@ export type HandlerReturn<R extends Pick<RouteDefinition, 'responses'>> = {
     [Status in keyof R['responses']]: {
         status: Status extends number ? Status : never;
         body: HandlerBody<R['responses'][Status], Status>;
-        headers?: Record<string, string>;
+        headers?: ResponseHeaders;
     };
 }[keyof R['responses']];
 

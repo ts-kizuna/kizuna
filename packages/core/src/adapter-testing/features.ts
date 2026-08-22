@@ -87,6 +87,15 @@ export const ADAPTER_FEATURES = {
     'responses.validation': {
         summary: 'With `responseValidation` on, a body the contract disallows fails as a 500.',
     },
+    'deprecation.deprecationHeader': {
+        summary: 'A route with a deprecation date announces it in `Deprecation`, with its documentation link in `Link`.',
+    },
+    'deprecation.sunsetHeader': {
+        summary: 'A route with a sunset timestamp announces it as an HTTP date in `Sunset`, with its retirement link in `Link`.',
+    },
+    'deprecation.errorResponses': {
+        summary: 'Deprecation and sunset headers ride on error responses from the route too.',
+    },
     'plugins.routesServed': {
         summary: 'A plugin route is served by `api.mount`, in the same pipeline as the contract’s own.',
     },

@@ -7,12 +7,14 @@ ts-kizuna is spec-driven. It follows these specifications as closely as it can.
 
 ## HTTP
 
-| Standard                                                           | What it governs                                                                                                    |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) HTTP Semantics  | Methods, status codes, headers, content negotiation, and which methods are safe and idempotent                     |
-| [RFC 5789](https://www.rfc-editor.org/rfc/rfc5789) PATCH Method    | The `PATCH` method, which RFC 9110 does not define, and its unsafe and non-idempotent semantics                    |
-| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details | The body of every error response, as `type`, `title`, `status`, `detail`, and `instance`                           |
-| [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) URI Syntax      | Percent-encoding of path parameters, and exact path matching, so `/users/1` and `/users/1/` are distinct resources |
+| Standard                                                              | What it governs                                                                                                                                    |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) HTTP Semantics     | Methods, status codes, headers, content negotiation, and which methods are safe and idempotent                                                     |
+| [RFC 5789](https://www.rfc-editor.org/rfc/rfc5789) PATCH Method       | The `PATCH` method, which RFC 9110 does not define, and its unsafe and non-idempotent semantics                                                    |
+| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details    | The body of every error response, as `type`, `title`, `status`, `detail`, and `instance`                                                           |
+| [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) URI Syntax         | Percent-encoding of path parameters, and exact path matching, so `/users/1` and `/users/1/` are distinct resources                                 |
+| [RFC 8594](https://www.rfc-editor.org/rfc/rfc8594) Sunset Header      | The `Sunset` response header and the `sunset` link relation, announcing when a route will be removed and where its retirement policy lives         |
+| [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745) Deprecation Header | The `Deprecation` response header and the `deprecation` link relation, carrying the date a route became deprecated and a link to its documentation |
 
 ## OpenAPI
 

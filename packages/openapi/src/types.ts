@@ -26,6 +26,14 @@ export interface OpenApiParameter {
 
 export interface OpenApiResponseObject {
     description: string;
+    headers?: Record<
+        string,
+        {
+            description?: string;
+            required?: boolean;
+            schema: Record<string, unknown>;
+        }
+    >;
     content?: Record<string, { schema: Record<string, unknown> }>;
 }
 

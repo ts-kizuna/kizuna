@@ -203,7 +203,12 @@ export const usersRoutes = k.routes('users', {
     deleteUser: {
         method: 'DELETE',
         path: '/users/:id',
-        deprecated: true,
+        deprecated: {
+            message: 'use `archiveUser` instead',
+            date: '2026-03-01',
+            link: 'https://example.com/changelog/delete-user',
+        },
+        sunset: '2027-01-01',
         responses: {
             200: z.object({
                 success: z.boolean(),

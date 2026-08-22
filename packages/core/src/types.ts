@@ -81,6 +81,11 @@ export type AccessGate = Record<string, Record<string, unknown>>;
  */
 export type RoutePath = `/${string}`;
 
+/**
+ * Response headers keyed by name.
+ */
+export type ResponseHeaders = Record<string, string>;
+
 export interface RouteDefinition<TagKeys extends string = string, SchemeNames extends string = string> {
     method: Method;
     /**
@@ -92,9 +97,62 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
     summary?: string;
     description?: string;
     /**
-     * Deprecates the route. Pass a message to tell callers what to use instead.
+     * Deprecates the route. Pass a message to tell callers what to use instead,
+     * or the object form to announce the deprecation in response headers.
      */
-    deprecated?: boolean | string;
+    deprecated?:
+        | boolean
+        | string
+        | {
+              message?: string;
+              /**
+               * When the route became deprecated, ISO 8601.
+               * A date alone means midnight UTC. Sent in the `Deprecation` header.
+               *
+               * @example
+               * '2026-03-01'
+               *
+               * @example
+               * '2026-03-01T12:00:00Z'
+               */
+              date?: string;
+              /**
+               * Documentation about the deprecation. Sent in the `Link` header.
+               *
+               * @example
+               * 'https://example.com/changelog/delete-user'
+               */
+              link?: string;
+          };
+    /**
+     * When the route will be removed, ISO 8601.
+     * A date alone means midnight UTC. Sent in the `Sunset` header.
+     *
+     * @example
+     * '2027-01-01'
+     *
+     * @example
+     * '2027-01-01T12:00:00Z'
+     */
+    sunset?:
+        | string
+        | {
+              /**
+               * @example
+               * '2027-01-01'
+               *
+               * @example
+               * '2027-01-01T12:00:00Z'
+               */
+              date: string;
+              /**
+               * The retirement policy. Sent in the `Link` header.
+               *
+               * @example
+               * 'https://example.com/retirement-policy'
+               */
+              link?: string;
+          };
     /**
      * Tag keys grouping this route in the OpenAPI spec. Keys come from the tag set
      * declared with `Kizuna.tags`; `k.routes` stamps the group's tag onto every

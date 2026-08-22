@@ -72,7 +72,7 @@ export const features: Feature[] = [
     },
     {
         icons: [TriangleAlert],
-        title: 'Deprecation support',
-        description: 'Deprecate endpoints and fields, and OpenAPI, Swift, and Kotlin all pick it up.',
+        title: 'Deprecation and sunset support',
+        description: 'Deprecate routes and fields, and it shows up in OpenAPI, Swift, Kotlin, and the response headers.',
     },
 ];
