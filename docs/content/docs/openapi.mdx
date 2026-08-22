@@ -140,7 +140,7 @@ spec('yaml'); // YAML string
 
 ## Deprecation
 
-Routes with `deprecated` and fields with `.meta({ deprecated: ... })` get `deprecated: true` in the generated spec, with no extra options here. See [Deprecations](/docs/deprecations).
+Routes with `deprecated` and fields with `.meta({ deprecated: ... })` get `deprecated: true` in the generated spec, with no extra options here. Routes with a deprecation `date` or a `sunset` get the `Deprecation`, `Sunset`, and `Link` headers they send documented on every response. See [Deprecations](/docs/deprecations).
 
 ## Options
 

@@ -351,7 +351,7 @@ getUser: {
 },
 ```
 
-The OpenAPI spec and the Swift and Kotlin clients pick both up. See [Deprecations](/docs/deprecations).
+The OpenAPI spec and the Swift and Kotlin clients pick both up. A route also takes a deprecation `date` and a `sunset` timestamp, both RFC 3339, and every response from it then announces them in the `Deprecation` and `Sunset` headers. See [Deprecations](/docs/deprecations).
 
 ### Exporting types
 

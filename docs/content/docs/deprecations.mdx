@@ -1,16 +1,39 @@
 ---
 title: Deprecations
-description: Declare deprecations on the contract and have them reach OpenAPI, Swift, and Kotlin.
+description: Declare deprecations and sunset dates on the contract and have them reach OpenAPI, Swift, Kotlin, and the Deprecation and Sunset response headers.
 ---
-
-| Where  | Declaration                  | Type                |
-| ------ | ---------------------------- | ------------------- |
-| Routes | `deprecated` on the route    | `boolean \| string` |
-| Fields | `.meta({ deprecated: ... })` | `boolean \| string` |
 
 ## Routes
 
-Set `deprecated` on the route, either `true` or a migration message:
+| Declaration               | Type                                              |
+| ------------------------- | ------------------------------------------------- |
+| `deprecated` on the route | `boolean \| string \| { message?, date?, link? }` |
+| `sunset` on the route     | `string \| { date, link? }`                       |
+
+Set `deprecated` on the route, either `true`, a migration message, or the object form, which adds the date the route became deprecated and a link to documentation about it:
+
+<Tabs groupId="route-deprecated" items={['Boolean', 'Message', 'Message, date, and link']}>
+
+<Tab value="Boolean">
+
+```ts title="contract/index.ts"
+export const usersRoutes = k.routes('users', {
+    deleteUser: {
+        method: 'DELETE',
+        path: '/users/:id',
+        deprecated: true,
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+```
+
+</Tab>
+
+<Tab value="Message">
 
 ```ts title="contract/index.ts"
 export const usersRoutes = k.routes('users', {
@@ -27,7 +50,107 @@ export const usersRoutes = k.routes('users', {
 });
 ```
 
+</Tab>
+
+<Tab value="Message, date, and link">
+
+```ts title="contract/index.ts"
+export const usersRoutes = k.routes('users', {
+    deleteUser: {
+        method: 'DELETE',
+        path: '/users/:id',
+        deprecated: {
+            message: 'use archiveUser instead',
+            date: '2026-03-01T00:00:00Z',
+            link: 'https://example.com/changelog/delete-user',
+        },
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+```
+
+</Tab>
+
+</Tabs>
+
+With a `date`, every response from the route carries a `Deprecation` header per [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745), and the `link` rides in a `Link` header with the `deprecation` relation:
+
+```
+Deprecation: @1772323200
+Link: <https://example.com/changelog/delete-user>; rel="deprecation"
+```
+
+The date may sit in the future, announcing a deprecation before it takes effect.
+
+### Sunset
+
+A route that is scheduled to be removed declares when, as an RFC 3339 timestamp. The object form adds a link to the retirement policy:
+
+<Tabs groupId="route-sunset" items={['Timestamp', 'Timestamp and link']}>
+
+<Tab value="Timestamp">
+
+```ts title="contract/index.ts"
+export const usersRoutes = k.routes('users', {
+    deleteUser: {
+        method: 'DELETE',
+        path: '/users/:id',
+        deprecated: 'use archiveUser instead',
+        sunset: '2027-01-01T00:00:00Z',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+```
+
+</Tab>
+
+<Tab value="Timestamp and link">
+
+```ts title="contract/index.ts"
+export const usersRoutes = k.routes('users', {
+    deleteUser: {
+        method: 'DELETE',
+        path: '/users/:id',
+        deprecated: 'use archiveUser instead',
+        sunset: {
+            date: '2027-01-01T00:00:00Z',
+            link: 'https://example.com/retirement-policy',
+        },
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+```
+
+</Tab>
+
+</Tabs>
+
+Every response from the route then carries a `Sunset` header per [RFC 8594](https://www.rfc-editor.org/rfc/rfc8594), with the timestamp formatted as an HTTP date, and the `link` in a `Link` header with the `sunset` relation:
+
+```
+Sunset: Fri, 01 Jan 2027 00:00:00 GMT
+Link: <https://example.com/retirement-policy>; rel="sunset"
+```
+
+`sunset` stands on its own. A route serving a time-limited resource can sunset without being deprecated, and a deprecated route with no removal date declares no `sunset`. `k.contract` rejects a `sunset` or `deprecated.date` that does not parse as an RFC 3339 timestamp.
+
 ## Fields
+
+| Declaration                  | Type                |
+| ---------------------------- | ------------------- |
+| `.meta({ deprecated: ... })` | `boolean \| string` |
 
 Fields declare it in their [Zod metadata](https://zod.dev/metadata), with the same `true | string` shape:
 
@@ -45,4 +168,7 @@ const UserSchema = z.object({
 
 ## What each output emits
 
-OpenAPI marks the operation and the field's schema with `deprecated: true` (the spec has no message field). Swift emits `@available(*, deprecated, message: "use email_address instead")` and Kotlin `@Deprecated("use email_address instead")`, so the message reaches autocomplete and compiler warnings in both mobile clients.
+- OpenAPI marks the operation and the field's schema with `deprecated: true` (the spec has no message field), and documents the `Deprecation`, `Sunset`, and `Link` headers on every response of a route that sends them.
+- Swift emits `@available(*, deprecated, message: "use email_address instead")`, so the message reaches autocomplete and compiler warnings.
+- Kotlin emits `@Deprecated("use email_address instead")`, reaching the same places.
+- The headers themselves are sent by the server, so every client sees them at runtime.
