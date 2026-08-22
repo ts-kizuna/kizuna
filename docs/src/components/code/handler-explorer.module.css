@@ -1,74 +1,78 @@
-.root {
-    --handler-surface: var(--kizuna-surface, #f4f4f4);
-    --handler-toolbar-line: #d8d8d8;
-    --handler-muted: var(--color-fd-muted-foreground);
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
 }
 
-:global(.dark) .root {
-    --handler-surface: var(--kizuna-surface, #1c1c1c);
-    --handler-toolbar-line: #3a3a3a;
-}
-
-.card {
+.panel {
     display: flex;
     min-width: 0;
     flex-direction: column;
     border: var(--kizuna-hairline) solid var(--kizuna-line);
     border-radius: var(--kizuna-radius-card);
-    padding: 20px;
+    padding: 26px;
 }
 
-.tabs {
+.visual {
+    position: relative;
+    height: 250px;
+    margin-bottom: 22px;
+}
+
+.crop {
+    position: absolute;
+    inset: 0;
     display: flex;
-    overflow-x: auto;
-    gap: 4px;
-    padding-bottom: 20px;
+    overflow: hidden;
+    border-radius: 10px;
+    mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
 }
 
-.tab {
+.zoom {
+    display: flex;
+    width: 87%;
     flex-shrink: 0;
-    border: 0;
-    border-radius: 999px;
-    background: none;
-    padding: 6px 12px;
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 12.5px;
-    color: var(--handler-muted);
-    cursor: pointer;
+    transform: scale(1.15);
+    transform-origin: top left;
 }
 
-.tabActive {
-    background-color: var(--handler-surface);
-    color: var(--color-fd-foreground);
+.hoverCard {
+    position: absolute;
+    right: 12px;
+    bottom: 24px;
+    z-index: 1;
+    display: flex;
+    width: min(280px, 66%);
+    overflow: hidden;
+    transform: scale(1.15);
+    transform-origin: bottom right;
+    border: var(--kizuna-hairline) solid var(--kizuna-line-strong);
+    border-radius: 10px;
+    background-color: var(--kizuna-canvas);
+    box-shadow: 0 14px 36px rgb(0 0 0 / 20%);
 }
 
-.types {
-    min-width: 0;
-    margin-top: 12px;
+.title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: var(--font-weight-600);
+    letter-spacing: -0.015em;
+    color: var(--kizuna-ink);
 }
 
-.note {
-    margin: 14px 0 0;
+.text {
+    margin: 8px 0 0;
     font-size: 0.9375rem;
     line-height: 1.55;
-    color: var(--handler-muted);
-}
-
-.brandIcon {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
+    color: var(--kizuna-muted);
 }
 
 @media (max-width: 767px) {
-    .tabs {
-        margin-inline: calc(var(--kizuna-gutter) * -1);
-        padding-inline: var(--kizuna-gutter);
-        scroll-padding-inline: var(--kizuna-gutter);
-        scrollbar-width: none;
+    .grid {
+        grid-template-columns: 1fr;
     }
 
-    .tabs::-webkit-scrollbar {
-        display: none;
+    .visual {
+        height: 220px;
     }
 }
