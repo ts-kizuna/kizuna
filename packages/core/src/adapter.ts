@@ -1118,7 +1118,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             routeKey,
             route,
             status: handlerResult.status,
-            body: route.method === 'HEAD' ? undefined : handlerResult.body,
+            body: handlerResult.body,
             headers: successHeaders,
         };
     } catch (error) {
@@ -1237,6 +1237,17 @@ const describeBodyType = (body: unknown): string => {
     return `a value of type ${typeof body}`;
 };
 
+const contentEncoder = new TextEncoder();
+
+/**
+ * The bytes the body would occupy on the wire, for a HEAD response's `Content-Length`.
+ */
+const contentByteLength = (body: unknown, raw: boolean | undefined): number => {
+    if (body instanceof Uint8Array) return body.byteLength;
+    if (raw && typeof body === 'string') return contentEncoder.encode(body).length;
+    return contentEncoder.encode(JSON.stringify(body)).length;
+};
+
 /**
  * Maps an `AdapterResult` to `{ status, headers, body }` using ts-kizuna's default
  * JSON conventions (e.g. 405 with an `Allow` header, 400 with `{ detail, errors }`
@@ -1249,11 +1260,34 @@ const describeBodyType = (body: unknown): string => {
  *
  * `raw-response` is excluded, it carries a framework-specific `NativeResponse`
  * the adapter must return directly, so handle that case before calling this.
+ *
+ * Pass `requestMethod` where kizuna's rendering is the last stop before the
+ * wire: a HEAD request then keeps GET's status and headers, gains a
+ * `Content-Length`, and loses the content (RFC 9110 §9.3.2). Leave it
+ * unset where the framework discards HEAD content itself (Express, Fastify, Hono).
  */
 export const renderJsonResult = (
     result: Exclude<AdapterResult, { kind: 'raw-response' }>,
     formatError: ErrorFormatter = defaultErrorFormatter,
-    request: unknown = undefined
+    request: unknown = undefined,
+    requestMethod?: string
+): { status: number; headers: ResponseHeaders; body: unknown; raw?: boolean } => {
+    const rendered = renderResult(result, formatError, request);
+    if (requestMethod !== 'HEAD' || rendered.body === undefined) return rendered;
+    return {
+        status: rendered.status,
+        headers: {
+            ...rendered.headers,
+            'content-length': String(contentByteLength(rendered.body, rendered.raw)),
+        },
+        body: undefined,
+    };
+};
+
+const renderResult = (
+    result: Exclude<AdapterResult, { kind: 'raw-response' }>,
+    formatError: ErrorFormatter,
+    request: unknown
 ): { status: number; headers: ResponseHeaders; body: unknown; raw?: boolean } => {
     const renderError = (
         status: number,

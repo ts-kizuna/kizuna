@@ -268,6 +268,46 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
+        'routing.headViaGet': async () => {
+            await usingMethods(async (methods) => {
+                const get = await methods.request({
+                    method: 'GET',
+                    path: '/items',
+                });
+                const head = await methods.request({
+                    method: 'HEAD',
+                    path: '/items',
+                });
+                // RFC 9110 §9.3.2: same status and headers as GET, no content.
+                expect(head.status).toBe(200);
+                expect(head.text).toBe('');
+                expect(head.headers.get('content-type')).toContain('application/json');
+                expect(head.headers.get('content-length')).toBe(String(new TextEncoder().encode(get.text).length));
+            });
+        },
+
+        'routing.headInAllow': async () => {
+            await usingMethods(async (methods) => {
+                const options = await methods.request({
+                    method: 'OPTIONS',
+                    path: '/items',
+                });
+                expect(options.status).toBe(200);
+                const allow = options.headers.get('allow') ?? '';
+                expect(allow, `Allow: ${allow}`).toContain('GET');
+                expect(allow, `Allow: ${allow}`).toContain('HEAD');
+
+                if (behaviour.methodMismatchStatus === 405) {
+                    const mismatch = await methods.request({
+                        method: 'PATCH',
+                        path: '/items',
+                    });
+                    expect(mismatch.status).toBe(405);
+                    expect(mismatch.headers.get('allow') ?? '').toContain('HEAD');
+                }
+            });
+        },
+
         'routing.optionsAllow': async () => {
             await usingMethods(async (methods) => {
                 const response = await methods.request({

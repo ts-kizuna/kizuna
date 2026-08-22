@@ -572,6 +572,24 @@ export const methodRoutes = k.routes('api', {
             }),
         },
     },
+    listItems: {
+        method: 'GET',
+        path: '/items',
+        responses: {
+            200: z.object({
+                method: z.string(),
+            }),
+        },
+    },
+    optionsItems: {
+        method: 'OPTIONS',
+        path: '/items',
+        responses: {
+            200: z.object({
+                method: z.string(),
+            }),
+        },
+    },
     replaceItem: {
         method: 'PUT',
         path: '/items/:id',
@@ -633,6 +651,8 @@ export const createMethodRouter = <Context>(): Router<typeof methodRoutes, Conte
     return {
         getItem: echo('GET'),
         createItem: echo('POST'),
+        listItems: echo('GET'),
+        optionsItems: echo('OPTIONS'),
         replaceItem: echo('PUT'),
         patchItem: echo('PATCH'),
         deleteItem: echo('DELETE'),

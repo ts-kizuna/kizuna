@@ -186,6 +186,15 @@ type GeneratorContext = GenerateOpenApiOptions & {
     tagLookup?: ReadonlyMap<string, TagOptions>;
 };
 
+const deriveHeadOperation = (getOperation: OpenApiOperation): OpenApiOperation => {
+    const operation = structuredClone(getOperation);
+    delete operation.operationId;
+    for (const response of Object.values(operation.responses)) {
+        delete response.content;
+    }
+    return operation;
+};
+
 const openApiGenerator = createGenerator((options: GeneratorContext, contract: Contract) => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
 
@@ -398,6 +407,13 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
         },
 
         finalize() {
+            if (options.derivedHead) {
+                for (const operations of Object.values(paths)) {
+                    if (!operations['get'] || operations['head']) continue;
+                    operations['head'] = deriveHeadOperation(operations['get']);
+                }
+            }
+
             const document: OpenApiDocument = {
                 openapi: options.openApiVersion ?? '3.1.0',
                 info: options.info,

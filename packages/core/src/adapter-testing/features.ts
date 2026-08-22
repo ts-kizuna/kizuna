@@ -24,6 +24,12 @@ export const ADAPTER_FEATURES = {
     'routing.headStripsBody': {
         summary: 'A declared HEAD route answers with its status but no body.',
     },
+    'routing.headViaGet': {
+        summary: 'A HEAD request to a GET-only path answers with GET’s status and headers but no content.',
+    },
+    'routing.headInAllow': {
+        summary: 'HEAD rides along GET in every `Allow` header kizuna sends.',
+    },
     'routing.optionsAllow': {
         summary: 'A declared OPTIONS route carries an `Allow` header listing every method on the path.',
     },

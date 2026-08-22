@@ -94,6 +94,12 @@ export interface GenerateOpenApiOptions {
     externalDocs?: OpenApiExternalDocs;
     setOperationId?: boolean | 'concatenated-path';
     operationMapper?: (operation: OpenApiOperation, route: RouteDefinition, operationId: string) => OpenApiOperation;
+    /**
+     * Document the derived `head` operation on every `GET` path without a declared one.
+     *
+     * @default false
+     */
+    derivedHead?: boolean;
 }
 
 export interface OpenApiRenderer {

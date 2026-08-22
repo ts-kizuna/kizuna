@@ -113,9 +113,9 @@ describe('Next.js handler', () => {
     it('returns 405 with Allow header on method mismatch', async () => {
         const response = await DELETE(makeRequest('DELETE', '/api/users/123'));
         expect(response.status).toBe(405);
-        expect(response.headers.get('allow')).toBe('GET');
+        expect(response.headers.get('allow')).toBe('GET, HEAD');
         const body = await response.json();
-        expect(body.allowed).toEqual(['GET']);
+        expect(body.allowed).toEqual(['GET', 'HEAD']);
     });
 
     it('routes onError hook overrides the default 500', async () => {

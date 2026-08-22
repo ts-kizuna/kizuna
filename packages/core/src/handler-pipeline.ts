@@ -425,5 +425,7 @@ export const allowedMethodsForPath = (routes: Routes, path: string): Method[] =>
     for (const { route } of flattenRoutes(routes)) {
         if (route.path === path) methods.add(route.method);
     }
+    // A GET path serves HEAD too (RFC 9110 §9.3.2).
+    if (methods.has('GET')) methods.add('HEAD');
     return Array.from(methods);
 };

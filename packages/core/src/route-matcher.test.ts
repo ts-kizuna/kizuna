@@ -140,16 +140,70 @@ describe('matchRoute', () => {
         expect(matched(matchRoute('GET', '/users/123', routes)).routeKey).toBe('getUser');
     });
 
-    it('returns method-mismatch for the wrong method', () => {
+    it('returns method-mismatch for the wrong method, allowing HEAD alongside GET', () => {
         const result = matchRoute('DELETE', '/users/123', routes);
         expect(result.kind).toBe('method-mismatch');
         if (result.kind === 'method-mismatch') {
-            expect(result.allowed).toEqual(['GET']);
+            expect(result.allowed).toEqual(['GET', 'HEAD']);
         }
     });
 
     it('returns not-found for an unknown path', () => {
         expect(matchRoute('GET', '/unknown/path', routes).kind).toBe('not-found');
+    });
+
+    it('serves HEAD from the GET route when no HEAD route is declared', () => {
+        const match = matched(matchRoute('HEAD', '/users/123', routes));
+        expect(match.routeKey).toBe('getUser');
+        expect(match.params).toEqual({
+            id: '123',
+        });
+    });
+
+    it('prefers a declared HEAD route over the GET fallback', () => {
+        const withHead = k.routes('api', {
+            getReport: {
+                method: 'GET',
+                path: '/report',
+                responses: {
+                    200: z.object({
+                        rows: z.number(),
+                    }),
+                },
+            },
+            headReport: {
+                method: 'HEAD',
+                path: '/report',
+                responses: {
+                    200: z.object({
+                        rows: z.number(),
+                    }),
+                },
+            },
+        });
+        expect(matched(matchRoute('HEAD', '/report', withHead)).routeKey).toBe('headReport');
+    });
+
+    it('does not allow HEAD on a path without GET', () => {
+        const postOnly = k.routes('api', {
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+        });
+        const mismatch = matchRoute('HEAD', '/users', postOnly);
+        expect(mismatch.kind).toBe('method-mismatch');
+        if (mismatch.kind === 'method-mismatch') {
+            expect(mismatch.allowed).toEqual(['POST']);
+        }
     });
 
     it('strips basePath before matching', () => {

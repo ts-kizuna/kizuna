@@ -1082,6 +1082,62 @@ describe('OpenAPI generator: HEAD method', () => {
         expect(headOp?.responses?.['404']?.content).toBeUndefined();
     });
 
+    it('does not document derived HEAD by default', () => {
+        const spec = generateJson(contract, baseConfig);
+        expect(spec.paths['/users/{id}']?.head).toBeUndefined();
+        expect(spec.paths['/users']?.head).toBeUndefined();
+    });
+
+    it('derivedHead documents a head operation on every GET path without a declared one', () => {
+        const spec = generateJson(contract, {
+            ...baseConfig,
+            setOperationId: true,
+            derivedHead: true,
+        });
+        const headOp = spec.paths['/users/{id}']?.head;
+        expect(headOp).toBeDefined();
+        expect(headOp?.summary).toBe('Get a user');
+        expect(headOp?.parameters).toEqual(spec.paths['/users/{id}']?.get?.parameters);
+        expect(headOp?.operationId).toBeUndefined();
+        expect(headOp?.responses?.['200']?.content).toBeUndefined();
+        expect(headOp?.responses?.['404']?.content).toBeUndefined();
+        expect(spec.paths['/users/{id}']?.get?.responses?.['200']?.content).toBeDefined();
+    });
+
+    it('derivedHead leaves a declared HEAD route alone', () => {
+        const contractRoutes = k.routes('api', {
+            getReport: {
+                method: 'GET',
+                path: '/report',
+                responses: {
+                    200: z.object({
+                        rows: z.number(),
+                    }),
+                },
+            },
+            checkReport: {
+                method: 'HEAD',
+                path: '/report',
+                summary: 'Check the report',
+                responses: {
+                    204: z.void(),
+                },
+            },
+        });
+
+        const contract = k.contract({
+            routes: contractRoutes,
+        });
+        const spec = generateJson(contract, {
+            ...baseConfig,
+            derivedHead: true,
+        });
+        const headOp = spec.paths['/report']?.head;
+        expect(headOp?.summary).toBe('Check the report');
+        expect(headOp?.responses?.['204']).toBeDefined();
+        expect(headOp?.responses?.['200']).toBeUndefined();
+    });
+
     it('OPTIONS routes emit response content normally', () => {
         const contractRoutes = k.routes('api', {
             describeUsers: {

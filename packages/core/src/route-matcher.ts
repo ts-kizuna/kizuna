@@ -85,32 +85,48 @@ export const sortFlattenedRoutes = <T extends { route: RouteDefinition }>(routes
     return parsed.map((p) => p.entry);
 };
 
+const toMatch = (candidate: CompiledRoute, result: RegExpExecArray): MatchResult => {
+    const params: Record<string, string> = {};
+    candidate.paramNames.forEach((name, index) => {
+        const captured = result[index + 1];
+        if (captured !== undefined) params[name] = decodeURIComponent(captured);
+    });
+    return {
+        kind: 'matched',
+        match: {
+            routeKey: candidate.routeKey,
+            route: candidate.route,
+            params,
+        },
+    };
+};
+
 export const matchRoute = (method: string, pathname: string, routes: Routes, basePath?: string): MatchResult => {
     const target = stripBasePath(pathname, basePath);
     const compiled = getCompiled(routes);
     const allowed = new Set<Method>();
+    // The GET route serves HEAD unless a HEAD route claims the path (RFC 9110 §9.3.2).
+    let getFallback: { candidate: CompiledRoute; result: RegExpExecArray } | undefined;
     for (const candidate of compiled) {
         const result = candidate.pattern.exec(target);
         if (!result) continue;
         if (candidate.route.method !== method) {
+            if (method === 'HEAD' && candidate.route.method === 'GET' && getFallback === undefined) {
+                getFallback = {
+                    candidate,
+                    result,
+                };
+            }
             allowed.add(candidate.route.method);
             continue;
         }
-        const params: Record<string, string> = {};
-        candidate.paramNames.forEach((name, index) => {
-            const captured = result[index + 1];
-            if (captured !== undefined) params[name] = decodeURIComponent(captured);
-        });
-        return {
-            kind: 'matched',
-            match: {
-                routeKey: candidate.routeKey,
-                route: candidate.route,
-                params,
-            },
-        };
+        return toMatch(candidate, result);
+    }
+    if (getFallback) {
+        return toMatch(getFallback.candidate, getFallback.result);
     }
     if (allowed.size > 0) {
+        if (allowed.has('GET')) allowed.add('HEAD');
         return {
             kind: 'method-mismatch',
             allowed: Array.from(allowed),
