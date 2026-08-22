@@ -9,4 +9,11 @@
     line-height: 1.6;
     text-transform: uppercase;
     vertical-align: middle;
+    white-space: nowrap;
+}
+
+/* -- For inline badges in text -- */
+p > .badge {
+    margin-inline-start: 6px;
+    transform: translateY(-2px);
 }

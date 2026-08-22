@@ -3,6 +3,12 @@ title: mcpPlugin
 description: Install an MCP (Model Context Protocol) endpoint so AI assistants can call your API as tools.
 ---
 
+<BetaNotice>
+
+MCP support is new and still settling. The plugin options and the generated tool surface may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
 Serve an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint as part of your API. Declare it on [`k.contract`](/docs/reference/k-contract), pass `mcpPluginServer()` to [`server.api`](/docs/reference/server-api), and `api.mount` serves it, on every adapter.
 
 <InstallTabs packageName="@ts-kizuna/mcp" />

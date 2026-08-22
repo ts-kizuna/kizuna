@@ -3,6 +3,12 @@ title: Kizuna.identity
 description: Define who can call your API with an OpenAPI security scheme, the context a passing guard provides, and the access fields routes may constrain.
 ---
 
+<BetaNotice>
+
+Authentication is still settling. `Kizuna.identity` may change before v2, so pin your version if you depend on it.
+
+</BetaNotice>
+
 An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/server-guard) provides to handlers), and an optional `access` schema (the fields the [`auth` map](/docs/reference/k-contract#the-auth-map) may constrain per route). See the [Authentication guide](/docs/authentication) for the full walkthrough.
 
 <InstallTabs packageName="@ts-kizuna/core" />

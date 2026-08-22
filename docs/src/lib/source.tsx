@@ -10,10 +10,22 @@ const badges: Record<string, string> = {
     '/docs/authentication': 'Beta',
     '/docs/jobs': 'Beta',
     '/docs/mcp': 'Beta',
+    '/docs/extend/create-adapter': 'Beta',
+    '/docs/extend/create-generator': 'Beta',
     '/docs/extend/create-plugin': 'Beta',
     '/docs/extend/create-job-transport': 'Beta',
+    '/docs/extend/create-ts-client': 'Beta',
     '/docs/clients/kotlin': 'Beta',
     '/docs/clients/tanstack-query': 'Beta',
+    '/docs/reference/kizuna-identity': 'Beta',
+    '/docs/reference/k-auth': 'Beta',
+    '/docs/reference/k-jobs': 'Beta',
+    '/docs/reference/server-guard': 'Beta',
+    '/docs/reference/server-jobs': 'Beta',
+    '/docs/reference/kizuna-tanstack-query': 'Beta',
+    '/docs/reference/generate-kotlin-client': 'Beta',
+    '/docs/reference/mcp-plugin': 'Beta',
+    '/docs/reference/create-mcp-server': 'Beta',
 };
 
 export const source = loader({

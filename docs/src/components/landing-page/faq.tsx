@@ -71,6 +71,10 @@ export const questions: Question[] = [
                     Read that number as 0.x. While ts-kizuna is in beta a minor version can carry a breaking change, and every release names
                     them under <strong className={styles.strong}>&#9888; BREAKING CHANGES</strong>.
                 </p>
+                <p className={styles.body}>
+                    The docs mark the newest surfaces with a <strong className={styles.strong}>Beta</strong> badge. Those are the most
+                    likely to change before v2.
+                </p>
             </>
         ),
     },

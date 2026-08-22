@@ -3,6 +3,12 @@ title: createMcpServer
 description: Create a raw MCP server from a ts-kizuna API for use with any transport (stdio, SSE, etc.).
 ---
 
+<BetaNotice>
+
+MCP support is new and still settling. `createMcpServer` and the generated tool surface may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
 Create a raw [MCP](https://modelcontextprotocol.io) server from a ts-kizuna API. Use this when you want full control over the transport, for example stdio for CLI tools or SSE for custom setups.
 
 To serve it from your app, install [`mcpPlugin`](/docs/reference/mcp-plugin) instead.
