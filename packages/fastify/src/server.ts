@@ -3,6 +3,7 @@ import fastifyPlugin from 'fastify-plugin';
 import { Readable } from 'node:stream';
 import {
     type AdapterRequest,
+    type Method,
     type RouteDefinition,
     type Routes,
     type RouteHandler as CoreRouteHandler,
@@ -150,7 +151,7 @@ const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
             void writeWebResponse(result.response, reply);
             return;
         }
-        const rendered = renderJsonResult(result, formatError as ErrorFormatter, reply.request);
+        const rendered = renderJsonResult(result, formatError as ErrorFormatter, reply.request, reply.request.method);
         for (const [key, value] of Object.entries(rendered.headers)) {
             reply.header(key, value);
         }
@@ -194,10 +195,11 @@ export const fastifyKizuna = fastifyPlugin(
             routeKey: string,
             route: RouteDefinition,
             lane: Routes,
-            resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>
+            resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>,
+            method: Method = route.method
         ): void => {
             app.route({
-                method: route.method,
+                method,
                 url: route.path,
                 preHandler: [
                     async (request: FastifyRequest) => {
@@ -239,13 +241,21 @@ export const fastifyKizuna = fastifyPlugin(
         };
 
         const mountLane = (lane: Routes, resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>): void => {
-            // Fastify's auto-exposed HEAD collides with a declared one, but it skips paths that already have HEAD.
-            const declaredRoutes = [...adapter.eachRoute(lane, resolvedRouter)].sort(
-                (left, right) => Number(right.route.method === 'HEAD') - Number(left.route.method === 'HEAD')
-            );
+            // HEAD routes register first, a derived one per GET-only path, so HEAD works without
+            // `exposeHeadRoutes` and Fastify's auto-exposed HEAD skips the taken paths instead of colliding.
+            const declaredRoutes = [...adapter.eachRoute(lane, resolvedRouter)];
+            const headPaths = new Set(declaredRoutes.filter(({ route }) => route.method === 'HEAD').map(({ route }) => route.path));
 
             for (const { routeKey, route } of declaredRoutes) {
-                mountRoute(routeKey, route, lane, resolvedRouter);
+                if (route.method === 'HEAD') mountRoute(routeKey, route, lane, resolvedRouter);
+            }
+            for (const { routeKey, route } of declaredRoutes) {
+                if (route.method === 'GET' && !headPaths.has(route.path)) {
+                    mountRoute(routeKey, route, lane, resolvedRouter, 'HEAD');
+                }
+            }
+            for (const { routeKey, route } of declaredRoutes) {
+                if (route.method !== 'HEAD') mountRoute(routeKey, route, lane, resolvedRouter);
             }
         };
 

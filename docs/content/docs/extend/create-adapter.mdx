@@ -148,6 +148,12 @@ const rendered = renderJsonResult(result);
 // rendered.status, rendered.headers, rendered.body
 ```
 
+Pass the request's method as the fourth argument when your adapter writes the wire bytes itself: a `HEAD` request then keeps `GET`'s status and headers, gains a `Content-Length`, and loses the content ([RFC 9110 §9.3.2](https://www.rfc-editor.org/rfc/rfc9110#section-9.3.2)). Leave it unset when the framework discards `HEAD` content itself, as Express, Fastify, and Hono do.
+
+```ts
+const rendered = renderJsonResult(result, formatError, request, request.method);
+```
+
 ### `parseFetchBody`
 
 Content-type-aware body parsing for fetch-based runtimes (`Request` / `Response` API). Handles `application/json`, `multipart/form-data`, and `application/x-www-form-urlencoded`.

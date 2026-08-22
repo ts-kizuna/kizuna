@@ -22,10 +22,13 @@ ts-kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RF
 
 `users.getUser` publishes as `users_get_user`. The [spec](https://modelcontextprotocol.io/specification/latest/server/tools) allows the dot, but Claude Code rewrites it to `_` before the model sees the name, so publishing the dot means the tool is called something kizuna never chose.
 
+### Derived HEAD
+
+Every GET route answers HEAD (RFC 9110 section 9.3.2): same status and headers, `Content-Length`, no body. A declared HEAD route takes the path instead, and HEAD joins GET in every `Allow` header. The derived route stays out of the OpenAPI document and the clients; the generator's `derivedHead` option opts it in. Express, Fastify, and Hono discard HEAD content themselves; Next passes the request method to `renderJsonResult`, which strips it.
+
 ### Deliberate omissions
 
 - **TRACE**: excluded from `Method`. Universally disabled in production and unsupported by modern frameworks. Do not add it.
-- **Auto HEAD-via-GET fallback**: ts-kizuna is contract-first; if HEAD isn't in the contract it doesn't exist. HEAD on a GET-only route returns 405. Authors who want HEAD declare an explicit HEAD route. Express handles HEAD natively for GET routes as a framework feature; Next and other adapters return 405. Might reconsider at a later time.
 
 # Jobs
 

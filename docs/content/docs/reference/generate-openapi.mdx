@@ -36,6 +36,7 @@ Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin), and `
 | `setOperationId`  | `boolean \| 'concatenated-path'`      | `false`   | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys. |
 | `externalDocs`    | `{ url, description? }`               | none      | Top-level external documentation link                                                   |
 | `operationMapper` | `(operation, route, id) => operation` | none      | Callback to transform each operation before it is added to the spec                     |
+| `derivedHead`     | `boolean`                             | `false`   | Document the derived `head` operation on every `GET` path without a declared one        |
 
 There are no security or tag options. Security is emitted from the [`auth` map](#security-emission) and the document's tag list from [`Kizuna.tags`](/docs/reference/kizuna-tags), so neither can disagree with the contract.
 

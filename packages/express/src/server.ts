@@ -157,6 +157,7 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
             next();
             return;
         }
+        // Express strips HEAD content in res.send itself, so requestMethod stays unset.
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, res.req);
         for (const [key, value] of Object.entries(rendered.headers)) {
             res.setHeader(key, value);
@@ -237,7 +238,11 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
     };
 
     const mountLane = (routes: Routes, router: CoreRouter<Routes, ExpressHandlerContext>): void => {
-        for (const { routeKey, route } of adapter.eachRoute(routes, router)) {
+        // A GET layer answers HEAD too, so a declared HEAD route registers first or is never reached.
+        const declaredRoutes = [...adapter.eachRoute(routes, router)].sort(
+            (left, right) => Number(right.route.method === 'HEAD') - Number(left.route.method === 'HEAD')
+        );
+        for (const { routeKey, route } of declaredRoutes) {
             mountRoute(routeKey, route, routes, router);
         }
     };

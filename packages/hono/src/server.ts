@@ -112,7 +112,7 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
         if (result.kind === 'raw-response') {
             return result.response as Response;
         }
-        const rendered = renderJsonResult(result, formatError as ErrorFormatter, c.req.raw);
+        const rendered = renderJsonResult(result, formatError as ErrorFormatter, c.req.raw, c.req.method);
         if (rendered.body === undefined) {
             return c.body(null, rendered.status as ContentfulStatusCode, rendered.headers);
         }
