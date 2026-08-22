@@ -1,6 +1,6 @@
 ---
 title: Deprecations
-description: Declare deprecations on the contract and have them reach OpenAPI, Swift, and Kotlin.
+description: Declare deprecations on the contract and have them reach your editor, OpenAPI, Swift, and Kotlin.
 ---
 
 | Where  | Declaration                  | Type                |
@@ -46,3 +46,7 @@ const UserSchema = z.object({
 ## What each output emits
 
 OpenAPI marks the operation and the field's schema with `deprecated: true` (the spec has no message field). Swift emits `@available(*, deprecated, message: "use email_address instead")` and Kotlin `@Deprecated("use email_address instead")`, so the message reaches autocomplete and compiler warnings in both mobile clients.
+
+## Editors
+
+The [ts-kizuna VS Code extension](/docs/vscode) strikes through deprecated routes and fields as you code and shows the migration message on hover. Other editors load the same plugin through `tsconfig.json`, covered on the same page.

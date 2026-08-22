@@ -1,0 +1,36 @@
+---
+title: VS Code
+description: Deprecation strikethroughs, hovers, and completions in your editor.
+---
+
+The ts-kizuna extension shows [deprecations](/docs/deprecations) where you code. A deprecated route or field is struck through everywhere the contract's types flow, `client.deleteUser(...)` at the call site and `user.email` on a response alike. Hovering shows the migration message, and completions strike through deprecated entries.
+
+<ExtensionCard />
+
+## How it works
+
+The extension carries `@ts-kizuna/typescript-plugin`, a TypeScript language service plugin, into the TypeScript server your editor already runs. It reads the `deprecated` declarations on your routes and schemas through the type checker, so it follows them through `z.infer`, generic wrappers, and the client's types.
+
+## Other editors
+
+The plugin also loads without the extension, in any editor that runs the TypeScript server. Add it as a dev dependency and declare it in `tsconfig.json`:
+
+<InstallTabs packageName="@ts-kizuna/typescript-plugin" dev />
+
+```json title="tsconfig.json"
+{
+    "compilerOptions": {
+        "plugins": [
+            {
+                "name": "@ts-kizuna/typescript-plugin"
+            }
+        ]
+    }
+}
+```
+
+This covers Zed, Neovim, and JetBrains with no further setup. VS Code forks like Cursor and Windsurf work too, once the workspace TypeScript version is selected (**TypeScript: Select TypeScript Version**).
+
+## Troubleshooting
+
+Deprecations not showing after changing the contract or tsconfig? Run **TypeScript: Restart TS Server** from the command palette. With the tsconfig route in a VS Code-family editor, also check the status bar shows the workspace TypeScript version.

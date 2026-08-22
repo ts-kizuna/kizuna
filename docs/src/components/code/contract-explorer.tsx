@@ -261,6 +261,7 @@ Content-Type: application/problem+json
     deprecated: true,
     ...
 }
+// → editor strikethrough
 // → OpenAPI deprecated: true
 // → Swift @available
 // → Kotlin @Deprecated`,

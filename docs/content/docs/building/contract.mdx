@@ -90,6 +90,7 @@ export const usersRoutes = k.routes('users', {
 | `contentType` | No       | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
 | `summary`     | No       | Short description shown in OpenAPI                                                             |
 | `tags`        | No       | OpenAPI tags                                                                                   |
+| `deprecated`  | No       | `true`, or a migration message. See [Deprecations](/docs/deprecations)                         |
 
 ### Typing path parameters
 
@@ -351,7 +352,7 @@ getUser: {
 },
 ```
 
-The OpenAPI spec and the Swift and Kotlin clients pick both up. See [Deprecations](/docs/deprecations).
+Your editor, the OpenAPI spec, and the Swift and Kotlin clients pick both up. See [Deprecations](/docs/deprecations).
 
 ### Exporting types
 

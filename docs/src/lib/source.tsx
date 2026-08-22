@@ -14,6 +14,7 @@ const badges: Record<string, string> = {
     '/docs/extend/create-job-transport': 'Beta',
     '/docs/clients/kotlin': 'Beta',
     '/docs/clients/tanstack-query': 'Beta',
+    '/docs/vscode': 'Beta',
 };
 
 export const source = loader({
