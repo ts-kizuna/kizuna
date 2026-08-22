@@ -1,6 +1,6 @@
 /* eslint-disable no-undef */
 
-const HIDDEN_IN_STRICT = new Set(['chore', 'ci', 'docs']);
+const HIDDEN_IN_STRICT = new Set(['chore', 'ci', 'docs', 'test']);
 
 const types = [
     { type: 'feat', section: 'Features' },
@@ -10,6 +10,7 @@ const types = [
     { type: 'docs', section: 'Documentation' },
     { type: 'refactor', section: 'Refactors' },
     { type: 'perf', section: 'Performance' },
+    { type: 'test', section: 'Tests' },
 ];
 
 const ignoreReleaseCommits = /^chore(\([^)]*\))?:\s*release\s/;
