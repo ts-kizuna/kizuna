@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { GithubIcon } from './github-icon';
+import GithubIcon from '@/icons/Github.svg';
 import styles from './closing-cta.module.css';
 
 export function ClosingCta() {

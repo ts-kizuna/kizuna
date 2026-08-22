@@ -1,5 +1,5 @@
 import { MapPin } from 'lucide-react';
-import { GithubIcon } from './github-icon';
+import GithubIcon from '@/icons/Github.svg';
 import styles from './maintainers.module.css';
 
 interface Maintainer {

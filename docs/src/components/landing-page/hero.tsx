@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import Link from 'next/link';
-import { GithubIcon } from './github-icon';
+import GithubIcon from '@/icons/Github.svg';
 import styles from './hero.module.css';
 
 export function Hero({ className }: { className?: string }) {

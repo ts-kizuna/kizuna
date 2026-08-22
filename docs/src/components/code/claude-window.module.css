@@ -1,0 +1,135 @@
+.window {
+    --window-surface: var(--kizuna-surface, #f4f4f4);
+    --window-line: #d8d8d8;
+    --claude-prompt-surface: #e5e5e5;
+
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 10px;
+    background-color: var(--window-surface);
+}
+
+:global(.dark) .window {
+    --window-surface: var(--kizuna-surface, #1c1c1c);
+    --window-line: #3a3a3a;
+    --claude-prompt-surface: #313131;
+}
+
+.dots {
+    display: flex;
+    gap: 6px;
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--window-line);
+}
+
+.dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 999px;
+    background-color: var(--window-line);
+}
+
+.titleBar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--window-line);
+    font-size: 13px;
+    color: var(--color-fd-muted-foreground);
+}
+
+.titleIcon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.chat {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+    font-family: var(--default-mono-font-family, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    font-size: 12px;
+    line-height: 1.65;
+}
+
+.promptRow {
+    display: flex;
+    gap: 8px;
+    margin-inline: -6px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background-color: var(--claude-prompt-surface);
+}
+
+.promptCaret {
+    color: var(--color-fd-muted-foreground);
+}
+
+.turn {
+    display: flex;
+    gap: 8px;
+}
+
+.turnBody {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bullet {
+    flex-shrink: 0;
+    color: var(--color-fd-foreground);
+}
+
+.toolName {
+    font-weight: 600;
+}
+
+.toolArgs {
+    color: var(--color-fd-muted-foreground);
+}
+
+.toolNote {
+    margin-left: 8px;
+    color: var(--color-fd-muted-foreground);
+    font-size: 11px;
+}
+
+.permissionBox {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-inline: -6px;
+    padding: 7px 10px;
+    border: 1px solid var(--window-line);
+    border-radius: 6px;
+}
+
+.permissionQuestion {
+    margin-top: 4px;
+}
+
+.permissionDeclined {
+    padding-left: 1.2em;
+    color: var(--color-fd-muted-foreground);
+}
+
+.toolResult {
+    display: flex;
+    gap: 6px;
+    color: var(--color-fd-muted-foreground);
+    white-space: nowrap;
+    overflow-x: auto;
+}
+
+.resultElbow {
+    flex-shrink: 0;
+}

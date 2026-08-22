@@ -91,7 +91,7 @@
     line-height: 1.25;
 }
 
-.nodeDesc {
+.nodeDescription {
     font-size: 0.75rem;
     color: var(--explorer-muted);
 }

@@ -2,7 +2,12 @@ import clsx from 'clsx';
 import type { ReactNode } from 'react';
 import { FileText, Globe, Server, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { CodeWindow } from './code-window';
-import { KotlinLogo, McpLogo, SwiftLogo, TanstackLogo, TsLogo } from './brand-icons';
+import { ClaudeWindow } from './claude-window';
+import KotlinLogo from '@/icons/Kotlin.svg';
+import McpLogo from '@/icons/Mcp.svg';
+import SwiftLogo from '@/icons/Swift.svg';
+import TanstackLogo from '@/icons/TanStack.svg';
+import TsLogo from '@/icons/TypeScript.svg';
 import styles from './contract-explorer.module.css';
 
 const icons = {
@@ -31,21 +36,30 @@ function Method({ name }: { name: keyof typeof methodStyles }) {
     return <span className={clsx(styles.method, methodStyles[name])}>{name}</span>;
 }
 
-interface OutputNode {
+interface CodeOutputNode {
     icon: ReactNode;
     label: string;
-    desc: string;
+    description: string;
     file: string;
     fileIcon?: ReactNode;
     lang: string;
     code: string;
 }
 
+interface CustomOutputNode {
+    icon: ReactNode;
+    label: string;
+    description: string;
+    content: ReactNode;
+}
+
+type OutputNode = CodeOutputNode | CustomOutputNode;
+
 const NODES: OutputNode[] = [
     {
         icon: icons.server,
         label: 'Server',
-        desc: 'Validated inputs, type-checked responses',
+        description: 'Validated inputs, type-checked responses',
         file: 'router.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
@@ -72,7 +86,7 @@ const NODES: OutputNode[] = [
     {
         icon: icons.file,
         label: 'OpenAPI',
-        desc: 'Generated from the contract',
+        description: 'Generated from the contract',
         file: 'openapi.yaml',
         lang: 'yaml',
         code: `/users/{id}:
@@ -99,7 +113,7 @@ const NODES: OutputNode[] = [
     {
         icon: icons.globe,
         label: 'REST',
-        desc: 'Every route is a real REST endpoint',
+        description: 'Every route is a real REST endpoint',
         file: 'localhost:3000/users/1',
         fileIcon: <Method name="GET" />,
         lang: 'http',
@@ -123,7 +137,7 @@ Content-Type: application/problem+json
     {
         icon: <TsLogo className={styles.icon} />,
         label: 'TypeScript client',
-        desc: 'Call your API like a function',
+        description: 'Call your API like a function',
         file: 'api-client.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
@@ -146,7 +160,7 @@ if (res.status === 200) {
     {
         icon: <TanstackLogo className={styles.icon} />,
         label: 'TanStack Query client',
-        desc: 'Query and mutation options, keys included',
+        description: 'Query and mutation options, keys included',
         file: 'user-list.tsx',
         fileIcon: brandIcons.typescript,
         lang: 'tsx',
@@ -170,7 +184,7 @@ queryClient.invalidateQueries({
     {
         icon: <SwiftLogo className={styles.icon} />,
         label: 'Swift client',
-        desc: 'A native client for iOS and macOS',
+        description: 'A native client for iOS and macOS',
         file: 'UserService.swift',
         fileIcon: brandIcons.swift,
         lang: 'swift',
@@ -192,7 +206,7 @@ do {
     {
         icon: <KotlinLogo className={styles.icon} />,
         label: 'Kotlin client',
-        desc: 'A native client for Android and the JVM',
+        description: 'A native client for Android and the JVM',
         file: 'APIClient.kt',
         fileIcon: brandIcons.kotlin,
         lang: 'kotlin',
@@ -214,22 +228,13 @@ try {
     {
         icon: <McpLogo className={styles.icon} />,
         label: 'MCP server',
-        desc: 'Your routes as tools for AI agents',
-        file: 'k.ts',
-        fileIcon: brandIcons.typescript,
-        lang: 'ts',
-        code: `plugins: {
-  mcp: mcpPlugin()
-}
-
-// each route → a typed MCP tool:
-// GET → read-only · DELETE → destructive
-// PUT → idempotent`,
+        description: 'Your routes as tools for AI agents',
+        content: <ClaudeWindow />,
     },
     {
         icon: icons.shield,
         label: 'Built-in validation',
-        desc: 'Every request checked against the contract',
+        description: 'Every request checked against the contract',
         file: 'localhost:3000/users',
         fileIcon: <Method name="POST" />,
         lang: 'http',
@@ -252,20 +257,25 @@ Content-Type: application/problem+json
     },
     {
         icon: icons.alert,
-        label: 'Deprecation',
-        desc: 'Mark once, it propagates everywhere',
+        label: 'Deprecation and sunset',
+        description: 'Phase out routes from the contract',
         file: 'routes.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
-        code: `deleteUser: {
-    deprecated: true,
-    sunset: '2027-01-01',
-    ...
+        code: `searchUsers: {
+  deprecated: {
+    message: 'use listUsers instead',
+    date: '2026-03-01',
+  },
+  sunset: '2027-01-01',
+  ...
 }
-// → OpenAPI deprecated: true
-// → Swift @available(*, deprecated)
-// → Kotlin @Deprecated
-// → Deprecation and Sunset headers`,
+
+// OpenAPI deprecated: true
+// Swift @available(*, deprecated, message: "use listUsers instead")
+// Kotlin @Deprecated("use listUsers instead")
+// HTTP Deprecation: @1772323200
+// HTTP Sunset: Fri, 01 Jan 2027 00:00:00 GMT`,
     },
 ];
 
@@ -323,10 +333,14 @@ export function ContractExplorer({ className }: { className?: string }) {
                             <span className={styles.chip}>{node.icon}</span>
                             <div>
                                 <div className={styles.nodeLabel}>{node.label}</div>
-                                <div className={styles.nodeDesc}>{node.desc}</div>
+                                <div className={styles.nodeDescription}>{node.description}</div>
                             </div>
                         </div>
-                        <CodeWindow lang={node.lang} code={node.code} title={node.file} icon={node.fileIcon} dots />
+                        {'code' in node ? (
+                            <CodeWindow lang={node.lang} code={node.code} title={node.file} icon={node.fileIcon} dots />
+                        ) : (
+                            node.content
+                        )}
                     </div>
                 ))}
             </div>

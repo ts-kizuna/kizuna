@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { Logo } from '@/components/shared/logo';
-import { GithubIcon } from './github-icon';
+import Logo from '@/icons/Logo.svg';
+import GithubIcon from '@/icons/Github.svg';
 import { SearchButton } from './search-button';
 import styles from './site-header.module.css';
 
