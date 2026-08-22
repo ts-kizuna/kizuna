@@ -259,11 +259,13 @@ Content-Type: application/problem+json
         lang: 'ts',
         code: `deleteUser: {
     deprecated: true,
+    sunset: '2027-01-01',
     ...
 }
 // → OpenAPI deprecated: true
-// → Swift @available
-// → Kotlin @Deprecated`,
+// → Swift @available(*, deprecated)
+// → Kotlin @Deprecated
+// → Deprecation and Sunset headers`,
     },
 ];
 

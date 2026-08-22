@@ -8,10 +8,12 @@ import {
     createIssueRouter,
     createMethodRouter,
     createResponseShapeRouter,
+    createDeprecatedRouter,
     createSecuredRouter,
     createSubUserRouter,
     createUserRouter,
     csvBody,
+    deprecatedContract,
     issueContract,
     methodContract,
     ownerToken,
@@ -101,6 +103,15 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             {
                 contract: methodContract,
                 router: createMethodRouter(),
+            },
+            use
+        );
+
+    const usingDeprecated = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                contract: deprecatedContract,
+                router: createDeprecatedRouter(),
             },
             use
         );
@@ -626,6 +637,39 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     expect(response.status).toBe(500);
                 }
             );
+        },
+        'deprecation.deprecationHeader': async () => {
+            await usingDeprecated(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'DELETE',
+                    path: '/deprecated-users/1',
+                });
+                expect(response.status).toBe(200);
+                expect(response.headers.get('deprecation')).toBe('@1772323200');
+                expect(response.headers.get('link')).toBe('<https://example.com/changelog/delete-user>; rel="deprecation"');
+            });
+        },
+        'deprecation.sunsetHeader': async () => {
+            await usingDeprecated(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/report',
+                });
+                expect(response.status).toBe(200);
+                expect(response.headers.get('sunset')).toBe('Fri, 01 Jan 2027 00:00:00 GMT');
+                expect(response.headers.get('link')).toBe('<https://example.com/retirement-policy>; rel="sunset"');
+            });
+        },
+        'deprecation.errorResponses': async () => {
+            await usingDeprecated(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'DELETE',
+                    path: '/deprecated-users/404',
+                });
+                expect(response.status).toBe(404);
+                expect(response.headers.get('deprecation')).toBe('@1772323200');
+                expect(response.headers.get('link')).toBe('<https://example.com/changelog/delete-user>; rel="deprecation"');
+            });
         },
         'plugins.routesServed': async () => {
             await usingPlugins(async (mounted) => {

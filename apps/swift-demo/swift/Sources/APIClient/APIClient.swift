@@ -1901,7 +1901,7 @@ public struct APIUsersClient: Sendable {
     }
 
     /// Delete a user
-    @available(*, deprecated)
+    @available(*, deprecated, message: "use `archiveUser` instead")
     public func deleteUser(_ params: APIClient.UsersDeleteUser.Params) async throws(APIClient.UsersDeleteUser.Failure) -> APIClient.UsersDeleteUser.Result {
         var path = "/users/:id"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))

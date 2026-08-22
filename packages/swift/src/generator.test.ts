@@ -978,6 +978,21 @@ describe('Swift generator: @available(*, deprecated)', () => {
                 }),
             },
         },
+        sunsetRoute: {
+            method: 'GET',
+            path: '/sunset',
+            deprecated: {
+                message: 'use newRoute instead',
+                date: '2026-03-01T00:00:00Z',
+                link: 'https://example.com/changelog/old',
+            },
+            sunset: '2027-01-01T00:00:00Z',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
         getUser: {
             method: 'GET',
             path: '/users/:id',
@@ -1019,6 +1034,12 @@ describe('Swift generator: @available(*, deprecated)', () => {
         const output = generate({ oldRoute: deprecatedContract.routes.oldRoute });
         expect(output).toContain('@available(*, deprecated, message: "use newRoute instead")');
         expect(output).toContain('func oldRoute');
+    });
+
+    it('emits the object form message on a route with a deprecation date and sunset', () => {
+        const output = generate({ sunsetRoute: deprecatedContract.routes.sunsetRoute });
+        expect(output).toContain('@available(*, deprecated, message: "use newRoute instead")');
+        expect(output).toContain('func sunsetRoute');
     });
 
     it('emits @available(*, deprecated) on a deprecated field in a response struct', () => {

@@ -1,16 +1,16 @@
-import type { RouteDefinition } from './types.js';
+import type { ResponseHeaders, RouteDefinition } from './types.js';
 import type { HandlerReturn } from './handler-pipeline.js';
 
 interface ResponseErrorPayload {
     status: number;
     body: unknown;
-    headers?: Record<string, string>;
+    headers?: ResponseHeaders;
 }
 
 export class ResponseError<R extends RouteDefinition = never> extends Error {
     public readonly status: number;
     public readonly body: unknown;
-    public readonly headers?: Record<string, string>;
+    public readonly headers?: ResponseHeaders;
 
     constructor(response: [R] extends [never] ? ResponseErrorPayload : HandlerReturn<R>) {
         const body = response.body;

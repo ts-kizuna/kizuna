@@ -15,11 +15,20 @@ import {
     resolveResponseBody,
     resolveResponseHeaders,
     resolveResponseContentType,
+    deprecationHeaders,
 } from '@ts-kizuna/core/generator';
 import { getStatusText } from '@ts-kizuna/core';
 import type { Contract, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
 import { OPENAPI_PLUGIN_NAME } from './plugin.js';
-import type { GenerateOpenApiOptions, OpenApiDocument, OpenApiOperation, OpenApiParameter, OpenApiRenderer, OpenApiTag } from './types.js';
+import type {
+    GenerateOpenApiOptions,
+    OpenApiDocument,
+    OpenApiOperation,
+    OpenApiParameter,
+    OpenApiRenderer,
+    OpenApiResponseObject,
+    OpenApiTag,
+} from './types.js';
 
 const convertPath = (path: string): string => {
     const { segments } = parsePath(path);
@@ -271,10 +280,11 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                 const bodySchema = resolveResponseBody(responseValue);
                 const headersSchema = resolveResponseHeaders(responseValue);
                 const description = getStatusText(Number(statusKey));
-                const headersObject: Record<string, unknown> | undefined = headersSchema
+                const headersObject: OpenApiResponseObject['headers'] = headersSchema
                     ? Object.fromEntries(
                           Object.entries(
-                              (toJsonSchema(headersSchema, 'output') as { properties?: Record<string, unknown> }).properties ?? {}
+                              (toJsonSchema(headersSchema, 'output') as { properties?: Record<string, Record<string, unknown>> })
+                                  .properties ?? {}
                           ).map(([name, schema]) => [name, { schema, required: false }])
                       )
                     : undefined;
@@ -346,6 +356,35 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                                 schema: validationSchema,
                             },
                         },
+                    };
+                }
+            }
+
+            const announced = deprecationHeaders(route);
+            if (Object.keys(announced).length > 0) {
+                const documented: Record<string, { description: string; schema: Record<string, unknown> }> = {};
+                if (announced['deprecation']) {
+                    documented['Deprecation'] = {
+                        description: 'The date the route became deprecated, per RFC 9745.',
+                        schema: { type: 'string' },
+                    };
+                }
+                if (announced['sunset']) {
+                    documented['Sunset'] = {
+                        description: 'When the route will be removed, per RFC 8594.',
+                        schema: { type: 'string' },
+                    };
+                }
+                if (announced['link']) {
+                    documented['Link'] = {
+                        description: 'Links to documentation about the deprecation and the retirement policy.',
+                        schema: { type: 'string' },
+                    };
+                }
+                for (const response of Object.values(operation.responses)) {
+                    response.headers = {
+                        ...documented,
+                        ...response.headers,
                     };
                 }
             }

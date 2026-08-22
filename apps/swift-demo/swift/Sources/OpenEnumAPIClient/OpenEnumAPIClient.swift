@@ -2046,7 +2046,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
     }
 
     /// Delete a user
-    @available(*, deprecated)
+    @available(*, deprecated, message: "use `archiveUser` instead")
     public func deleteUser(_ params: OpenEnumAPIClient.UsersDeleteUser.Params) async throws(OpenEnumAPIClient.UsersDeleteUser.Failure) -> OpenEnumAPIClient.UsersDeleteUser.Result {
         var path = "/users/:id"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))

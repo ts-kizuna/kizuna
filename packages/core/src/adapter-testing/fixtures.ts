@@ -490,6 +490,66 @@ export const createResponseShapeRouter = <Context>(): Router<typeof responseShap
     }),
 });
 
+export const deprecatedRoutes = k.routes('api', {
+    deleteUser: {
+        method: 'DELETE',
+        path: '/deprecated-users/:id',
+        deprecated: {
+            message: 'use `archiveUser` instead',
+            date: '2026-03-01T00:00:00Z',
+            link: 'https://example.com/changelog/delete-user',
+        },
+        responses: {
+            200: z.object({
+                success: z.boolean(),
+            }),
+            404: ProblemDetailsSchema,
+        },
+    },
+    exportReport: {
+        method: 'GET',
+        path: '/report',
+        sunset: {
+            date: '2027-01-01',
+            link: 'https://example.com/retirement-policy',
+        },
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+
+export const deprecatedContract = k.contract({
+    routes: deprecatedRoutes,
+});
+
+export const createDeprecatedRouter = <Context>(): Router<typeof deprecatedRoutes, Context> => ({
+    deleteUser: ({ params }) => {
+        if (params.id !== '1') {
+            return {
+                status: 404,
+                body: {
+                    detail: 'Not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: {
+                success: true,
+            },
+        };
+    },
+    exportReport: () => ({
+        status: 200,
+        body: {
+            ok: true,
+        },
+    }),
+});
+
 /**
  * One route per HTTP method, so every adapter proves it registers and dispatches all of them.
  */

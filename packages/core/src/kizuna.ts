@@ -3,6 +3,7 @@ import { tagRoutes } from './routes.js';
 import { assembleContract, type Contract } from './contract.js';
 import { pluginRouteTree, type ContractPlugins, type ContractPluginsArg, type PluginArgs } from './plugin.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
+import { assertValidDeprecationDates } from './deprecation.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { jobClaims, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, type JobsArg, type JobsConfig } from './jobs.js';
@@ -397,6 +398,8 @@ const createSurface = <
             ...routeClaims(pluginRouteTree(plugins), 'Plugin route'),
             ...jobClaims(contractJobs, config?.jobs),
         ]);
+        assertValidDeprecationDates(contractRoutes);
+        assertValidDeprecationDates(pluginRouteTree(plugins));
         if (auth) {
             for (const groupKey of Object.keys(auth)) {
                 if (!(groupKey in contractRoutes)) {

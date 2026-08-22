@@ -1246,7 +1246,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     }
 
     /** Delete a user */
-    @Deprecated("Deprecated")
+    @Deprecated("use `archiveUser` instead")
     @Throws(APIClient.UsersDeleteUser.Failure::class)
     suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.UsersDeleteUser.Args): APIClient.UsersDeleteUser.Result {
         val args = APIClient.UsersDeleteUser.Scope.build()

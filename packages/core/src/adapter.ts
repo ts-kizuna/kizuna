@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { RouteDefinition, Routes, Method } from './types.js';
+import type { ResponseHeaders, RouteDefinition, Routes, Method } from './types.js';
 import type { OpenApiSecuritySchemeObject, SecurityScheme } from './security-scheme.js';
 import type { Credential, NoCredential } from './identity.js';
 import {
@@ -15,6 +15,7 @@ import {
 import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes } from './route-matcher.js';
 import { parsePath } from './path-params.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
+import { deprecationHeaders } from './deprecation.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
@@ -38,7 +39,7 @@ import { ProblemDetailsSchema } from './schemas.js';
 import type { Contract } from './contract.js';
 import type { JobTransport } from './job-transport.js';
 
-export type { RouteDefinition, RoutePath, Routes, Method } from './types.js';
+export type { ResponseHeaders, RouteDefinition, RoutePath, Routes, Method } from './types.js';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
 export {
     createPlugin,
@@ -135,14 +136,14 @@ export interface GuardDenial {
     /**
      * The `WWW-Authenticate` challenge RFC 9110 section 11.6.1 requires on a `401`.
      */
-    headers?: Record<string, string>;
+    headers?: ResponseHeaders;
 }
 
 /**
  * Reject the request from inside a guard. Extra `headers` ride on the
  * response; a `www-authenticate` among them replaces the default challenge.
  */
-export type GuardDeny = (status: number, detail: string, headers?: Record<string, string>) => GuardDenial;
+export type GuardDeny = (status: number, detail: string, headers?: ResponseHeaders) => GuardDenial;
 
 type HttpScheme = Extract<OpenApiSecuritySchemeObject, { type: 'http' }>['scheme'];
 
@@ -589,20 +590,24 @@ export type AdapterResult =
           kind: 'unsupported-media-type';
           expected: string;
           received: string;
+          headers?: ResponseHeaders;
       }
     | {
           kind: 'invalid-body';
           detail: string;
+          headers?: ResponseHeaders;
       }
     | {
           kind: 'validation-failed';
           stage: ValidationStage;
           detail: string;
           issues: z.core.$ZodIssue[];
+          headers?: ResponseHeaders;
       }
     | {
           kind: 'no-handler';
           routeKey: string;
+          headers?: ResponseHeaders;
       }
     | {
           kind: 'guard-denied';
@@ -611,13 +616,14 @@ export type AdapterResult =
           /**
            * The `WWW-Authenticate` challenge RFC 9110 requires on a `401`.
            */
-          headers?: Record<string, string>;
+          headers?: ResponseHeaders;
       }
     | {
           kind: 'handler-error';
           routeKey: string;
           route: RouteDefinition;
           error: unknown;
+          headers?: ResponseHeaders;
       }
     | {
           kind: 'success';
@@ -625,10 +631,11 @@ export type AdapterResult =
           route: RouteDefinition;
           status: number;
           body: unknown;
-          headers?: Record<string, string>;
+          headers?: ResponseHeaders;
       }
     | {
           kind: 'not-acceptable';
+          headers?: ResponseHeaders;
       }
     | {
           kind: 'raw-response';
@@ -869,6 +876,31 @@ const isAcceptable = (acceptHeader: string | undefined): boolean => {
     return false;
 };
 
+/**
+ * Attach the route's `Deprecation`, `Sunset`, and `Link` announcement headers
+ * to a pipeline outcome, so every response from the route carries them. Headers
+ * the outcome already holds win on a name collision.
+ */
+const withDeprecationHeaders = (result: AdapterResult, route: RouteDefinition): AdapterResult => {
+    switch (result.kind) {
+        case 'raw-response':
+        case 'not-found':
+        case 'method-not-allowed':
+            return result;
+        default: {
+            const announced = deprecationHeaders(route);
+            if (Object.keys(announced).length === 0) return result;
+            return {
+                ...result,
+                headers: {
+                    ...announced,
+                    ...result.headers,
+                },
+            };
+        }
+    }
+};
+
 const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     request: AdapterRequest<NativeRequest>,
     routes: Routes,
@@ -886,7 +918,38 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     const matcher = definition.matcher ?? defaultMatchRoute;
     const resolution = resolveRoute(request as AdapterRequest<unknown>, routes, matcher, basePath);
     if (!resolution.ok) return resolution.result;
-    const { routeKey, route, params } = resolution.resolved;
+    const result = await routedPipeline(
+        resolution.resolved,
+        request,
+        routes,
+        router,
+        definition,
+        responseContext,
+        guards,
+        schemes,
+        contextResolvers,
+        pluginExports,
+        jobRunner,
+        responseValidation
+    );
+    return withDeprecationHeaders(result, resolution.resolved.route);
+};
+
+const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
+    resolved: ResolvedRoute,
+    request: AdapterRequest<NativeRequest>,
+    routes: Routes,
+    router: Router<Routes, HandlerContext>,
+    definition: AdapterDefinition<NativeRequest, unknown, HandlerContext, ResponseContext>,
+    responseContext: ResponseContext,
+    guards: GuardMap<HandlerContext> | undefined,
+    schemes: Record<string, SecurityScheme> | undefined,
+    contextResolvers: RequestContextMap<HandlerContext> | undefined,
+    pluginExports: Record<string, unknown> | undefined,
+    jobRunner: JobRunner<Jobs> | undefined,
+    responseValidation: boolean | undefined
+): Promise<AdapterResult> => {
+    const { routeKey, route, params } = resolved;
 
     const raw: RawInputs = {
         params,
@@ -997,11 +1060,11 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             }
         }
 
-        const throwError = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
+        const throwError = (response: { status: number; body: unknown; headers?: ResponseHeaders }): never => {
             throw new ResponseError(response);
         };
         const handlerResult = await (
-            handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: Record<string, string> } | RawResponse>
+            handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: ResponseHeaders } | RawResponse>
         )({
             params: validation.parsed.params,
             query: validation.parsed.query,
@@ -1191,13 +1254,13 @@ export const renderJsonResult = (
     result: Exclude<AdapterResult, { kind: 'raw-response' }>,
     formatError: ErrorFormatter = defaultErrorFormatter,
     request: unknown = undefined
-): { status: number; headers: Record<string, string>; body: unknown; raw?: boolean } => {
+): { status: number; headers: ResponseHeaders; body: unknown; raw?: boolean } => {
     const renderError = (
         status: number,
         detail: string,
         extensions?: Record<string, unknown>,
-        extraHeaders?: Record<string, string>
-    ): { status: number; headers: Record<string, string>; body: unknown } => {
+        extraHeaders?: ResponseHeaders
+    ): { status: number; headers: ResponseHeaders; body: unknown } => {
         const problem = problemDetails(status, detail, extensions);
         const { contentType, body } = formatError(problem, { status, request });
         return {
@@ -1260,25 +1323,35 @@ export const renderJsonResult = (
                 }
             );
         case 'invalid-body':
-            return renderError(400, result.detail);
+            return renderError(400, result.detail, undefined, result.headers);
         case 'validation-failed':
-            return renderError(400, result.detail, {
-                errors: result.issues.map((issue) => ({
-                    code: issue.code ?? 'custom',
-                    path: issue.path,
-                    message: issue.message,
-                })),
-            });
+            return renderError(
+                400,
+                result.detail,
+                {
+                    errors: result.issues.map((issue) => ({
+                        code: issue.code ?? 'custom',
+                        path: issue.path,
+                        message: issue.message,
+                    })),
+                },
+                result.headers
+            );
         case 'no-handler':
-            return renderError(500, `Handler not implemented: ${result.routeKey}`);
+            return renderError(500, `Handler not implemented: ${result.routeKey}`, undefined, result.headers);
         case 'guard-denied':
             return renderError(result.status, result.detail, undefined, result.headers);
         case 'unsupported-media-type':
-            return renderError(415, `Unsupported Media Type: expected ${result.expected}, received ${result.received}`);
+            return renderError(
+                415,
+                `Unsupported Media Type: expected ${result.expected}, received ${result.received}`,
+                undefined,
+                result.headers
+            );
         case 'not-acceptable':
-            return renderError(406, 'Not Acceptable');
+            return renderError(406, 'Not Acceptable', undefined, result.headers);
         case 'handler-error':
-            return renderError(500, 'Internal Server Error');
+            return renderError(500, 'Internal Server Error', undefined, result.headers);
     }
 };
 
@@ -1316,8 +1389,8 @@ export const parseFetchBody = async (request: Request, route: RouteDefinition): 
     }
 };
 
-export const headersToObject = (headers: Headers): Record<string, string> => {
-    const result: Record<string, string> = {};
+export const headersToObject = (headers: Headers): ResponseHeaders => {
+    const result: ResponseHeaders = {};
     headers.forEach((value, key) => {
         result[key] = value;
     });

@@ -703,6 +703,21 @@ describe('Kotlin generator: @Deprecated', () => {
                 }),
             },
         },
+        sunsetRoute: {
+            method: 'GET',
+            path: '/sunset',
+            deprecated: {
+                message: 'use newRoute instead',
+                date: '2026-03-01T00:00:00Z',
+                link: 'https://example.com/changelog/old',
+            },
+            sunset: '2027-01-01T00:00:00Z',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
         getUser: {
             method: 'GET',
             path: '/users/:id',
@@ -744,6 +759,12 @@ describe('Kotlin generator: @Deprecated', () => {
         const output = generate({ oldRoute: deprecatedContract.routes.oldRoute });
         expect(output).toContain('@Deprecated("use newRoute instead")');
         expect(output).toContain('fun oldRoute');
+    });
+
+    it('emits the object form message on a route with a deprecation date and sunset', () => {
+        const output = generate({ sunsetRoute: deprecatedContract.routes.sunsetRoute });
+        expect(output).toContain('@Deprecated("use newRoute instead")');
+        expect(output).toContain('fun sunsetRoute');
     });
 
     it('emits @Deprecated on a deprecated field in a response data class', () => {

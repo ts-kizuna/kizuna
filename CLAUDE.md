@@ -8,6 +8,8 @@ ts-kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RF
 - **RFC 5789** (PATCH Method, April 2010): PATCH semantics
 - **RFC 9457** (Problem Details for HTTP APIs, July 2023): error response bodies
 - **RFC 3986** (URI Syntax, January 2005): paths match exactly, so `/users/1` and `/users/1/` differ
+- **RFC 8594** (Sunset HTTP Header, May 2019): the `Sunset` response header and the `sunset` link relation on routes with a `sunset` date
+- **RFC 9745** (Deprecation HTTP Header, March 2025): the `Deprecation` response header and the `deprecation` link relation on routes with a deprecation date
 - **OpenAPI 3.1.0**: spec generation
 - **OAuth 2.1**: the resource server model, for an API that verifies tokens rather than issuing them
 - **RFC 9728** (OAuth 2.0 Protected Resource Metadata, April 2025): the discovery document

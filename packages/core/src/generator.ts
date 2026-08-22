@@ -33,6 +33,8 @@ export {
     type DiscriminatedUnion,
 } from './zod-internals.js';
 
+export { deprecationHeaders } from './deprecation.js';
+
 export {
     resolveResponseBody,
     resolveResponseHeaders,
@@ -59,8 +61,8 @@ export interface GeneratorRouteContext {
      */
     deprecated: boolean;
     /**
-     * The route's `deprecated` string, or `undefined` for `deprecated: true` or
-     * a non-deprecated route.
+     * The route's `deprecated` string, or the object form's `message`, or
+     * `undefined` when the route declares neither.
      */
     deprecationMessage: string | undefined;
 }
@@ -106,7 +108,12 @@ export const createGenerator =
                 route,
                 routeTags,
                 deprecated: route.deprecated !== undefined && route.deprecated !== false,
-                deprecationMessage: typeof route.deprecated === 'string' ? route.deprecated : undefined,
+                deprecationMessage:
+                    typeof route.deprecated === 'string'
+                        ? route.deprecated
+                        : typeof route.deprecated === 'object'
+                          ? route.deprecated.message
+                          : undefined,
             });
         }
         return finalize();
