@@ -3,6 +3,12 @@ title: server.jobs
 description: Write a handler for each of the contract's jobs.
 ---
 
+<BetaNotice>
+
+Jobs are new and still settling. `server.jobs` may change before v2, so pin your version if you depend on it.
+
+</BetaNotice>
+
 `server.jobs(handlers)` takes a handler for each of the contract's [jobs](/docs/jobs), mirroring the declaration including its nesting.
 
 ```ts title="jobs.ts"

@@ -3,6 +3,12 @@ title: Create a Generator
 description: Build and ship your own code generator or client from a ts-kizuna contract using createGenerator.
 ---
 
+<BetaNotice>
+
+The generator API is new and still settling. `createGenerator` and the walked route shape may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
 `createGenerator` from `@ts-kizuna/core/generator` lets you walk your contract and produce any output, such as a typed client for another language, documentation, or a route manifest. The OpenAPI and Swift generators are both built on it.
 
 Whether a generator goes first-party comes down to demand, not age. If enough teams need a target, we will add it. What we will not take on is one a handful of people need, since we maintain everything we merge. The generator API is public, so you can build and publish your own today.
