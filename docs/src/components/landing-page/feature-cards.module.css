@@ -1,24 +1,34 @@
 .grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 16px;
+    row-gap: 36px;
+    border-radius: 20px;
+    background-color: var(--kizuna-surface);
+    padding: 32px 28px;
 }
 
 .card {
-    border: var(--kizuna-hairline) solid var(--kizuna-line);
-    border-radius: var(--kizuna-radius-card);
-    padding: 24px;
+    display: block;
+    min-width: 0;
+    text-decoration: none;
 }
 
-.icons {
+.head {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
+.icons {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+}
+
 .icon {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     color: var(--kizuna-ink);
     stroke-width: 2.25;
 }
@@ -30,28 +40,66 @@
 }
 
 .title {
-    margin: 10px 0 0;
+    min-width: 0;
     font-size: var(--kizuna-text-ui);
     font-weight: var(--font-weight-600);
     letter-spacing: -0.01em;
     color: var(--kizuna-ink);
 }
 
+.arrow {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--kizuna-ink);
+    transition: transform 0.15s ease;
+}
+
+.card:hover .arrow {
+    transform: translateX(3px);
+}
+
 .description {
-    margin: 8px 0 0;
+    margin: 10px 0 0;
     font-size: 0.9375rem;
     line-height: 1.55;
     color: var(--kizuna-muted);
 }
 
-@media (min-width: 640px) {
+@media (min-width: 640px) and (max-width: 1023px) {
     .grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        row-gap: 44px;
+    }
+
+    .card {
+        padding-inline: 24px;
+    }
+
+    .card:nth-child(2n + 1) {
+        padding-left: 0;
+    }
+
+    .card:nth-child(2n) {
+        border-left: var(--kizuna-hairline) solid var(--kizuna-line);
     }
 }
 
 @media (min-width: 1024px) {
     .grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        row-gap: 52px;
+    }
+
+    .card {
+        padding-inline: 28px;
+    }
+
+    .card:nth-child(3n + 1) {
+        padding-left: 0;
+    }
+
+    .card:not(:nth-child(3n + 1)) {
+        border-left: var(--kizuna-hairline) solid var(--kizuna-line);
     }
 }

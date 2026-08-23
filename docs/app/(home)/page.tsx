@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
 import { HandlerExplorer } from '@/components/code/handler-explorer';
 import { Adapters } from '@/components/landing-page/adapters';
-import { AiEra } from '@/components/landing-page/ai-era';
+import { Agents } from '@/components/landing-page/agents';
 import { Beta } from '@/components/landing-page/beta';
 import { ClosingCta } from '@/components/landing-page/closing-cta';
+import { Contract } from '@/components/landing-page/contract';
 import { FeatureCards } from '@/components/landing-page/feature-cards';
 import { Hero } from '@/components/landing-page/hero';
 import { LinkCards } from '@/components/landing-page/link-cards';
 import { Section } from '@/components/landing-page/section';
-import { SourceOfTruth } from '@/components/landing-page/source-of-truth';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -31,7 +31,7 @@ export default function HomePage() {
             </Section>
 
             <div className={styles.sections}>
-                <SourceOfTruth />
+                <Contract />
 
                 <HandlerExplorer />
 
@@ -41,7 +41,7 @@ export default function HomePage() {
                     <Adapters />
                 </Section>
 
-                <AiEra />
+                <Agents />
 
                 <Section title="Start here">
                     <LinkCards />

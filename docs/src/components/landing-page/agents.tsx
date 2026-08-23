@@ -6,7 +6,7 @@ import ChatGPTLogo from '@/icons/ChatGPT.svg';
 import ClaudeLogo from '@/icons/Claude.svg';
 import CursorLogo from '@/icons/Cursor.svg';
 import McpLogo from '@/icons/Mcp.svg';
-import styles from './ai-era.module.css';
+import styles from './agents.module.css';
 
 interface Tool {
     method: 'GET' | 'POST' | 'DELETE';
@@ -38,7 +38,7 @@ const methodStyles = {
     DELETE: styles.methodDelete,
 };
 
-export function AiEra() {
+export function Agents() {
     return (
         <section className={styles.root}>
             <div className={styles.head}>

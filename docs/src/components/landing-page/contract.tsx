@@ -5,7 +5,7 @@ import KotlinLogo from '@/icons/Kotlin.svg';
 import SwiftLogo from '@/icons/Swift.svg';
 import TanstackLogo from '@/icons/TanStack.svg';
 import TsLogo from '@/icons/TypeScript.svg';
-import styles from './source-of-truth.module.css';
+import styles from './contract.module.css';
 import type { ComponentType } from 'react';
 
 interface Declaration {
@@ -86,7 +86,7 @@ const OPENAPI_CODE = `/users/{id}:
 
 const tsIcon = <TsLogo className={styles.fileIcon} />;
 
-export function SourceOfTruth() {
+export function Contract() {
     return (
         <section className={styles.root}>
             <div className={styles.head}>
