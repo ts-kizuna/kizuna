@@ -191,7 +191,7 @@
 .panelTitle {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
     align-self: flex-start;
     margin: 0;
     font-size: 1.375rem;
@@ -204,11 +204,7 @@
 .panelArrow {
     width: 19px;
     height: 19px;
-    transition: transform 0.15s ease;
-}
-
-.panelTitle:hover .panelArrow {
-    transform: translateX(3px);
+    stroke-width: 2.5;
 }
 
 .panelText {

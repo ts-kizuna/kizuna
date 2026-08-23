@@ -201,7 +201,7 @@
 .columnTitle {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
     align-self: flex-start;
     font-size: 1.5rem;
     font-weight: var(--font-weight-600);
@@ -211,13 +211,9 @@
 }
 
 .columnArrow {
-    width: 20px;
-    height: 20px;
-    transition: transform 0.15s ease;
-}
-
-.columnTitle:hover .columnArrow {
-    transform: translateX(3px);
+    width: 22px;
+    height: 22px;
+    stroke-width: 2.5;
 }
 
 .columnText {
