@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { ROUTES_TAG, type Routes, type RouteDefinition, type ResponseDefinition } from './types.js';
 import { isRouteDefinition } from './handler-pipeline.js';
 import { type TagSet, type TagKeysOf, isTagSet } from './tags.js';
-import { findCoercedSchemaPath, readObjectShape, resolveBaseType } from './zod-internals.js';
+import { findCoercedSchemaPath, isFileSchema, readObjectShape, resolveBaseType, unwrapOptionalWrappers } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
 
@@ -87,6 +87,29 @@ const assertPathParamsAreScalar = (route: RouteDefinition, routeKey: string): vo
     }
 };
 
+/**
+ * Throws when a body declares a file but the route is not multipart. A `File`
+ * cannot ride JSON, so the route could never receive a valid request.
+ */
+const assertFilesRideMultipart = (route: RouteDefinition, routeKey: string): void => {
+    if (!route.body || route.contentType === 'multipart/form-data') return;
+    if (isFileSchema(route.body)) {
+        throw new Error(
+            `Route "${routeKey}" declares a file body without contentType: 'multipart/form-data'. ` +
+                `A File cannot ride JSON; set the content type on the route.`
+        );
+    }
+    const shape = readObjectShape(route.body);
+    if (!shape) return;
+    for (const [name, fieldSchema] of Object.entries(shape)) {
+        if (!isFileSchema(unwrapOptionalWrappers(fieldSchema).inner)) continue;
+        throw new Error(
+            `Route "${routeKey}" declares a file at "body.${name}" without contentType: 'multipart/form-data'. ` +
+                `A File cannot ride JSON; set the content type on the route.`
+        );
+    }
+};
+
 const validateRoutes = (routes: Routes, prefix?: string): void => {
     for (const [key, value] of Object.entries(routes)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
@@ -97,6 +120,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             assertPathParamsMatchPath(value, fullKey);
             assertPathParamsAreScalar(value, fullKey);
             assertNoCoercion(value, fullKey);
+            assertFilesRideMultipart(value, fullKey);
             resolveCoercionPlans(value);
         } else if (value && typeof value === 'object') {
             validateRoutes(value as Routes, fullKey);

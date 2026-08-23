@@ -26,6 +26,7 @@ Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typ
 - **Adapters**: mount your API on Express, Fastify, Hono, or Next.js
 - **HTTP/REST**: follows HTTP and REST standards. RFC 9110 semantics, RFC 9457 Problem Details
 - **Built-in coercion**: query, path, and header params are coerced to their declared types (`z.number()`, `z.boolean()`, `z.date()`, `z.bigint()`), with no manual parsing or `z.coerce` needed
+- **Native types in bodies**: `z.date()`, `z.bigint()`, `URL`, and `File` cross the wire as plain JSON and multipart, and arrive as real values on every surface: handlers, the fetch client, Swift, and Kotlin
 - **OpenAPI generation**: from the same contract, no annotations needed
 - **Native client generation**: typed API clients for Swift (iOS/macOS) and Kotlin (Android/JVM)
 - **Plugins**: extend your API with features built on the contract you already wrote, and get them fully typed in your handlers

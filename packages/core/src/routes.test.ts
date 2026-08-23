@@ -416,3 +416,61 @@ describe('k.routes structured path params', () => {
         ).not.toThrow();
     });
 });
+
+describe('file bodies require multipart', () => {
+    it('throws when a body field declares a file on a JSON route', () => {
+        expect(() =>
+            k.routes('users', {
+                uploadAvatar: {
+                    method: 'POST',
+                    path: '/avatar',
+                    body: z.object({
+                        file: z.instanceof(File),
+                    }),
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            })
+        ).toThrow(/body.file.*multipart/);
+    });
+
+    it('throws when the whole body is a file on a JSON route', () => {
+        expect(() =>
+            k.routes('users', {
+                uploadReport: {
+                    method: 'POST',
+                    path: '/reports',
+                    body: z.file(),
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            })
+        ).toThrow(/file body/);
+    });
+
+    it('accepts a file field on a multipart route', () => {
+        expect(() =>
+            k.routes('users', {
+                uploadAvatar: {
+                    method: 'POST',
+                    path: '/avatar',
+                    contentType: 'multipart/form-data',
+                    body: z.object({
+                        file: z.instanceof(File),
+                    }),
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            })
+        ).not.toThrow();
+    });
+});

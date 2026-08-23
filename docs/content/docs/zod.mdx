@@ -24,11 +24,11 @@ listEvents: {
 },
 ```
 
-One `z.date()`, and every surface gets the real type:
+One `z.date()`, and every surface gets the real type, in query params and bodies alike:
 
-- **The handler** receives `from` as a `Date`, coerced from the query string.
+- **The handler** receives `from` as a `Date`, coerced from the query string. A `z.date()` body field arrives as a `Date` too.
 - **The Swift client** compiles it to `Date`, the Kotlin client to `Instant`.
-- **The fetch client** serializes it back on the way out.
+- **The fetch client** serializes it on the way out and revives response dates on the way back.
 
 A validator-neutral description cannot say any of that. JSON Schema has no `Date`, `bigint`, or transform to describe, a file upload flattens to a string, and a discriminated union loses its discriminator.
 

@@ -40,7 +40,7 @@ export const reportsRoutes = k.routes('reports', {
 });
 ```
 
-The handler returns the bytes, as a `Buffer` or `Uint8Array`. Set `Content-Disposition` as a normal response header if you want a download:
+The handler returns the bytes, as a `Buffer` or `Uint8Array`. The fetch client hands the body back as a `Uint8Array`. Set `Content-Disposition` as a normal response header if you want a download:
 
 ```ts title="router/reports.ts"
 downloadReport: async ({ params }) => {
@@ -77,3 +77,5 @@ uploadAvatar: {
     },
 },
 ```
+
+Zod's own `z.file()` is recognized everywhere `FileSchema` is. For `Date`, `bigint`, and `URL` values in bodies, see [Native types](/docs/reference/native-types).

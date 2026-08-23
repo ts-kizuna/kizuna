@@ -189,21 +189,21 @@ If a path is matched but the method is not defined in the contract, the adapter 
 
 ## Multipart / file uploads
 
-For routes with `contentType: 'multipart/form-data'`, add a multipart middleware such as `multer` or `busboy` before the ts-kizuna handler. The adapter reads `req.body` as-is.
+Routes with `contentType: 'multipart/form-data'` work out of the box: the adapter buffers the request and parses it itself, so a `FileSchema` field reaches the handler as a real `File` with no middleware.
 
-```ts title="src/index.ts"
-import multer from 'multer';
-
-const upload = multer({
-    storage: multer.memoryStorage(),
-});
-
-app.post('/avatar', upload.single('file'), (req, res, next) => {
-    next();
-});
-
-api.mount(app);
+```ts
+uploadAvatar: async ({ body }) => ({
+    status: 200,
+    body: {
+        size: body.file.size,
+        userId: body.userId,
+    },
+}),
 ```
+
+A multipart middleware such as `multer` still works: when it has already set `req.body`, the adapter uses that instead of parsing.
+
+Urlencoded bodies (`contentType: 'application/x-www-form-urlencoded'`) still need `express.urlencoded()` before the handler.
 
 ## Reference
 

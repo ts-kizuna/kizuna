@@ -127,7 +127,7 @@ Values in the URL and in headers always arrive as strings. ts-kizuna coerces the
 | `z.bigint()`             | `"9007199254740993"` | `9007199254740993n` |
 | `z.date()`               | an ISO 8601 string   | `Date`              |
 
-Arrays of these coerce too (`z.array(z.number())`). The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without manual formatting. Request bodies are sent as JSON and keep their types.
+Arrays of these coerce too (`z.array(z.number())`). The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without manual formatting.
 
 Because coercion is built in, **`z.coerce` is not supported**, and `k.routes` throws if any schema uses it. Declare the plain schema (`z.number()`, `z.date()`, `z.bigint()`). To receive a different type than you send, use `z.string().transform(...)`.
 
@@ -163,6 +163,23 @@ responses: {
     },
 },
 ```
+
+## Native types in bodies
+
+Bodies carry native types too, nested at any depth. The wire stays plain JSON, and the OpenAPI document describes exactly what crosses it:
+
+| Declare                   | On the wire        | OpenAPI               | You get  |
+| ------------------------- | ------------------ | --------------------- | -------- |
+| `z.date()`                | an ISO 8601 string | `string`, `date-time` | `Date`   |
+| `z.bigint()`              | a JSON integer     | `integer`, `int64`    | `bigint` |
+| `UrlSchema`               | the absolute URL   | `string`, `uri`       | `URL`    |
+| `FileSchema` / `z.file()` | a multipart part   | `string`, `binary`    | `File`   |
+
+Both directions revive: a handler receives a `z.date()` body field as a `Date`, and the fetch client hands a `z.date()` response field back as a `Date`. The Swift client sees `Date`, `Int64`, and `URL`; the Kotlin client `Instant`, `Long`, and `String`.
+
+A `bigint` crosses the wire as a JSON integer with its exact digits, beyond `Number.MAX_SAFE_INTEGER` included, in every response and in bodies the fetch client sends or receives. Two bounds remain: a request body parsed by the server framework's own `JSON.parse` is exact up to ±2^53, and a browser without `JSON.rawJSON` (Baseline 2025) sends larger values as an error instead of rounding them silently.
+
+Fields inside plain `z.union(...)` options pass through unconverted; `z.discriminatedUnion(...)` variants revive like any other object. The full behavior, bounds included, is in [Native types](/docs/reference/native-types).
 
 ## Bundle into a contract
 

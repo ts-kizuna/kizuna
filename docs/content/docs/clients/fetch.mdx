@@ -162,6 +162,12 @@ type ListUsersResponse = {
 
 `ClientArgs<Route>` and `ClientResponse<Route>` are exported for building on top of the client, as [`@ts-kizuna/tanstack-query`](/docs/clients/tanstack-query) does. Reach for them when writing your own wrapper; calling routes needs neither.
 
+## Native types
+
+Bodies round-trip [native types](/docs/reference/native-types). The client serializes `Date`, `bigint`, and `URL` values in the request body, and revives the same fields in the response, so a `z.date()` response field really is a `Date` at runtime, exactly as its type says. A `BinarySchema` response arrives as a `Uint8Array`.
+
+Revival is driven by the contract's schemas and never validates: fields the contract does not declare pass through untouched, so a newer server's extra fields do not break an older client. Undeclared statuses arrive as plain parsed JSON.
+
 ## Validation errors
 
 A route with a `body` or `query` schema can answer `400` when the request fails validation. It is in the response type already, without you declaring it.

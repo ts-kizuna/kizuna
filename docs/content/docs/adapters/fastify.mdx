@@ -212,6 +212,12 @@ const router: Router<typeof contract> = { ... };
 
 `RouteHandler` carries the route's `auth` and request context, nested groups included.
 
+## Multipart / file uploads
+
+Routes with `contentType: 'multipart/form-data'` work out of the box. When no multipart parser is registered, the plugin registers one that buffers the request, and the adapter parses it, so a `FileSchema` field reaches the handler as a real `File`.
+
+A registered `@fastify/multipart` keeps precedence: register it before `api.mount` and its parsed body flows through unchanged.
+
 ## Reference
 
 - [`new KizunaServer()`](/docs/reference/kizuna-server)

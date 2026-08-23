@@ -1,0 +1,56 @@
+---
+title: Native types
+description: Date, bigint, URL, and File in request and response bodies, revived on both sides of the wire.
+---
+
+Declare `z.date()`, `z.bigint()`, `UrlSchema`, or `FileSchema` anywhere in a body, and every surface works with the real type. The wire stays plain JSON (multipart for files), and the OpenAPI document describes exactly what crosses it.
+
+| Declare                   | On the wire        | OpenAPI               | Handler and fetch client | Swift           | Kotlin          |
+| ------------------------- | ------------------ | --------------------- | ------------------------ | --------------- | --------------- |
+| `z.date()`                | an ISO 8601 string | `string`, `date-time` | `Date`                   | `Date`          | `Instant`       |
+| `z.bigint()`              | a JSON integer     | `integer`, `int64`    | `bigint`                 | `Int64`         | `Long`          |
+| `UrlSchema`               | the absolute URL   | `string`, `uri`       | `URL`                    | `URL`           | `String`        |
+| `FileSchema` / `z.file()` | a multipart part   | `string`, `binary`    | `File`                   | `MultipartFile` | `MultipartFile` |
+
+`UrlSchema` is `z.instanceof(URL)`, from `@ts-kizuna/core/schemas`:
+
+```ts
+import { UrlSchema } from '@ts-kizuna/core/schemas';
+
+scheduleUserExport: {
+    method: 'POST',
+    path: '/users/:id/exports',
+    body: z.object({
+        startAfter: z.date(),
+        notifyUrl: UrlSchema,
+    }),
+    responses: {
+        201: z.object({
+            scheduledFor: z.date(),
+            estimatedBytes: z.bigint(),
+            statusUrl: UrlSchema,
+        }),
+    },
+},
+```
+
+The handler receives `startAfter` as a `Date` and `notifyUrl` as a `URL`, and returns them as such. The fetch client takes the same native values in `body` and revives `scheduledFor`, `estimatedBytes`, and `statusUrl` in the response.
+
+## How revival works
+
+The conversion is driven by the schema, not by tagging values on the wire. kizuna walks each body schema once, caches the plan, and applies it where the body crosses a boundary: request validation on the server, response rendering in core, and both directions in the fetch client. Objects, arrays, records, optionals, and discriminated unions revive at any depth. Fields inside plain `z.union(...)` options pass through unconverted when the options disagree.
+
+The fetch client never validates responses. It revives the declared fields and passes everything else through, so a response with fields the client's contract does not know yet still parses. Undeclared statuses, including the automatic `400` validation error, arrive as plain parsed JSON.
+
+## bigint precision
+
+A `z.bigint()` crosses the wire as a JSON integer with its exact digits. Responses are serialized in core with `JSON.rawJSON`, and the fetch client parses with the raw source in hand, so values beyond `Number.MAX_SAFE_INTEGER` round-trip exactly between a kizuna server and its clients. Swift's `Int64` and Kotlin's `Long` read the same integers directly.
+
+Two bounds remain:
+
+- A request body is parsed by the server framework's own `JSON.parse` before kizuna sees it, so request-side integers are exact up to ±2^53. Larger values belong in responses, or in a `z.string().transform(BigInt)` field.
+- In a browser without `JSON.rawJSON` (Baseline 2025), the fetch client sends values within ±2^53 as plain numbers and throws for larger ones, naming the field. Nothing rounds silently.
+
+## Files
+
+`FileSchema` fields ride `multipart/form-data` on every adapter. Express and Fastify parse multipart themselves when no middleware got there first; Hono and Next.js use the framework's own form parsing. See [BinarySchema & FileSchema](/docs/reference/binary-and-file-schemas) for the upload route shape and binary responses.
