@@ -520,3 +520,100 @@ describe('body is not coerced', () => {
         expect(result.ok).toBe(false);
     });
 });
+
+describe('body revival', () => {
+    it('revives dates, bigints, and urls in a JSON body', () => {
+        const route = makeRoute({
+            method: 'POST',
+            body: z.object({
+                scheduledAt: z.date(),
+                total: z.bigint(),
+                website: z.instanceof(URL),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {},
+            body: {
+                scheduledAt: '2026-08-23T10:00:00.000Z',
+                total: 42,
+                website: 'https://example.com/docs',
+            },
+            headers: {},
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            const body = result.parsed.body as {
+                scheduledAt: Date;
+                total: bigint;
+                website: URL;
+            };
+            expect(body.scheduledAt).toBeInstanceOf(Date);
+            expect(body.total).toBe(42n);
+            expect(body.website.href).toBe('https://example.com/docs');
+        }
+    });
+
+    it('rejects a body whose wire values do not match their schemas', () => {
+        const route = makeRoute({
+            method: 'POST',
+            body: z.object({
+                scheduledAt: z.date(),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {},
+            body: {
+                scheduledAt: 'not-a-date',
+            },
+            headers: {},
+        });
+        expect(result.ok).toBe(false);
+    });
+
+    it('does not coerce JSON body strings into numbers or booleans', () => {
+        const route = makeRoute({
+            method: 'POST',
+            body: z.object({
+                age: z.number(),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {},
+            body: {
+                age: '30',
+            },
+            headers: {},
+        });
+        expect(result.ok).toBe(false);
+    });
+
+    it('coerces multipart body strings into their declared scalars', () => {
+        const route = makeRoute({
+            method: 'POST',
+            contentType: 'multipart/form-data',
+            body: z.object({
+                age: z.number(),
+                active: z.boolean(),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {},
+            body: {
+                age: '30',
+                active: 'true',
+            },
+            headers: {},
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.parsed.body).toEqual({
+                age: 30,
+                active: true,
+            });
+        }
+    });
+});
