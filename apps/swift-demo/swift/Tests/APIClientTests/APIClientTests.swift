@@ -322,6 +322,28 @@ final class APIClientTests: XCTestCase {
         }
     }
 
+    func testScheduleUserExportNativeTypes() async throws {
+        // scheduleUserExport carries z.date(), z.bigint(), and UrlSchema across
+        // the wire: Date and URL out, Date, Int64, and URL back.
+        let created = try await client.users.createUser(
+            .body(
+                name: "Export Target",
+                email: "export@example.com"
+            )
+        )
+        let startAfter = Date(timeIntervalSince1970: 1_787_479_200)
+        let response = try await client.users.scheduleUserExport(
+            .params(id: created.body.id),
+            .body(
+                startAfter: startAfter,
+                notifyUrl: URL(string: "https://example.com/hooks/exports")!
+            )
+        )
+        XCTAssertEqual(response.body.scheduledFor, startAfter.addingTimeInterval(60))
+        XCTAssertEqual(response.body.estimatedBytes, 8_589_934_592)
+        XCTAssertEqual(response.body.statusUrl.absoluteString, "https://api.example.com/users/\(created.body.id)/exports/next")
+    }
+
     func testPingUserVoidBodyAndResponse() async throws {
         // pingUser has body: z.void() and responses: { 204: z.void() }.
         // The generated method takes no body param and returns Void, this test
@@ -439,29 +461,18 @@ final class APIClientTests: XCTestCase {
     }
 
     func testUploadAvatarMultipartEncoding() async throws {
-        // The express demo ships a stub for multipart (see CLAUDE.md). The contract validator
-        // rejects with 400 because parsed form fields don't satisfy `z.instanceof(File)`. We
-        // verify the client serialized and sent the request, not the server-side round-trip.
+        // The Express adapter parses multipart itself, so the upload round-trips:
+        // the server receives the file and answers with its size.
         let bytes = Data(repeating: 0xAB, count: 16)
         let file = APIClient.MultipartFile(data: bytes, filename: "avatar.bin", mimeType: "application/octet-stream")
-        do {
-            _ = try await client.users.uploadAvatar(
-                .body(
-                    file: file,
-                    userId: "1"
-                )
+        let result = try await client.users.uploadAvatar(
+            .body(
+                file: file,
+                userId: "1"
             )
-            XCTFail("expected .unexpectedStatus to be thrown")
-        } catch let failure {
-            switch failure {
-            case .badRequest:
-                break
-            case .requestFailed(let underlying):
-                XCTFail("multipart request should reach the server, got request failure: \(underlying)")
-            default:
-                XCTFail("expected .badRequest, got \(failure)")
-            }
-        }
+        )
+        XCTAssertEqual(result.body.size, 16)
+        XCTAssertEqual(result.body.userId, "1")
     }
 }
 

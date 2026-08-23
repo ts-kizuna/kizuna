@@ -948,6 +948,83 @@ public final class OpenEnumAPIClient: Sendable {
         }
     }
 
+    public enum UsersScheduleUserExport {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let startAfter: Date
+            public let notifyUrl: Foundation.URL
+
+            public init(
+                startAfter: Date,
+                notifyUrl: Foundation.URL
+            ) {
+                self.startAfter = startAfter
+                self.notifyUrl = notifyUrl
+            }
+        }
+
+        public struct Response201: Codable, Sendable, Equatable {
+            public let scheduledFor: Date
+            public let estimatedBytes: Int64
+            public let statusUrl: Foundation.URL
+
+            public init(
+                scheduledFor: Date,
+                estimatedBytes: Int64,
+                statusUrl: Foundation.URL
+            ) {
+                self.scheduledFor = scheduledFor
+                self.estimatedBytes = estimatedBytes
+                self.statusUrl = statusUrl
+            }
+        }
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(
+                startAfter: Date,
+                notifyUrl: Foundation.URL
+            ) -> Self {
+                .init(payload: Input(startAfter: startAfter, notifyUrl: notifyUrl))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response201
+
+            public init(body: Response201) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(OpenEnumAPIClient.ValidationError)
+        }
+    }
+
     public enum UsersUploadAvatar {
 
         public struct Input: Sendable, Equatable {
@@ -2085,6 +2162,29 @@ public struct OpenEnumAPIUsersClient: Sendable {
             return OpenEnumAPIClient.UsersArchiveUser.Result(body: .status201(payload))
         default:
             throw OpenEnumAPIClient.UsersArchiveUser.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Schedule an export of a user, native types in both directions
+    public func scheduleUserExport(_ params: OpenEnumAPIClient.UsersScheduleUserExport.Params, _ body: OpenEnumAPIClient.UsersScheduleUserExport.Body) async throws(OpenEnumAPIClient.UsersScheduleUserExport.Failure) -> OpenEnumAPIClient.UsersScheduleUserExport.Result {
+        var path = "/users/:id/exports"
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersScheduleUserExport.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.UsersScheduleUserExport.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersScheduleUserExport.Failure.self)
+        switch statusCode {
+        case 201:
+            let body = try Kizuna.decode(OpenEnumAPIClient.UsersScheduleUserExport.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersScheduleUserExport.Failure.self)
+            return OpenEnumAPIClient.UsersScheduleUserExport.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersScheduleUserExport.Failure.self)
+            throw OpenEnumAPIClient.UsersScheduleUserExport.Failure.badRequest(payload)
+        default:
+            throw OpenEnumAPIClient.UsersScheduleUserExport.Failure.unexpectedStatus(statusCode, data)
         }
     }
 

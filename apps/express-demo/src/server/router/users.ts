@@ -157,17 +157,21 @@ export const users: Router<typeof contract.routes.users> = {
             },
         };
     },
-    uploadAvatar: () => {
-        // Multipart is out of scope for the Express adapter today (see CLAUDE.md).
-        // Real consumers wire multer (or similar) before this handler runs.
-        return {
-            status: 200,
-            body: {
-                size: 0,
-                userId: 'unsupported',
-            },
-        };
-    },
+    scheduleUserExport: ({ params, body }) => ({
+        status: 201,
+        body: {
+            scheduledFor: new Date(body.startAfter.getTime() + 60_000),
+            estimatedBytes: 8_589_934_592n,
+            statusUrl: new URL(`https://api.example.com/users/${params.id}/exports/next`),
+        },
+    }),
+    uploadAvatar: ({ body }) => ({
+        status: 200,
+        body: {
+            size: body.file.size,
+            userId: body.userId,
+        },
+    }),
     pingUser: () => ({
         status: 204,
         body: undefined,

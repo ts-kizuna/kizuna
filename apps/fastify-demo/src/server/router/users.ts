@@ -157,6 +157,14 @@ export const users: Router<typeof contract.routes.users> = {
             },
         };
     },
+    scheduleUserExport: ({ params, body }) => ({
+        status: 201,
+        body: {
+            scheduledFor: new Date(body.startAfter.getTime() + 60_000),
+            estimatedBytes: 8_589_934_592n,
+            statusUrl: new URL(`https://api.example.com/users/${params.id}/exports/next`),
+        },
+    }),
     uploadAvatar: async ({ body }) => {
         const buffer = await body.file.arrayBuffer();
         return {

@@ -444,6 +444,52 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
+    object UsersScheduleUserExport {
+
+        @Serializable
+        data class Input(
+            val startAfter: Instant,
+            val notifyUrl: String
+        )
+
+        @Serializable
+        data class Response201(
+            val scheduledFor: Instant,
+            val estimatedBytes: Long,
+            val statusUrl: String
+        )
+
+        data class Params(val id: String)
+
+        data class Body(
+            val startAfter: Instant,
+            val notifyUrl: String
+        )
+
+        sealed interface Args {
+            val params: Params
+            val body: Body
+        }
+
+        object Scope {
+            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+        }
+
+        class AfterParams internal constructor(internal val params: Params) {
+            fun body(startAfter: Instant, notifyUrl: String): AfterBody = AfterBody(params = params, body = Body(startAfter = startAfter, notifyUrl = notifyUrl))
+        }
+
+        class AfterBody internal constructor(override val params: Params, override val body: Body) : Args
+
+        data class Result(val body: Response201)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object UsersUploadAvatar {
 
         data class Input(
@@ -1315,6 +1361,46 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     catch (error: Exception) { throw APIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
                 }
                 else -> throw APIClient.UsersArchiveUser.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Schedule an export of a user, native types in both directions */
+    @Throws(APIClient.UsersScheduleUserExport.Failure::class)
+    suspend fun scheduleUserExport(build: APIClient.UsersScheduleUserExport.Scope.() -> APIClient.UsersScheduleUserExport.Args): APIClient.UsersScheduleUserExport.Result {
+        val args = APIClient.UsersScheduleUserExport.Scope.build()
+        val params = args.params
+        val body = args.body
+        var path = "/users/:id/exports"
+        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = APIClient.UsersScheduleUserExport.Input(startAfter = body.startAfter, notifyUrl = body.notifyUrl)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                201 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.UsersScheduleUserExport.Response201>(data.decodeToString())
+                        return@use APIClient.UsersScheduleUserExport.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.UsersScheduleUserExport.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersScheduleUserExport.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersScheduleUserExport.Failure.BadRequest(body = payload)
+                }
+                else -> throw APIClient.UsersScheduleUserExport.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

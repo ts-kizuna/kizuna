@@ -1,5 +1,5 @@
 import { Kizuna } from '@ts-kizuna/core';
-import { ProblemDetailsSchema, BinarySchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema, BinarySchema, UrlSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
 import { k } from '../k';
 import { PaginationQuery } from '../pagination';
@@ -231,6 +231,22 @@ export const usersRoutes = k.routes('users', {
             }),
         },
         summary: 'Archive a user, first call returns 201, subsequent calls 200',
+    },
+    scheduleUserExport: {
+        method: 'POST',
+        path: '/users/:id/exports',
+        body: z.object({
+            startAfter: z.date(),
+            notifyUrl: UrlSchema,
+        }),
+        responses: {
+            201: z.object({
+                scheduledFor: z.date(),
+                estimatedBytes: z.bigint(),
+                statusUrl: UrlSchema,
+            }),
+        },
+        summary: 'Schedule an export of a user, native types in both directions',
     },
     uploadAvatar: {
         method: 'POST',
