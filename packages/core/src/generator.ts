@@ -13,6 +13,7 @@ export {
     FILE_PROBE,
     isFileSchema,
     isBinarySchema,
+    isUrlSchema,
     isVoidSchema,
     isObjectSchema,
     isIntegerSchema,

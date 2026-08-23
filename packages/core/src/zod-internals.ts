@@ -199,10 +199,12 @@ export const readDiscriminatorStringLiteral = (variant: z.core.$ZodType, propert
 export const FILE_PROBE: unknown = typeof File !== 'undefined' ? new File([''], 'probe') : null;
 
 /**
- * True for `z.instanceof(File)`-style custom schemas. Probes with a real File
- * and a string so other `custom` schemas are not matched.
+ * True for `z.file()` schemas and `z.instanceof(File)`-style custom schemas.
+ * Custom schemas are probed with a real File and a string so other `custom`
+ * schemas are not matched.
  */
 export const isFileSchema = (schema: z.core.$ZodType): boolean => {
+    if (readDefType(schema) === 'file') return true;
     if (FILE_PROBE === null) return false;
     if (readDefType(schema) !== 'custom') return false;
     return z.core.safeParse(schema, FILE_PROBE).success && !z.core.safeParse(schema, 'not-a-file').success;
@@ -222,6 +224,21 @@ export const isBinarySchema = (schema: z.core.$ZodType): boolean => {
     if (readDefType(schema) !== 'custom') return false;
     if (isFileSchema(schema)) return false;
     return z.core.safeParse(schema, BINARY_PROBE).success && !z.core.safeParse(schema, 'not-a-uint8array').success;
+};
+
+/**
+ * A `URL` instance used to probe schemas.
+ */
+export const URL_PROBE: URL = new URL('https://example.com/');
+
+/**
+ * True for `z.instanceof(URL)`-style custom schemas (the `UrlSchema` helper).
+ * Probes with a real `URL` and the equivalent string so other `custom` schemas,
+ * including `z.instanceof(File)` and `z.instanceof(Uint8Array)`, are not matched.
+ */
+export const isUrlSchema = (schema: z.core.$ZodType): boolean => {
+    if (readDefType(schema) !== 'custom') return false;
+    return z.core.safeParse(schema, URL_PROBE).success && !z.core.safeParse(schema, URL_PROBE.href).success;
 };
 
 /**
