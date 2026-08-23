@@ -1,10 +1,10 @@
 .grid {
     display: grid;
     grid-template-columns: 1fr;
-    row-gap: 36px;
+    row-gap: 48px;
     border-radius: 20px;
     background-color: var(--kizuna-surface);
-    padding: 32px 0;
+    padding: 24px 0;
 }
 
 .card {
@@ -19,7 +19,7 @@
     content: '';
     position: absolute;
     right: 20px;
-    bottom: -18px;
+    bottom: -24px;
     left: 20px;
     height: var(--kizuna-hairline);
     background-color: var(--kizuna-line-strong);
@@ -79,10 +79,17 @@
     color: var(--kizuna-muted);
 }
 
+@media (max-width: 639px) {
+    .description {
+        margin-top: 4px;
+    }
+}
+
 @media (min-width: 640px) and (max-width: 1023px) {
     .grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         row-gap: 44px;
+        padding: 32px 0;
     }
 
     .card {
@@ -108,6 +115,7 @@
     .grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         row-gap: 52px;
+        padding: 32px 0;
     }
 
     .card {
