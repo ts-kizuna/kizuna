@@ -23,7 +23,7 @@ export const features: Feature[] = [
         icons: [FileText],
         title: 'OpenAPI generation',
         href: '/docs/openapi',
-        description: 'From the same contract, no annotations needed.',
+        description: 'Generate a complete OpenAPI spec from the contract you already wrote.',
     },
     {
         icons: [SwiftLogo, KotlinLogo],
