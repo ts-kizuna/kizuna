@@ -51,7 +51,7 @@ export function Agents() {
                     <div className={styles.visual}>
                         <div className={styles.diagram}>
                             <div className={styles.agents}>
-                                <span className={clsx(styles.agent, styles.agentActive)}>
+                                <span className={styles.agent}>
                                     <ClaudeLogo className={styles.agentIcon} aria-hidden />
                                     Claude
                                 </span>

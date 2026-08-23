@@ -55,7 +55,7 @@
     flex: 1;
     align-items: center;
     justify-content: center;
-    padding-block: 24px 40px;
+    padding-block: 0 28px;
 }
 
 .diagram {
@@ -63,6 +63,10 @@
     width: 100%;
     align-items: center;
     justify-content: center;
+    align-self: stretch;
+    border-radius: 10px;
+    background-color: var(--kizuna-window);
+    padding: 48px 28px;
 }
 
 .agents {
@@ -75,16 +79,12 @@
     display: inline-flex;
     align-items: center;
     gap: 9px;
-    border: var(--kizuna-hairline) solid var(--kizuna-line);
+    border: var(--kizuna-hairline) solid var(--kizuna-line-strong);
     border-radius: 12px;
     padding: 10px 16px;
     font-family: var(--kizuna-mono);
     font-size: 0.85rem;
     color: var(--kizuna-ink);
-}
-
-.agentActive {
-    border-color: var(--kizuna-line-strong);
 }
 
 .agentIcon {
@@ -159,6 +159,7 @@
 
 .method {
     display: inline-flex;
+    flex-shrink: 0;
     justify-content: center;
     min-width: 34px;
     border-radius: 6px;
@@ -184,8 +185,9 @@
 }
 
 .claudeFrame {
+    display: flex;
     width: 100%;
-    max-width: 460px;
+    align-self: stretch;
 }
 
 .panelTitle {
@@ -218,11 +220,6 @@
 @media (max-width: 1023px) {
     .panels {
         grid-template-columns: 1fr;
-    }
-
-    .panel:first-child .corner,
-    .corner {
-        right: 8px;
     }
 }
 
