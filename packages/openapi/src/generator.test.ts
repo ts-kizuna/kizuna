@@ -247,12 +247,12 @@ describe('Zod meta() in OpenAPI output', () => {
         });
     });
 
-    it('preserves description and example metadata on properties', () => {
+    it('preserves description and emits example as examples on properties', () => {
         const spec = generateJson(taggedContract, baseConfig);
         const userSchema = spec.components?.schemas?.TaggedUser as Record<string, unknown> | undefined;
         const properties = (userSchema?.properties ?? {}) as Record<string, Record<string, unknown>>;
         expect(properties['id']?.description).toBe('User ID');
-        expect(properties['id']?.example).toBe('usr_123');
+        expect(properties['id']?.examples).toEqual(['usr_123']);
         expect(properties['name']?.description).toBe('Display name');
     });
 
@@ -1285,6 +1285,67 @@ describe('deprecation from metadata', () => {
             | undefined;
         expect(responseSchema?.properties?.['name']?.deprecated).toBe(true);
         expect(responseSchema?.properties?.['fullName']?.deprecated).toBeUndefined();
+    });
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+});
+
+describe('examples from metadata', () => {
+    const EventSchema = Kizuna.model({
+        title: 'ExampleEvent',
+        schema: z.object({
+            id: z.string().meta({
+                example: 'evt_123',
+            }),
+            example: z.string(),
+        }),
+    });
+    const exampleRoutes = k.routes('api', {
+        listEvents: {
+            method: 'GET',
+            path: '/events',
+            responses: {
+                200: EventSchema,
+            },
+        },
+        createEvent: {
+            method: 'POST',
+            path: '/events',
+            body: z.object({
+                name: z.string().meta({
+                    example: ['Launch party', 'Board meeting'],
+                }),
+            }),
+            responses: {
+                201: EventSchema,
+            },
+        },
+    });
+
+    const exampleContract = k.contract({
+        routes: exampleRoutes,
+    });
+    const spec = generateJson(exampleContract, baseConfig);
+    const eventSchema = spec.components?.schemas?.ExampleEvent as Record<string, Record<string, Record<string, unknown>>> | undefined;
+
+    it('emits a field example as JSON Schema `examples` on its component schema', () => {
+        expect(eventSchema?.properties?.['id']?.examples).toEqual(['evt_123']);
+        expect(eventSchema?.properties?.['id']?.example).toBeUndefined();
+    });
+
+    it('leaves a property named `example` untouched', () => {
+        expect(eventSchema?.properties?.['example']).toEqual({
+            type: 'string',
+        });
+    });
+
+    it('emits an example array as multiple JSON Schema examples', () => {
+        const bodySchema = spec.paths['/events']?.post?.requestBody?.content?.['application/json']?.schema as
+            | Record<string, Record<string, Record<string, unknown>>>
+            | undefined;
+        expect(bodySchema?.properties?.['name']?.examples).toEqual(['Launch party', 'Board meeting']);
     });
 
     it('is a valid OpenAPI 3.1 document', async () => {

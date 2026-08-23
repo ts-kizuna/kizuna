@@ -1,8 +1,5 @@
-/**
- * Zod types `deprecated` as a boolean to match JSON Schema. Widened here so a
- * schema deprecation can carry a message, the same shape routes use. Outputs
- * that need a boolean emit `deprecated: true`.
- */
+import type { $output } from 'zod/v4/core';
+
 declare module 'zod/v4/core' {
     interface GlobalMeta {
         /**
@@ -10,6 +7,16 @@ declare module 'zod/v4/core' {
          * instead.
          */
         deprecated?: boolean | string;
+        /**
+         * An example value, or an array of them. Emitted as JSON Schema
+         * `examples`.
+         *
+         * @example
+         * const email = z.email().meta({
+         *     example: 'ada@example.com',
+         * });
+         */
+        example?: $output | $output[];
     }
 }
 

@@ -21,6 +21,7 @@
         "extend",
         "---Reference---",
         "standards",
+        "zod",
         "reference",
         "migration"
     ]

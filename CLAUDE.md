@@ -29,6 +29,7 @@ Every GET route answers HEAD (RFC 9110 section 9.3.2): same status and headers, 
 ### Deliberate omissions
 
 - **TRACE**: excluded from `Method`. Universally disabled in production and unsupported by modern frameworks. Do not add it.
+- **Standard Schema**: contracts accept Zod schemas alone. The generators read metadata, JSON Schema conversion, and schema internals the interface does not expose, and supporting every validator would mean rebuilding them per library. Do not add it.
 
 # Jobs
 

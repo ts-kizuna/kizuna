@@ -106,19 +106,19 @@ const buildDiscriminatorBlock = (
 };
 
 /**
- * JSON Schema and OpenAPI declare `deprecated` as a boolean, while kizuna's
- * metadata allows a message string. Emit `deprecated: true`; the message stays
- * in outputs with a place for it, like Swift's `@available`.
+ * kizuna's metadata widens JSON Schema: `deprecated` may carry a message and
+ * `example` holds one value or several. Emit `deprecated: true` and an
+ * `examples` array; the message stays in outputs with a place for it, like
+ * Swift's `@available`.
  */
-const normalizeDeprecated = (value: unknown): void => {
-    if (Array.isArray(value)) {
-        for (const entry of value) normalizeDeprecated(entry);
-        return;
+const normalizeMeta = ({ jsonSchema }: { jsonSchema: Record<string, unknown> }): void => {
+    if (typeof jsonSchema.deprecated === 'string') jsonSchema.deprecated = true;
+    if ('example' in jsonSchema) {
+        const given = Array.isArray(jsonSchema.example) ? jsonSchema.example : [jsonSchema.example];
+        const declared = Array.isArray(jsonSchema.examples) ? jsonSchema.examples : [];
+        jsonSchema.examples = [...given, ...declared];
+        delete jsonSchema.example;
     }
-    if (!value || typeof value !== 'object') return;
-    const record = value as Record<string, unknown>;
-    if (typeof record.deprecated === 'string') record.deprecated = true;
-    for (const child of Object.values(record)) normalizeDeprecated(child);
 };
 
 const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Record<string, unknown> => {
@@ -131,18 +131,19 @@ const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Rec
     const discriminated = readDiscriminatedUnion(schema);
     if (discriminated) {
         const raw = rewriteRefs(
-            omit(z.toJSONSchema(schema, { unrepresentable: 'any', io }) as Record<string, unknown>, ['$defs', '$schema'])
+            omit(z.toJSONSchema(schema, { unrepresentable: 'any', io, override: normalizeMeta }) as Record<string, unknown>, [
+                '$defs',
+                '$schema',
+            ])
         ) as Record<string, unknown>;
-        normalizeDeprecated(raw);
         return {
             ...raw,
             discriminator: buildDiscriminatorBlock(discriminated.discriminator, discriminated.options),
         };
     }
-    const raw = z.toJSONSchema(schema, { unrepresentable: 'any', io }) as Record<string, unknown>;
+    const raw = z.toJSONSchema(schema, { unrepresentable: 'any', io, override: normalizeMeta }) as Record<string, unknown>;
     const result = rewriteRefs(omit(raw, ['$defs', '$schema'])) as Record<string, unknown>;
     applyFileBinary(schema, result);
-    normalizeDeprecated(result);
     return result;
 };
 
@@ -161,12 +162,12 @@ const buildComponentSchemas = (): Record<string, unknown> | undefined => {
         uri: (id: string) => COMPONENT_REF_BASE + id,
         unrepresentable: 'any',
         io: 'output',
+        override: normalizeMeta,
     });
     const schemas = result.schemas as Record<string, Record<string, unknown>>;
     const cleaned: Record<string, unknown> = {};
     for (const [id, schema] of Object.entries(schemas)) {
         const base = rewriteRefs(omit(schema, ['$schema', '$defs', '$id'])) as Record<string, unknown>;
-        normalizeDeprecated(base);
         const discriminator = discriminators.get(id);
         cleaned[id] = discriminator
             ? {
