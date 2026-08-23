@@ -4,13 +4,14 @@ import {
     createGenerator,
     isFileSchema,
     isBinarySchema,
+    isUrlSchema,
     isVoidSchema,
     parsePath,
+    readDefType,
     readDiscriminatedUnion,
     readDiscriminatorLiteral,
     readMeta,
     readMetaId,
-    readObjectShape,
     globalRegistrySchemas,
     resolveResponseBody,
     resolveResponseHeaders,
@@ -62,24 +63,6 @@ const rewriteRefs = (value: unknown): unknown => {
     return value;
 };
 
-const applyFileBinary = (zodSchema: z.core.$ZodType, jsonSchema: unknown): void => {
-    if (!jsonSchema || typeof jsonSchema !== 'object') return;
-    const shape = readObjectShape(zodSchema);
-    if (!shape) return;
-    const properties = (jsonSchema as { properties?: Record<string, unknown> }).properties;
-    if (!properties) return;
-    for (const [key, child] of Object.entries(shape)) {
-        if (isFileSchema(child)) {
-            properties[key] = {
-                type: 'string',
-                format: 'binary',
-            };
-        } else {
-            applyFileBinary(child, properties[key]);
-        }
-    }
-};
-
 const buildDiscriminatorBlock = (
     propertyName: string,
     options: z.core.$ZodType[]
@@ -121,6 +104,41 @@ const normalizeMeta = ({ jsonSchema }: { jsonSchema: Record<string, unknown> }):
     }
 };
 
+/**
+ * Zod marks `z.date()` and `z.bigint()` unrepresentable, so the converter
+ * would emit `{}` for them. kizuna puts them on the wire as ISO 8601 strings
+ * and int64 numbers, and the document says so. Files and URLs are schemas the
+ * converter cannot see into; the shared probes recognize them.
+ */
+const applyNativeTypes = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; jsonSchema: Record<string, unknown> }): void => {
+    const type = readDefType(zodSchema);
+    if (type === 'date') {
+        jsonSchema.type = 'string';
+        jsonSchema.format = 'date-time';
+        return;
+    }
+    if (type === 'bigint') {
+        jsonSchema.type = 'integer';
+        jsonSchema.format = 'int64';
+        return;
+    }
+    if (type !== 'custom') return;
+    if (isFileSchema(zodSchema)) {
+        jsonSchema.type = 'string';
+        jsonSchema.format = 'binary';
+        return;
+    }
+    if (isUrlSchema(zodSchema)) {
+        jsonSchema.type = 'string';
+        jsonSchema.format = 'uri';
+    }
+};
+
+const overrideSchema = (context: { zodSchema: z.core.$ZodType; jsonSchema: Record<string, unknown> }): void => {
+    normalizeMeta(context);
+    applyNativeTypes(context);
+};
+
 const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Record<string, unknown> => {
     const id = readMetaId(schema);
     if (id) {
@@ -131,7 +149,7 @@ const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Rec
     const discriminated = readDiscriminatedUnion(schema);
     if (discriminated) {
         const raw = rewriteRefs(
-            omit(z.toJSONSchema(schema, { unrepresentable: 'any', io, override: normalizeMeta }) as Record<string, unknown>, [
+            omit(z.toJSONSchema(schema, { unrepresentable: 'any', io, override: overrideSchema }) as Record<string, unknown>, [
                 '$defs',
                 '$schema',
             ])
@@ -141,10 +159,8 @@ const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Rec
             discriminator: buildDiscriminatorBlock(discriminated.discriminator, discriminated.options),
         };
     }
-    const raw = z.toJSONSchema(schema, { unrepresentable: 'any', io, override: normalizeMeta }) as Record<string, unknown>;
-    const result = rewriteRefs(omit(raw, ['$defs', '$schema'])) as Record<string, unknown>;
-    applyFileBinary(schema, result);
-    return result;
+    const raw = z.toJSONSchema(schema, { unrepresentable: 'any', io, override: overrideSchema }) as Record<string, unknown>;
+    return rewriteRefs(omit(raw, ['$defs', '$schema'])) as Record<string, unknown>;
 };
 
 const buildComponentSchemas = (): Record<string, unknown> | undefined => {
@@ -162,7 +178,7 @@ const buildComponentSchemas = (): Record<string, unknown> | undefined => {
         uri: (id: string) => COMPONENT_REF_BASE + id,
         unrepresentable: 'any',
         io: 'output',
-        override: normalizeMeta,
+        override: overrideSchema,
     });
     const schemas = result.schemas as Record<string, Record<string, unknown>>;
     const cleaned: Record<string, unknown> = {};

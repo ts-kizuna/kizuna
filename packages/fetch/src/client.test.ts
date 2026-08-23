@@ -845,15 +845,16 @@ describe('KizunaClient: native types', () => {
         });
 
         const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit];
-        expect(options.body).toBe(
-            '{"startsAt":"2026-08-23T10:00:00.000Z","total":9007199254740993,"website":"https://example.com/docs"}'
-        );
+        expect(options.body).toBe('{"startsAt":"2026-08-23T10:00:00.000Z","total":9007199254740993,"website":"https://example.com/docs"}');
     });
 
     it('revives dates, bigints, and urls in a declared response body', async () => {
         const fetchMock = vi.fn().mockResolvedValue({
             status: 201,
-            text: () => Promise.resolve('{"id":"1","startsAt":"2026-08-23T10:00:00.000Z","total":9007199254740993,"website":"https://example.com/docs"}'),
+            text: () =>
+                Promise.resolve(
+                    '{"id":"1","startsAt":"2026-08-23T10:00:00.000Z","total":9007199254740993,"website":"https://example.com/docs"}'
+                ),
             headers: {
                 forEach: () => undefined,
             },

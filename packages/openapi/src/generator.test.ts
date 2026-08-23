@@ -1966,3 +1966,106 @@ describe('custom identities (no OpenAPI scheme)', () => {
         expect(operation?.['x-kizuna-guarded']).toBeUndefined();
     });
 });
+
+describe('native types', () => {
+    const nativeRoutes = k.routes('api', {
+        createEvent: {
+            method: 'POST',
+            path: '/events',
+            body: z.object({
+                startsAt: z.date(),
+                total: z.bigint(),
+                website: z.instanceof(URL),
+            }),
+            responses: {
+                201: z.object({
+                    id: z.string(),
+                    startsAt: z.date(),
+                    total: z.bigint(),
+                    website: z.instanceof(URL),
+                }),
+            },
+        },
+        uploadReport: {
+            method: 'POST',
+            path: '/reports',
+            contentType: 'multipart/form-data',
+            body: z.file(),
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+    });
+    const nativeContract = k.contract({
+        routes: nativeRoutes,
+    });
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(generateJson(nativeContract, baseConfig)).toBeAValidOpenAPIDefinition();
+    });
+
+    it('emits date-time, int64, and uri for a request body', () => {
+        const spec = generateJson(nativeContract, baseConfig);
+        const schema = spec.paths['/events']?.post?.requestBody?.content?.['application/json']?.schema as Record<string, unknown>;
+        const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+        expect(properties['startsAt']).toEqual({
+            type: 'string',
+            format: 'date-time',
+        });
+        expect(properties['total']).toEqual({
+            type: 'integer',
+            format: 'int64',
+        });
+        expect(properties['website']).toEqual({
+            type: 'string',
+            format: 'uri',
+        });
+    });
+
+    it('emits date-time, int64, and uri for a response body', () => {
+        const spec = generateJson(nativeContract, baseConfig);
+        const schema = spec.paths['/events']?.post?.responses['201']?.content?.['application/json']?.schema as Record<string, unknown>;
+        const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+        expect(properties['startsAt']?.format).toBe('date-time');
+        expect(properties['total']?.format).toBe('int64');
+        expect(properties['website']?.format).toBe('uri');
+    });
+
+    it('emits format: binary for a bare z.file() body', () => {
+        const spec = generateJson(nativeContract, baseConfig);
+        const schema = spec.paths['/reports']?.post?.requestBody?.content?.['multipart/form-data']?.schema as Record<string, unknown>;
+        expect(schema.type).toBe('string');
+        expect(schema.format).toBe('binary');
+    });
+
+    it('emits native-type formats inside a model component', () => {
+        const Stats = Kizuna.model({
+            title: 'NativeStats',
+            schema: z.object({
+                generatedAt: z.date(),
+                total: z.bigint(),
+                docs: z.instanceof(URL),
+            }),
+        });
+        const statsRoutes = k.routes('api', {
+            getStats: {
+                method: 'GET',
+                path: '/stats',
+                responses: {
+                    200: Stats,
+                },
+            },
+        });
+        const statsContract = k.contract({
+            routes: statsRoutes,
+        });
+        const spec = generateJson(statsContract, baseConfig);
+        const component = spec.components?.schemas?.NativeStats as Record<string, unknown> | undefined;
+        const properties = (component?.properties ?? {}) as Record<string, Record<string, unknown>>;
+        expect(properties['generatedAt']?.format).toBe('date-time');
+        expect(properties['total']?.format).toBe('int64');
+        expect(properties['docs']?.format).toBe('uri');
+    });
+});
