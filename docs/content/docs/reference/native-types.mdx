@@ -3,14 +3,14 @@ title: Native types
 description: Date, bigint, URL, and File in request and response bodies, revived on both sides of the wire.
 ---
 
-Declare `z.date()`, `z.bigint()`, `UrlSchema`, or `FileSchema` anywhere in a body, and every surface works with the real type. The wire stays plain JSON (multipart for files), and the OpenAPI document describes exactly what crosses it.
+Declare `z.date()`, `z.bigint()`, `UrlSchema`, or `z.file()` anywhere in a body, and every surface works with the real type. The wire stays plain JSON (multipart for files), and the OpenAPI document describes exactly what crosses it.
 
-| Declare                   | On the wire        | OpenAPI               | Handler and fetch client | Swift           | Kotlin          |
-| ------------------------- | ------------------ | --------------------- | ------------------------ | --------------- | --------------- |
-| `z.date()`                | an ISO 8601 string | `string`, `date-time` | `Date`                   | `Date`          | `Instant`       |
-| `z.bigint()`              | a JSON integer     | `integer`, `int64`    | `bigint`                 | `Int64`         | `Long`          |
-| `UrlSchema`               | the absolute URL   | `string`, `uri`       | `URL`                    | `URL`           | `String`        |
-| `FileSchema` / `z.file()` | a multipart part   | `string`, `binary`    | `File`                   | `MultipartFile` | `MultipartFile` |
+| Declare      | On the wire        | OpenAPI               | Handler and fetch client | Swift           | Kotlin          |
+| ------------ | ------------------ | --------------------- | ------------------------ | --------------- | --------------- |
+| `z.date()`   | an ISO 8601 string | `string`, `date-time` | `Date`                   | `Date`          | `Instant`       |
+| `z.bigint()` | a JSON integer     | `integer`, `int64`    | `bigint`                 | `Int64`         | `Long`          |
+| `UrlSchema`  | the absolute URL   | `string`, `uri`       | `URL`                    | `URL`           | `String`        |
+| `z.file()`   | a multipart part   | `string`, `binary`    | `File`                   | `MultipartFile` | `MultipartFile` |
 
 `UrlSchema` is `z.instanceof(URL)`, from `@ts-kizuna/core/schemas`:
 
@@ -36,6 +36,10 @@ scheduleUserExport: {
 
 The handler receives `startAfter` as a `Date` and `notifyUrl` as a `URL`, and returns them as such. The fetch client takes the same native values in `body` and revives `scheduledFor`, `estimatedBytes`, and `statusUrl` in the response.
 
+## UrlSchema or z.url()
+
+`z.url()` is a string schema: it validates the format and infers `string`, and it is the right choice when a validated string is all the handler wants. `UrlSchema` is for when handlers and clients should hold a `URL` object. For strict format validation and the object in one field, `z.url().transform((value) => new URL(value))` validates the string on the way in and hands the handler the `URL`.
+
 ## How revival works
 
 The conversion is driven by the schema, not by tagging values on the wire. kizuna walks each body schema once, caches the plan, and applies it where the body crosses a boundary: request validation on the server, response rendering in core, and both directions in the fetch client. Objects, arrays, records, optionals, and discriminated unions revive at any depth. Fields inside plain `z.union(...)` options pass through unconverted when the options disagree.
@@ -53,4 +57,4 @@ Two bounds remain:
 
 ## Files
 
-`FileSchema` fields ride `multipart/form-data` on every adapter. Express and Fastify parse multipart themselves when no middleware got there first; Hono and Next.js use the framework's own form parsing. See [BinarySchema & FileSchema](/docs/reference/binary-and-file-schemas) for the upload route shape and binary responses.
+`z.file()` fields ride `multipart/form-data` on every adapter. Express and Fastify parse multipart themselves when no middleware got there first; Hono and Next.js use the framework's own form parsing. See [BinarySchema & z.file()](/docs/reference/binary-and-file-schemas) for the upload route shape, MIME and size checks, and binary responses.

@@ -214,7 +214,7 @@ const router: Router<typeof contract> = { ... };
 
 ## Multipart / file uploads
 
-Routes with `contentType: 'multipart/form-data'` work out of the box. When no multipart parser is registered, the plugin registers one that buffers the request, and the adapter parses it, so a `FileSchema` field reaches the handler as a real `File`.
+Routes with `contentType: 'multipart/form-data'` work out of the box. When no multipart parser is registered, the plugin registers one that buffers the request, and the adapter parses it, so a `z.file()` field reaches the handler as a real `File`.
 
 A registered `@fastify/multipart` keeps precedence: register it before `api.mount` and its parsed body flows through unchanged.
 

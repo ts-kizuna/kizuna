@@ -168,12 +168,12 @@ responses: {
 
 Bodies carry native types too, nested at any depth. The wire stays plain JSON, and the OpenAPI document describes exactly what crosses it:
 
-| Declare                   | On the wire        | OpenAPI               | You get  |
-| ------------------------- | ------------------ | --------------------- | -------- |
-| `z.date()`                | an ISO 8601 string | `string`, `date-time` | `Date`   |
-| `z.bigint()`              | a JSON integer     | `integer`, `int64`    | `bigint` |
-| `UrlSchema`               | the absolute URL   | `string`, `uri`       | `URL`    |
-| `FileSchema` / `z.file()` | a multipart part   | `string`, `binary`    | `File`   |
+| Declare      | On the wire        | OpenAPI               | You get  |
+| ------------ | ------------------ | --------------------- | -------- |
+| `z.date()`   | an ISO 8601 string | `string`, `date-time` | `Date`   |
+| `z.bigint()` | a JSON integer     | `integer`, `int64`    | `bigint` |
+| `UrlSchema`  | the absolute URL   | `string`, `uri`       | `URL`    |
+| `z.file()`   | a multipart part   | `string`, `binary`    | `File`   |
 
 Both directions revive: a handler receives a `z.date()` body field as a `Date`, and the fetch client hands a `z.date()` response field back as a `Date`. The Swift client sees `Date`, `Int64`, and `URL`; the Kotlin client `Instant`, `Long`, and `String`.
 

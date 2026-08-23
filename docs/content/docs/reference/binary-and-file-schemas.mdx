@@ -1,20 +1,21 @@
 ---
-title: BinarySchema & FileSchema
-description: Helper schemas for binary response bodies (BinarySchema) and multipart upload fields (FileSchema).
+title: BinarySchema & z.file()
+description: Binary response bodies with BinarySchema, multipart upload fields with Zod's z.file().
 ---
 
-Two helper schemas for non-JSON bodies, both from `@ts-kizuna/core/schemas`.
+Two schemas cover non-JSON bodies: kizuna's `BinarySchema` for raw bytes, and Zod's own `z.file()` for uploaded files.
 
 ```ts
-import { BinarySchema, FileSchema } from '@ts-kizuna/core/schemas';
+import { BinarySchema } from '@ts-kizuna/core/schemas';
+import { z } from 'zod';
 ```
 
-**Sending or returning a blob of bytes, use `BinarySchema`. Taking a file uploaded through a form, use `FileSchema`.**
+**Sending or returning a blob of bytes, use `BinarySchema`. Taking a file uploaded through a form, use `z.file()`.**
 
-| Helper         | Is                         | Use                                                       | Swift type      |
+| Schema         | Is                         | Use                                                       | Swift type      |
 | -------------- | -------------------------- | --------------------------------------------------------- | --------------- |
 | `BinarySchema` | `z.instanceof(Uint8Array)` | Binary response bodies (PDF, images) and raw binary input | `Data`          |
-| `FileSchema`   | `z.instanceof(File)`       | `multipart/form-data` upload fields                       | `MultipartFile` |
+| `z.file()`     | Zod's file schema          | `multipart/form-data` upload fields                       | `MultipartFile` |
 
 The split follows what each type carries. A `File` has a filename and MIME type, which is what a multipart part needs. A `Uint8Array` is bytes alone, and a Node `Buffer` satisfies it.
 
@@ -55,19 +56,17 @@ downloadReport: async ({ params }) => {
 },
 ```
 
-## FileSchema
+## z.file()
 
-Use it inside a `multipart/form-data` request body for uploaded files:
+Use it inside a `multipart/form-data` request body for uploaded files. Zod's own checks apply, so `.mime()` and size bounds validate on the server before the handler runs:
 
 ```ts title="users.ts"
-import { FileSchema } from '@ts-kizuna/core/schemas';
-
 uploadAvatar: {
     method: 'POST',
     path: '/avatar',
     contentType: 'multipart/form-data',
     body: z.object({
-        file: FileSchema,
+        file: z.file().mime('image/png').max(5_000_000),
         userId: z.string(),
     }),
     responses: {
@@ -78,4 +77,4 @@ uploadAvatar: {
 },
 ```
 
-Zod's own `z.file()` is recognized everywhere `FileSchema` is. For `Date`, `bigint`, and `URL` values in bodies, see [Native types](/docs/reference/native-types).
+`z.instanceof(File)` is recognized the same way, without the MIME and size checks. For `Date`, `bigint`, and `URL` values in bodies, see [Native types](/docs/reference/native-types).

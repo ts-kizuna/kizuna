@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { FileSchema } from '../binary.js';
 import { UrlSchema } from '../url.js';
 import { ProblemDetailsSchema } from '../error-response.js';
 import { Kizuna } from '../kizuna.js';
@@ -523,7 +522,7 @@ export const nativeRoutes = k.routes('api', {
         path: '/native/avatar',
         contentType: 'multipart/form-data',
         body: z.object({
-            file: FileSchema,
+            file: z.file(),
             userId: z.string(),
             weight: z.number(),
         }),

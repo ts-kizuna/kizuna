@@ -3,10 +3,10 @@ import { z } from 'zod';
 /**
  * Schema for a URL, a WHATWG `URL` instance.
  *
- * Use it in bodies where a field is a URL rather than free-form text. On the
- * wire it is the absolute URL string (`url.href`); handlers and the fetch
- * client see a real `URL`. The OpenAPI generator emits `type: string,
- * format: uri`.
+ * Use it in bodies where handlers and the fetch client should hold a real
+ * `URL` object. On the wire it is the absolute URL string (`url.href`); the
+ * OpenAPI generator emits `type: string, format: uri`. For a URL-shaped
+ * string, use `z.url()`, which validates the format and infers `string`.
  *
  * @example
  * ```ts

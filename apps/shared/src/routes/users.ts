@@ -253,7 +253,7 @@ export const usersRoutes = k.routes('users', {
         path: '/avatar',
         contentType: 'multipart/form-data',
         body: z.object({
-            file: z.instanceof(File),
+            file: z.file(),
             userId: z.string(),
         }),
         responses: {

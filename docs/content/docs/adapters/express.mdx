@@ -189,7 +189,7 @@ If a path is matched but the method is not defined in the contract, the adapter 
 
 ## Multipart / file uploads
 
-Routes with `contentType: 'multipart/form-data'` work out of the box: the adapter buffers the request and parses it itself, so a `FileSchema` field reaches the handler as a real `File` with no middleware.
+Routes with `contentType: 'multipart/form-data'` work out of the box: the adapter buffers the request and parses it itself, so a `z.file()` field reaches the handler as a real `File` with no middleware.
 
 ```ts
 uploadAvatar: async ({ body }) => ({
