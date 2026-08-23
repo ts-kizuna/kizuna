@@ -42,6 +42,8 @@ import type { JobTransport } from './job-transport.js';
 
 export type { ResponseHeaders, RouteDefinition, RoutePath, Routes, Method } from './types.js';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
+export { isBinarySchema } from './zod-internals.js';
+export { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
 export {
     wirePlanFor,
     requestBodyPlanFor,

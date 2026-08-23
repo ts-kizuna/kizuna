@@ -785,3 +785,143 @@ describe('discriminated union response built from named models', () => {
         }
     });
 });
+
+describe('KizunaClient: native types', () => {
+    const nativeRoutes = k.routes('api', {
+        createEvent: {
+            method: 'POST',
+            path: '/events',
+            body: z.object({
+                startsAt: z.date(),
+                total: z.bigint(),
+                website: z.instanceof(URL),
+            }),
+            responses: {
+                201: z.object({
+                    id: z.string(),
+                    startsAt: z.date(),
+                    total: z.bigint(),
+                    website: z.instanceof(URL),
+                }),
+            },
+        },
+        downloadBadge: {
+            method: 'GET',
+            path: '/badge',
+            responses: {
+                200: {
+                    body: z.instanceof(Uint8Array),
+                    contentType: 'application/octet-stream',
+                },
+            },
+        },
+    });
+    const nativeContract = k.contract({
+        routes: nativeRoutes,
+    });
+
+    beforeEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('serializes dates, bigints, and urls in a JSON request body', async () => {
+        const fetchMock = stubFetch(201, {
+            id: '1',
+            startsAt: '2026-08-23T10:00:00.000Z',
+            total: 1,
+            website: 'https://example.com/',
+        });
+        const client = new KizunaClient(nativeContract, {
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        await client.createEvent({
+            body: {
+                startsAt: new Date('2026-08-23T10:00:00.000Z'),
+                total: 9007199254740993n,
+                website: new URL('https://example.com/docs'),
+            },
+        });
+
+        const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit];
+        expect(options.body).toBe(
+            '{"startsAt":"2026-08-23T10:00:00.000Z","total":9007199254740993,"website":"https://example.com/docs"}'
+        );
+    });
+
+    it('revives dates, bigints, and urls in a declared response body', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            status: 201,
+            text: () => Promise.resolve('{"id":"1","startsAt":"2026-08-23T10:00:00.000Z","total":9007199254740993,"website":"https://example.com/docs"}'),
+            headers: {
+                forEach: () => undefined,
+            },
+        });
+        const client = new KizunaClient(nativeContract, {
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        const response = await client.createEvent({
+            body: {
+                startsAt: new Date('2026-08-23T10:00:00.000Z'),
+                total: 1n,
+                website: new URL('https://example.com/'),
+            },
+        });
+
+        expect(response.status).toBe(201);
+        if (response.status === 201) {
+            expect(response.body.startsAt).toBeInstanceOf(Date);
+            expect(response.body.total).toBe(9007199254740993n);
+            expect(response.body.website).toBeInstanceOf(URL);
+            expect(response.body.website.href).toBe('https://example.com/docs');
+        }
+    });
+
+    it('leaves undeclared statuses untouched, unknown keys included', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            status: 404,
+            text: () => Promise.resolve('{"detail":"Not Found","hint":"2026-08-23T10:00:00.000Z"}'),
+            headers: {
+                forEach: () => undefined,
+            },
+        });
+        const client = new KizunaClient(nativeContract, {
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        const response = await client.downloadBadge();
+
+        expect(response.status).toBe(404);
+        expect(response.body).toEqual({
+            detail: 'Not Found',
+            hint: '2026-08-23T10:00:00.000Z',
+        });
+    });
+
+    it('returns a declared binary response as a Uint8Array', async () => {
+        const bytes = new Uint8Array([1, 2, 3, 255]);
+        const fetchMock = vi.fn().mockResolvedValue({
+            status: 200,
+            arrayBuffer: () => Promise.resolve(bytes.buffer),
+            headers: {
+                forEach: () => undefined,
+            },
+        });
+        const client = new KizunaClient(nativeContract, {
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        const response = await client.downloadBadge();
+
+        expect(response.status).toBe(200);
+        if (response.status === 200) {
+            expect(response.body).toBeInstanceOf(Uint8Array);
+            expect(Array.from(response.body)).toEqual([1, 2, 3, 255]);
+        }
+    });
+});

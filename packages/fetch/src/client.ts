@@ -11,7 +11,19 @@ import type {
     SecurityScheme,
 } from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
-import { buildPath, isRouteDefinition } from '@ts-kizuna/core/adapter';
+import {
+    buildPath,
+    isRouteDefinition,
+    isBinarySchema,
+    isJsonMediaType,
+    parseJsonWithPlan,
+    requestBodyPlanFor,
+    responseBodyPlanFor,
+    resolveResponseBody,
+    resolveResponseContentType,
+    serializeBody,
+} from '@ts-kizuna/core/adapter';
+import type { ResponseDefinition } from '@ts-kizuna/core';
 
 type ResponseUnion<R extends RouteDefinition> = {
     [S in keyof R['responses']]: {
@@ -129,6 +141,16 @@ export interface ClientConfig {
     onRequest?: (context: RequestContext) => void | Promise<void>;
 }
 
+/**
+ * Serializes a query, path, or form-field value. Dates use ISO 8601, URLs
+ * their href; everything else uses `String`.
+ */
+const serializeValue = (value: unknown): string => {
+    if (value instanceof Date) return value.toISOString();
+    if (value instanceof URL) return value.href;
+    return String(value);
+};
+
 const buildFormData = (body: Record<string, unknown>): FormData => {
     const formData = new FormData();
     for (const [key, entry] of Object.entries(body)) {
@@ -137,18 +159,17 @@ const buildFormData = (body: Record<string, unknown>): FormData => {
             if (value instanceof File || value instanceof Blob) {
                 formData.append(key, value);
             } else if (value !== undefined && value !== null) {
-                formData.append(key, typeof value === 'string' ? value : JSON.stringify(value));
+                formData.append(
+                    key,
+                    typeof value === 'object' && !(value instanceof Date) && !(value instanceof URL)
+                        ? JSON.stringify(value)
+                        : serializeValue(value)
+                );
             }
         }
     }
     return formData;
 };
-
-/**
- * Serializes a query or path value for the URL. Dates use ISO 8601; everything
- * else uses `String`.
- */
-const serializeValue = (value: unknown): string => (value instanceof Date ? value.toISOString() : String(value));
 
 const buildQueryString = (query: Record<string, unknown>): string => {
     const params = new URLSearchParams();
@@ -167,7 +188,7 @@ const buildQueryString = (query: Record<string, unknown>): string => {
 const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
     return async (
         args: {
-            params?: Record<string, string | number | bigint | Date>;
+            params?: Record<string, string | number | bigint | Date | URL>;
             query?: Record<string, unknown>;
             body?: unknown;
             headers?: Record<string, string>;
@@ -192,7 +213,7 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
                     break;
                 default:
                     if (!hasContentTypeHeader) headers['Content-Type'] = 'application/json';
-                    body = JSON.stringify(args.body);
+                    body = JSON.stringify(serializeBody(args.body, requestBodyPlanFor(route)));
             }
         }
         const requestHeaders = new Headers(headers);
@@ -207,12 +228,26 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
             credentials: config.credentials,
             ...args.fetchOptions,
         });
-        const text = await res.text();
+        const responseSpec = (route.responses as Record<number, ResponseDefinition>)[res.status];
+        const responseSchema = responseSpec === undefined ? undefined : resolveResponseBody(responseSpec);
         let parsed: unknown;
-        try {
-            parsed = text.length > 0 ? JSON.parse(text) : undefined;
-        } catch {
-            parsed = text;
+        if (responseSchema !== undefined && isBinarySchema(responseSchema)) {
+            parsed = new Uint8Array(await res.arrayBuffer());
+        } else {
+            const declaredContentType = resolveResponseContentType(responseSpec);
+            const text = await res.text();
+            if (declaredContentType !== undefined && !isJsonMediaType(declaredContentType)) {
+                parsed = text;
+            } else {
+                // Undeclared statuses (the automatic 400, proxies, version skew) fall
+                // back to plain JSON.parse, and to the text itself when that fails.
+                const plan = responseSpec === undefined ? null : responseBodyPlanFor(responseSpec);
+                try {
+                    parsed = text.length > 0 ? parseJsonWithPlan(text, plan) : undefined;
+                } catch {
+                    parsed = text;
+                }
+            }
         }
         const responseHeaders: Record<string, string> = {};
         res.headers.forEach((value, key) => {
