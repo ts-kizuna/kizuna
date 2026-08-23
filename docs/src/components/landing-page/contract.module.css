@@ -36,10 +36,44 @@
 
 .chips {
     display: flex;
-    flex-wrap: wrap;
     justify-content: center;
-    gap: 12px;
     margin-top: 44px;
+}
+
+.chipCell {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    padding-inline: 9px;
+    padding-bottom: 28px;
+}
+
+.chipCell::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    height: 28px;
+    background-image: var(--sot-dash-v);
+}
+
+.chipCell::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background-image: var(--sot-dash-h);
+}
+
+.chipCell:first-child::after {
+    left: 50%;
+}
+
+.chipCell:last-child::after {
+    right: 50%;
 }
 
 .chip {
@@ -63,7 +97,7 @@
 
 .joinIn {
     width: 1px;
-    height: 44px;
+    height: 28px;
     background-image: var(--sot-dash-v);
 }
 
@@ -297,11 +331,26 @@
 
     .chips {
         margin-top: 32px;
-        gap: 8px;
+        flex-wrap: wrap;
+        row-gap: 8px;
+    }
+
+    .chipCell {
+        padding-inline: 4px;
+        padding-bottom: 0;
+    }
+
+    .chipCell::before,
+    .chipCell::after {
+        content: none;
     }
 
     .chip {
         padding: 8px 13px;
         font-size: 0.875rem;
+    }
+
+    .joinIn {
+        height: 40px;
     }
 }

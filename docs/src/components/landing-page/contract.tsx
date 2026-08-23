@@ -101,9 +101,11 @@ export function Contract() {
 
             <div className={styles.chips}>
                 {declarations.map((declaration) => (
-                    <span key={declaration.label} className={styles.chip}>
-                        <declaration.icon className={styles.chipIcon} aria-hidden />
-                        {declaration.label}
+                    <span key={declaration.label} className={styles.chipCell}>
+                        <span className={styles.chip}>
+                            <declaration.icon className={styles.chipIcon} aria-hidden />
+                            {declaration.label}
+                        </span>
                     </span>
                 ))}
             </div>
