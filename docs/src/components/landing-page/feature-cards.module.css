@@ -8,9 +8,25 @@
 }
 
 .card {
+    position: relative;
     display: block;
     min-width: 0;
+    padding-inline: 20px;
     text-decoration: none;
+}
+
+.card::after {
+    content: '';
+    position: absolute;
+    right: 20px;
+    bottom: -18px;
+    left: 20px;
+    height: var(--kizuna-hairline);
+    background-color: var(--kizuna-line-strong);
+}
+
+.card:last-child::after {
+    content: none;
 }
 
 .head {
@@ -74,7 +90,17 @@
     }
 
     .card:nth-child(2n) {
-        border-left: var(--kizuna-hairline) solid var(--kizuna-line);
+        border-left: var(--kizuna-hairline) solid var(--kizuna-line-strong);
+    }
+
+    .card::after {
+        right: 24px;
+        bottom: -22px;
+        left: 24px;
+    }
+
+    .card:nth-last-child(-n + 2)::after {
+        content: none;
     }
 }
 
@@ -89,6 +115,16 @@
     }
 
     .card:not(:nth-child(3n + 1)) {
-        border-left: var(--kizuna-hairline) solid var(--kizuna-line);
+        border-left: var(--kizuna-hairline) solid var(--kizuna-line-strong);
+    }
+
+    .card::after {
+        right: 28px;
+        bottom: -26px;
+        left: 28px;
+    }
+
+    .card:nth-last-child(-n + 3)::after {
+        content: none;
     }
 }
