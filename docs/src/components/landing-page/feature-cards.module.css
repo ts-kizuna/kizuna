@@ -4,7 +4,7 @@
     row-gap: 36px;
     border-radius: 20px;
     background-color: var(--kizuna-surface);
-    padding: 32px 28px;
+    padding: 32px 0;
 }
 
 .card {
@@ -73,10 +73,6 @@
         padding-inline: 24px;
     }
 
-    .card:nth-child(2n + 1) {
-        padding-left: 0;
-    }
-
     .card:nth-child(2n) {
         border-left: var(--kizuna-hairline) solid var(--kizuna-line);
     }
@@ -90,10 +86,6 @@
 
     .card {
         padding-inline: 28px;
-    }
-
-    .card:nth-child(3n + 1) {
-        padding-left: 0;
     }
 
     .card:not(:nth-child(3n + 1)) {
