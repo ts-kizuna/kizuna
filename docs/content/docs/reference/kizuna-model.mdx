@@ -54,7 +54,18 @@ With `Kizuna.model`:
 
 ## Extracting TypeScript types
 
-Export a type alongside the schema with `z.infer`:
+A title is a name on both sides. [`InferModels`](/docs/reference/infer-models) reads every model the contract names, so one declaration covers the whole API:
+
+```ts title="types.ts"
+import type { InferModels } from '@ts-kizuna/core';
+import type { contract } from './contract';
+
+export declare const API: InferModels<typeof contract>;
+
+const user: typeof API.User = await loadUser();
+```
+
+For a schema on its own, `z.infer` still reads it directly:
 
 ```ts title="types.ts"
 export type User = z.infer<typeof UserSchema>;

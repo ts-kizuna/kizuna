@@ -6,6 +6,7 @@
         "kizuna-identity",
         "kizuna-request-context",
         "kizuna-model",
+        "infer-models",
         "k-routes",
         "k-auth",
         "k-jobs",

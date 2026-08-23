@@ -33,7 +33,7 @@ export {
     type PluginPropsOf,
     type PluginExportsOf,
 } from './plugin.js';
-export { type ModelOptions } from './model.js';
+export { type ModelOptions, type ModelTitle, MODEL_TITLE } from './model.js';
 export { type TagOptions, type TagSet, type TagKeysOf, type NormalizeTags } from './tags.js';
 export {
     type Identity,
@@ -169,3 +169,4 @@ export {
     type BrandedHandlerContext,
 } from './handler-pipeline.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
+export { type InferModels } from './infer.js';

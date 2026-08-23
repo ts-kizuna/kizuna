@@ -1,0 +1,95 @@
+---
+title: InferModels
+description: Read every model a contract names as TypeScript types, under the same titles the OpenAPI document and the generated clients publish.
+---
+
+Read a contract's models as TypeScript types. One declaration covers the API, so no schema needs a `z.infer` export of its own.
+
+<InstallTabs packageName="@ts-kizuna/core" />
+
+```ts
+import type { InferModels } from '@ts-kizuna/core';
+```
+
+## Parameters
+
+```ts
+InferModels<Contract>;
+```
+
+| Parameter  | Type              | Required | Description                            |
+| ---------- | ----------------- | -------- | -------------------------------------- |
+| `Contract` | `typeof contract` | Yes      | The contract assembled by `k.contract` |
+
+## Returns
+
+A type keyed by each model's [`Kizuna.model`](/docs/reference/kizuna-model) title. Each value is that model's output type, the type `z.infer` gives.
+
+## Example
+
+Declare it once, then read models by name:
+
+```ts title="types.ts"
+import type { InferModels } from '@ts-kizuna/core';
+import type { contract } from './contract';
+
+export declare const API: InferModels<typeof contract>;
+```
+
+```tsx title="UserCard.tsx"
+import type { API } from '@/contract/types';
+
+function UserCard({ user }: { user: typeof API.User }) {
+    return <div>{user.name}</div>;
+}
+```
+
+`API` is declared, never defined, so it exists for the type checker alone and nothing is added to the bundle. Import it with `import type` and a runtime import can never reach for it.
+
+Name a model locally where that reads better:
+
+```ts title="types.ts"
+export type User = typeof API.User;
+```
+
+The alias form skips the declared value:
+
+```ts title="types.ts"
+export type API = InferModels<typeof contract>;
+
+const user: API['User'] = await loadUser();
+```
+
+`API.User` without `typeof` asks TypeScript for a namespace member, and a namespace has to list its members literally, so a title only reaches dotted syntax through a value. That is what the declared `API` is for.
+
+## What it reads
+
+Every route's `body`, `query`, `pathParams`, `headers` and `responses`, and every job's `input` and responses. It looks through arrays, optionals, nullables, unions, records, tuples, intersections and object fields, so a model used as a field of another model gets a key of its own:
+
+```ts
+const AvatarSchema = Kizuna.model({
+    title: 'Avatar',
+    schema: z.object({
+        url: z.string(),
+    }),
+});
+
+const UserSchema = Kizuna.model({
+    title: 'User',
+    schema: z.object({
+        avatar: AvatarSchema.nullable(),
+    }),
+});
+
+// 'User' | 'Avatar'
+type Names = keyof InferModels<typeof contract>;
+```
+
+The keys are the names `components.schemas` uses in the OpenAPI document, and the names the Swift and Kotlin clients give their own `API` types. An anonymous schema has no name to publish, so it has no key here either. Plugin routes stay outside `contract.routes`, so their models stay out too.
+
+A key holds the type a response carries. For the type a request body accepts before defaults and coercion apply, read the schema with `z.input<typeof CreateUserSchema>`.
+
+## Reference
+
+- [`Kizuna.model`](/docs/reference/kizuna-model)
+- [`k.contract`](/docs/reference/k-contract)

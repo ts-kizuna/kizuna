@@ -1,14 +1,28 @@
 import type { z } from 'zod';
 import { markModelSchema } from './zod-internals.js';
 
-export interface ModelOptions<T extends z.ZodType> {
+/**
+ * Type-only key under which `Kizuna.model` carries a model's title. Never
+ * written at runtime; `Kizuna.Infer` reads it to key a contract's models by
+ * name.
+ */
+export const MODEL_TITLE: unique symbol = Symbol('ts-kizuna.model.title');
+
+/**
+ * A schema named by `Kizuna.model`, carrying its title in the type.
+ */
+export interface ModelTitle<Title extends string> {
+    readonly [MODEL_TITLE]: Title;
+}
+
+export interface ModelOptions<Title extends string, T extends z.ZodType> {
     /**
      * The name of this schema in the generated OpenAPI spec and client code.
      *
      * Appears as the key in `components/schemas` and as the struct/class name
      * in generated Swift clients.
      */
-    title: string;
+    title: Title;
     /**
      * Optional description shown in the OpenAPI spec.
      */
@@ -33,11 +47,11 @@ export interface ModelOptions<T extends z.ZodType> {
  * });
  * ```
  */
-export const createModel = <T extends z.ZodType>(options: ModelOptions<T>): T => {
+export const createModel = <const Title extends string, T extends z.ZodType>(options: ModelOptions<Title, T>): T & ModelTitle<Title> => {
     const model = options.schema.meta({
         id: options.title,
         description: options.description,
-    }) as T;
+    }) as T & ModelTitle<Title>;
     markModelSchema(model);
     return model;
 };

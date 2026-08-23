@@ -355,22 +355,28 @@ The OpenAPI spec and the Swift and Kotlin clients pick both up. A route also tak
 
 ### Exporting types
 
-Infer TypeScript types from your schemas in a separate `types.ts` so consumers can import them without pulling in runtime code:
+[`InferModels`](/docs/reference/infer-models) reads every model the contract names, keyed by its title. Declare it once in a `types.ts` and the whole API is available by name, the same names the OpenAPI document and the Swift and Kotlin clients publish:
 
 ```ts title="types.ts"
-import type { z } from 'zod';
-import { UserSchema, CreateUserSchema } from './routes';
+import type { InferModels } from '@ts-kizuna/core';
+import type { contract } from './contract';
 
-export type User = z.infer<typeof UserSchema>;
-export type CreateUserInput = z.infer<typeof CreateUserSchema>;
+export declare const API: InferModels<typeof contract>;
 ```
 
 ```tsx title="UserCard.tsx"
-import type { User } from '@/contract/types';
+import type { API } from '@/contract/types';
 
-function UserCard({ user }: { user: User }) {
+function UserCard({ user }: { user: typeof API.User }) {
     return <div>{user.name}</div>;
 }
+```
+
+Add a model and it is there to read. Name one locally where that reads better:
+
+```ts title="types.ts"
+export type User = typeof API.User;
+export type CreateUserInput = typeof API.CreateUserInput;
 ```
 
 ## Reference

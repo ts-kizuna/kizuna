@@ -1,4 +1,6 @@
-import type { z } from 'zod';
-import type { UserSchema } from './routes/users';
+import type { InferModels } from '@ts-kizuna/core';
+import type { contract } from './contract';
 
-export type User = z.infer<typeof UserSchema>;
+export declare const API: InferModels<typeof contract>;
+
+export type User = typeof API.User;
