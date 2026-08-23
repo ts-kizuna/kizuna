@@ -387,3 +387,61 @@ describe('renderJsonResult: non-JSON and binary bodies', () => {
         ).toThrow(/must be a string or Uint8Array/);
     });
 });
+
+describe('renderJsonResult: native-type bodies', () => {
+    const nativeContract = k.routes('api', {
+        getStats: {
+            method: 'GET',
+            path: '/stats',
+            responses: {
+                200: z.object({
+                    generatedAt: z.date(),
+                    total: z.bigint(),
+                    docs: z.instanceof(URL),
+                }),
+            },
+        },
+    });
+
+    it('serializes dates, bigints, and urls to a pre-stringified JSON body', () => {
+        const rendered = renderJsonResult({
+            kind: 'success',
+            routeKey: 'getStats',
+            route: nativeContract.getStats,
+            status: 200,
+            body: {
+                generatedAt: new Date('2026-08-23T10:00:00.000Z'),
+                total: 9007199254740993n,
+                docs: new URL('https://example.com/docs'),
+            },
+            headers: {},
+        });
+        expect(rendered.raw).toBe(true);
+        expect(rendered.headers['content-type']).toBe('application/json');
+        expect(rendered.body).toBe(
+            '{"generatedAt":"2026-08-23T10:00:00.000Z","total":9007199254740993,"docs":"https://example.com/docs"}'
+        );
+    });
+
+    it('keeps HEAD Content-Length in sync with the serialized body', () => {
+        const rendered = renderJsonResult(
+            {
+                kind: 'success',
+                routeKey: 'getStats',
+                route: nativeContract.getStats,
+                status: 200,
+                body: {
+                    generatedAt: new Date('2026-08-23T10:00:00.000Z'),
+                    total: 1n,
+                    docs: new URL('https://example.com/docs'),
+                },
+                headers: {},
+            },
+            undefined,
+            undefined,
+            'HEAD'
+        );
+        expect(rendered.body).toBeUndefined();
+        expect(rendered.headers['content-length']).toBe('86');
+    });
+});

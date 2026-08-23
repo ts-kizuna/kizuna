@@ -25,6 +25,7 @@ import { isRawResponse, type RawResponse } from './raw-response.js';
 import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from './plugin.js';
 import { resolvePluginServers, type PluginImplementation } from './plugin-server.js';
 import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
+import { responseBodyPlanFor, serializeBody } from './wire-plan.js';
 import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from './jobs.js';
 import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
 import {
@@ -1321,7 +1322,9 @@ const renderResult = (
     switch (result.kind) {
         case 'success': {
             if (result.status >= 400) {
-                const body = result.body;
+                const errorSpec = result.route.responses[result.status];
+                const errorPlan = errorSpec !== undefined ? responseBodyPlanFor(errorSpec) : null;
+                const body = errorPlan === null ? result.body : serializeBody(result.body, errorPlan);
                 const extensions = body !== null && typeof body === 'object' ? (body as Record<string, unknown>) : {};
                 const detail = typeof extensions.detail === 'string' ? extensions.detail : (STATUS_TITLES[result.status] ?? 'Error');
                 return renderError(result.status, detail, extensions, result.headers);
@@ -1343,6 +1346,20 @@ const renderResult = (
                 throw new Error(
                     `${result.routeKey} (status ${result.status}) is declared with content type "${contentType}", so its body must be a string or Uint8Array, but the handler returned ${describeBodyType(result.body)}.`
                 );
+            }
+            const plan = !raw && responseSpec !== undefined ? responseBodyPlanFor(responseSpec) : null;
+            if (plan !== null) {
+                // Pre-stringified in core so the wire values (ISO dates, exact
+                // bigint digits, URL hrefs) never depend on an adapter's JSON settings.
+                return {
+                    status: result.status,
+                    headers: {
+                        'content-type': contentType,
+                        ...(result.headers ?? {}),
+                    },
+                    body: JSON.stringify(serializeBody(result.body, plan)),
+                    raw: true,
+                };
             }
             return {
                 status: result.status,
