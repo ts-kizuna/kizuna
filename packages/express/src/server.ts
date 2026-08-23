@@ -23,6 +23,7 @@ import {
     pluginRouterOf,
     createAdapter,
     renderJsonResult,
+    parseBufferedBody,
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
@@ -215,7 +216,23 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                     },
                     query: req.query,
                     headers: req.headers,
-                    readBody: () => req.body,
+                    readBody: async () => {
+                        // Multipart is parsed here when no middleware (e.g. multer) got there first.
+                        const contentTypeHeader = req.headers['content-type'];
+                        if (
+                            route.contentType === 'multipart/form-data' &&
+                            req.body === undefined &&
+                            req.readable &&
+                            typeof contentTypeHeader === 'string'
+                        ) {
+                            const chunks: Buffer[] = [];
+                            for await (const chunk of req) {
+                                chunks.push(chunk as Buffer);
+                            }
+                            return parseBufferedBody(contentTypeHeader, Buffer.concat(chunks), route);
+                        }
+                        return req.body;
+                    },
                 };
                 await adapter.handle({
                     routes,

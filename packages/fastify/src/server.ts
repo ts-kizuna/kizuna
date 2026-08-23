@@ -24,6 +24,7 @@ import {
     pluginRouterOf,
     createAdapter,
     renderJsonResult,
+    parseBufferedBody,
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
@@ -198,6 +199,13 @@ export const fastifyKizuna = fastifyPlugin(
             resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>,
             method: Method = route.method
         ): void => {
+            if (route.contentType === 'multipart/form-data' && !app.hasContentTypeParser('multipart/form-data')) {
+                // Without a parser Fastify rejects multipart with its own 415 before kizuna runs.
+                // A user-registered parser (e.g. @fastify/multipart) is left in charge instead.
+                app.addContentTypeParser('multipart/form-data', { parseAs: 'buffer' }, (_request, payload, done) => {
+                    done(null, payload);
+                });
+            }
             app.route({
                 method,
                 url: route.path,
@@ -218,7 +226,17 @@ export const fastifyKizuna = fastifyPlugin(
                         },
                         query: (request.query ?? {}) as Record<string, string>,
                         headers: request.headers,
-                        readBody: () => request.body,
+                        readBody: () => {
+                            const contentTypeHeader = request.headers['content-type'];
+                            if (
+                                route.contentType === 'multipart/form-data' &&
+                                Buffer.isBuffer(request.body) &&
+                                typeof contentTypeHeader === 'string'
+                            ) {
+                                return parseBufferedBody(contentTypeHeader, request.body, route);
+                            }
+                            return request.body;
+                        },
                     };
 
                     await adapter.handle({

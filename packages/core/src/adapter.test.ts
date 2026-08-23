@@ -418,9 +418,7 @@ describe('renderJsonResult: native-type bodies', () => {
         });
         expect(rendered.raw).toBe(true);
         expect(rendered.headers['content-type']).toBe('application/json');
-        expect(rendered.body).toBe(
-            '{"generatedAt":"2026-08-23T10:00:00.000Z","total":9007199254740993,"docs":"https://example.com/docs"}'
-        );
+        expect(rendered.body).toBe('{"generatedAt":"2026-08-23T10:00:00.000Z","total":9007199254740993,"docs":"https://example.com/docs"}');
     });
 
     it('keeps HEAD Content-Length in sync with the serialized body', () => {

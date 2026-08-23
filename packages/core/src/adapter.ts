@@ -1451,6 +1451,23 @@ export const parseFetchBody = async (request: Request, route: RouteDefinition): 
     }
 };
 
+/**
+ * Parses a buffered multipart or urlencoded body by handing the bytes to the
+ * Web Fetch parser, for adapters whose framework exposes a raw Node body
+ * instead of a Fetch `Request`. `contentTypeHeader` is the request's full
+ * `Content-Type` value, which carries the multipart boundary.
+ */
+export const parseBufferedBody = async (contentTypeHeader: string, bytes: Uint8Array, route: RouteDefinition): Promise<unknown> => {
+    const request = new Request('http://kizuna.internal/', {
+        method: 'POST',
+        headers: {
+            'content-type': contentTypeHeader,
+        },
+        body: bytes as BodyInit,
+    });
+    return parseFetchBody(request, route);
+};
+
 export const headersToObject = (headers: Headers): ResponseHeaders => {
     const result: ResponseHeaders = {};
     headers.forEach((value, key) => {
