@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/cli",
-  "version": "1.55.0",
+  "version": "1.56.0",
   "description": "The contract loader the Swift and Kotlin client generators share",
   "keywords": [
     "ts-kizuna",
