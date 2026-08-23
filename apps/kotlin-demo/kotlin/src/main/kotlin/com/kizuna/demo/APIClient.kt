@@ -1365,7 +1365,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** Schedule an export of a user, native types in both directions */
+    /** Schedule an export of a user */
     @Throws(APIClient.UsersScheduleUserExport.Failure::class)
     suspend fun scheduleUserExport(build: APIClient.UsersScheduleUserExport.Scope.() -> APIClient.UsersScheduleUserExport.Args): APIClient.UsersScheduleUserExport.Result {
         val args = APIClient.UsersScheduleUserExport.Scope.build()

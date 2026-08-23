@@ -323,8 +323,6 @@ final class APIClientTests: XCTestCase {
     }
 
     func testScheduleUserExportNativeTypes() async throws {
-        // scheduleUserExport carries z.date(), z.bigint(), and UrlSchema across
-        // the wire: Date and URL out, Date, Int64, and URL back.
         let created = try await client.users.createUser(
             .body(
                 name: "Export Target",
@@ -461,8 +459,6 @@ final class APIClientTests: XCTestCase {
     }
 
     func testUploadAvatarMultipartEncoding() async throws {
-        // The Express adapter parses multipart itself, so the upload round-trips:
-        // the server receives the file and answers with its size.
         let bytes = Data(repeating: 0xAB, count: 16)
         let file = APIClient.MultipartFile(data: bytes, filename: "avatar.bin", mimeType: "application/octet-stream")
         let result = try await client.users.uploadAvatar(

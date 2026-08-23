@@ -2020,7 +2020,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// Schedule an export of a user, native types in both directions
+    /// Schedule an export of a user
     public func scheduleUserExport(_ params: APIClient.UsersScheduleUserExport.Params, _ body: APIClient.UsersScheduleUserExport.Body) async throws(APIClient.UsersScheduleUserExport.Failure) -> APIClient.UsersScheduleUserExport.Result {
         var path = "/users/:id/exports"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))

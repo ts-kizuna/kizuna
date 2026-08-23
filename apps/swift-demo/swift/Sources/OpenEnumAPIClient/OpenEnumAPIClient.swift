@@ -2165,7 +2165,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// Schedule an export of a user, native types in both directions
+    /// Schedule an export of a user
     public func scheduleUserExport(_ params: OpenEnumAPIClient.UsersScheduleUserExport.Params, _ body: OpenEnumAPIClient.UsersScheduleUserExport.Body) async throws(OpenEnumAPIClient.UsersScheduleUserExport.Failure) -> OpenEnumAPIClient.UsersScheduleUserExport.Result {
         var path = "/users/:id/exports"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))

@@ -7,7 +7,7 @@ import { isUrlSchema, readDef, readDiscriminatedUnion, readDiscriminatorLiteral,
  * How a body reaches the wire. `json` bodies are already typed, so only the
  * values JSON cannot carry natively convert: `Date`, `bigint`, and `URL`.
  * `form` bodies (multipart and urlencoded) arrive as strings, so every
- * coercible scalar converts, the same set query params coerce.
+ * coercible scalar converts.
  */
 export type WireDialect = 'json' | 'form';
 
@@ -290,18 +290,16 @@ const applyPlan = (value: unknown, plan: WirePlanNode, direction: 'revive' | 'se
 };
 
 /**
- * Converts a body's wire values to their native types (`Date`, `bigint`,
- * `URL`, and for form bodies every coercible scalar), returning the input
+ * Converts a body's wire values to their native types, returning the input
  * itself when nothing changed. Values that do not match the plan are left
  * untouched for Zod to report.
  */
 export const reviveBody = (value: unknown, plan: WirePlan): unknown => (plan === null ? value : applyPlan(value, plan, 'revive', ''));
 
 /**
- * Converts a body's native values to their wire form (`Date` to ISO 8601,
- * `URL` to its href, `bigint` to a JSON number), returning the input itself
- * when nothing changed. The result is for `JSON.stringify` only: bigint fields
- * become `JSON.rawJSON` carriers where the runtime supports them.
+ * Converts a body's native values to their wire form, returning the input
+ * itself when nothing changed. The result is for `JSON.stringify` only: bigint
+ * fields become `JSON.rawJSON` carriers where the runtime supports them.
  */
 export const serializeBody = (value: unknown, plan: WirePlan): unknown => (plan === null ? value : applyPlan(value, plan, 'serialize', ''));
 

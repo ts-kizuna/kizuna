@@ -246,7 +246,7 @@ export const usersRoutes = k.routes('users', {
                 statusUrl: UrlSchema,
             }),
         },
-        summary: 'Schedule an export of a user, native types in both directions',
+        summary: 'Schedule an export of a user',
     },
     uploadAvatar: {
         method: 'POST',

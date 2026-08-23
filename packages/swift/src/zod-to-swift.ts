@@ -189,7 +189,7 @@ export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: s
     }
 
     if (isUrlSchema(schema)) {
-        // Foundation.URL is Codable as a single string, matching the wire.
+        // Foundation.URL is Codable as a single string.
         return {
             expression: 'Foundation.URL',
             optional: false,

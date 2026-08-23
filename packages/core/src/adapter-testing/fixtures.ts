@@ -492,8 +492,7 @@ export const createResponseShapeRouter = <Context>(): Router<typeof responseShap
 });
 
 /**
- * Routes exercising native types in bodies: `z.date()`, `z.bigint()`, and
- * `UrlSchema` in JSON, and a multipart body with a `File` and a coerced scalar.
+ * Routes with native-typed JSON bodies and a multipart upload.
  */
 export const nativeRoutes = k.routes('api', {
     scheduleEvent: {
@@ -545,8 +544,7 @@ export const createNativeRouter = <Context>(): Router<typeof nativeRoutes, Conte
         status: 201,
         body: {
             scheduledAt: body.scheduledAt,
-            // The addend exceeds 2^53, so an exact wire integer proves the
-            // response serializes real bigint digits, not a float.
+            // The addend exceeds 2^53, so an exact response proves real bigint digits.
             total: body.total + 9007199254740993n,
             website: body.website,
             receivedTypes: {

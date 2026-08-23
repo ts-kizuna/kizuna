@@ -239,8 +239,6 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
             if (declaredContentType !== undefined && !isJsonMediaType(declaredContentType)) {
                 parsed = text;
             } else {
-                // Undeclared statuses (the automatic 400, proxies, version skew) fall
-                // back to plain JSON.parse, and to the text itself when that fails.
                 const plan = responseSpec === undefined ? null : responseBodyPlanFor(responseSpec);
                 try {
                     parsed = text.length > 0 ? parseJsonWithPlan(text, plan) : undefined;

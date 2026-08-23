@@ -1487,7 +1487,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Schedule an export of a user, native types in both directions */
+    /** Schedule an export of a user */
     @Throws(OpenEnumAPIClient.UsersScheduleUserExport.Failure::class)
     suspend fun scheduleUserExport(build: OpenEnumAPIClient.UsersScheduleUserExport.Scope.() -> OpenEnumAPIClient.UsersScheduleUserExport.Args): OpenEnumAPIClient.UsersScheduleUserExport.Result {
         val args = OpenEnumAPIClient.UsersScheduleUserExport.Scope.build()

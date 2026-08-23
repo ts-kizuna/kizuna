@@ -217,7 +217,6 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                     query: req.query,
                     headers: req.headers,
                     readBody: async () => {
-                        // Multipart is parsed here when no middleware (e.g. multer) got there first.
                         const contentTypeHeader = req.headers['content-type'];
                         if (
                             route.contentType === 'multipart/form-data' &&

@@ -203,8 +203,7 @@ export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: s
     }
 
     if (isUrlSchema(schema)) {
-        // The wire carries the absolute URL string; java.net.URI would need a
-        // custom serializer for no added safety.
+        // java.net.URI has no kotlinx serializer, so the wire string stays a String.
         return {
             expression: 'String',
             optional: false,

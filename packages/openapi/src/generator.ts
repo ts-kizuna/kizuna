@@ -105,10 +105,8 @@ const normalizeMeta = ({ jsonSchema }: { jsonSchema: Record<string, unknown> }):
 };
 
 /**
- * Zod marks `z.date()` and `z.bigint()` unrepresentable, so the converter
- * would emit `{}` for them. kizuna puts them on the wire as ISO 8601 strings
- * and int64 numbers, and the document says so. Files and URLs are schemas the
- * converter cannot see into; the shared probes recognize them.
+ * Zod marks these types unrepresentable and would emit `{}`; emit their wire
+ * format instead.
  */
 const applyNativeTypes = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; jsonSchema: Record<string, unknown> }): void => {
     const type = readDefType(zodSchema);

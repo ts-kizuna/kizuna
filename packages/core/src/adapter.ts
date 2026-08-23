@@ -1351,8 +1351,7 @@ const renderResult = (
             }
             const plan = !raw && responseSpec !== undefined ? responseBodyPlanFor(responseSpec) : null;
             if (plan !== null) {
-                // Pre-stringified in core so the wire values (ISO dates, exact
-                // bigint digits, URL hrefs) never depend on an adapter's JSON settings.
+                // Pre-stringified so the wire never depends on an adapter's JSON settings.
                 return {
                     status: result.status,
                     headers: {
@@ -1454,10 +1453,9 @@ export const parseFetchBody = async (request: Request, route: RouteDefinition): 
 };
 
 /**
- * Parses a buffered multipart or urlencoded body by handing the bytes to the
- * Web Fetch parser, for adapters whose framework exposes a raw Node body
- * instead of a Fetch `Request`. `contentTypeHeader` is the request's full
- * `Content-Type` value, which carries the multipart boundary.
+ * Parses buffered multipart or urlencoded bytes through the Web Fetch parser.
+ * `contentTypeHeader` is the full `Content-Type` value, which carries the
+ * multipart boundary.
  */
 export const parseBufferedBody = async (contentTypeHeader: string, bytes: Uint8Array, route: RouteDefinition): Promise<unknown> => {
     const request = new Request('http://kizuna.internal/', {

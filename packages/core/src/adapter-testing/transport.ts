@@ -66,7 +66,7 @@ const resolveRequest = async ({ method, path, body, headers }: TestRequest): Pro
         };
     }
     if (body instanceof FormData) {
-        // `Response` encodes the multipart body and mints the boundary-carrying content type.
+        // Response mints the boundary-carrying content type.
         const encoded = new Response(body);
         return {
             method,

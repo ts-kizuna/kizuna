@@ -454,7 +454,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             expect(response.status).toBe(201);
             const body = response.body as NativeEventResponse;
             expect(body.receivedTypes.totalIsBigint).toBe(true);
-            // 2^53 + 1 in, exact digits plus one out: the value never became a float.
             expect(response.text).toContain('"total":9007199254740994');
         },
 

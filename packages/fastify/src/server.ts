@@ -201,7 +201,6 @@ export const fastifyKizuna = fastifyPlugin(
         ): void => {
             if (route.contentType === 'multipart/form-data' && !app.hasContentTypeParser('multipart/form-data')) {
                 // Without a parser Fastify rejects multipart with its own 415 before kizuna runs.
-                // A user-registered parser (e.g. @fastify/multipart) is left in charge instead.
                 app.addContentTypeParser('multipart/form-data', { parseAs: 'buffer' }, (_request, payload, done) => {
                     done(null, payload);
                 });
