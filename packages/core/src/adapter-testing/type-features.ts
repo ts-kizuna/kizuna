@@ -28,6 +28,9 @@ export const ADAPTER_TYPE_FEATURES = {
     'handler.body': {
         summary: 'A declared body reaches the handler typed.',
     },
+    'handler.nativeBodyTypes': {
+        summary: 'Native-typed body fields reach the handler as `Date`, `bigint`, and `URL`.',
+    },
     'handler.context': {
         summary: 'Handler args carry the adapter’s own handler context.',
     },

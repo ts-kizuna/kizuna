@@ -5,6 +5,7 @@ import {
     gateContract,
     inferenceContract,
     inferenceGroupContract,
+    nativeInferenceContract,
     inferenceRoutes,
     pluginTypeContract,
     requestContextContract,
@@ -115,6 +116,11 @@ test('conforms to the shared adapter type catalogue', () => {
                 .parameter(0)
                 .toMatchTypeOf<{ body: { name: string; email: string } }>();
             expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<{ body: undefined }>();
+        },
+        'handler.nativeBodyTypes': () => {
+            expectTypeOf<Router<typeof nativeInferenceContract>['scheduleEvent']>()
+                .parameter(0)
+                .toMatchTypeOf<{ body: { scheduledAt: Date; total: bigint; website: URL } }>();
         },
         'handler.context': () => {
             expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<NextHandlerContext>();

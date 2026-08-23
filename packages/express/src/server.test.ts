@@ -16,7 +16,7 @@ testAdapterFeatures({
             request: async ({ method, path, body, headers }) => {
                 let call = request(app)[method.toLowerCase() as 'get'](path).buffer(true);
                 for (const [name, value] of Object.entries(headers)) call = call.set(name, value);
-                const response = body === undefined ? await call : await call.send(body);
+                const response = body === undefined ? await call : await call.send(typeof body === 'string' ? body : Buffer.from(body));
                 // supertest leaves `.text` unset for non-text bodies, so fall back to the buffered body.
                 const text = response.text ?? (Buffer.isBuffer(response.body) ? response.body.toString('binary') : '');
                 return {

@@ -54,6 +54,32 @@ export const inferenceGroupContract = k.contract({
     },
 });
 
+/**
+ * One route with native-typed body fields, for the `handler.nativeBodyTypes` feature.
+ */
+export const nativeInferenceRoutes = k.routes('api', {
+    scheduleEvent: {
+        method: 'POST',
+        path: '/native/events',
+        body: z.object({
+            scheduledAt: z.date(),
+            total: z.bigint(),
+            website: z.instanceof(URL),
+        }),
+        responses: {
+            201: z.object({
+                scheduledAt: z.date(),
+                total: z.bigint(),
+                website: z.instanceof(URL),
+            }),
+        },
+    },
+});
+
+export const nativeInferenceContract = k.contract({
+    routes: nativeInferenceRoutes,
+});
+
 export const userIdentity = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),

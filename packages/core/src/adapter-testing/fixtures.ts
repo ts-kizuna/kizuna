@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { FileSchema } from '../binary.js';
+import { UrlSchema } from '../url.js';
 import { ProblemDetailsSchema } from '../error-response.js';
 import { Kizuna } from '../kizuna.js';
 import { createPlugin, implementPlugin, rawResponse } from '../adapter.js';
@@ -486,6 +488,81 @@ export const createResponseShapeRouter = <Context>(): Router<typeof responseShap
         status: 201,
         body: {
             id: '1',
+        },
+    }),
+});
+
+/**
+ * Routes exercising native types in bodies: `z.date()`, `z.bigint()`, and
+ * `UrlSchema` in JSON, and a multipart body with a `File` and a coerced scalar.
+ */
+export const nativeRoutes = k.routes('api', {
+    scheduleEvent: {
+        method: 'POST',
+        path: '/native/events',
+        body: z.object({
+            scheduledAt: z.date(),
+            total: z.bigint(),
+            website: UrlSchema,
+        }),
+        responses: {
+            201: z.object({
+                scheduledAt: z.date(),
+                total: z.bigint(),
+                website: UrlSchema,
+                receivedTypes: z.object({
+                    scheduledAtIsDate: z.boolean(),
+                    totalIsBigint: z.boolean(),
+                    websiteIsUrl: z.boolean(),
+                }),
+            }),
+        },
+    },
+    uploadAvatar: {
+        method: 'POST',
+        path: '/native/avatar',
+        contentType: 'multipart/form-data',
+        body: z.object({
+            file: FileSchema,
+            userId: z.string(),
+            weight: z.number(),
+        }),
+        responses: {
+            200: z.object({
+                size: z.number(),
+                userId: z.string(),
+                weight: z.number(),
+            }),
+        },
+    },
+});
+
+export const nativeContract = k.contract({
+    routes: nativeRoutes,
+});
+
+export const createNativeRouter = <Context>(): Router<typeof nativeRoutes, Context> => ({
+    scheduleEvent: ({ body }) => ({
+        status: 201,
+        body: {
+            scheduledAt: body.scheduledAt,
+            // The addend exceeds 2^53, so an exact wire integer proves the
+            // response serializes real bigint digits, not a float.
+            total: body.total + 9007199254740993n,
+            website: body.website,
+            receivedTypes: {
+                scheduledAtIsDate: body.scheduledAt instanceof Date,
+                totalIsBigint: typeof body.total === 'bigint',
+                websiteIsUrl: body.website instanceof URL,
+            },
+        },
+    }),
+    uploadAvatar: ({ body }) => ({
+        status: 200,
+        body: {
+            size: body.file.size,
+            userId: body.userId,
+            weight: body.weight,
         },
     }),
 });

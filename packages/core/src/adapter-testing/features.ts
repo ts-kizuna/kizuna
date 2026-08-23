@@ -48,6 +48,18 @@ export const ADAPTER_FEATURES = {
     'body.optionalFields': {
         summary: 'An optional body field may be omitted, but is validated when present.',
     },
+    'body.dates': {
+        summary: 'A `z.date()` body field arrives as a `Date` and returns as an ISO 8601 string.',
+    },
+    'body.bigints': {
+        summary: 'A `z.bigint()` body field arrives as a `bigint` and returns as an exact JSON integer.',
+    },
+    'body.urls': {
+        summary: 'A `UrlSchema` body field arrives as a `URL` and returns as its href.',
+    },
+    'body.multipartFile': {
+        summary: 'A multipart body reaches the handler with its `File` and coerced scalar fields.',
+    },
     'errors.declaredProblemDetails': {
         summary: 'A declared error response is sent as `application/problem+json`.',
     },

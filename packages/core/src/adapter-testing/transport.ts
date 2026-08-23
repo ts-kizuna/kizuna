@@ -3,6 +3,10 @@ export type TestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 
 export interface TestRequest {
     method: TestMethod;
     path: string;
+    /**
+     * A string is sent as-is, a `FormData` is multipart-encoded, anything else
+     * is JSON-serialized.
+     */
     body?: unknown;
     headers?: Record<string, string>;
 }
@@ -13,7 +17,7 @@ export interface TestRequest {
 export interface MountRequest {
     method: TestMethod;
     path: string;
-    body: string | undefined;
+    body: string | Uint8Array<ArrayBuffer> | undefined;
     headers: Record<string, string>;
 }
 
@@ -52,13 +56,26 @@ export const readTestBody = (text: string): unknown => {
     }
 };
 
-const resolveRequest = ({ method, path, body, headers }: TestRequest): MountRequest => {
+const resolveRequest = async ({ method, path, body, headers }: TestRequest): Promise<MountRequest> => {
     if (body === undefined) {
         return {
             method,
             path,
             body: undefined,
             headers: headers ?? {},
+        };
+    }
+    if (body instanceof FormData) {
+        // `Response` encodes the multipart body and mints the boundary-carrying content type.
+        const encoded = new Response(body);
+        return {
+            method,
+            path,
+            body: new Uint8Array(await encoded.arrayBuffer()),
+            headers: {
+                'content-type': encoded.headers.get('content-type') ?? 'multipart/form-data',
+                ...headers,
+            },
         };
     }
     return {
@@ -74,6 +91,6 @@ const resolveRequest = ({ method, path, body, headers }: TestRequest): MountRequ
 };
 
 export const toMountedApi = (transport: Transport): MountedApi => ({
-    request: (request) => transport.request(resolveRequest(request)),
+    request: async (request) => transport.request(await resolveRequest(request)),
     close: transport.close,
 });

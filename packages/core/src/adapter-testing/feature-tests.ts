@@ -10,9 +10,11 @@ import {
     createResponseShapeRouter,
     createDeprecatedRouter,
     createSecuredRouter,
+    createNativeRouter,
     createSubUserRouter,
     createUserRouter,
     csvBody,
+    nativeContract,
     deprecatedContract,
     issueContract,
     methodContract,
@@ -41,6 +43,17 @@ export interface AdapterUnderTest<Api> {
      */
     initServerApi: (contract: never, options: never) => Api;
     mount: (api: Api, options: { responseValidation?: boolean }) => Transport | Promise<Transport>;
+}
+
+interface NativeEventResponse {
+    scheduledAt: string;
+    total: number;
+    website: string;
+    receivedTypes: {
+        scheduledAtIsDate: boolean;
+        totalIsBigint: boolean;
+        websiteIsUrl: boolean;
+    };
 }
 
 interface MountOptions {
@@ -123,6 +136,28 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 router: createResponseShapeRouter(),
             },
             use
+        );
+
+    const usingNative = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                contract: nativeContract,
+                router: createNativeRouter(),
+            },
+            use
+        );
+
+    const scheduleNativeEvent = () =>
+        usingNative((native) =>
+            native.request({
+                method: 'POST',
+                path: '/native/events',
+                body: {
+                    scheduledAt: '2026-08-23T10:00:00.000Z',
+                    total: 1,
+                    website: 'https://example.com/docs',
+                },
+            })
         );
 
     const postProfile = (body: unknown) =>
@@ -404,6 +439,51 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 nickname: 123,
             });
             expect(wrongType.status).toBe(400);
+        },
+
+        'body.dates': async () => {
+            const response = await scheduleNativeEvent();
+            expect(response.status).toBe(201);
+            const body = response.body as NativeEventResponse;
+            expect(body.receivedTypes.scheduledAtIsDate).toBe(true);
+            expect(body.scheduledAt).toBe('2026-08-23T10:00:00.000Z');
+        },
+
+        'body.bigints': async () => {
+            const response = await scheduleNativeEvent();
+            expect(response.status).toBe(201);
+            const body = response.body as NativeEventResponse;
+            expect(body.receivedTypes.totalIsBigint).toBe(true);
+            // 2^53 + 1 in, exact digits plus one out: the value never became a float.
+            expect(response.text).toContain('"total":9007199254740994');
+        },
+
+        'body.urls': async () => {
+            const response = await scheduleNativeEvent();
+            expect(response.status).toBe(201);
+            const body = response.body as NativeEventResponse;
+            expect(body.receivedTypes.websiteIsUrl).toBe(true);
+            expect(body.website).toBe('https://example.com/docs');
+        },
+
+        'body.multipartFile': async () => {
+            await usingNative(async (native) => {
+                const form = new FormData();
+                form.append('file', new File(['hello world'], 'hello.txt', { type: 'text/plain' }));
+                form.append('userId', 'u1');
+                form.append('weight', '42');
+                const response = await native.request({
+                    method: 'POST',
+                    path: '/native/avatar',
+                    body: form,
+                });
+                expect(response.status).toBe(200);
+                expect(response.body).toEqual({
+                    size: 11,
+                    userId: 'u1',
+                    weight: 42,
+                });
+            });
         },
 
         'errors.declaredProblemDetails': async () => {

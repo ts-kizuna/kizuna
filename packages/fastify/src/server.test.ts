@@ -66,7 +66,7 @@ testAdapterFeatures({
                 const response = await app.inject({
                     method,
                     url: path,
-                    payload: body,
+                    payload: typeof body === 'string' || body === undefined ? body : Buffer.from(body),
                     headers,
                 });
                 return {
