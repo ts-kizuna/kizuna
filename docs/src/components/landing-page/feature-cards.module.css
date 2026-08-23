@@ -11,16 +11,16 @@
     position: relative;
     display: block;
     min-width: 0;
-    padding-inline: 20px;
+    padding-inline: 24px;
     text-decoration: none;
 }
 
 .card::after {
     content: '';
     position: absolute;
-    right: 20px;
+    right: 24px;
     bottom: -24px;
-    left: 20px;
+    left: 24px;
     height: var(--kizuna-hairline);
     background-color: var(--kizuna-line-strong);
 }
