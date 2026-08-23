@@ -169,3 +169,14 @@ export {
     type BrandedHandlerContext,
 } from './handler-pipeline.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
+export {
+    wirePlanFor,
+    requestBodyPlanFor,
+    responseBodyPlanFor,
+    reviveBody,
+    serializeBody,
+    parseJsonWithPlan,
+    type WireDialect,
+    type WirePlan,
+    type WirePlanNode,
+} from './wire-plan.js';

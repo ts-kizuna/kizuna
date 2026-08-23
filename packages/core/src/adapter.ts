@@ -42,6 +42,17 @@ import type { JobTransport } from './job-transport.js';
 export type { ResponseHeaders, RouteDefinition, RoutePath, Routes, Method } from './types.js';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
 export {
+    wirePlanFor,
+    requestBodyPlanFor,
+    responseBodyPlanFor,
+    reviveBody,
+    serializeBody,
+    parseJsonWithPlan,
+    type WireDialect,
+    type WirePlan,
+    type WirePlanNode,
+} from './wire-plan.js';
+export {
     createPlugin,
     pluginRouteTree,
     type PluginDeclaration,

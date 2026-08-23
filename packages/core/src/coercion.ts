@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { RouteDefinition } from './types.js';
+import { requestBodyPlanFor, responseBodyPlanFor } from './wire-plan.js';
 import { readDef, readObjectShape, resolveBaseType, WRAPPER_TYPES } from './zod-internals.js';
 
 /**
@@ -79,13 +80,18 @@ export const coercionPlanFor = (schema: z.ZodType): CoercionPlan => {
 };
 
 /**
- * Resolves the plans for a route's coerced schemas ahead of any request. Called
- * when a contract is defined and when an API is assembled.
+ * Resolves the plans for a route's coerced schemas and wire plans for its
+ * bodies ahead of any request. Called when a contract is defined and when an
+ * API is assembled.
  */
 export const resolveCoercionPlans = (route: RouteDefinition): void => {
     if (route.pathParams) coercionPlanFor(route.pathParams);
     if (route.query) coercionPlanFor(route.query);
     if (route.headers) coercionPlanFor(route.headers);
+    requestBodyPlanFor(route);
+    for (const response of Object.values(route.responses)) {
+        responseBodyPlanFor(response);
+    }
 };
 
 const coerceValue = (value: unknown, type: string): unknown => {
