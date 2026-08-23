@@ -1,7 +1,7 @@
 .window {
-    --window-surface: var(--kizuna-surface, #f4f4f4);
-    --window-line: #d8d8d8;
-    --claude-prompt-surface: #e5e5e5;
+    --window-surface: #f5f5f5;
+    --window-line: var(--kizuna-line, #e4e4e4);
+    --claude-prompt-surface: #ebebeb;
 
     display: flex;
     flex: 1;

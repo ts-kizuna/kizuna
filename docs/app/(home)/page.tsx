@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
-import { ContractExplorer } from '@/components/code/contract-explorer';
 import { HandlerExplorer } from '@/components/code/handler-explorer';
 import { Adapters } from '@/components/landing-page/adapters';
+import { AiEra } from '@/components/landing-page/ai-era';
 import { Beta } from '@/components/landing-page/beta';
 import { ClosingCta } from '@/components/landing-page/closing-cta';
 import { FeatureCards } from '@/components/landing-page/feature-cards';
 import { Hero } from '@/components/landing-page/hero';
 import { LinkCards } from '@/components/landing-page/link-cards';
 import { Section } from '@/components/landing-page/section';
+import { SourceOfTruth } from '@/components/landing-page/source-of-truth';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -30,21 +31,17 @@ export default function HomePage() {
             </Section>
 
             <div className={styles.sections}>
-                <Section
-                    title="The idea"
-                    description="One contract is the source of truth. Your server, your clients, and every generated artifact read from it.">
-                    <ContractExplorer />
-                </Section>
+                <SourceOfTruth />
 
-                <Section title="Inside a handler" description="Whatever the contract declares, the handler gets it validated and typed.">
-                    <HandlerExplorer />
-                </Section>
+                <HandlerExplorer />
 
                 <Section
                     title="Runs anywhere"
                     description="The same contract and router move between adapters, and the framework underneath stays available to you.">
                     <Adapters />
                 </Section>
+
+                <AiEra />
 
                 <Section title="Start here">
                     <LinkCards />

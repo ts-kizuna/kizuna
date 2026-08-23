@@ -2,9 +2,9 @@
 
 import clsx from 'clsx';
 import { useState } from 'react';
-import type { ShikiTransformer } from 'shiki';
 import { CodeWindow } from './code-window';
 import styles from './handler-explorer.module.css';
+import type { CodeCompletion } from './code-completion';
 
 function TsLogo({ className }: { className?: string }) {
     return (
@@ -14,362 +14,200 @@ function TsLogo({ className }: { className?: string }) {
     );
 }
 
-interface Feature {
+interface Moment {
     id: string;
     file: string;
-    token: string;
-    type: string;
     note: string;
     code: string;
+    completion?: CodeCompletion;
+    hover?: string;
 }
 
-const FEATURES: Feature[] = [
+const MOMENTS: Moment[] = [
     {
         id: 'params',
-        file: 'users.router.ts',
-        token: 'params',
-        type: `params: {
-    workspaceId: string;
-    userId: string;
-}`,
-        note: `Autocomplete knows every param in the path. Change the path and your editor points at every handler to update.`,
-        code: `export const users: Router<typeof contract.routes.users> = {
-    getUser: async ({ params }) => {
-        const user = await db.user.findFirstOrThrow({
-            where: {
-                id: params.userId,
-                workspaceId: params.workspaceId,
-            },
-        });
-        return {
-            status: 200,
-            body: user,
-        };
-    },
-};`,
+        file: 'reports.router.ts',
+        note: 'Typed from the path string itself. Rename a param and every handler that reads it fails to compile.',
+        code: `getReport: async ({ params }) => {
+    const month = params.month;
+    const report = await db.reports.findFirst({
+        where: {
+            year: params.`,
+        completion: {
+            after: 'params.',
+            items: ['year', 'month'],
+            selected: 'year',
+        },
     },
     {
         id: 'query',
         file: 'users.router.ts',
-        token: 'query',
-        type: `query: {
-    page: number;
-    perPage: number;
-    order: 'asc' | 'desc';
-    search?: string;
-}`,
-        note: `Autocomplete over your filters and pagination, already the right types. Nothing to look up, nothing to convert.`,
-        code: `export const users: Router<typeof contract.routes.users> = {
-    listUsers: async ({ query }) => {
-        const users = await db.user.findMany({
-            where: {
-                name: {
-                    contains: query.search,
-                },
-            },
-            skip: (query.page - 1) * query.perPage,
-            take: query.perPage,
-            orderBy: {
-                createdAt: query.order,
-            },
-        });
-        return {
-            status: 200,
-            body: users,
-        };
-    },
-};`,
+        note: 'Numbers arrive as numbers and enums as enums, so you never reach for z.coerce.',
+        code: `listUsers: async ({ query }) => {
+    const users = await db.users.findMany({
+        take: query.perPage,
+        orderBy: {
+            createdAt: query.`,
+        completion: {
+            after: 'query.',
+            items: ['order', 'search'],
+            selected: 'order',
+        },
     },
     {
         id: 'body',
         file: 'users.router.ts',
-        token: 'body',
-        type: `body: {
-    email: string;
-    name: string;
-    role: 'member' | 'admin';
-    profile?: {
-        timezone: string;
-    };
-}`,
-        note: `body is already the shape you declared, so it drops straight into your database call with autocomplete on every field.`,
-        code: `export const users: Router<typeof contract.routes.users> = {
-    createUser: async ({ body, auth }) => {
-        const user = await db.user.create({
-            data: {
-                email: body.email,
-                name: body.name,
-                role: body.role,
-                timezone: body.profile?.timezone ?? 'UTC',
-                invitedById: auth.member.workspaceUserId,
-            },
-        });
-        return {
-            status: 201,
-            body: user,
-        };
-    },
-};`,
+        note: 'Validated against your schema before the handler runs, so invalid requests never reach your code.',
+        code: `createUser: async ({ body }) => {
+    const user = await db.users.create({
+        data: body,
+    });
+    await mailer.sendWelcome(body.`,
+        completion: {
+            after: 'body.',
+            items: ['email', 'name'],
+            selected: 'email',
+        },
     },
     {
         id: 'headers',
         file: 'users.router.ts',
-        token: 'headers',
-        type: `headers: {
-    'if-match': string;
-    'accept-language': 'en' | 'nb';
-}`,
-        note: `Type headers[' and your editor lists the headers this route declares, spelled the way the spec spells them.`,
-        code: `export const users: Router<typeof contract.routes.users> = {
-    updateUser: async ({ params, body, headers }) => {
-        const updated = await db.user.update({
-            where: {
-                id: params.userId,
-                version: Number(headers['if-match']),
-            },
-            data: body,
-        });
-        return {
-            status: 200,
-            body: updated,
-            headers: {
-                etag: String(updated.version),
-                'content-language': headers['accept-language'],
-            },
-        };
-    },
-};`,
+        note: 'Declared headers become literal keys, spelled exactly the way the spec spells them.',
+        code: `updateUser: async ({ params, headers }) => {
+    const version = Number(headers['`,
+        completion: {
+            after: "headers['",
+            items: ["'if-match'", "'accept-language'"],
+            selected: "'if-match'",
+        },
     },
     {
         id: 'auth',
-        file: 'workspace.router.ts',
-        token: 'auth',
-        type: `auth: {
+        file: 'users.router.ts',
+        note: 'The guard has already verified the caller, so the handler receives a plain typed value.',
+        code: `getMe: async ({ auth }) => {
+    const me = await db.users.findById(auth.member.workspaceUserId);
+
+    return {
+        status: 200,
+        body: me,
+    };
+},`,
+        hover: `auth: {
     member: {
         workspaceUserId: string;
-        role: 'owner';
-        permissions: ('billing:read' | 'billing:write' | 'members:manage')[];
+        role: 'owner' | 'admin';
+        permissions: ('members:read' | 'members:manage')[];
     };
 }`,
-        note: `auth. autocompletes to exactly what this route's caller is allowed to be. No casting, no optional chaining.`,
-        code: `export const workspace: Router<typeof contract.routes.workspace> = {
-    deleteWorkspace: async ({ params, auth }) => {
-        const deleted = await db.workspace.delete({
-            where: {
-                id: params.workspaceId,
-                ownerId: auth.member.workspaceUserId,
-            },
-        });
-        return {
-            status: 200,
-            body: {
-                deletedAt: deleted.deletedAt,
-            },
-        };
-    },
-};`,
     },
     {
         id: 'requestContext',
         file: 'users.router.ts',
-        token: 'requestContext',
-        type: `requestContext: {
-    analytics: {
-        sessionId: string | null;
-        distinctId: string;
-    };
-}`,
-        note: `Available by name in every handler, with autocomplete, without touching a single function signature.`,
-        code: `export const users: Router<typeof contract.routes.users> = {
-    listUsers: async ({ query, requestContext }) => {
-        const { analytics } = requestContext;
-        const users = await db.user.findMany({
-            take: query.perPage,
-        });
-        await posthog.capture({
-            distinctId: analytics.distinctId,
-            event: 'users_listed',
-            properties: {
-                sessionId: analytics.sessionId,
-            },
-        });
-        return {
-            status: 200,
-            body: users,
-        };
-    },
-};`,
+        note: 'Declared once, resolved per request, available in every handler without touching a signature.',
+        code: `listUsers: async ({ query, requestContext }) => {
+    await posthog.capture({
+        event: 'users_listed',
+        distinctId: requestContext.analytics.`,
+        completion: {
+            after: 'analytics.',
+            items: ['distinctId', 'sessionId'],
+            selected: 'distinctId',
+        },
     },
     {
         id: 'jobs',
         file: 'users.router.ts',
-        token: 'jobs',
-        type: `jobs: {
-    indexUser: {
-        run: (input: { userId: string }) => Promise<void>;
-        queue: (message: {
-            input: { userId: string };
-            dedupeKey?: string;
-            runAt?: Date;
-        }) => Promise<void>;
-    };
-}`,
-        note: `Every job the contract declares, shaped like the declaration. queue answers the request without waiting; run blocks and gives you the result.`,
-        code: `export const users: Router<typeof contract.routes.users> = {
-    createUser: async ({ body, jobs }) => {
-        const user = await db.user.create({
-            data: body,
-        });
-        await jobs.indexUser.queue({
-            input: {
-                userId: user.id,
-            },
-        });
-        return {
-            status: 201,
-            body: user,
-        };
-    },
-};`,
+        note: 'Every job the contract declares. Queue it and answer now, or run it and wait for the result.',
+        code: `createUser: async ({ body, jobs }) => {
+    const user = await db.users.create({
+        data: body,
+    });
+    await jobs.indexUser.`,
+        completion: {
+            after: 'indexUser.',
+            items: ['queue', 'run'],
+            selected: 'queue',
+        },
     },
     {
         id: 'plugins',
         file: 'users.router.ts',
-        token: 'plugins',
-        type: `plugins: {
-    email: {
-        send: (message: {
-            to: string;
-            template: 'welcome' | 'profile-updated';
-        }) => Promise<void>;
-    };
-}`,
-        note: `Whatever your plugins offer, keyed by name. Type plugins. and autocomplete lists them.`,
-        code: `export const users: Router<typeof contract.routes.users> = {
-    updateUser: async ({ params, body, plugins }) => {
-        const user = await db.user.update({
-            where: {
-                id: params.userId,
-            },
-            data: body,
-        });
-        await plugins.email.send({
-            to: user.email,
-            template: 'profile-updated',
-        });
-        return {
-            status: 200,
-            body: user,
-        };
-    },
-};`,
+        note: 'Plugins ride on the contract, so their features arrive typed under their own names.',
+        code: `updateUser: async ({ params, body, plugins }) => {
+    await plugins.email.send({
+        to: body.email,
+        template: '`,
+        completion: {
+            after: "template: '",
+            items: ["'welcome'", "'profile-updated'"],
+            selected: "'profile-updated'",
+        },
     },
     {
         id: 'throwError',
         file: 'users.router.ts',
-        token: 'throwError',
-        type: `throwError: (response: {
-    status: 404 | 409;
-    body: {
-        detail: string;
-    };
-}) => never`,
-        note: `The failures this endpoint declares show up in autocomplete as you type.`,
-        code: `export const users: Router<typeof contract.routes.users> = {
-    deleteUser: async ({ params, auth, throwError }) => {
-        if (params.userId === auth.member.workspaceUserId) return throwError({
+        note: 'Failure responses live in the contract, so a handler can only throw what its route declares.',
+        code: `deleteUser: async ({ params, auth, throwError }) => {
+    if (params.userId === auth.member.workspaceUserId) {
+        throwError({
             status: 409,
             body: {
-                detail: 'You cannot remove yourself from the workspace',
+                detail: 'You cannot remove yourself',
             },
         });
-        const removed = await db.user.delete({
-            where: {
-                id: params.userId,
-            },
-        });
-        return {
-            status: 200,
-            body: {
-                removed: removed.id,
-            },
-        };
-    },
-};`,
+    }`,
     },
 ];
 
-function tokenTransformer(feature: Feature): ShikiTransformer {
-    const lines = feature.code.split('\n');
-    const lineIndex = lines.findIndex((line) => line.includes(`{ ${feature.token}`) || line.includes(`, ${feature.token}`));
-
-    return {
-        name: 'kizuna-type-token',
-        line(node, lineNumber) {
-            if (lineNumber - 1 !== lineIndex) return;
-            for (const child of node.children) {
-                if (child.type !== 'element') continue;
-                const [text] = child.children;
-                if (text?.type === 'text' && text.value.trim() === feature.token) {
-                    child.properties.className = ['kizuna-type-token'];
-                    return;
-                }
-            }
-        },
-    };
-}
-
-const TRANSFORMERS = new Map(FEATURES.map((feature) => [feature.id, tokenTransformer(feature)]));
-
 export function HandlerExplorer({ className }: { className?: string }) {
-    const [active, setActive] = useState(FEATURES[0].id);
-    const feature = FEATURES.find((candidate) => candidate.id === active) ?? FEATURES[0];
+    const [active, setActive] = useState(MOMENTS[0].id);
+    const moment = MOMENTS.find((candidate) => candidate.id === active) ?? MOMENTS[0];
 
     return (
-        <div className={clsx('not-prose kizuna-handler', styles.root, className)}>
-            <div className={styles.tabs}>
-                {FEATURES.map((candidate) => (
-                    <button
+        <section className={clsx('not-prose', styles.root, className)}>
+            <div className={styles.copy}>
+                <h2 className={styles.title}>Inside a handler</h2>
+                <p className={styles.description}>Whatever the contract declares, the handler gets it validated and typed.</p>
+                <div className={styles.tokens}>
+                    {MOMENTS.map((candidate) => (
+                        <button
+                            key={candidate.id}
+                            type="button"
+                            aria-pressed={candidate.id === active}
+                            onClick={() => setActive(candidate.id)}
+                            className={candidate.id === active ? clsx(styles.token, styles.tokenActive) : styles.token}>
+                            {candidate.id}
+                        </button>
+                    ))}
+                </div>
+                <p className={styles.note}>{moment.note}</p>
+            </div>
+
+            <div className={styles.scene}>
+                {MOMENTS.map((candidate) => (
+                    <div
                         key={candidate.id}
-                        type="button"
-                        aria-pressed={active === candidate.id}
-                        onClick={() => setActive(candidate.id)}
-                        className={active === candidate.id ? `${styles.tab} ${styles.tabActive}` : styles.tab}>
-                        {candidate.id}
-                    </button>
+                        aria-hidden={candidate.id !== active}
+                        className={candidate.id === active ? styles.sceneItem : clsx(styles.sceneItem, styles.sceneItemHidden)}>
+                        <div className={styles.window}>
+                            <CodeWindow
+                                lang="ts"
+                                code={candidate.code}
+                                dots
+                                title={candidate.file}
+                                icon={<TsLogo className={styles.brandIcon} />}
+                                completion={candidate.completion}
+                            />
+                        </div>
+                        {candidate.hover ? (
+                            <div className={styles.hoverCard}>
+                                <CodeWindow lang="ts" code={candidate.hover} />
+                            </div>
+                        ) : null}
+                    </div>
                 ))}
             </div>
-
-            <CodeWindow
-                lang="ts"
-                code={feature.code}
-                dots
-                title={feature.file}
-                icon={<TsLogo key="ts" className={styles.brandIcon} />}
-                options={{
-                    themes: {
-                        light: 'github-light',
-                        dark: 'github-dark',
-                    },
-                    transformers: [TRANSFORMERS.get(feature.id)!],
-                }}
-            />
-
-            <div className={styles.types}>
-                <CodeWindow
-                    lang="ts"
-                    code={feature.type}
-                    size="small"
-                    options={{
-                        themes: {
-                            light: 'github-light',
-                            dark: 'github-dark',
-                        },
-                    }}
-                />
-            </div>
-
-            <p className={styles.note}>{feature.note}</p>
-        </div>
+        </section>
     );
 }

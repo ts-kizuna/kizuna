@@ -11,8 +11,8 @@
 }
 
 .adapter {
+    border: var(--kizuna-hairline) solid var(--kizuna-line);
     border-radius: var(--kizuna-radius-card);
-    background-color: var(--kizuna-surface);
     padding: 24px;
 }
 
@@ -52,8 +52,8 @@
     gap: 8px;
     margin: 0;
     max-width: 704px;
+    border: var(--kizuna-hairline) solid var(--kizuna-line);
     border-radius: var(--kizuna-radius-card);
-    background-color: var(--kizuna-surface);
     padding: 16px 20px;
     font-size: 0.9375rem;
     line-height: 1.3;

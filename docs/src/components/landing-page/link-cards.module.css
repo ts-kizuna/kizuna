@@ -6,10 +6,15 @@
 
 .card {
     display: block;
+    border: var(--kizuna-hairline) solid var(--kizuna-line);
     border-radius: var(--kizuna-radius-card);
-    background-color: var(--kizuna-surface);
     padding: 24px;
     text-decoration: none;
+    transition: border-color 0.15s ease;
+}
+
+.card:hover {
+    border-color: var(--kizuna-line-strong);
 }
 
 .title {
