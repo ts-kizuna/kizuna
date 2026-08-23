@@ -1829,3 +1829,48 @@ describe('Kotlin generator: union variants owned by a name-prefix class', () => 
         expect(output).not.toContain('User.SessionEventLogoutReason');
     });
 });
+
+describe('Kotlin generator: UrlSchema maps to String', () => {
+    it('maps z.instanceof(URL) to Kotlin String', () => {
+        const contract = k.contract({
+            routes: {
+                createLink: {
+                    method: 'POST',
+                    path: '/links',
+                    body: z.object({
+                        target: z.instanceof(URL),
+                    }),
+                    responses: {
+                        201: z.object({
+                            target: z.instanceof(URL),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val target: String');
+    });
+
+    it('maps z.file() like z.instanceof(File)', () => {
+        const contract = k.contract({
+            routes: {
+                uploadReport: {
+                    method: 'POST',
+                    path: '/reports',
+                    contentType: 'multipart/form-data',
+                    body: z.object({
+                        report: z.file(),
+                    }),
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val report: TestAPIClient.MultipartFile');
+    });
+});

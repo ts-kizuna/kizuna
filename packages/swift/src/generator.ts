@@ -812,7 +812,7 @@ const buildOperationTypeMap = (allMethods: RouteMethod[], registry: TypeRegistry
     return operationTypeMap;
 };
 
-const SWIFT_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Bool', 'Date', 'Void', 'Foundation.Data']);
+const SWIFT_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Int64', 'Double', 'Bool', 'Date', 'Void', 'Foundation.Data', 'Foundation.URL']);
 
 // Resolve a registry type name to the Swift reference expression appropriate for the given context.
 // scope 'operation-enum': inside the operation's nested enum, same-op types use unqualified short name.

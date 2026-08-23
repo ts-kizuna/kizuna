@@ -1777,3 +1777,68 @@ describe('Swift generator: union variants nest under their union', () => {
         expect(output).toContain('.started(Started(kind: "started", at: at))');
     });
 });
+
+describe('Swift generator: native wire formats', () => {
+    it('maps z.bigint() to Int64 and z.date() to Date', () => {
+        const contract = k.contract({
+            routes: {
+                getStats: {
+                    method: 'GET',
+                    path: '/stats',
+                    responses: {
+                        200: z.object({
+                            generatedAt: z.date(),
+                            totalBytes: z.bigint(),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public let generatedAt: Date');
+        expect(output).toContain('public let totalBytes: Int64');
+    });
+
+    it('maps z.instanceof(URL) to Foundation.URL', () => {
+        const contract = k.contract({
+            routes: {
+                createLink: {
+                    method: 'POST',
+                    path: '/links',
+                    body: z.object({
+                        target: z.instanceof(URL),
+                    }),
+                    responses: {
+                        201: z.object({
+                            target: z.instanceof(URL),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public let target: Foundation.URL');
+    });
+
+    it('maps z.file() like z.instanceof(File)', () => {
+        const contract = k.contract({
+            routes: {
+                uploadReport: {
+                    method: 'POST',
+                    path: '/reports',
+                    contentType: 'multipart/form-data',
+                    body: z.object({
+                        report: z.file(),
+                    }),
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public let report: TestAPIClient.MultipartFile');
+    });
+});

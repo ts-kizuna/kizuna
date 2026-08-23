@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import {
     isFileSchema,
+    isUrlSchema,
     isIntegerSchema,
     readDef,
     readDefType,
@@ -198,6 +199,15 @@ export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: s
             expression: 'MultipartFile',
             optional: false,
             isFile: true,
+        };
+    }
+
+    if (isUrlSchema(schema)) {
+        // The wire carries the absolute URL string; java.net.URI would need a
+        // custom serializer for no added safety.
+        return {
+            expression: 'String',
+            optional: false,
         };
     }
 

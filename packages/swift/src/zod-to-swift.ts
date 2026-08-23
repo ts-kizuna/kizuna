@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import {
     isFileSchema,
+    isUrlSchema,
     isBinarySchema,
     isIntegerSchema,
     readDef,
@@ -183,6 +184,14 @@ export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: s
     if (isBinarySchema(schema)) {
         return {
             expression: 'Foundation.Data',
+            optional: false,
+        };
+    }
+
+    if (isUrlSchema(schema)) {
+        // Foundation.URL is Codable as a single string, matching the wire.
+        return {
+            expression: 'Foundation.URL',
             optional: false,
         };
     }
