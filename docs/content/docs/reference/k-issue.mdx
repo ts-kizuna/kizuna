@@ -3,6 +3,12 @@ title: k.issue
 description: Emit a validation issue with a machine-readable code, checked against your declared issueCodes.
 ---
 
+<BetaNotice>
+
+Custom issue codes are new and still settling. `k.issue` and the `issueCodes` option may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
 Emit a single Zod validation issue carrying a custom machine-readable `code`. The code is surfaced verbatim in the `errors[].code` field of kizuna's [`ValidationErrorSchema`](/docs/reference/is-validation-error).
 
 The code is checked against the `issueCodes` you declared on `new Kizuna()`, so a typo is a compile error.

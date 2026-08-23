@@ -20,6 +20,7 @@ const badges: Record<string, string> = {
     '/docs/reference/kizuna-identity': 'Beta',
     '/docs/reference/k-auth': 'Beta',
     '/docs/reference/k-jobs': 'Beta',
+    '/docs/reference/k-issue': 'Beta',
     '/docs/reference/server-guard': 'Beta',
     '/docs/reference/server-jobs': 'Beta',
     '/docs/reference/kizuna-tanstack-query': 'Beta',

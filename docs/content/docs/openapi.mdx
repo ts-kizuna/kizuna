@@ -142,6 +142,26 @@ spec('yaml'); // YAML string
 
 Routes with `deprecated` and fields with `.meta({ deprecated: ... })` get `deprecated: true` in the generated spec, with no extra options here. Routes with a deprecation `date` or a `sunset` get the `Deprecation`, `Sunset`, and `Link` headers they send documented on every response. See [Deprecations](/docs/deprecations).
 
+## Examples
+
+Give a field an example with `.meta({ example: ... })`:
+
+```ts
+const UserSchema = Kizuna.model({
+    title: 'User',
+    schema: z.object({
+        id: z.string().meta({
+            example: 'usr_k7f3q9',
+        }),
+        email: z.email().meta({
+            example: 'ada@example.com',
+        }),
+    }),
+});
+```
+
+Pass an array for several. It lands as JSON Schema `examples` on the field's schema, and documentation UIs like Scalar and Swagger pick it up from there.
+
 ## Options
 
 They go on `openApiPlugin` on the contract, and `generateOpenApi` reads them from there.

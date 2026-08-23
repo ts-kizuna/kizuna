@@ -1,0 +1,72 @@
+---
+title: Zod
+description: Contracts are written in Zod, and the schema carries more than validation.
+---
+
+<Supports items={['Zod 4']} />
+
+A kizuna contract is written in [Zod](https://zod.dev). Validation is the smaller job: the same schemas generate the OpenAPI document, the Swift and Kotlin clients, and the MCP tools, so what you can say in Zod is what your API can say. Every package that works with schemas declares `zod@^4.0.0` as a peer dependency.
+
+## Standard Schema
+
+kizuna does not support [Standard Schema](https://standardschema.dev). We looked into it, and the clients are why we ultimately chose not to.
+
+```ts
+listEvents: {
+    method: 'GET',
+    path: '/events',
+    query: z.object({
+        from: z.date(),
+    }),
+    responses: {
+        200: z.array(EventSchema),
+    },
+},
+```
+
+One `z.date()`, and every surface gets the real type:
+
+- **The handler** receives `from` as a `Date`, coerced from the query string.
+- **The Swift client** compiles it to `Date`, the Kotlin client to `Instant`.
+- **The fetch client** serializes it back on the way out.
+
+A validator-neutral description cannot say any of that. JSON Schema has no `Date`, `bigint`, or transform to describe, a file upload flattens to a string, and a discriminated union loses its discriminator.
+
+Reading one library also pays inside kizuna: the OpenAPI, Swift, Kotlin, and MCP generators share one toolkit for walking schemas, so a fix or a feature in that reading lands in all of them at once. Contracts take Zod, and kizuna reads all of it.
+
+We wanted every client to behave the same, whatever the language, and one deeply read library is what keeps that true.
+
+## Metadata
+
+`.meta()` is where a schema says things validation cannot. kizuna reads Zod's own `title` and `description`, and `@ts-kizuna/core` adds its own:
+
+| Property     | Type                                 | Where it lands                                                                                                                                                            |
+| ------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `deprecated` | `boolean \| string`                  | `deprecated: true` in the OpenAPI document, `@available(*, deprecated)` in Swift, `@Deprecated` in Kotlin. A string carries the message into outputs with a place for it. |
+| `example`    | The schema's type, or an array of it | JSON Schema `examples` in the OpenAPI document                                                                                                                            |
+
+```ts
+const UserSchema = z.object({
+    id: z.string().meta({
+        example: 'usr_k7f3q9',
+    }),
+});
+```
+
+Routes deprecate too, with dates and sunset headers. See [Deprecations](/docs/deprecations) for every surface.
+
+## Named schemas
+
+[`Kizuna.model`](/docs/reference/kizuna-model) registers a schema under a stable name, so the OpenAPI document emits `#/components/schemas/User` and the Swift and Kotlin clients emit a `User` type, instead of repeating the shape inline everywhere it appears. Only names registered through `Kizuna.model` reach the generators.
+
+## Coercion
+
+Path parameters, query parameters, and headers arrive as strings, and kizuna coerces them to the declared schema, so `z.number()` in a query means the handler receives a number. Declare plain schemas; `k.routes` throws on `z.coerce`, since coercion is already built in. See [coercion](/docs/building/contract#query-path-and-header-coercion).
+
+## Custom issue codes
+
+A `.refine()` failure reports its code as `custom`. Declare `validation.issueCodes` on `new Kizuna()` and raise them with [`k.issue`](/docs/reference/k-issue) to put a typed, machine-readable code in `errors[].code` instead.
+
+## Binary bodies and uploads
+
+JSON is the default body encoding. For bytes, [`BinarySchema` and `FileSchema`](/docs/reference/binary-and-file-schemas) describe binary response bodies and `multipart/form-data` upload fields, and the generators map them to native types like Swift's `Data`.
