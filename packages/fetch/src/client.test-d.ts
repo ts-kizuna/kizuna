@@ -4,12 +4,12 @@ import { Kizuna, type ValidationError } from '@ts-kizuna/core';
 import { KizunaClient } from './client.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
 
-const contractRoutes = k.routes('api', {
+const contractRoutes = k.routes.api({
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -190,7 +190,7 @@ const contract = k.contract({
     routes: contractRoutes,
 });
 
-const voidBodyContractRoutes = k.routes('api', {
+const voidBodyContractRoutes = k.routes.api({
     deleteItem: {
         method: 'DELETE',
         path: '/items/:id',
@@ -222,7 +222,7 @@ test('route with body: z.void() rejects a non-void body', () => {
     voidBodyClient.deleteItem({ params: { id: '1' }, body: { foo: 'bar' } });
 });
 
-const nestedContractRoutes = k.routes('api', {
+const nestedContractRoutes = k.routes.api({
     users: {
         getUser: {
             method: 'GET',
@@ -377,7 +377,7 @@ test('nested object, array, and date/bigint fields surface as their input types'
             filters: {
                 price: 99,
                 createdAt: new Date(),
-                tags: [
+                groups: [
                     {
                         weight: 1,
                         name: 'a',
@@ -404,7 +404,7 @@ test('nested number field rejects wrong-typed values', () => {
                 // @ts-expect-error price must be a number
                 price: '99',
                 createdAt: new Date(),
-                tags: [],
+                groups: [],
             },
             scores: [],
             pair: [1, 'x'],
@@ -574,7 +574,7 @@ test('route without body or query does not include ValidationError', async () =>
 
 const UserIdSchema = z.string().brand<'UserId'>();
 
-const pathParamsContractRoutes = k.routes('api', {
+const pathParamsContractRoutes = k.routes.api({
     getUserEvents: {
         method: 'GET',
         path: '/users/:userId/events/:eventId',
@@ -750,7 +750,7 @@ test('requestContext config is required when a declared header is required', () 
     });
 });
 
-const activityRoutes = k.routes('api', {
+const activityRoutes = k.routes.api({
     getActivity: {
         method: 'GET',
         path: '/activity',

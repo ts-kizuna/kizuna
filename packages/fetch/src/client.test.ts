@@ -4,12 +4,12 @@ import { Kizuna } from '@ts-kizuna/core';
 import { KizunaClient } from './client.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
 
-const contractRoutes = k.routes('api', {
+const contractRoutes = k.routes.api({
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -83,7 +83,7 @@ const contract = k.contract({
     routes: contractRoutes,
 });
 
-const nestedContractRoutes = k.routes('api', {
+const nestedContractRoutes = k.routes.api({
     users: {
         getUser: {
             method: 'GET',
@@ -672,7 +672,7 @@ describe('requestContext on the client initializer', () => {
     });
 });
 
-const activityRoutes = k.routes('api', {
+const activityRoutes = k.routes.api({
     getActivity: {
         method: 'GET',
         path: '/activity',

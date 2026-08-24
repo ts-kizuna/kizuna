@@ -10,12 +10,12 @@ import { mcpPlugin } from './plugin.js';
 import { mcpPluginServer } from './server.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
 
-const routes = k.routes('api', {
+const routes = k.routes.api({
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -137,7 +137,7 @@ describe('mcpPlugin', () => {
     });
 });
 
-const selective = k.routes('api', {
+const selective = k.routes.api({
     listUsers: {
         method: 'GET',
         path: '/users',

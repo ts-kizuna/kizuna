@@ -18,7 +18,7 @@ import {
     deprecationHeaders,
 } from '@ts-kizuna/core/generator';
 import { getStatusText } from '@ts-kizuna/core';
-import type { Contract, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
+import type { Contract, SecurityRequirement } from '@ts-kizuna/core';
 import { OPENAPI_PLUGIN_NAME } from './plugin.js';
 import type {
     GenerateOpenApiOptions,
@@ -180,11 +180,11 @@ const buildComponentSchemas = (): Record<string, unknown> | undefined => {
 };
 
 /**
- * Internal generator options: the public options plus a `key → TagOptions`
- * lookup built from the contract's tag set, used to resolve tag keys to titles.
+ * Internal generator options: the public options plus, per group path, the tag
+ * names an operation in that group is filed under.
  */
 type GeneratorContext = GenerateOpenApiOptions & {
-    tagLookup?: ReadonlyMap<string, TagOptions>;
+    groupTitles?: ReadonlyMap<string, readonly string[]>;
 };
 
 const deriveHeadOperation = (getOperation: OpenApiOperation): OpenApiOperation => {
@@ -215,8 +215,8 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                     options.setOperationId === 'concatenated-path' ? routeKey : routeKey.slice(routeKey.lastIndexOf('.') + 1);
             }
             if (deprecated) operation.deprecated = true;
-            const resolveTagTitle = (key: string): string => options.tagLookup?.get(key)?.title ?? key;
-            const mergedTags = [...new Set([...routeTags, ...(route.tags ?? [])].map(resolveTagTitle))];
+            const filedUnder = (path: string): readonly string[] => options.groupTitles?.get(path) ?? [path];
+            const mergedTags = [...new Set([...routeTags, ...(route.groups ?? [])].flatMap(filedUnder))];
             if (mergedTags.length > 0) {
                 operation.tags = mergedTags;
             }
@@ -504,17 +504,31 @@ const buildSecuritySchemes = (contract: Contract): Record<string, unknown> | und
     return Object.keys(result).length > 0 ? result : undefined;
 };
 
-const buildTagLookup = (contract: Contract): ReadonlyMap<string, TagOptions> => new Map(Object.entries(contract.tags?.tags ?? {}));
+/**
+ * The tag names an operation gets for each group path.
+ *
+ * OpenAPI 3.1.0 has no way to nest a tag, so an operation names its whole
+ * lineage and a reader finds it under every ancestor.
+ */
+const groupTitlesFor = (contract: Contract): ReadonlyMap<string, readonly string[]> => {
+    const titles = new Map<string, readonly string[]>();
+    const declared = contract.groups;
+    if (!declared) return titles;
+    const titleOf = (path: string): string => declared.groups[path]?.title ?? path;
+    for (const [path, group] of declared.resolved) {
+        titles.set(path, group.lineage.map(titleOf));
+    }
+    return titles;
+};
 
 /**
- * Document-level tag definitions from the contract's declared tag set, one
- * entry per declared tag, in declaration order, named by its `title`.
+ * Document-level tag definitions from the contract's groups, outermost first.
  */
 const tagsFromContract = (contract: Contract): OpenApiTag[] => {
-    const declared = contract.tags?.tags;
+    const declared = contract.groups;
     if (!declared) return [];
     const tags: OpenApiTag[] = [];
-    for (const options of Object.values(declared)) {
+    for (const { options } of declared.resolved.values()) {
         const entry: OpenApiTag = { name: options.title };
         if (options.description) entry.description = options.description;
         if (options.externalDocs) entry.externalDocs = options.externalDocs;
@@ -541,7 +555,7 @@ const optionsFromInstalledPlugin = (contract: Contract): GenerateOpenApiOptions 
 export function renderOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer {
     const renderer = openApiGenerator(contract, {
         ...options,
-        tagLookup: buildTagLookup(contract),
+        groupTitles: groupTitlesFor(contract),
     });
     const tags = tagsFromContract(contract);
     if (tags.length > 0) {

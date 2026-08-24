@@ -5,12 +5,12 @@ import { createAdapter, renderJsonResult, ResponseValidationError, type AdapterR
 import { Kizuna } from './kizuna.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
 
-const contract = k.routes('api', {
+const contract = k.routes.api({
     getItem: {
         method: 'GET',
         path: '/items/:id',
@@ -296,7 +296,7 @@ describe('renderJsonResult: error formatting', () => {
 
 describe('eachRoute', () => {
     it('yields static routes before parameterized routes at the same path segment', () => {
-        const c = k.routes('api', {
+        const c = k.routes.api({
             getById: {
                 method: 'GET',
                 path: '/items/:id',
@@ -321,7 +321,7 @@ describe('eachRoute', () => {
 });
 
 describe('renderJsonResult: non-JSON and binary bodies', () => {
-    const rawContract = k.routes('api', {
+    const rawContract = k.routes.api({
         exportCsv: {
             method: 'GET',
             path: '/export',

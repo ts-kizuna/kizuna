@@ -9,7 +9,7 @@ import { openApiPlugin } from './plugin.js';
 import { openApiPluginServer } from './server.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
@@ -24,7 +24,7 @@ const contract = k.contract({
             docsPath: '/docs',
         }),
     },
-    routes: k.routes('api', {
+    routes: k.routes.api({
         getUser: {
             method: 'GET',
             path: '/users/:id',
@@ -87,7 +87,7 @@ describe('openApiPlugin', () => {
 
     it('hands its options to generateOpenApi, so a build step cannot drift from what is served', async () => {
         const servedK = new Kizuna({
-            tags: Kizuna.tags({
+            groups: Kizuna.groups({
                 api: 'API',
             }),
         });
@@ -101,7 +101,7 @@ describe('openApiPlugin', () => {
                     jsonPath: '/openapi.json',
                 }),
             },
-            routes: servedK.routes('api', {
+            routes: servedK.routes.api({
                 ping: {
                     method: 'GET',
                     path: '/ping',
@@ -139,12 +139,12 @@ describe('openApiPlugin', () => {
 
     it('says what to do when there are no options and no plugin', () => {
         const bareK = new Kizuna({
-            tags: Kizuna.tags({
+            groups: Kizuna.groups({
                 api: 'API',
             }),
         });
         const bare = bareK.contract({
-            routes: bareK.routes('api', {
+            routes: bareK.routes.api({
                 ping: {
                     method: 'GET',
                     path: '/ping',
@@ -162,7 +162,7 @@ describe('openApiPlugin', () => {
 
     it('serves the document with no UI when only a document path is given', async () => {
         const specOnlyK = new Kizuna({
-            tags: Kizuna.tags({
+            groups: Kizuna.groups({
                 api: 'API',
             }),
         });
@@ -176,7 +176,7 @@ describe('openApiPlugin', () => {
                     jsonPath: '/openapi.json',
                 }),
             },
-            routes: specOnlyK.routes('api', {
+            routes: specOnlyK.routes.api({
                 ping: {
                     method: 'GET',
                     path: '/ping',
@@ -212,7 +212,7 @@ describe('openApiPlugin', () => {
 
     it('takes a path for each of the three', async () => {
         const customK = new Kizuna({
-            tags: Kizuna.tags({
+            groups: Kizuna.groups({
                 api: 'API',
             }),
         });
@@ -227,7 +227,7 @@ describe('openApiPlugin', () => {
                     yamlPath: '/spec.yaml',
                 }),
             },
-            routes: customK.routes('api', {
+            routes: customK.routes.api({
                 ping: {
                     method: 'GET',
                     path: '/ping',
@@ -265,7 +265,7 @@ describe('openApiPlugin', () => {
 
     it('serves the document at the paths it is given', async () => {
         const jsonOnlyK = new Kizuna({
-            tags: Kizuna.tags({
+            groups: Kizuna.groups({
                 api: 'API',
             }),
         });
@@ -280,7 +280,7 @@ describe('openApiPlugin', () => {
                     yamlPath: '/openapi.yaml',
                 }),
             },
-            routes: jsonOnlyK.routes('api', {
+            routes: jsonOnlyK.routes.api({
                 ping: {
                     method: 'GET',
                     path: '/ping',

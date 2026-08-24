@@ -1,9 +1,11 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { tagRoutes } from './routes.js';
+
 import { Kizuna } from './kizuna.js';
 
-const routes = tagRoutes({
+const plain = new Kizuna();
+
+const routes = plain.routes({
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -45,24 +47,28 @@ test('createUser has body, getUser does not', () => {
 
 test('path must start with /', () => {
     // @ts-expect-error path must start with /
-    tagRoutes({ bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } } });
+    plain.routes({ bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } } });
 });
 
-const tags = Kizuna.tags({
+const groups = Kizuna.groups({
     users: {
         title: 'Users',
-        description: 'User management endpoints',
+        description: 'User management routes',
     },
     health: {
         title: 'Health',
     },
 });
 
-const tagged = tagRoutes(tags, 'users', {
+const grouped = new Kizuna({
+    groups,
+});
+
+const tagged = grouped.routes.users({
     getUser: {
         method: 'GET',
         path: '/users/:id',
-        tags: ['health'],
+        groups: ['health'],
         responses: {
             200: z.object({
                 id: z.string(),
@@ -71,14 +77,14 @@ const tagged = tagRoutes(tags, 'users', {
     },
 });
 
-test('tagged routes preserves literal types', () => {
+test('grouped routes preserve literal types', () => {
     expectTypeOf(tagged.getUser.method).toEqualTypeOf<'GET'>();
     expectTypeOf(tagged.getUser.path).toEqualTypeOf<'/users/:id'>();
 });
 
-test('group key must be a declared tag key', () => {
-    // @ts-expect-error 'unknown' is not a declared tag key
-    tagRoutes(tags, 'unknown', {
+test('a group must be declared', () => {
+    // @ts-expect-error the set declares no `unknown` group
+    grouped.routes.unknown({
         getUser: {
             method: 'GET',
             path: '/users/:id',
@@ -91,13 +97,13 @@ test('group key must be a declared tag key', () => {
     });
 });
 
-test('route-level tags must be declared tag keys', () => {
-    tagRoutes(tags, 'users', {
+test('route-level groups must be declared paths', () => {
+    grouped.routes.users({
         getUser: {
             method: 'GET',
             path: '/users/:id',
-            // @ts-expect-error 'unknown' is not a declared tag key
-            tags: ['unknown'],
+            // @ts-expect-error the set declares no `unknown` group
+            groups: ['unknown'],
             responses: {
                 200: z.object({
                     id: z.string(),
@@ -107,12 +113,12 @@ test('route-level tags must be declared tag keys', () => {
     });
 });
 
-test('tagless tagRoutes accepts arbitrary tag strings', () => {
-    tagRoutes({
+test('the root group accepts routes with no group', () => {
+    plain.routes({
         getUser: {
             method: 'GET',
             path: '/users/:id',
-            tags: ['anything'],
+            groups: ['anything'],
             responses: {
                 200: z.object({
                     id: z.string(),
@@ -123,7 +129,7 @@ test('tagless tagRoutes accepts arbitrary tag strings', () => {
 });
 
 test('pathParams keys must match the path placeholders', () => {
-    tagRoutes({
+    plain.routes({
         getPlace: {
             method: 'GET',
             path: '/places/:plackeId',
@@ -141,7 +147,7 @@ test('pathParams keys must match the path placeholders', () => {
 });
 
 test('every path placeholder must appear in pathParams', () => {
-    tagRoutes({
+    plain.routes({
         getVisit: {
             method: 'GET',
             path: '/places/:placeId/visits/:visitId',
@@ -159,7 +165,7 @@ test('every path placeholder must appear in pathParams', () => {
 });
 
 test('matching pathParams are accepted, in nested groups too', () => {
-    const checked = tagRoutes({
+    const checked = plain.routes({
         getPlace: {
             method: 'GET',
             path: '/places/:placeId',
@@ -193,7 +199,7 @@ test('matching pathParams are accepted, in nested groups too', () => {
 });
 
 test('routes that omit pathParams are left alone', () => {
-    tagRoutes({
+    plain.routes({
         getPlace: {
             method: 'GET',
             path: '/places/:placeId',
@@ -207,7 +213,7 @@ test('routes that omit pathParams are left alone', () => {
 });
 
 test('a pathParams schema without a known key set switches the check off', () => {
-    tagRoutes({
+    plain.routes({
         getPlace: {
             method: 'GET',
             path: '/places/:placeId',

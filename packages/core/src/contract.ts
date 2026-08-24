@@ -1,5 +1,5 @@
 import type { Routes } from './types.js';
-import type { TagSet, TagOptions } from './tags.js';
+import type { GroupSet, GroupOptions, GroupPaths } from './groups.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { Jobs, JobsConfig } from './jobs.js';
@@ -12,7 +12,7 @@ import type { ContractPlugins } from './plugin.js';
  */
 export interface Contract<
     Routes_ extends Routes = Routes,
-    Tags extends Record<string, TagOptions> = Record<string, TagOptions>,
+    Groups extends Record<string, GroupOptions | string> = Record<string, GroupOptions | string>,
     Codes extends string = string,
     Schemes extends Record<string, SecurityScheme> = Record<string, SecurityScheme>,
     Auth = unknown,
@@ -45,10 +45,9 @@ export interface Contract<
      */
     auth?: Auth;
     /**
-     * The tag set declared with `Kizuna.tags`. Routes reference its keys; the
-     * OpenAPI generator resolves each key to its title and description.
+     * The group set declared with `Kizuna.groups`.
      */
-    tags?: TagSet<Tags>;
+    groups?: GroupSet<Groups>;
     /**
      * The identities passed to `new Kizuna()`. Routes reference them by name in
      * their `security` field; the OpenAPI generator emits them under
@@ -78,11 +77,11 @@ export interface Contract<
  * author contracts through `k`.
  */
 export function assembleContract<
-    const Tags extends Record<string, TagOptions> = Record<string, never>,
+    const Groups extends Record<string, GroupOptions | string> = Record<string, never>,
     const Codes extends string = never,
     const Schemes extends Record<string, SecurityScheme> = Record<string, never>,
-    const R extends Routes<Extract<keyof Tags, string>, Extract<keyof Schemes, string>> = Routes<
-        Extract<keyof Tags, string>,
+    const R extends Routes<Extract<GroupPaths<Groups>, string>, Extract<keyof Schemes, string>> = Routes<
+        Extract<GroupPaths<Groups>, string>,
         Extract<keyof Schemes, string>
     >,
     const Auth = unknown,
@@ -94,21 +93,21 @@ export function assembleContract<
     jobs?: Jobs_;
     jobsConfig?: JobsConfig;
     auth?: Auth;
-    tags?: TagSet<Tags>;
+    groups?: GroupSet<Groups>;
     securitySchemes?: Schemes;
     requestContext?: RequestContext;
     validation?: {
         issueCodes?: readonly Codes[];
     };
     plugins?: Plugins;
-}): Contract<R, Tags, Codes, Schemes, Auth, RequestContext, Plugins, Jobs_> {
+}): Contract<R, Groups, Codes, Schemes, Auth, RequestContext, Plugins, Jobs_> {
     return {
         routes: config.routes,
         plugins: config.plugins,
         jobs: config.jobs,
         jobsConfig: config.jobsConfig,
         auth: config.auth,
-        tags: config.tags,
+        groups: config.groups,
         securitySchemes: config.securitySchemes,
         requestContext: config.requestContext,
         validation: config.validation,

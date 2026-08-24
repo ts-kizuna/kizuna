@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { applyCoercion, coercionPlanFor, resolveCoercionPlans } from './coercion.js';
-import { tagRoutes } from './routes.js';
 import { readDef } from './zod-internals.js';
 import type { RouteDefinition } from './types.js';
 import { Kizuna } from './kizuna.js';
+
+const coercionK = new Kizuna();
 
 describe('coercion plans', () => {
     it('is null when no field can be coerced', () => {
@@ -227,7 +228,7 @@ describe('startup resolution', () => {
         const query = z.object({
             page: z.number(),
         });
-        tagRoutes({
+        coercionK.routes({
             listEvents: {
                 method: 'GET',
                 path: '/events',

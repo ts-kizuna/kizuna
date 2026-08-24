@@ -86,7 +86,7 @@ export type RoutePath = `/${string}`;
  */
 export type ResponseHeaders = Record<string, string>;
 
-export interface RouteDefinition<TagKeys extends string = string, SchemeNames extends string = string> {
+export interface RouteDefinition<GroupPaths extends string = string, SchemeNames extends string = string> {
     method: Method;
     /**
      * Use `:paramName` for path parameters.
@@ -154,11 +154,9 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
               link?: string;
           };
     /**
-     * Tag keys grouping this route in the OpenAPI spec. Keys come from the tag set
-     * declared with `Kizuna.tags`; `k.routes` stamps the group's tag onto every
-     * route, and the generator resolves each key to its `title` for the spec.
+     * Groups this route also appears under.
      */
-    tags?: readonly TagKeys[];
+    groups?: readonly GroupPaths[];
     /**
      * The security schemes this route requires, referencing identities registered
      * on the `kizuna` factory. Each entry is a scheme name or a `{ scheme: scopes }`
@@ -220,17 +218,25 @@ export interface HandlerContextBrand<Context> {
     readonly [HANDLER_CONTEXT_BRAND]?: Context;
 }
 
-export interface Routes<TagKeys extends string = string, SchemeNames extends string = string> {
+export interface Routes<GroupPaths extends string = string, SchemeNames extends string = string> {
     [ROUTES_TAG]?: string;
-    [key: string]: RouteDefinition<TagKeys, SchemeNames> | Routes<TagKeys, SchemeNames>;
+    [key: string]: RouteDefinition<GroupPaths, SchemeNames> | Routes<GroupPaths, SchemeNames>;
 }
 
 /**
- * A route as authored in `k.routes`: the route shape minus `security` and
- * `accessGate`, which the `auth` map owns and `k.contract` resolves. Writing
- * either on a route is a type error.
+ * A route `path` as authored: relative to its group's `pathPrefix`, or absolute.
  */
-export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<RouteDefinition<TagKeys>, 'security' | 'accessGate'> & {
+export type AuthoredPath = RoutePath | { absolute: RoutePath };
+
+/**
+ * A route as authored in `k.routes`: the route shape minus `security` and `accessGate`,
+ * which the `auth` map owns and `k.contract` resolves.
+ */
+export type AuthoredRouteDefinition<GroupPaths extends string = string> = Omit<
+    RouteDefinition<GroupPaths>,
+    'security' | 'accessGate' | 'path'
+> & {
+    path: AuthoredPath;
     security?: never;
     accessGate?: never;
 };
@@ -238,7 +244,7 @@ export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<Rout
 /**
  * A tree of {@link AuthoredRouteDefinition}s, the shape `k.routes` accepts.
  */
-export interface AuthoredRoutes<TagKeys extends string = string> {
+export interface AuthoredRoutes<GroupPaths extends string = string> {
     [ROUTES_TAG]?: string;
-    [key: string]: AuthoredRouteDefinition<TagKeys> | AuthoredRoutes<TagKeys>;
+    [key: string]: AuthoredRouteDefinition<GroupPaths> | AuthoredRoutes<GroupPaths>;
 }

@@ -6,7 +6,7 @@ import type { Router } from '../handler-pipeline.js';
 import type { GuardDeny } from '../adapter.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
@@ -23,7 +23,7 @@ export interface User {
  * Module level rather than a factory so `k.routes` infers `method` and `path` as literals; a factory returning an object
  * literal widens both to `string` and weakens `PathParamsCheck`.
  */
-export const userRoutes = k.routes('api', {
+export const userRoutes = k.routes.api({
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -162,7 +162,7 @@ export const createUserRouter = <Context>(): Router<UserRoutes, Context> => {
 /**
  * A route whose handler returns a body the contract does not allow, for `responses.validation`.
  */
-export const brokenRoutes = k.routes('api', {
+export const brokenRoutes = k.routes.api({
     getBroken: {
         method: 'GET',
         path: '/broken',
@@ -351,7 +351,7 @@ export const createSecuredRouter = <Context>(): SecuredRouter<Context> => ({
 /**
  * A one-route group at a distinct path, for the sub-router composition tests each adapter repeated.
  */
-export const subUserRoutes = k.routes('api', {
+export const subUserRoutes = k.routes.api({
     getUser: {
         method: 'GET',
         path: '/sub-users/:id',
@@ -383,7 +383,7 @@ export const createSubUserRouter = <Context>(): Router<typeof subUserContract.ro
 /**
  * Constraints covering each Zod issue code the kernel serializes, so every adapter proves it surfaces them.
  */
-export const issueRoutes = k.routes('api', {
+export const issueRoutes = k.routes.api({
     createProfile: {
         method: 'POST',
         path: '/profiles',
@@ -420,7 +420,7 @@ export const createIssueRouter = <Context>(): Router<typeof issueRoutes, Context
 /**
  * Routes declaring non-JSON and empty response bodies.
  */
-export const responseShapeRoutes = k.routes('api', {
+export const responseShapeRoutes = k.routes.api({
     exportCsv: {
         method: 'GET',
         path: '/items.csv',
@@ -490,7 +490,7 @@ export const createResponseShapeRouter = <Context>(): Router<typeof responseShap
     }),
 });
 
-export const deprecatedRoutes = k.routes('api', {
+export const deprecatedRoutes = k.routes.api({
     deleteUser: {
         method: 'DELETE',
         path: '/deprecated-users/:id',
@@ -553,7 +553,7 @@ export const createDeprecatedRouter = <Context>(): Router<typeof deprecatedRoute
 /**
  * One route per HTTP method, so every adapter proves it registers and dispatches all of them.
  */
-export const methodRoutes = k.routes('api', {
+export const methodRoutes = k.routes.api({
     getItem: {
         method: 'GET',
         path: '/items/:id',
@@ -726,12 +726,12 @@ const probeServer = (config: { label: string }) =>
     }));
 
 const pluginK = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
 
-export const pluginRoutes = pluginK.routes('api', {
+export const pluginRoutes = pluginK.routes.api({
     whichLabel: {
         method: 'GET',
         path: '/which-label',

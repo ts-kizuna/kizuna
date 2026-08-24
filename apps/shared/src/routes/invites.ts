@@ -2,10 +2,10 @@ import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
 import { k } from '../k';
 
-export const inviteRoutes = k.routes('invites', {
+export const inviteRoutes = k.routes.workspace.invites({
     getInvite: {
         method: 'GET',
-        path: '/invites/:token',
+        path: '/:token',
         responses: {
             200: z.object({
                 inviteId: z.string(),
@@ -17,7 +17,7 @@ export const inviteRoutes = k.routes('invites', {
     },
     acceptInvite: {
         method: 'POST',
-        path: '/invites/:token/accept',
+        path: '/:token/accept',
         body: z.object({
             name: z.string(),
         }),

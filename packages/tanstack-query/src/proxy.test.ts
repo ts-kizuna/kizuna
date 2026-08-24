@@ -6,7 +6,7 @@ import { KizunaTanstackQuery } from './proxy.js';
 import { UndeclaredResponseError, isUndeclaredResponseError } from './errors.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         users: 'Users',
     }),
 });
@@ -16,7 +16,7 @@ const UserSchema = z.object({
     name: z.string(),
 });
 
-const routes = k.routes('users', {
+const routes = k.routes.users({
     listUsers: {
         method: 'GET',
         path: '/users',
@@ -379,7 +379,7 @@ describe('passthrough', () => {
 
 describe('name collisions', () => {
     it('lets a route named like a factory win over it', () => {
-        const collidingRoutes = k.routes('users', {
+        const collidingRoutes = k.routes.users({
             key: {
                 method: 'GET',
                 path: '/key',

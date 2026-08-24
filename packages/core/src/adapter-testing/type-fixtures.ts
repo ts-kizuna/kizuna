@@ -5,7 +5,7 @@ import { Kizuna } from '@ts-kizuna/core';
 import { createPlugin } from '@ts-kizuna/core/adapter';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
@@ -13,7 +13,7 @@ const k = new Kizuna({
 /**
  * Two routes, not the runtime suite's four: every `router.*` feature writes one handler per route, once per adapter.
  */
-export const inferenceRoutes = k.routes('api', {
+export const inferenceRoutes = k.routes.api({
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -247,7 +247,7 @@ const typedProbePlugin = createPlugin<{ label: () => string }>()({
 });
 
 const pluginTypeK = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
@@ -256,7 +256,7 @@ export const pluginTypeContract = pluginTypeK.contract({
     plugins: {
         probe: typedProbePlugin,
     },
-    routes: pluginTypeK.routes('api', {
+    routes: pluginTypeK.routes.api({
         whichLabel: {
             method: 'GET',
             path: '/which-label',

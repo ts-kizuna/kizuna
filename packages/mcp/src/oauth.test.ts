@@ -82,7 +82,7 @@ const member = Kizuna.identity.apiKey({
 });
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
     identities: {
@@ -91,7 +91,7 @@ const k = new Kizuna({
     },
 });
 
-const apiRoutes = k.routes('api', {
+const apiRoutes = k.routes.api({
     getUser: {
         method: 'GET',
         path: '/users/:id',

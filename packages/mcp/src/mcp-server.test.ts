@@ -7,12 +7,12 @@ import { InMemoryTransport } from '@modelcontextprotocol/client';
 import { buildInstructions, buildToolDefinitions, createMcpServer } from './mcp-server.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
 
-const contractRoutes = k.routes('api', {
+const contractRoutes = k.routes.api({
     users: {
         listUsers: {
             method: 'GET',
@@ -422,7 +422,7 @@ describe('buildToolDefinitions: input schema', () => {
     });
 
     it('handles non-object body (discriminated union)', () => {
-        const unionContractRoutes = k.routes('api', {
+        const unionContractRoutes = k.routes.api({
             sendNotification: {
                 method: 'POST',
                 path: '/notifications',
@@ -456,7 +456,7 @@ describe('buildToolDefinitions: input schema', () => {
     });
 
     it('combines params, query, and body for complex routes', () => {
-        const complexContractRoutes = k.routes('api', {
+        const complexContractRoutes = k.routes.api({
             updateItem: {
                 method: 'PUT',
                 path: '/items/:id',
@@ -490,7 +490,7 @@ describe('buildToolDefinitions: input schema', () => {
     });
 
     it('keeps a query with a required field required', () => {
-        const contractRoutesWithRequiredQuery = k.routes('api', {
+        const contractRoutesWithRequiredQuery = k.routes.api({
             searchItems: {
                 method: 'GET',
                 path: '/items',

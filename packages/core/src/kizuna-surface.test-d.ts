@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({ users: { title: 'Users' } }),
+    groups: Kizuna.groups({ users: { title: 'Users' } }),
     validation: { issueCodes: ['invalid_phone_number'] },
 });
 
@@ -19,7 +19,7 @@ test('issueCodes literal is preserved, not widened to string', () => {
 });
 
 test('tag names are checked against the declared tags', () => {
-    k.routes('users', {});
+    k.routes.users({});
     // @ts-expect-error 'userz' is not a declared tag
-    k.routes('userz', {});
+    k.routes.userz({});
 });

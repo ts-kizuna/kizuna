@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { tagRoutes } from './routes.js';
+import { validateRoutes } from './routes.js';
 import { assembleContract, type Contract } from './contract.js';
 import { pluginRouteTree, type ContractPlugins, type ContractPluginsArg, type PluginArgs } from './plugin.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
@@ -7,7 +7,8 @@ import { assertValidDeprecationDates } from './deprecation.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { jobClaims, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, type JobsArg, type JobsConfig } from './jobs.js';
-import { createTags, type TagSet, type TagOptions } from './tags.js';
+import { createGroups, emptyGroupSet, type GroupSet, type GroupOptions, type GroupPaths } from './groups.js';
+import { buildGroupRoutes, type GroupRoutes } from './group-routes.js';
 import { createIdentity } from './identity.js';
 import { createRequestContext } from './request-context.js';
 import { createModel } from './model.js';
@@ -193,16 +194,16 @@ const applyGroupAuth = (group: Routes, groupAuth: GroupAuth, path: string): void
  * What a {@link Kizuna} instance declares.
  */
 export interface KizunaSpec {
-    tags: Record<string, TagOptions>;
+    groups: Record<string, GroupOptions | string>;
     codes: string;
     identities: Record<string, SecurityScheme>;
     requestContext: Record<string, RequestContextSchema>;
 }
 
 /**
- * The tag names declared on a spec, e.g. `'health' | 'users'`.
+ * The dotted group paths declared on a spec, e.g. `'workspace' | 'workspace.members'`.
  */
-export type TagNamesOf<Spec extends KizunaSpec> = Extract<keyof Spec['tags'], string>;
+export type GroupNamesOf<Spec extends KizunaSpec> = Extract<GroupPaths<Spec['groups']>, string>;
 
 /**
  * The identity names declared on a spec, e.g. `'user' | 'member'`.
@@ -214,11 +215,10 @@ export type IdentityNamesOf<Spec extends KizunaSpec> = Extract<keyof Spec['ident
  */
 export interface K<Spec extends KizunaSpec = KizunaSpec> {
     /**
-     * Define a group of routes. Pass a tag (one of the keys from `Kizuna.tags`)
-     * to group them in the OpenAPI document, or omit it for an untagged group.
+     * Declare routes into a group.
+     * Call it for the root group, or reach a declared group by property: `k.routes.workspace.members({ ... })`.
      */
-    routes<const T extends AuthoredRoutes<TagNamesOf<Spec>>>(tag: TagNamesOf<Spec>, defs: T & PathParamsCheck<T>): T;
-    routes<const T extends AuthoredRoutes>(defs: T & PathParamsCheck<T>): T;
+    readonly routes: GroupRoutes<Spec['groups']>;
     /**
      * The `auth` map, typed against the routes and identities. Define it wherever
      * you like, then pass it to `k.contract` under `auth`.
@@ -229,7 +229,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *     members: 'user',
      * });
      */
-    auth<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>, const A extends AuthMap<IdentityNamesOf<Spec>, R>>(
+    auth<const R extends Routes<GroupNamesOf<Spec>, IdentityNamesOf<Spec>>, const A extends AuthMap<IdentityNamesOf<Spec>, R>>(
         routes: R,
         map: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>
     ): A;
@@ -265,7 +265,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      * `auth` map.
      */
     contract<
-        const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
+        const R extends Routes<GroupNamesOf<Spec>, IdentityNamesOf<Spec>>,
         const A extends AuthMap<IdentityNamesOf<Spec>, R>,
         const J extends Jobs = Record<string, never>,
         const P extends ContractPlugins = Record<string, never>,
@@ -276,7 +276,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
     }): Contract<
         RoutesWithHandlerContext<R, Spec['identities'], A, Spec['requestContext'], PluginArgs<P> & JobsArg<J>>,
-        Spec['tags'],
+        Spec['groups'],
         Spec['codes'],
         Spec['identities'],
         A,
@@ -285,7 +285,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         J
     >;
     contract<
-        const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
+        const R extends Routes<GroupNamesOf<Spec>, IdentityNamesOf<Spec>>,
         const J extends Jobs = Record<string, never>,
         const P extends ContractPlugins = Record<string, never>,
     >(definition: {
@@ -294,7 +294,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         plugins?: ContractPluginsArg<R, P>;
     }): Contract<
         RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext'], PluginArgs<P> & JobsArg<J>>,
-        Spec['tags'],
+        Spec['groups'],
         Spec['codes'],
         Spec['identities'],
         unknown,
@@ -323,12 +323,12 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
  * The spec a {@link Kizuna} instance's type parameters assemble into.
  */
 type SpecOf<
-    Tags extends Record<string, TagOptions>,
+    Groups extends Record<string, GroupOptions | string>,
     Codes extends string,
     Identities extends Record<string, SecurityScheme>,
     RequestContext extends Record<string, RequestContextSchema>,
 > = {
-    tags: Tags;
+    groups: Groups;
     codes: Codes;
     identities: Identities;
     requestContext: RequestContext;
@@ -339,14 +339,14 @@ type SpecOf<
  * API surface is bound to. Routes, auth, jobs and plugins go on `k.contract`.
  */
 export interface KizunaConfig<
-    Tags extends Record<string, TagOptions> = Record<string, never>,
+    Groups extends Record<string, GroupOptions | string> = Record<string, never>,
     Codes extends string = never,
     Identities extends Record<string, SecurityScheme> = Record<string, never>,
     RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
 > {
     identities?: Identities;
     requestContext?: RequestContext;
-    tags?: TagSet<Tags>;
+    groups?: GroupSet<Groups>;
     validation?: {
         issueCodes?: readonly Codes[];
     };
@@ -357,23 +357,18 @@ export interface KizunaConfig<
 }
 
 const createSurface = <
-    Tags extends Record<string, TagOptions>,
+    Groups extends Record<string, GroupOptions | string>,
     Codes extends string,
     Identities extends Record<string, SecurityScheme>,
     RequestContext extends Record<string, RequestContextSchema>,
 >(
-    config?: KizunaConfig<Tags, Codes, Identities, RequestContext>
-): K<SpecOf<Tags, Codes, Identities, RequestContext>> => {
-    type Spec = SpecOf<Tags, Codes, Identities, RequestContext>;
+    config?: KizunaConfig<Groups, Codes, Identities, RequestContext>
+): K<SpecOf<Groups, Codes, Identities, RequestContext>> => {
+    type Spec = SpecOf<Groups, Codes, Identities, RequestContext>;
 
-    const tagSet: TagSet<Tags> = config?.tags ?? { __brand: 'TagSet', tags: {} as Tags };
+    const groupSet: GroupSet<Groups> = config?.groups ?? emptyGroupSet<Groups>();
 
-    const routes = ((tagOrDefs: string | Routes, defs?: Routes) => {
-        if (defs === undefined) {
-            return tagRoutes(tagOrDefs as Routes);
-        }
-        return tagRoutes(tagSet, tagOrDefs as Extract<keyof Tags, string>, defs as Routes<Extract<keyof Tags, string>>);
-    }) as K<Spec>['routes'];
+    const routes = buildGroupRoutes(groupSet, validateRoutes) as K<Spec>['routes'];
 
     const jobs = ((identityOrDefinitions: string | AuthoredJobs, definitions?: AuthoredJobs) =>
         definitions === undefined
@@ -417,10 +412,10 @@ const createSurface = <
             }
         }
         return assembleContract({
-            routes: contractRoutes as Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
+            routes: contractRoutes as Routes<Extract<GroupPaths<Groups>, string>, Extract<keyof Identities, string>>,
             jobs: contractJobs,
             auth,
-            tags: config?.tags,
+            groups: config?.groups,
             securitySchemes: config?.identities,
             requestContext: config?.requestContext,
             validation: config?.validation,
@@ -445,7 +440,7 @@ const createSurface = <
  * validation issue codes. Keep the instance and use `k.routes` to define route
  * groups, `k.auth` to type the auth map, and `k.contract` to assemble them.
  *
- * The authoring helpers that need no instance stay static: `Kizuna.tags`,
+ * The authoring helpers that need no instance stay static: `Kizuna.groups`,
  * `Kizuna.identity`, `Kizuna.requestContext` and `Kizuna.model`.
  *
  * @example
@@ -460,23 +455,23 @@ const createSurface = <
  * });
  */
 export class Kizuna<
-    const Tags extends Record<string, TagOptions> = Record<string, never>,
+    const Groups extends Record<string, GroupOptions | string> = Record<string, never>,
     const Codes extends string = never,
     const Identities extends Record<string, SecurityScheme> = Record<string, never>,
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
-> implements K<SpecOf<Tags, Codes, Identities, RequestContext>> {
-    static readonly tags = createTags;
+> implements K<SpecOf<Groups, Codes, Identities, RequestContext>> {
+    static readonly groups = createGroups;
     static readonly identity = createIdentity;
     static readonly requestContext = createRequestContext;
     static readonly model = createModel;
 
-    declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext>>['routes'];
-    declare readonly auth: K<SpecOf<Tags, Codes, Identities, RequestContext>>['auth'];
-    declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext>>['jobs'];
-    declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext>>['contract'];
-    declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext>>['issue'];
+    declare readonly routes: K<SpecOf<Groups, Codes, Identities, RequestContext>>['routes'];
+    declare readonly auth: K<SpecOf<Groups, Codes, Identities, RequestContext>>['auth'];
+    declare readonly jobs: K<SpecOf<Groups, Codes, Identities, RequestContext>>['jobs'];
+    declare readonly contract: K<SpecOf<Groups, Codes, Identities, RequestContext>>['contract'];
+    declare readonly issue: K<SpecOf<Groups, Codes, Identities, RequestContext>>['issue'];
 
-    constructor(config?: KizunaConfig<Tags, Codes, Identities, RequestContext>) {
-        Object.assign(this, createSurface<Tags, Codes, Identities, RequestContext>(config));
+    constructor(config?: KizunaConfig<Groups, Codes, Identities, RequestContext>) {
+        Object.assign(this, createSurface<Groups, Codes, Identities, RequestContext>(config));
     }
 }

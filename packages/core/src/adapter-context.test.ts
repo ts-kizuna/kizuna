@@ -4,7 +4,7 @@ import { Kizuna } from './kizuna.js';
 import { HANDLER_ARG_KEYS, adapterContextOf, assembleApi, createAdapter, type AdapterRequest } from './adapter.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
     identities: {
@@ -24,7 +24,7 @@ const k = new Kizuna({
 });
 
 const contract = k.contract({
-    routes: k.routes('api', {
+    routes: k.routes.api({
         everything: {
             method: 'POST',
             path: '/everything/:id',

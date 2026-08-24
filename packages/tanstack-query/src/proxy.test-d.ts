@@ -5,7 +5,7 @@ import { KizunaClient } from '@ts-kizuna/fetch';
 import { KizunaTanstackQuery } from './proxy.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         users: 'Users',
     }),
 });
@@ -15,7 +15,7 @@ const UserSchema = z.object({
     name: z.string(),
 });
 
-const routes = k.routes('users', {
+const routes = k.routes.users({
     listUsers: {
         method: 'GET',
         path: '/users',

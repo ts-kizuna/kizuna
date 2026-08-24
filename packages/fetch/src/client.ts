@@ -5,7 +5,7 @@ import type {
     ValidationError,
     ValidationErrorFor,
     Contract,
-    TagOptions,
+    GroupOptions,
     RequestContextSchema,
     RequestContextHeaderInputs,
     SecurityScheme,
@@ -280,7 +280,7 @@ export interface KizunaClientConstructor {
         Schemes extends Record<string, SecurityScheme> = Record<string, never>,
         RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
     >(
-        contract: Contract<T, Record<string, TagOptions>, Codes, Schemes, unknown, RequestContext>,
+        contract: Contract<T, Record<string, GroupOptions | string>, Codes, Schemes, unknown, RequestContext>,
         config: ClientConfig &
             ({} extends ContextHeaderInputs<RequestContext>
                 ? { requestContext?: ContextHeaderInputs<RequestContext> }

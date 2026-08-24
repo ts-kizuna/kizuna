@@ -5,7 +5,7 @@ export {
     type K,
     type KizunaConfig,
     type KizunaSpec,
-    type TagNamesOf,
+    type GroupNamesOf,
     type IdentityNamesOf,
     type AuthMap,
     type GroupAuth,
@@ -34,7 +34,9 @@ export {
     type PluginExportsOf,
 } from './plugin.js';
 export { type ModelOptions } from './model.js';
-export { type TagOptions, type TagSet, type TagKeysOf, type NormalizeTags } from './tags.js';
+export { type GroupOptions, type GroupSet, type GroupPaths, type GroupPathsOf, type ResolvedGroup } from './groups.js';
+export { type AuthoredPath } from './group-path.js';
+export { type GroupRoutes, type GroupAccessor } from './group-routes.js';
 export {
     type Identity,
     type Credential,

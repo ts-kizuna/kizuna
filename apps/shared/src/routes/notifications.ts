@@ -58,11 +58,11 @@ export const EventRecord = Kizuna.model({
     }),
 });
 
-export const notificationsRoutes = k.routes('notifications', {
+export const notificationsRoutes = k.routes.notifications({
     sendNotification: {
         method: 'POST',
         path: '/notifications',
-        tags: ['notifications', 'health'],
+        groups: ['health'],
         body: NotificationEvent,
         responses: {
             202: z.object({

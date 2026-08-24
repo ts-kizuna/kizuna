@@ -1,7 +1,6 @@
 import type { z } from 'zod';
 import { ROUTES_TAG, type Routes, type RouteDefinition, type ResponseDefinition } from './types.js';
 import { isRouteDefinition } from './handler-pipeline.js';
-import { type TagSet, type TagKeysOf, isTagSet } from './tags.js';
 import { findCoercedSchemaPath, readObjectShape, resolveBaseType } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
@@ -87,7 +86,7 @@ const assertPathParamsAreScalar = (route: RouteDefinition, routeKey: string): vo
     }
 };
 
-const validateRoutes = (routes: Routes, prefix?: string): void => {
+export const validateRoutes = (routes: Routes, prefix?: string): void => {
     for (const [key, value] of Object.entries(routes)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
         if (isRouteDefinition(value)) {
@@ -104,38 +103,3 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
     }
 };
 
-/**
- * Define a group of routes under a tag. Pass the tag set declared with
- * `Kizuna.tags` for completion on the group tag and route-level `tags`; the
- * tag is stamped onto every route in the group.
- */
-export function tagRoutes<const T extends Routes<TagKeysOf<Set>>, Set extends TagSet>(
-    tags: Set,
-    tag: TagKeysOf<Set>,
-    routes: T & PathParamsCheck<T>
-): T;
-export function tagRoutes<const T extends Routes<TagKeysOf<Set>>, Set extends TagSet>(tags: Set, routes: T & PathParamsCheck<T>): T;
-export function tagRoutes<const T extends Routes>(tag: string, routes: T & PathParamsCheck<T>): T;
-export function tagRoutes<const T extends Routes>(routes: T & PathParamsCheck<T>): T;
-export function tagRoutes(first: TagSet | string | Routes, second?: string | Routes, third?: Routes): Routes {
-    if (isTagSet(first)) {
-        if (third !== undefined) {
-            const result = third;
-            (result as Record<typeof ROUTES_TAG, string>)[ROUTES_TAG] = second as string;
-            validateRoutes(result);
-            return result;
-        }
-        const result = second as Routes;
-        validateRoutes(result);
-        return result;
-    }
-    if (typeof first === 'string') {
-        const result = second as Routes;
-        (result as Record<typeof ROUTES_TAG, string>)[ROUTES_TAG] = first;
-        validateRoutes(result);
-        return result;
-    }
-    const result = first;
-    validateRoutes(result);
-    return result;
-}

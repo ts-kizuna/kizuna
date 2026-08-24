@@ -7,7 +7,7 @@ import { generateOpenApi, renderOpenApi } from './generator.js';
 import type { GenerateOpenApiOptions } from './types.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
@@ -24,7 +24,7 @@ declare module 'vitest' {
     }
 }
 
-const contractRoutes = k.routes('api', {
+const contractRoutes = k.routes.api({
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -145,7 +145,7 @@ describe('generateOpenApi', () => {
     });
 
     it('sets concatenated-path operationId for nested routers', () => {
-        const nestedRoutes = k.routes('api', {
+        const nestedRoutes = k.routes.api({
             users: {
                 getUser: {
                     method: 'GET',
@@ -171,7 +171,7 @@ describe('generateOpenApi', () => {
     });
 
     it('omits requestBody and response content for z.void()', () => {
-        const voidContractRoutes = k.routes('api', {
+        const voidContractRoutes = k.routes.api({
             ping: {
                 method: 'POST',
                 path: '/ping/:id',
@@ -197,7 +197,7 @@ describe('generateOpenApi', () => {
             ...baseConfig,
             operationMapper: (operation) => ({
                 ...operation,
-                tags: ['users'],
+                groups: ['users'],
             }),
         });
         expect(tagged.paths['/users/{id}']?.get?.tags).toEqual(['users']);
@@ -219,7 +219,7 @@ describe('Zod meta() in OpenAPI output', () => {
         }),
     });
 
-    const taggedContractRoutes = k.routes('api', {
+    const taggedContractRoutes = k.routes.api({
         getUser: {
             method: 'GET',
             path: '/users/:id',
@@ -264,7 +264,7 @@ describe('Zod meta() in OpenAPI output', () => {
             .meta({
                 id: 'RawTagged',
             });
-        const rawRoutes = k.routes('api', {
+        const rawRoutes = k.routes.api({
             getRaw: {
                 method: 'GET',
                 path: '/raw',
@@ -289,16 +289,16 @@ describe('Zod meta() in OpenAPI output', () => {
 
 describe('operation metadata passthrough', () => {
     const kTagged = new Kizuna({
-        tags: Kizuna.tags({
+        groups: Kizuna.groups({
             api: 'API',
             users: 'Users',
         }),
     });
-    const annotatedRoutes = kTagged.routes('api', {
+    const annotatedRoutes = kTagged.routes.api({
         getUser: {
             method: 'GET',
             path: '/users/:id',
-            tags: ['users'],
+            groups: ['users'],
             externalDocs: {
                 url: 'https://example.com/docs/getUser',
                 description: 'Reference docs',
@@ -355,7 +355,7 @@ describe('operation metadata passthrough', () => {
             ...baseConfig,
             operationMapper: (operation) => ({
                 ...operation,
-                tags: ['mapped'],
+                groups: ['mapped'],
             }),
         });
         expect(spec.paths['/users/{id}']?.get?.tags).toEqual(['mapped']);
@@ -363,7 +363,7 @@ describe('operation metadata passthrough', () => {
 
     it('merges route-level tags with the group tag', () => {
         const k = new Kizuna({
-            tags: Kizuna.tags({
+            groups: Kizuna.groups({
                 users: {
                     title: 'Users',
                 },
@@ -372,11 +372,11 @@ describe('operation metadata passthrough', () => {
                 },
             }),
         });
-        const usersRoutes = k.routes('users', {
+        const usersRoutes = k.routes.users({
             getUser: {
                 method: 'GET',
                 path: '/users/:id',
-                tags: ['health'],
+                groups: ['health'],
                 responses: {
                     200: z.object({
                         id: z.string(),
@@ -408,7 +408,7 @@ describe('discriminated unions', () => {
                 url: z.string(),
             }),
         });
-        const routeRoutes = k.routes('api', {
+        const routeRoutes = k.routes.api({
             getMedia: {
                 method: 'GET',
                 path: '/media',
@@ -439,7 +439,7 @@ describe('discriminated unions', () => {
                 url: z.string(),
             }),
         });
-        const routeRoutes = k.routes('api', {
+        const routeRoutes = k.routes.api({
             getMedia: {
                 method: 'GET',
                 path: '/media',
@@ -472,7 +472,7 @@ describe('discriminated unions', () => {
     });
 
     it('emits discriminator without mapping when variants are not id-tagged', () => {
-        const routeRoutes = k.routes('api', {
+        const routeRoutes = k.routes.api({
             getMedia: {
                 method: 'GET',
                 path: '/inline-media',
@@ -522,7 +522,7 @@ describe('discriminated unions', () => {
             title: 'NotificationEvent',
             schema: z.discriminatedUnion('channel', [EmailEvent, SmsEvent]),
         });
-        const routeRoutes = k.routes('api', {
+        const routeRoutes = k.routes.api({
             sendNotification: {
                 method: 'POST',
                 path: '/notifications',
@@ -562,7 +562,7 @@ describe('discriminated unions', () => {
     });
 
     it('does not add discriminator to plain z.union', () => {
-        const routeRoutes = k.routes('api', {
+        const routeRoutes = k.routes.api({
             getOne: {
                 method: 'GET',
                 path: '/plain-union',
@@ -583,7 +583,7 @@ describe('discriminated unions', () => {
 
 describe('request body content types', () => {
     it('is a valid OpenAPI 3.1 document', async () => {
-        const routeRoutes = k.routes('api', {
+        const routeRoutes = k.routes.api({
             uploadAvatar: {
                 method: 'POST',
                 path: '/avatar',
@@ -632,7 +632,7 @@ describe('request body content types', () => {
     });
 
     it('emits multipart/form-data when contentType is set, with format: binary for File fields', () => {
-        const routeRoutes = k.routes('api', {
+        const routeRoutes = k.routes.api({
             uploadAvatar: {
                 method: 'POST',
                 path: '/avatar',
@@ -668,7 +668,7 @@ describe('request body content types', () => {
     });
 
     it('emits application/x-www-form-urlencoded when contentType is set', () => {
-        const routeRoutes = k.routes('api', {
+        const routeRoutes = k.routes.api({
             postForm: {
                 method: 'POST',
                 path: '/form',
@@ -694,7 +694,7 @@ describe('request body content types', () => {
     });
 
     it('defaults to application/json when contentType is not set', () => {
-        const routeRoutes = k.routes('api', {
+        const routeRoutes = k.routes.api({
             postUser: {
                 method: 'POST',
                 path: '/users',
@@ -719,7 +719,7 @@ describe('request body content types', () => {
 
 describe('transform field handling', () => {
     it('uses input schema for request body transform fields', () => {
-        const contractRoutes = k.routes('api', {
+        const contractRoutes = k.routes.api({
             createUser: {
                 method: 'POST',
                 path: '/users',
@@ -751,7 +751,7 @@ describe('transform field handling', () => {
     });
 
     it('uses input schema for transform fields in union query params', () => {
-        const contractRoutes = k.routes('api', {
+        const contractRoutes = k.routes.api({
             getItems: {
                 method: 'GET',
                 path: '/items',
@@ -789,7 +789,7 @@ describe('transform field handling', () => {
 
 describe('complex transform edge cases', () => {
     it('handles transforms across nested objects, arrays, records, tuples, unions, nullable, and intersections without producing {}', () => {
-        const insaneRoutes = k.routes('api', {
+        const insaneRoutes = k.routes.api({
             users: {
                 create: {
                     method: 'POST',
@@ -898,7 +898,7 @@ describe('complex transform edge cases', () => {
 
 describe('response headers', () => {
     it('emits OpenAPI headers object on the response when headers are declared', () => {
-        const contractRoutes = k.routes('api', {
+        const contractRoutes = k.routes.api({
             getUser: {
                 method: 'GET',
                 path: '/users/:id',
@@ -939,13 +939,13 @@ describe('response headers', () => {
 describe('contract-level tag grouping', () => {
     it('applies the group tag to all routes in that group', () => {
         const k = new Kizuna({
-            tags: Kizuna.tags({
+            groups: Kizuna.groups({
                 users: {
                     title: 'Users',
                 },
             }),
         });
-        const usersRoutes = k.routes('users', {
+        const usersRoutes = k.routes.users({
             listUsers: {
                 method: 'GET',
                 path: '/users',
@@ -972,7 +972,7 @@ describe('contract-level tag grouping', () => {
 
     it('accumulates tags from nested tagged groups', () => {
         const k = new Kizuna({
-            tags: Kizuna.tags({
+            groups: Kizuna.groups({
                 users: {
                     title: 'Users',
                 },
@@ -981,7 +981,7 @@ describe('contract-level tag grouping', () => {
                 },
             }),
         });
-        const healthRoutes = k.routes('health', {
+        const healthRoutes = k.routes.health({
             deleteUser: {
                 method: 'DELETE',
                 path: '/users/:id',
@@ -990,7 +990,7 @@ describe('contract-level tag grouping', () => {
                 },
             },
         });
-        const usersRoutes = k.routes('users', {
+        const usersRoutes = k.routes.users({
             health: healthRoutes,
         });
         const contract = k.contract({
@@ -1002,14 +1002,14 @@ describe('contract-level tag grouping', () => {
 
     it('collects tag descriptions into the document tags', () => {
         const k = new Kizuna({
-            tags: Kizuna.tags({
+            groups: Kizuna.groups({
                 users: {
                     title: 'Users',
                     description: 'User management endpoints',
                 },
             }),
         });
-        const usersRoutes = k.routes('users', {
+        const usersRoutes = k.routes.users({
             listUsers: {
                 method: 'GET',
                 path: '/users',
@@ -1032,13 +1032,13 @@ describe('contract-level tag grouping', () => {
 
     it('an untagged sub-group inside a tagged group inherits the outer tag', () => {
         const k = new Kizuna({
-            tags: Kizuna.tags({
+            groups: Kizuna.groups({
                 users: {
                     title: 'Users',
                 },
             }),
         });
-        const usersRoutes = k.routes('users', {
+        const usersRoutes = k.routes.users({
             nested: {
                 listUsers: {
                     method: 'GET',
@@ -1059,7 +1059,7 @@ describe('contract-level tag grouping', () => {
 
 describe('OpenAPI generator: HEAD method', () => {
     it('omits response content for HEAD routes', () => {
-        const contractRoutes = k.routes('api', {
+        const contractRoutes = k.routes.api({
             checkUser: {
                 method: 'HEAD',
                 path: '/users/:id',
@@ -1105,7 +1105,7 @@ describe('OpenAPI generator: HEAD method', () => {
     });
 
     it('derivedHead leaves a declared HEAD route alone', () => {
-        const contractRoutes = k.routes('api', {
+        const contractRoutes = k.routes.api({
             getReport: {
                 method: 'GET',
                 path: '/report',
@@ -1139,7 +1139,7 @@ describe('OpenAPI generator: HEAD method', () => {
     });
 
     it('OPTIONS routes emit response content normally', () => {
-        const contractRoutes = k.routes('api', {
+        const contractRoutes = k.routes.api({
             describeUsers: {
                 method: 'OPTIONS',
                 path: '/users',
@@ -1187,7 +1187,7 @@ describe('automatic validation error response', () => {
     });
 
     it('merges with a user-declared 400 using oneOf', () => {
-        const contractWith400Routes = k.routes('api', {
+        const contractWith400Routes = k.routes.api({
             createItem: {
                 method: 'POST',
                 path: '/items',
@@ -1229,7 +1229,7 @@ describe('deprecation from metadata', () => {
             }),
         }),
     });
-    const deprecationRoutes = k.routes('api', {
+    const deprecationRoutes = k.routes.api({
         getAccount: {
             method: 'GET',
             path: '/account',
@@ -1302,7 +1302,7 @@ describe('examples from metadata', () => {
             example: z.string(),
         }),
     });
-    const exampleRoutes = k.routes('api', {
+    const exampleRoutes = k.routes.api({
         listEvents: {
             method: 'GET',
             path: '/events',
@@ -1354,7 +1354,7 @@ describe('examples from metadata', () => {
 });
 
 describe('deprecation and sunset headers', () => {
-    const headerRoutes = k.routes('api', {
+    const headerRoutes = k.routes.api({
         deleteUser: {
             method: 'DELETE',
             path: '/users/:id',
@@ -1414,7 +1414,7 @@ describe('deprecation and sunset headers', () => {
     it('documents no headers on a route with neither', () => {
         const plain = generateJson(
             k.contract({
-                routes: k.routes('api', {
+                routes: k.routes.api({
                     getUser: {
                         method: 'GET',
                         path: '/users/:id',
@@ -1437,7 +1437,7 @@ describe('deprecation and sunset headers', () => {
 });
 
 describe('error response media type (RFC 9457)', () => {
-    const contractWithErrorsRoutes = k.routes('api', {
+    const contractWithErrorsRoutes = k.routes.api({
         getUser: {
             method: 'GET',
             path: '/users/{id}',
@@ -1482,7 +1482,7 @@ describe('error response media type (RFC 9457)', () => {
     });
 
     it('still applies field-level deprecation to an error response under application/problem+json', () => {
-        const errorFieldRoutes = k.routes('api', {
+        const errorFieldRoutes = k.routes.api({
             getUser: {
                 method: 'GET',
                 path: '/users/{id}',
@@ -1515,7 +1515,7 @@ describe('error response media type (RFC 9457)', () => {
 });
 
 describe('declared response contentType', () => {
-    const contractWithContentTypeRoutes = k.routes('api', {
+    const contractWithContentTypeRoutes = k.routes.api({
         exportUsers: {
             method: 'GET',
             path: '/users/export',
@@ -1556,7 +1556,7 @@ describe('declared response contentType', () => {
 });
 
 describe('binary response bodies', () => {
-    const binaryContractRoutes = k.routes('api', {
+    const binaryContractRoutes = k.routes.api({
         downloadBadge: {
             method: 'GET',
             path: '/badge',

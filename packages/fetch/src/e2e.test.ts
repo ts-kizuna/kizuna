@@ -8,12 +8,12 @@ import { KizunaClient, type Client } from '@ts-kizuna/fetch';
 import { KizunaServer } from '@ts-kizuna/express';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
 
-const contractRoutes = k.routes('api', {
+const contractRoutes = k.routes.api({
     createUser: {
         method: 'POST',
         path: '/users',
@@ -143,7 +143,7 @@ describe('end-to-end: typed client → Express server', () => {
     });
 });
 
-const contractWithResponseHeadersRoutes = k.routes('api', {
+const contractWithResponseHeadersRoutes = k.routes.api({
     getUser: {
         method: 'GET',
         path: '/users/:id',

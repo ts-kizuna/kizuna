@@ -3,12 +3,12 @@ import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         users: 'Users',
     }),
 });
 
-const routes = k.routes('users', {
+const routes = k.routes.users({
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -53,7 +53,7 @@ test('createUser has body, getUser does not', () => {
 });
 
 test('path must start with /', () => {
-    k.routes('users', {
+    k.routes.users({
         // @ts-expect-error path must start with /
         bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } },
     });

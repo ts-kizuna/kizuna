@@ -539,8 +539,7 @@ export type {
 export { buildPath, parsePath, type PathSegment } from './path-params.js';
 export { sortFlattenedRoutes } from './route-matcher.js';
 export { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand } from './types.js';
-export { tagRoutes } from './routes.js';
-export { isTagSet, type NormalizeTags } from './tags.js';
+export { isGroupSet } from './groups.js';
 export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';

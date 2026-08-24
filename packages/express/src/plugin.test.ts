@@ -38,12 +38,12 @@ const probeServer = (config: { label: string }) =>
     }));
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
 
-const routes = k.routes('api', {
+const routes = k.routes.api({
     indexUser: {
         method: 'POST',
         path: '/users/:id/index',
@@ -124,7 +124,7 @@ describe('plugin lane', () => {
         });
 
         const collidingK = new Kizuna({
-            tags: Kizuna.tags({
+            groups: Kizuna.groups({
                 api: 'API',
             }),
         });

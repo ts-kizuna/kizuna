@@ -539,12 +539,12 @@ describe('nested group auth', () => {
 
 describe('k.contract: plugins', () => {
     const k = new Kizuna({
-        tags: Kizuna.tags({
+        groups: Kizuna.groups({
             api: 'API',
         }),
     });
 
-    const routes = k.routes('api', {
+    const routes = k.routes.api({
         health: {
             method: 'GET',
             path: '/health',
@@ -613,7 +613,7 @@ describe('k.contract: plugins', () => {
     it('checks a plugin route against the contract routes', () => {
         expect(() =>
             k.contract({
-                routes: k.routes('api', {
+                routes: k.routes.api({
                     status: {
                         method: 'GET',
                         path: '/probe/status',

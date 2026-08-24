@@ -6,7 +6,7 @@ import { KizunaServer } from './server.js';
 import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
@@ -14,7 +14,7 @@ const k = new Kizuna({
 describe('Fastify: handler context', () => {
     it('provides the Fastify request and reply objects', async () => {
         const contextApp = Fastify();
-        const contextRoutes = k.routes('api', {
+        const contextRoutes = k.routes.api({
             echo: {
                 method: 'GET',
                 path: '/echo',

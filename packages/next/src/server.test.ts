@@ -6,12 +6,12 @@ import { KizunaServer, NextRequest, NextResponse } from './server.js';
 import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const k = new Kizuna({
-    tags: Kizuna.tags({
+    groups: Kizuna.groups({
         api: 'API',
     }),
 });
 
-const contractRoutes = k.routes('api', {
+const contractRoutes = k.routes.api({
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -119,7 +119,7 @@ describe('Next.js handler', () => {
     });
 
     it('routes onError hook overrides the default 500', async () => {
-        const throwingRoutes = k.routes('api', {
+        const throwingRoutes = k.routes.api({
             boom: {
                 method: 'GET',
                 path: '/boom',
@@ -158,7 +158,7 @@ describe('Next.js handler', () => {
 });
 
 describe('Next.js handler: alternate content types', () => {
-    const uploadRoutes = k.routes('api', {
+    const uploadRoutes = k.routes.api({
         uploadAvatar: {
             method: 'POST',
             path: '/avatar',
@@ -260,7 +260,7 @@ describe('Next.js handler: alternate content types', () => {
 });
 
 describe('Next.js handler: requestMiddleware', () => {
-    const middlewareContractRoutes = k.routes('api', {
+    const middlewareContractRoutes = k.routes.api({
         getResource: {
             method: 'GET',
             path: '/resources/:id',

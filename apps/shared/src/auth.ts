@@ -5,14 +5,6 @@ export const auth = k.auth(routes, {
     users: false,
     health: false,
     notifications: false,
-    members: {
-        '*': 'user',
-        inviteMember: {
-            member: {
-                role: ['owner', 'admin'],
-            },
-        },
-    },
     workspace: {
         '*': 'member',
         deleteWorkspace: {
@@ -25,6 +17,14 @@ export const auth = k.auth(routes, {
                 role: 'owner',
             },
         },
+        members: {
+            '*': 'user',
+            inviteMember: {
+                member: {
+                    role: ['owner', 'admin'],
+                },
+            },
+        },
+        invites: 'inviteToken',
     },
-    invites: 'inviteToken',
 });

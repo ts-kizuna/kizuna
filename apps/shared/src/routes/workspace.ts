@@ -1,37 +1,12 @@
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
 import { k } from '../k';
-import { UserSchema } from './users';
+import { memberRoutes } from './members';
+import { inviteRoutes } from './invites';
 
-const workspaceMembers = k.routes('members', {
-    listMembers: {
-        method: 'GET',
-        path: '/workspace/members',
-        responses: {
-            200: z.object({
-                members: z.array(UserSchema),
-            }),
-        },
-        summary: 'List workspace members',
-    },
-    inviteMember: {
-        method: 'POST',
-        path: '/workspace/members',
-        body: z.object({
-            email: z.email(),
-        }),
-        responses: {
-            201: UserSchema,
-            409: ProblemDetailsSchema,
-        },
-        summary: 'Invite a member to the workspace',
-    },
-});
-
-const workspaceInfo = k.routes('workspace', {
+export const workspaceRoutes = k.routes.workspace({
     getWorkspace: {
         method: 'GET',
-        path: '/workspace',
+        path: '/',
         responses: {
             200: z.object({
                 id: z.string(),
@@ -42,7 +17,7 @@ const workspaceInfo = k.routes('workspace', {
     },
     deleteWorkspace: {
         method: 'DELETE',
-        path: '/workspace',
+        path: '/',
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -52,7 +27,7 @@ const workspaceInfo = k.routes('workspace', {
     },
     transfer: {
         method: 'POST',
-        path: '/workspace/transfer',
+        path: '/transfer',
         body: z.object({
             toUserId: z.string(),
         }),
@@ -63,9 +38,6 @@ const workspaceInfo = k.routes('workspace', {
         },
         summary: 'Transfer ownership, owner-only via the auth map',
     },
+    members: memberRoutes,
+    invites: inviteRoutes,
 });
-
-export const workspaceRoutes = {
-    members: workspaceMembers,
-    info: workspaceInfo,
-};

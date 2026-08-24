@@ -177,14 +177,14 @@ export const buildInstructions = (
         'Every tool calls one HTTP route and returns `{ status, body }`. A status of 400 or more means the call failed.',
     ];
 
-    const tags = contract?.tags?.tags;
-    if (tags !== undefined) {
+    const groups = contract?.groups?.groups;
+    if (groups !== undefined) {
         // A group whose every route was excluded is not a group the model has.
         const exposed = new Set(definitions.flatMap((definition) => definition.tags));
-        const groups = Object.entries(tags)
+        const listed = Object.entries(groups)
             .filter(([key]) => exposed.has(key))
-            .map(([, tag]) => (tag.description ? `- ${tag.title}: ${tag.description}` : `- ${tag.title}`));
-        if (groups.length > 0) sections.push(`Groups:\n${groups.join('\n')}`);
+            .map(([, group]) => (group.description ? `- ${group.title}: ${group.description}` : `- ${group.title}`));
+        if (listed.length > 0) sections.push(`Groups:\n${listed.join('\n')}`);
     }
 
     if (authored) sections.push(authored);

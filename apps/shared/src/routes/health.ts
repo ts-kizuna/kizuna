@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import { k } from '../k';
 
-export const healthRoutes = k.routes('health', {
+export const healthRoutes = k.routes.health({
     check: {
         method: 'GET',
-        path: '/health',
+        path: '/',
         responses: {
             200: z.object({ ok: z.boolean() }),
         },
@@ -12,7 +12,7 @@ export const healthRoutes = k.routes('health', {
     },
     version: {
         method: 'GET',
-        path: '/health/version',
+        path: '/version',
         responses: {
             200: z.object({ version: z.string() }),
         },
@@ -20,7 +20,7 @@ export const healthRoutes = k.routes('health', {
     },
     history: {
         method: 'GET',
-        path: '/health/history',
+        path: '/history',
         responses: {
             200: z.array(z.object({ ok: z.boolean(), checkedAt: z.iso.datetime() })),
         },
