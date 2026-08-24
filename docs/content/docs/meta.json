@@ -16,6 +16,7 @@
         "mcp",
         "---Tooling---",
         "eslint",
+        "vscode",
         "breaking-changes",
         "---Build your own---",
         "extend",

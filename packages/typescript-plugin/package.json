@@ -1,0 +1,61 @@
+{
+  "name": "@ts-kizuna/typescript-plugin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TypeScript language service plugin that surfaces ts-kizuna deprecations in editors",
+  "keywords": [
+    "ts-kizuna",
+    "typescript",
+    "zod",
+    "openapi",
+    "contract-first",
+    "type-safe",
+    "rest",
+    "api",
+    "deprecations",
+    "tsserver",
+    "language-service-plugin"
+  ],
+  "license": "MIT",
+  "homepage": "https://ts-kizuna.com/docs/vscode",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "directory": "packages/typescript-plugin"
+  },
+  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.cts",
+      "default": "./dist/index.cjs"
+    }
+  },
+  "kizuna": {
+    "entries": {
+      ".": "server"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "pnpm run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}
