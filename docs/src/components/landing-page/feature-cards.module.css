@@ -1,24 +1,50 @@
 .grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 16px;
+    row-gap: 48px;
+    border-radius: 20px;
+    background-color: var(--kizuna-surface);
+    padding: 24px 0;
 }
 
 .card {
-    border-radius: var(--kizuna-radius-card);
-    background-color: var(--kizuna-surface);
-    padding: 24px;
+    position: relative;
+    display: block;
+    min-width: 0;
+    padding-inline: 24px;
+    text-decoration: none;
 }
 
-.icons {
+.card::after {
+    content: '';
+    position: absolute;
+    right: 24px;
+    bottom: -24px;
+    left: 24px;
+    height: var(--kizuna-hairline);
+    background-color: var(--kizuna-line-strong);
+}
+
+.card:last-child::after {
+    content: none;
+}
+
+.head {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
+.icons {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+}
+
 .icon {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     color: var(--kizuna-ink);
     stroke-width: 2.25;
 }
@@ -30,28 +56,83 @@
 }
 
 .title {
-    margin: 10px 0 0;
+    min-width: 0;
     font-size: var(--kizuna-text-ui);
     font-weight: var(--font-weight-600);
     letter-spacing: -0.01em;
     color: var(--kizuna-ink);
 }
 
+.arrow {
+    width: 19px;
+    height: 19px;
+    stroke-width: 2.5;
+    margin-left: -4px;
+    flex-shrink: 0;
+    color: var(--kizuna-ink);
+}
+
 .description {
-    margin: 8px 0 0;
+    margin: 10px 0 0;
     font-size: 0.9375rem;
     line-height: 1.55;
     color: var(--kizuna-muted);
 }
 
-@media (min-width: 640px) {
+@media (max-width: 639px) {
+    .description {
+        margin-top: 4px;
+    }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
     .grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        row-gap: 44px;
+        padding: 32px 0;
+    }
+
+    .card {
+        padding-inline: 24px;
+    }
+
+    .card:nth-child(2n) {
+        border-left: var(--kizuna-hairline) solid var(--kizuna-line-strong);
+    }
+
+    .card::after {
+        right: 24px;
+        bottom: -22px;
+        left: 24px;
+    }
+
+    .card:nth-last-child(-n + 2)::after {
+        content: none;
     }
 }
 
 @media (min-width: 1024px) {
     .grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        row-gap: 52px;
+        padding: 32px 0;
+    }
+
+    .card {
+        padding-inline: 28px;
+    }
+
+    .card:not(:nth-child(3n + 1)) {
+        border-left: var(--kizuna-hairline) solid var(--kizuna-line-strong);
+    }
+
+    .card::after {
+        right: 28px;
+        bottom: -26px;
+        left: 28px;
+    }
+
+    .card:nth-last-child(-n + 3)::after {
+        content: none;
     }
 }

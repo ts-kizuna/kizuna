@@ -24,6 +24,10 @@
     text-wrap: balance;
 }
 
+.bodyShort {
+    display: none;
+}
+
 .link {
     font-size: 1rem;
     color: var(--kizuna-ink);
@@ -35,10 +39,29 @@
 
 @media (max-width: 767px) {
     .beta {
-        flex-direction: column;
-        border-radius: var(--kizuna-radius-card);
-        background-color: var(--kizuna-surface);
-        padding: 24px 20px;
-        text-align: center;
+        gap: 10px;
+        margin-top: -2px;
+    }
+
+    .bodyLong {
+        display: none;
+    }
+
+    .bodyShort {
+        display: inline;
+    }
+
+    .pill {
+        padding: 1px 9px;
+        font-size: 0.6875rem;
+    }
+
+    .body,
+    .link {
+        font-size: 0.875rem;
+    }
+
+    .body {
+        margin-left: 1px;
     }
 }
