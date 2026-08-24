@@ -90,8 +90,18 @@ const MESSAGE_IDS = {
 const calleeName = (node: TSESTree.CallExpression): string | undefined => {
     const { callee } = node;
     if (callee.type === 'Identifier') return callee.name;
-    if (callee.type === 'MemberExpression' && callee.property.type === 'Identifier') return callee.property.name;
-    return undefined;
+    if (callee.type !== 'MemberExpression') return undefined;
+
+    // `k.routes.workspace.members(...)` is a routes call, so read the whole
+    // chain rather than only its last property.
+    const chain: string[] = [];
+    let current: TSESTree.Node = callee;
+    while (current.type === 'MemberExpression') {
+        if (current.property.type === 'Identifier') chain.unshift(current.property.name);
+        current = current.object;
+    }
+    if (chain.includes(AUTHORING_NAMES.routes)) return AUTHORING_NAMES.routes;
+    return chain[chain.length - 1];
 };
 
 const schemaNodesOf = (call: TSESTree.CallExpression): TSESTree.Node[] => {

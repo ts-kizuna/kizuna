@@ -271,6 +271,7 @@ Content-Type: application/problem+json
   ...
 }
 
+// Editor strikethrough
 // OpenAPI deprecated: true
 // Swift @available(*, deprecated, message: "use listUsers instead")
 // Kotlin @Deprecated("use listUsers instead")

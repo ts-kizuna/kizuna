@@ -377,7 +377,7 @@ test('nested object, array, and date/bigint fields surface as their input types'
             filters: {
                 price: 99,
                 createdAt: new Date(),
-                groups: [
+                tags: [
                     {
                         weight: 1,
                         name: 'a',
@@ -404,7 +404,7 @@ test('nested number field rejects wrong-typed values', () => {
                 // @ts-expect-error price must be a number
                 price: '99',
                 createdAt: new Date(),
-                groups: [],
+                tags: [],
             },
             scores: [],
             pair: [1, 'x'],
