@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/fetch",
-  "version": "1.56.0",
+  "version": "1.56.1",
   "description": "Typed fetch client for ts-kizuna contracts",
   "keywords": [
     "ts-kizuna",
