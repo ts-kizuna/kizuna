@@ -1,0 +1,50 @@
+---
+title: VS Code
+description: Deprecation strikethroughs, hovers, and completions in VS Code.
+---
+
+`@ts-kizuna/typescript-plugin` shows [deprecations](/docs/deprecations) as you type. A deprecated route or field is struck through everywhere the contract's types flow, `client.deleteUser(...)` at the call site and `user.email` on a response alike. Hovering shows the migration message, and completions strike through deprecated entries.
+
+<InstallTabs packageName="@ts-kizuna/typescript-plugin" dev />
+
+<Steps>
+
+<Step>
+
+## Declare the plugin
+
+```json title="tsconfig.json"
+{
+    "compilerOptions": {
+        "plugins": [
+            {
+                "name": "@ts-kizuna/typescript-plugin"
+            }
+        ]
+    }
+}
+```
+
+</Step>
+
+<Step>
+
+## Use the workspace TypeScript version
+
+Run **TypeScript: Select TypeScript Version** from the command palette and pick **Use Workspace Version**, the copy of TypeScript that has the plugin. Cursor, Windsurf, and the other forks work the same way.
+
+</Step>
+
+<Step>
+
+## Restart the TypeScript server
+
+Run **TypeScript: Restart TS Server** from the command palette. Deprecated routes and fields are struck through from here on, and every later `tsconfig.json` change needs the same restart.
+
+</Step>
+
+</Steps>
+
+## How it works
+
+The plugin reads the `deprecated` declarations on your routes and schemas through the type checker, so it follows them through `z.infer`, generic wrappers, and the client's types. It stays inert in projects that don't use ts-kizuna.

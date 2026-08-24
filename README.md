@@ -31,7 +31,7 @@ Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typ
 - **Plugins**: extend your API with features built on the contract you already wrote, and get them fully typed in your handlers
 - **MCP server generation**: expose your API as MCP tools so AI assistants can call your endpoints
 - **Scheduled jobs**: declare cron work next to its handler, tick it from any platform scheduler, or run it in process from a route handler
-- **Deprecation and sunset support**: deprecate routes and fields, and it shows up in OpenAPI, Swift, Kotlin, and the response headers
+- **Deprecation and sunset support**: deprecate routes and fields, and it shows up in your editor, OpenAPI, Swift, Kotlin, and the response headers
 
 ## Getting started
 

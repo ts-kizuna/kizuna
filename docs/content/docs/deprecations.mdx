@@ -1,6 +1,6 @@
 ---
 title: Deprecations
-description: Declare deprecations and sunset dates on the contract and have them reach OpenAPI, Swift, Kotlin, and the Deprecation and Sunset response headers.
+description: Declare deprecations and sunset dates on the contract and have them reach your editor, OpenAPI, Swift, Kotlin, and the Deprecation and Sunset response headers.
 ---
 
 ## Routes
@@ -168,6 +168,7 @@ const UserSchema = z.object({
 
 ## What each output emits
 
+- Your [editor](/docs/vscode) strikes them through where you code and shows the message on hover.
 - OpenAPI marks the operation and the field's schema with `deprecated: true` (the spec has no message field), and documents the `Deprecation`, `Sunset`, and `Link` headers on every response of a route that sends them.
 - Swift emits ``@available(*, deprecated, message: "use `email_address` instead")``, so the message reaches autocomplete and compiler warnings.
 - Kotlin emits ``@Deprecated("use `email_address` instead")``, reaching the same places.
