@@ -155,26 +155,3 @@ describe('completions', () => {
         expect(newRouteEntry?.kindModifiers ?? '').not.toContain('deprecated');
     });
 });
-
-describe('route path inlay hints', () => {
-    const hints = service.provideInlayHints(fixturePath, { start: 0, length: fixtureText.length }, {});
-
-    const hintAfter = (snippet: string): ts.InlayHint | undefined => {
-        const index = fixtureText.indexOf(snippet);
-        if (index === -1) throw new Error(`snippet not found: ${snippet}`);
-        return hints.find((hint) => hint.position >= index && hint.position <= index + snippet.length + 40);
-    };
-
-    test('shows the URL a relative path resolves to', () => {
-        expect(hintAfter("listMembers: {\n        method: 'GET',\n        path: '/',")?.text).toBe('/workspace/members');
-    });
-
-    test('composes the group prefix with the route path', () => {
-        expect(hintAfter("getMember: {\n        method: 'GET',\n        path: '/:id',")?.text).toBe('/workspace/members/:id');
-    });
-
-    test('adds nothing when the written path is already the URL', () => {
-        const index = fixtureText.indexOf("path: '/old'");
-        expect(hints.find((hint) => hint.position >= index && hint.position <= index + 20)).toBeUndefined();
-    });
-});

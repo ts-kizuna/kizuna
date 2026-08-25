@@ -15,12 +15,6 @@
     "declaration": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-    "plugins": [
-      {
-        "name": "@ts-kizuna/typescript-plugin",
-        "baseUrl": "https://api.example.com"
-      }
-    ]
+    "verbatimModuleSyntax": true
   }
 }

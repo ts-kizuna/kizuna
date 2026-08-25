@@ -1,4 +1,11 @@
 **/.git/**
 **/*.vsix
 .vscodeignore
-!node_modules/**
+src/**
+tsconfig.json
+package.json.bak
+node_modules/.bundled/**
+node_modules/typescript/**
+node_modules/@types/**
+node_modules/esbuild/**
+node_modules/.bin/**
