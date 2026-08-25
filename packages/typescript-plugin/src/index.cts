@@ -166,14 +166,25 @@ function init(modules: { typescript: TypeScriptModule }): {
         const declared = checker.getTypeAtLocation(call);
         const routeSymbol = checker.getPropertyOfType(declared, entry.name.getText());
         if (!routeSymbol) return undefined;
-        const pathSymbol = checker.getPropertyOfType(checker.getTypeOfSymbolAtLocation(routeSymbol, call), 'path');
+        const routeType = checker.getTypeOfSymbolAtLocation(routeSymbol, call);
+
+        const pathSymbol = checker.getPropertyOfType(routeType, 'path');
         if (!pathSymbol) return undefined;
         const pathType = checker.getTypeOfSymbolAtLocation(pathSymbol, call);
-        return pathType.isStringLiteral() ? pathType.value : undefined;
+        if (!pathType.isStringLiteral()) return undefined;
+
+        const methodSymbol = checker.getPropertyOfType(routeType, 'method');
+        const methodType = methodSymbol ? checker.getTypeOfSymbolAtLocation(methodSymbol, call) : undefined;
+        const method = methodType?.isStringLiteral() ? methodType.value : undefined;
+
+        return method ? `${method} ${pathType.value}` : pathType.value;
     };
 
     const create = (info: TypeScriptNamespace.server.PluginCreateInfo): TypeScriptNamespace.LanguageService => {
         const languageService = info.languageService;
+
+        // Declared in tsconfig beside the plugin name, so nothing has to be guessed.
+        const baseUrl = typeof info.config?.baseUrl === 'string' ? info.config.baseUrl.replace(/\/$/, '') : '';
 
         const members = Object.create(null) as Record<string, unknown>;
         for (const key of Object.keys(languageService)) {
@@ -294,9 +305,10 @@ function init(modules: { typescript: TypeScriptModule }): {
                     if (typescript.isPropertyAssignment(node) && node.name.getText() === 'path') {
                         const resolved = resolvedRoutePath(context.checker, node);
                         // Nothing to add when the written path is already the URL.
-                        if (resolved !== undefined && !node.initializer.getText().includes(`'${resolved}'`)) {
+                        const written = node.initializer.getText().replace(/^['"`]|['"`]$/g, '');
+                        if (resolved !== undefined && !resolved.endsWith(` ${written}`)) {
                             hints.push({
-                                text: `→ ${resolved}`,
+                                text: baseUrl ? resolved.replace(' /', ` ${baseUrl}/`) : resolved,
                                 position: node.end,
                                 kind: typescript.InlayHintKind.Type,
                                 whitespaceBefore: true,

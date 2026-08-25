@@ -11,5 +11,6 @@
         "editorInlayHint.background": "#00000000",
         "editorInlayHint.typeBackground": "#00000000",
         "editorInlayHint.parameterBackground": "#00000000"
-    }
+    },
+    "editor.inlayHints.maximumLength": 0
 }
