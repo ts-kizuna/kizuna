@@ -1,7 +1,7 @@
 import type { Router } from '@ts-kizuna/next';
 import type { contract } from '@ts-kizuna-demo/shared';
 
-export const invites: Router<typeof contract.routes.invites> = {
+export const invites: Router<typeof contract.routes.workspace.invites> = {
     getInvite: ({ auth }) => ({
         status: 200,
         body: {

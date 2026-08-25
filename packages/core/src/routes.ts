@@ -102,4 +102,3 @@ export const validateRoutes = (routes: Routes, prefix?: string): void => {
         }
     }
 };
-

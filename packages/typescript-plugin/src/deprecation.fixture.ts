@@ -16,15 +16,15 @@ const UserSchema = z.object({
     email_address: z.string(),
 });
 
-export const tags = Kizuna.tags({
+export const groups = Kizuna.groups({
     api: {
         title: 'API',
     },
 });
 
-const k = new Kizuna({ tags });
+const k = new Kizuna({ groups });
 
-const routes = k.routes('api', {
+const routes = k.routes.api({
     oldRoute: {
         method: 'GET',
         path: '/old',

@@ -197,7 +197,7 @@ describe('generateOpenApi', () => {
             ...baseConfig,
             operationMapper: (operation) => ({
                 ...operation,
-                groups: ['users'],
+                tags: ['users'],
             }),
         });
         expect(tagged.paths['/users/{id}']?.get?.tags).toEqual(['users']);
@@ -355,7 +355,7 @@ describe('operation metadata passthrough', () => {
             ...baseConfig,
             operationMapper: (operation) => ({
                 ...operation,
-                groups: ['mapped'],
+                tags: ['mapped'],
             }),
         });
         expect(spec.paths['/users/{id}']?.get?.tags).toEqual(['mapped']);

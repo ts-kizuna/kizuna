@@ -112,8 +112,7 @@ const flatten = (
 };
 
 /**
- * Throw unless a prefix can be joined to a route path without producing a
- * different resource than intended.
+ * A group's own prefix segment, and whether it starts from the root.
  */
 const ownPrefix = (declared: GroupOptions['pathPrefix']): { segment: string; absolute: boolean } => {
     if (declared === undefined) return { segment: '', absolute: false };
@@ -121,6 +120,9 @@ const ownPrefix = (declared: GroupOptions['pathPrefix']): { segment: string; abs
     return { segment: declared.absolute, absolute: true };
 };
 
+/**
+ * Throw unless a prefix joins to a route path without changing which resource it names.
+ */
 const assertUsablePrefix = (path: string, prefix: string): void => {
     if (!prefix.startsWith('/')) {
         throw new Error(`The group "${path}" has the prefix "${prefix}", which must start with "/".`);
@@ -160,7 +162,7 @@ const assertUniqueTitles = (flat: Record<string, GroupOptions>): void => {
  *         groups: {
  *             members: {
  *                 title: 'Members',
- *                 pathPrefix: '/workspace/members',
+ *                 pathPrefix: '/members',
  *             },
  *         },
  *     },

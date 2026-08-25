@@ -14,7 +14,7 @@ const groups = createGroups({
         groups: {
             members: {
                 title: 'Members',
-                pathPrefix: '/workspace/members',
+                pathPrefix: '/members',
             },
         },
     },

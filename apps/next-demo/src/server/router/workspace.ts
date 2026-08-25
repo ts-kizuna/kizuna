@@ -1,6 +1,8 @@
 import { db } from '@ts-kizuna-demo/shared';
 import type { Router } from '@ts-kizuna/next';
 import type { contract } from '@ts-kizuna-demo/shared';
+import { members } from './members';
+import { invites } from './invites';
 
 export const workspace: Router<typeof contract.routes.workspace> = {
     getWorkspace: ({ auth }) => ({
@@ -33,4 +35,6 @@ export const workspace: Router<typeof contract.routes.workspace> = {
             },
         };
     },
+    members,
+    invites,
 };

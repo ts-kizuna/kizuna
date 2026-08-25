@@ -1555,7 +1555,7 @@ describe('Kotlin generator: request context', () => {
 
     it('emits nothing when the contract declares no request context headers', () => {
         const plainContract = k.contract({
-            routes: k.routes.api({
+            routes: k.routes({
                 ping: {
                     method: 'GET',
                     path: '/ping',

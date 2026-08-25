@@ -5,9 +5,14 @@ import type { PathParamsCheck } from './path-params.js';
 import { assertPathBelowPrefix, resolvePath, type AuthoredPath, type ResolvedPath } from './group-path.js';
 
 /**
- * A group's declared `pathPrefix`, or `''` when it declares none.
+ * A group's prefix composed onto its ancestors', mirroring the runtime.
+ * An `{ absolute }` prefix starts from the root.
  */
-type PrefixOf<Options> = Options extends { pathPrefix: infer Prefix extends string } ? Prefix : '';
+type ComposedPrefix<Inherited extends string, Options> = Options extends { pathPrefix: { absolute: infer Absolute extends string } }
+    ? Absolute
+    : Options extends { pathPrefix: infer Prefix extends string }
+      ? `${Inherited}${Prefix}`
+      : Inherited;
 
 /**
  * The groups nested under one, or `never` when it has none.
@@ -28,13 +33,20 @@ type ResolveRoutes<Prefix extends string, T> = {
 /**
  * One group's entry on `k.routes`: callable, and indexable by its nested groups.
  */
-export type GroupAccessor<Options, Path extends string, AllPaths extends string> = (<const T extends AuthoredRoutes<AllPaths>>(
-    routes: T & PathParamsCheck<ResolveRoutes<PrefixOf<Options>, T>>
-) => ResolveRoutes<PrefixOf<Options>, T>) &
+export type GroupAccessor<Options, Path extends string, AllPaths extends string, Inherited extends string = ''> = (<
+    const T extends AuthoredRoutes<AllPaths>,
+>(
+    routes: T & PathParamsCheck<ResolveRoutes<ComposedPrefix<Inherited, Options>, T>>
+) => ResolveRoutes<ComposedPrefix<Inherited, Options>, T>) &
     ([NestedOf<Options>] extends [never]
         ? unknown
         : {
-              readonly [Key in Extract<keyof NestedOf<Options>, string>]: GroupAccessor<NestedOf<Options>[Key], `${Path}.${Key}`, AllPaths>;
+              readonly [Key in Extract<keyof NestedOf<Options>, string>]: GroupAccessor<
+                  NestedOf<Options>[Key],
+                  `${Path}.${Key}`,
+                  AllPaths,
+                  ComposedPrefix<Inherited, Options>
+              >;
           });
 
 /**
