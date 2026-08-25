@@ -33,6 +33,7 @@
     "@ts-kizuna/eslint-plugin": "workspace:*",
     "@ts-kizuna/typescript-plugin": "workspace:*",
     "@types/supertest": "^6.0.2",
+    "@vscode/vsce": "^3.9.2",
     "concurrently": "catalog:",
     "esbuild": "^0.28.2",
     "eslint": "catalog:",

@@ -302,7 +302,7 @@ function init(modules: { typescript: TypeScriptModule }): {
                         const resolved = resolvedRoutePath(context.checker, node);
                         // Nothing to add when the written path is already the URL.
                         const written = node.initializer.getText().replace(/^['"`]|['"`]$/g, '');
-                        if (resolved !== undefined && !resolved.endsWith(` ${written}`)) {
+                        if (resolved !== undefined && resolved !== written) {
                             hints.push({
                                 text: `${baseUrl}${resolved}`,
                                 position: node.end,

@@ -4,7 +4,9 @@ packages:
   - 'docs'
 
 allowBuilds:
+  '@vscode/vsce-sign': set this to true or false
   esbuild: false
+  keytar: set this to true or false
   sharp: false
   vue-demi: true
 
