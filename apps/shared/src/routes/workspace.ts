@@ -27,7 +27,7 @@ export const workspaceRoutes = k.routes.workspace({
     },
     transfer: {
         method: 'POST',
-        path: '/transfer',
+        path: '/transfer-this-to-me',
         body: z.object({
             toUserId: z.string(),
         }),

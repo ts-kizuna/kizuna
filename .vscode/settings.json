@@ -3,6 +3,5 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "css.lint.unknownAtRules": "ignore",
     "typescript.tsdk": "node_modules/typescript/lib",
-    "typescript.enablePromptUseWorkspaceTsdk": true,
-    "tsKizuna.routeUrls.baseUrl": "https://api.example.com"
+    "typescript.enablePromptUseWorkspaceTsdk": true
 }

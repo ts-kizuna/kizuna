@@ -155,3 +155,28 @@ describe('completions', () => {
         expect(newRouteEntry?.kindModifiers ?? '').not.toContain('deprecated');
     });
 });
+
+describe('resolved route paths', () => {
+    const routeTagAt = (snippet: string): string | undefined => {
+        const position = fixtureText.indexOf(snippet) + snippet.length;
+        const quickInfo = service.getQuickInfoAtPosition(fixturePath, position);
+        const tag = quickInfo?.tags?.find((candidate) => candidate.name === 'route');
+        return tag?.text?.map((part) => part.text).join('');
+    };
+
+    test('hovering a path shows where its group serves it', () => {
+        expect(routeTagAt("getMember: {\n        method: 'GET',\n        path: '")).toBe('/workspace/members/:id');
+    });
+
+    test('a path of "/" resolves to the prefix, without a trailing slash', () => {
+        expect(routeTagAt("listMembers: {\n        method: 'GET',\n        path: '")).toBe('/workspace/members');
+    });
+
+    test('an absolute path shows that it leaves the group behind', () => {
+        expect(routeTagAt("exportMembers: {\n        method: 'GET',\n        path: {")).toBe('/exports/members');
+    });
+
+    test('a path in an unprefixed group is left alone', () => {
+        expect(routeTagAt("oldRoute: {\n        method: 'GET',\n        path: '")).toBeUndefined();
+    });
+});

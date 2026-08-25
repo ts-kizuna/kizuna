@@ -487,16 +487,8 @@ public final class OpenEnumAPIClient: Sendable {
         OpenEnumAPINotificationsClient(client: self)
     }
 
-    public var members: OpenEnumAPIMembersClient {
-        OpenEnumAPIMembersClient(client: self)
-    }
-
     public var workspace: OpenEnumAPIWorkspaceClient {
         OpenEnumAPIWorkspaceClient(client: self)
-    }
-
-    public var invites: OpenEnumAPIInvitesClient {
-        OpenEnumAPIInvitesClient(client: self)
     }
 
     public enum UsersListUsers {
@@ -1574,76 +1566,6 @@ public final class OpenEnumAPIClient: Sendable {
         }
     }
 
-    public enum MembersListMembers {
-
-        public struct Response: Codable, Sendable, Equatable {
-            public let members: [OpenEnumAPI.User]
-
-            public init(members: [OpenEnumAPI.User]) {
-                self.members = members
-            }
-        }
-
-        public struct Result: Sendable {
-            public let body: Response
-
-            public init(body: Response) {
-                self.body = body
-            }
-        }
-
-        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
-            case requestFailed(Swift.Error)
-            case invalidRequest
-            case cancelled
-            case invalidResponse
-            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
-            case unexpectedStatus(Int, Foundation.Data)
-        }
-    }
-
-    public enum MembersInviteMember {
-
-        public struct Input: Codable, Sendable, Equatable {
-            public let email: String
-
-            public init(email: String) {
-                self.email = email
-            }
-        }
-
-        public struct Body: Sendable {
-            public let payload: Input
-
-            public init(payload: Input) {
-                self.payload = payload
-            }
-
-            public static func body(email: String) -> Self {
-                .init(payload: Input(email: email))
-            }
-        }
-
-        public struct Result: Sendable {
-            public let body: OpenEnumAPI.User
-
-            public init(body: OpenEnumAPI.User) {
-                self.body = body
-            }
-        }
-
-        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
-            case requestFailed(Swift.Error)
-            case invalidRequest
-            case cancelled
-            case invalidResponse
-            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
-            case unexpectedStatus(Int, Foundation.Data)
-            case conflict(OpenEnumAPI.ProblemDetails)
-            case badRequest(OpenEnumAPIClient.ValidationError)
-        }
-    }
-
     public enum WorkspaceGetWorkspace {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -1754,7 +1676,77 @@ public final class OpenEnumAPIClient: Sendable {
         }
     }
 
-    public enum InvitesGetInvite {
+    public enum WorkspaceMembersListMembers {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let members: [OpenEnumAPI.User]
+
+            public init(members: [OpenEnumAPI.User]) {
+                self.members = members
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+        }
+    }
+
+    public enum WorkspaceMembersInviteMember {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let email: String
+
+            public init(email: String) {
+                self.email = email
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(email: String) -> Self {
+                .init(payload: Input(email: email))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: OpenEnumAPI.User
+
+            public init(body: OpenEnumAPI.User) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case conflict(OpenEnumAPI.ProblemDetails)
+            case badRequest(OpenEnumAPIClient.ValidationError)
+        }
+    }
+
+    public enum WorkspaceInvitesGetInvite {
 
         public struct Response: Codable, Sendable, Equatable {
             public let inviteId: String
@@ -1800,7 +1792,7 @@ public final class OpenEnumAPIClient: Sendable {
         }
     }
 
-    public enum InvitesAcceptInvite {
+    public enum WorkspaceInvitesAcceptInvite {
 
         public struct Input: Codable, Sendable, Equatable {
             public let name: String
@@ -2353,56 +2345,6 @@ public struct OpenEnumAPINotificationsClient: Sendable {
     }
 }
 
-public struct OpenEnumAPIMembersClient: Sendable {
-    private let client: OpenEnumAPIClient
-
-    init(client: OpenEnumAPIClient) {
-        self.client = client
-    }
-
-    /// List workspace members
-    public func listMembers() async throws(OpenEnumAPIClient.MembersListMembers.Failure) -> OpenEnumAPIClient.MembersListMembers.Result {
-        let path = "/workspace/members"
-        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.MembersListMembers.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
-        request.httpMethod = "GET"
-        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.MembersListMembers.Failure.self)
-        switch statusCode {
-        case 200:
-            let body = try Kizuna.decode(OpenEnumAPIClient.MembersListMembers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersListMembers.Failure.self)
-            return OpenEnumAPIClient.MembersListMembers.Result(body: body)
-        default:
-            throw OpenEnumAPIClient.MembersListMembers.Failure.unexpectedStatus(statusCode, data)
-        }
-    }
-
-    /// Invite a member to the workspace
-    public func inviteMember(_ body: OpenEnumAPIClient.MembersInviteMember.Body) async throws(OpenEnumAPIClient.MembersInviteMember.Failure) -> OpenEnumAPIClient.MembersInviteMember.Result {
-        let path = "/workspace/members"
-        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.MembersInviteMember.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
-        request.httpMethod = "POST"
-        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.MembersInviteMember.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.MembersInviteMember.Failure.self)
-        switch statusCode {
-        case 201:
-            let body = try Kizuna.decode(OpenEnumAPI.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersInviteMember.Failure.self)
-            return OpenEnumAPIClient.MembersInviteMember.Result(body: body)
-        case 409:
-            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersInviteMember.Failure.self)
-            throw OpenEnumAPIClient.MembersInviteMember.Failure.conflict(payload)
-        case 400:
-            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersInviteMember.Failure.self)
-            throw OpenEnumAPIClient.MembersInviteMember.Failure.badRequest(payload)
-        default:
-            throw OpenEnumAPIClient.MembersInviteMember.Failure.unexpectedStatus(statusCode, data)
-        }
-    }
-}
-
 public struct OpenEnumAPIWorkspaceClient: Sendable {
     private let client: OpenEnumAPIClient
 
@@ -2446,7 +2388,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
 
     /// Transfer ownership, owner-only via the auth map
     public func transfer(_ body: OpenEnumAPIClient.WorkspaceTransfer.Body) async throws(OpenEnumAPIClient.WorkspaceTransfer.Failure) -> OpenEnumAPIClient.WorkspaceTransfer.Result {
-        let path = "/workspace/transfer"
+        let path = "/workspace/transfer-this-to-me"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
@@ -2465,59 +2407,93 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
             throw OpenEnumAPIClient.WorkspaceTransfer.Failure.unexpectedStatus(statusCode, data)
         }
     }
-}
 
-public struct OpenEnumAPIInvitesClient: Sendable {
-    private let client: OpenEnumAPIClient
-
-    init(client: OpenEnumAPIClient) {
-        self.client = client
-    }
-
-    /// Resolve an invite by its capability-URL token, guarded by a custom path-token identity
-    public func getInvite(_ params: OpenEnumAPIClient.InvitesGetInvite.Params) async throws(OpenEnumAPIClient.InvitesGetInvite.Failure) -> OpenEnumAPIClient.InvitesGetInvite.Result {
-        var path = "/invites/:token"
-        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
-        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.InvitesGetInvite.Failure.self)
+    /// List workspace members
+    public func membersListMembers() async throws(OpenEnumAPIClient.WorkspaceMembersListMembers.Failure) -> OpenEnumAPIClient.WorkspaceMembersListMembers.Result {
+        let path = "/workspace/members"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.InvitesGetInvite.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(OpenEnumAPIClient.InvitesGetInvite.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesGetInvite.Failure.self)
-            return OpenEnumAPIClient.InvitesGetInvite.Result(body: body)
-        case 404:
-            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesGetInvite.Failure.self)
-            throw OpenEnumAPIClient.InvitesGetInvite.Failure.notFound(payload)
+            let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceMembersListMembers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.self)
+            return OpenEnumAPIClient.WorkspaceMembersListMembers.Result(body: body)
         default:
-            throw OpenEnumAPIClient.InvitesGetInvite.Failure.unexpectedStatus(statusCode, data)
+            throw OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.unexpectedStatus(statusCode, data)
         }
     }
 
-    /// Accept an invite via the capability URL
-    public func acceptInvite(_ params: OpenEnumAPIClient.InvitesAcceptInvite.Params, _ body: OpenEnumAPIClient.InvitesAcceptInvite.Body) async throws(OpenEnumAPIClient.InvitesAcceptInvite.Failure) -> OpenEnumAPIClient.InvitesAcceptInvite.Result {
-        var path = "/invites/:token/accept"
-        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
-        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.InvitesAcceptInvite.Failure.self)
+    /// Invite a member to the workspace
+    public func membersInviteMember(_ body: OpenEnumAPIClient.WorkspaceMembersInviteMember.Body) async throws(OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure) -> OpenEnumAPIClient.WorkspaceMembersInviteMember.Result {
+        let path = "/workspace/members"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.InvitesAcceptInvite.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.InvitesAcceptInvite.Failure.self)
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.self)
         switch statusCode {
         case 201:
-            let body = try Kizuna.decode(OpenEnumAPIClient.InvitesAcceptInvite.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesAcceptInvite.Failure.self)
-            return OpenEnumAPIClient.InvitesAcceptInvite.Result(body: body)
-        case 404:
-            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesAcceptInvite.Failure.self)
-            throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.notFound(payload)
+            let body = try Kizuna.decode(OpenEnumAPI.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.self)
+            return OpenEnumAPIClient.WorkspaceMembersInviteMember.Result(body: body)
+        case 409:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.conflict(payload)
         case 400:
-            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesAcceptInvite.Failure.self)
-            throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.badRequest(payload)
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.badRequest(payload)
         default:
-            throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.unexpectedStatus(statusCode, data)
+            throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Resolve an invite by its capability-URL token, guarded by a custom path-token identity
+    public func invitesGetInvite(_ params: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Params) async throws(OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure) -> OpenEnumAPIClient.WorkspaceInvitesGetInvite.Result {
+        var path = "/invites/:token"
+        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceInvitesGetInvite.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.self)
+            return OpenEnumAPIClient.WorkspaceInvitesGetInvite.Result(body: body)
+        case 404:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.notFound(payload)
+        default:
+            throw OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Accept an invite via the capability URL
+    public func invitesAcceptInvite(_ params: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Params, _ body: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Body) async throws(OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure) -> OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Result {
+        var path = "/invites/:token/accept"
+        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+        switch statusCode {
+        case 201:
+            let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+            return OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Result(body: body)
+        case 404:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.badRequest(payload)
+        default:
+            throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.unexpectedStatus(statusCode, data)
         }
     }
 }

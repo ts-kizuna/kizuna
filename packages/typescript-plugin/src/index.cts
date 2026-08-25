@@ -134,7 +134,61 @@ function init(modules: { typescript: TypeScriptModule }): {
         return undefined;
     };
 
-            const create = (info: TypeScriptNamespace.server.PluginCreateInfo): TypeScriptNamespace.LanguageService => {
+    /**
+     * Whether a call is `k.routes(...)` or a group accessor beneath it.
+     */
+    const isRoutesCall = (call: TypeScriptNamespace.CallExpression): boolean => {
+        let current: TypeScriptNamespace.Node = call.expression;
+        while (typescript.isPropertyAccessExpression(current)) {
+            if (current.name.text === 'routes') return true;
+            current = current.expression;
+        }
+        return false;
+    };
+
+    /**
+     * A string literal's text, or undefined for any other expression.
+     */
+    const literalText = (node: TypeScriptNamespace.Expression): string | undefined =>
+        typescript.isStringLiteralLike(node) ? node.text : undefined;
+
+    /**
+     * The `path` property a position sits inside, when it belongs to a route.
+     */
+    const pathPropertyAt = (node: TypeScriptNamespace.Node): TypeScriptNamespace.PropertyAssignment | undefined => {
+        let current: TypeScriptNamespace.Node | undefined = node;
+        while (current && !typescript.isPropertyAssignment(current)) current = current.parent;
+        if (!current || current.name.getText() !== 'path') return undefined;
+        return current;
+    };
+
+    /**
+     * The URL a route is served at, read off the type `k.routes` returns.
+     * The group's `pathPrefix` is already composed into it there.
+     */
+    const resolvedRoutePath = (
+        checker: TypeScriptNamespace.TypeChecker,
+        pathProperty: TypeScriptNamespace.PropertyAssignment
+    ): string | undefined => {
+        const route = pathProperty.parent;
+        if (!typescript.isObjectLiteralExpression(route)) return undefined;
+        const entry = route.parent;
+        if (!typescript.isPropertyAssignment(entry)) return undefined;
+        const routes = entry.parent;
+        if (!typescript.isObjectLiteralExpression(routes)) return undefined;
+        const call = routes.parent;
+        if (!typescript.isCallExpression(call) || !isRoutesCall(call)) return undefined;
+
+        const declared = checker.getTypeAtLocation(call);
+        const routeSymbol = checker.getPropertyOfType(declared, entry.name.getText());
+        if (!routeSymbol) return undefined;
+        const pathSymbol = checker.getPropertyOfType(checker.getTypeOfSymbolAtLocation(routeSymbol, call), 'path');
+        if (!pathSymbol) return undefined;
+        const pathType = checker.getTypeOfSymbolAtLocation(pathSymbol, call);
+        return pathType.isStringLiteral() ? pathType.value : undefined;
+    };
+
+    const create = (info: TypeScriptNamespace.server.PluginCreateInfo): TypeScriptNamespace.LanguageService => {
         const languageService = info.languageService;
 
         const members = Object.create(null) as Record<string, unknown>;
@@ -203,10 +257,50 @@ function init(modules: { typescript: TypeScriptModule }): {
 
         proxy.getQuickInfoAtPosition = (fileName, position) => {
             const prior = languageService.getQuickInfoAtPosition(fileName, position);
-            if (!prior) return prior;
             const context = fileContext(fileName);
             if (!context) return prior;
             const node = nodeAt(context.sourceFile, position);
+
+            // A route's `path` is written relative to its group, so hovering it
+            // answers the question the source cannot: where is this served?
+            const pathProperty = pathPropertyAt(node);
+            if (pathProperty) {
+                const resolved = resolvedRoutePath(context.checker, pathProperty);
+                const written = literalText(pathProperty.initializer);
+                if (resolved === undefined || resolved === written) return prior;
+                const tag: TypeScriptNamespace.JSDocTagInfo = {
+                    name: 'route',
+                    text: [
+                        {
+                            kind: 'text',
+                            text: resolved,
+                        },
+                    ],
+                };
+                if (prior) return { ...prior, tags: [...(prior.tags ?? []), tag] };
+                // A string literal carries no quick info of its own, so hovering the
+                // path itself needs one built for it.
+                return {
+                    kind: typescript.ScriptElementKind.string,
+                    kindModifiers: '',
+                    textSpan: {
+                        start: pathProperty.initializer.getStart(context.sourceFile),
+                        length: pathProperty.initializer.getWidth(context.sourceFile),
+                    },
+                    displayParts:
+                        written === undefined
+                            ? []
+                            : [
+                                  {
+                                      kind: 'stringLiteral',
+                                      text: JSON.stringify(written),
+                                  },
+                              ],
+                    tags: [tag],
+                };
+            }
+
+            if (!prior) return prior;
             if (!typescript.isIdentifier(node)) return prior;
             const deprecation = symbolDeprecation(context.checker.getSymbolAtLocation(node));
             if (!deprecation) return prior;

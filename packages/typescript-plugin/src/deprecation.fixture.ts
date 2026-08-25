@@ -44,6 +44,17 @@ export const memberRoutes = k.routes.workspace.members({
             }),
         },
     },
+    exportMembers: {
+        method: 'GET',
+        path: {
+            absolute: '/exports/members',
+        },
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
     getMember: {
         method: 'GET',
         path: '/:id',

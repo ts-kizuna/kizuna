@@ -3,7 +3,7 @@
   "displayName": "ts-kizuna",
   "version": "0.0.0",
   "private": true,
-  "description": "Resolved route URLs, deprecation strikethroughs, hovers and completions for ts-kizuna contracts",
+  "description": "Deprecation strikethroughs, resolved route URLs on hover, and schema diagnostics for ts-kizuna contracts",
   "license": "MIT",
   "homepage": "https://ts-kizuna.com/docs",
   "repository": {
@@ -40,38 +40,12 @@
         "name": "@ts-kizuna/typescript-plugin",
         "enableForWorkspaceTypeScriptVersions": true
       }
-    ],
-    "configuration": {
-      "title": "ts-kizuna",
-      "properties": {
-        "tsKizuna.routeUrls.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show the URL each route resolves to, beside its path."
-        },
-        "tsKizuna.routeUrls.baseUrl": {
-          "type": "string",
-          "default": "",
-          "description": "Prepended to the resolved path, e.g. https://api.example.com."
-        }
-      }
-    }
+    ]
   },
   "dependencies": {
     "@ts-kizuna/typescript-plugin": "workspace:*"
   },
-  "main": "./dist/extension.cjs",
-  "activationEvents": [
-    "onLanguage:typescript"
-  ],
   "scripts": {
-    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
-    "typecheck": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "@types/node": "^22",
-    "@types/vscode": "^1.90.0",
-    "esbuild": "^0.28.2",
-    "typescript": "catalog:"
+    "package": "node scripts/package.mjs"
   }
 }

@@ -431,16 +431,8 @@ public final class APIClient: Sendable {
         APINotificationsClient(client: self)
     }
 
-    public var members: APIMembersClient {
-        APIMembersClient(client: self)
-    }
-
     public var workspace: APIWorkspaceClient {
         APIWorkspaceClient(client: self)
-    }
-
-    public var invites: APIInvitesClient {
-        APIInvitesClient(client: self)
     }
 
     public enum UsersListUsers {
@@ -1429,76 +1421,6 @@ public final class APIClient: Sendable {
         }
     }
 
-    public enum MembersListMembers {
-
-        public struct Response: Codable, Sendable, Equatable {
-            public let members: [API.User]
-
-            public init(members: [API.User]) {
-                self.members = members
-            }
-        }
-
-        public struct Result: Sendable {
-            public let body: Response
-
-            public init(body: Response) {
-                self.body = body
-            }
-        }
-
-        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
-            case requestFailed(Swift.Error)
-            case invalidRequest
-            case cancelled
-            case invalidResponse
-            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
-            case unexpectedStatus(Int, Foundation.Data)
-        }
-    }
-
-    public enum MembersInviteMember {
-
-        public struct Input: Codable, Sendable, Equatable {
-            public let email: String
-
-            public init(email: String) {
-                self.email = email
-            }
-        }
-
-        public struct Body: Sendable {
-            public let payload: Input
-
-            public init(payload: Input) {
-                self.payload = payload
-            }
-
-            public static func body(email: String) -> Self {
-                .init(payload: Input(email: email))
-            }
-        }
-
-        public struct Result: Sendable {
-            public let body: API.User
-
-            public init(body: API.User) {
-                self.body = body
-            }
-        }
-
-        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
-            case requestFailed(Swift.Error)
-            case invalidRequest
-            case cancelled
-            case invalidResponse
-            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
-            case unexpectedStatus(Int, Foundation.Data)
-            case conflict(API.ProblemDetails)
-            case badRequest(APIClient.ValidationError)
-        }
-    }
-
     public enum WorkspaceGetWorkspace {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -1609,7 +1531,77 @@ public final class APIClient: Sendable {
         }
     }
 
-    public enum InvitesGetInvite {
+    public enum WorkspaceMembersListMembers {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let members: [API.User]
+
+            public init(members: [API.User]) {
+                self.members = members
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+        }
+    }
+
+    public enum WorkspaceMembersInviteMember {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let email: String
+
+            public init(email: String) {
+                self.email = email
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(email: String) -> Self {
+                .init(payload: Input(email: email))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: API.User
+
+            public init(body: API.User) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case conflict(API.ProblemDetails)
+            case badRequest(APIClient.ValidationError)
+        }
+    }
+
+    public enum WorkspaceInvitesGetInvite {
 
         public struct Response: Codable, Sendable, Equatable {
             public let inviteId: String
@@ -1655,7 +1647,7 @@ public final class APIClient: Sendable {
         }
     }
 
-    public enum InvitesAcceptInvite {
+    public enum WorkspaceInvitesAcceptInvite {
 
         public struct Input: Codable, Sendable, Equatable {
             public let name: String
@@ -2208,56 +2200,6 @@ public struct APINotificationsClient: Sendable {
     }
 }
 
-public struct APIMembersClient: Sendable {
-    private let client: APIClient
-
-    init(client: APIClient) {
-        self.client = client
-    }
-
-    /// List workspace members
-    public func listMembers() async throws(APIClient.MembersListMembers.Failure) -> APIClient.MembersListMembers.Result {
-        let path = "/workspace/members"
-        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.MembersListMembers.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
-        request.httpMethod = "GET"
-        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.MembersListMembers.Failure.self)
-        switch statusCode {
-        case 200:
-            let body = try Kizuna.decode(APIClient.MembersListMembers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersListMembers.Failure.self)
-            return APIClient.MembersListMembers.Result(body: body)
-        default:
-            throw APIClient.MembersListMembers.Failure.unexpectedStatus(statusCode, data)
-        }
-    }
-
-    /// Invite a member to the workspace
-    public func inviteMember(_ body: APIClient.MembersInviteMember.Body) async throws(APIClient.MembersInviteMember.Failure) -> APIClient.MembersInviteMember.Result {
-        let path = "/workspace/members"
-        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.MembersInviteMember.Failure.self)
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
-        request.httpMethod = "POST"
-        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.MembersInviteMember.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.MembersInviteMember.Failure.self)
-        switch statusCode {
-        case 201:
-            let body = try Kizuna.decode(API.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
-            return APIClient.MembersInviteMember.Result(body: body)
-        case 409:
-            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
-            throw APIClient.MembersInviteMember.Failure.conflict(payload)
-        case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
-            throw APIClient.MembersInviteMember.Failure.badRequest(payload)
-        default:
-            throw APIClient.MembersInviteMember.Failure.unexpectedStatus(statusCode, data)
-        }
-    }
-}
-
 public struct APIWorkspaceClient: Sendable {
     private let client: APIClient
 
@@ -2301,7 +2243,7 @@ public struct APIWorkspaceClient: Sendable {
 
     /// Transfer ownership, owner-only via the auth map
     public func transfer(_ body: APIClient.WorkspaceTransfer.Body) async throws(APIClient.WorkspaceTransfer.Failure) -> APIClient.WorkspaceTransfer.Result {
-        let path = "/workspace/transfer"
+        let path = "/workspace/transfer-this-to-me"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceTransfer.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
@@ -2320,59 +2262,93 @@ public struct APIWorkspaceClient: Sendable {
             throw APIClient.WorkspaceTransfer.Failure.unexpectedStatus(statusCode, data)
         }
     }
-}
 
-public struct APIInvitesClient: Sendable {
-    private let client: APIClient
-
-    init(client: APIClient) {
-        self.client = client
-    }
-
-    /// Resolve an invite by its capability-URL token, guarded by a custom path-token identity
-    public func getInvite(_ params: APIClient.InvitesGetInvite.Params) async throws(APIClient.InvitesGetInvite.Failure) -> APIClient.InvitesGetInvite.Result {
-        var path = "/invites/:token"
-        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
-        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.InvitesGetInvite.Failure.self)
+    /// List workspace members
+    public func membersListMembers() async throws(APIClient.WorkspaceMembersListMembers.Failure) -> APIClient.WorkspaceMembersListMembers.Result {
+        let path = "/workspace/members"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceMembersListMembers.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.InvitesGetInvite.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.WorkspaceMembersListMembers.Failure.self)
         switch statusCode {
         case 200:
-            let body = try Kizuna.decode(APIClient.InvitesGetInvite.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
-            return APIClient.InvitesGetInvite.Result(body: body)
-        case 404:
-            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
-            throw APIClient.InvitesGetInvite.Failure.notFound(payload)
+            let body = try Kizuna.decode(APIClient.WorkspaceMembersListMembers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceMembersListMembers.Failure.self)
+            return APIClient.WorkspaceMembersListMembers.Result(body: body)
         default:
-            throw APIClient.InvitesGetInvite.Failure.unexpectedStatus(statusCode, data)
+            throw APIClient.WorkspaceMembersListMembers.Failure.unexpectedStatus(statusCode, data)
         }
     }
 
-    /// Accept an invite via the capability URL
-    public func acceptInvite(_ params: APIClient.InvitesAcceptInvite.Params, _ body: APIClient.InvitesAcceptInvite.Body) async throws(APIClient.InvitesAcceptInvite.Failure) -> APIClient.InvitesAcceptInvite.Result {
-        var path = "/invites/:token/accept"
-        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
-        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.InvitesAcceptInvite.Failure.self)
+    /// Invite a member to the workspace
+    public func membersInviteMember(_ body: APIClient.WorkspaceMembersInviteMember.Body) async throws(APIClient.WorkspaceMembersInviteMember.Failure) -> APIClient.WorkspaceMembersInviteMember.Result {
+        let path = "/workspace/members"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceMembersInviteMember.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.InvitesAcceptInvite.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.InvitesAcceptInvite.Failure.self)
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.WorkspaceMembersInviteMember.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.WorkspaceMembersInviteMember.Failure.self)
         switch statusCode {
         case 201:
-            let body = try Kizuna.decode(APIClient.InvitesAcceptInvite.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
-            return APIClient.InvitesAcceptInvite.Result(body: body)
-        case 404:
-            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
-            throw APIClient.InvitesAcceptInvite.Failure.notFound(payload)
+            let body = try Kizuna.decode(API.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceMembersInviteMember.Failure.self)
+            return APIClient.WorkspaceMembersInviteMember.Result(body: body)
+        case 409:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceMembersInviteMember.Failure.self)
+            throw APIClient.WorkspaceMembersInviteMember.Failure.conflict(payload)
         case 400:
-            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
-            throw APIClient.InvitesAcceptInvite.Failure.badRequest(payload)
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceMembersInviteMember.Failure.self)
+            throw APIClient.WorkspaceMembersInviteMember.Failure.badRequest(payload)
         default:
-            throw APIClient.InvitesAcceptInvite.Failure.unexpectedStatus(statusCode, data)
+            throw APIClient.WorkspaceMembersInviteMember.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Resolve an invite by its capability-URL token, guarded by a custom path-token identity
+    public func invitesGetInvite(_ params: APIClient.WorkspaceInvitesGetInvite.Params) async throws(APIClient.WorkspaceInvitesGetInvite.Failure) -> APIClient.WorkspaceInvitesGetInvite.Result {
+        var path = "/invites/:token"
+        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceInvitesGetInvite.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.WorkspaceInvitesGetInvite.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.WorkspaceInvitesGetInvite.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceInvitesGetInvite.Failure.self)
+            return APIClient.WorkspaceInvitesGetInvite.Result(body: body)
+        case 404:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceInvitesGetInvite.Failure.self)
+            throw APIClient.WorkspaceInvitesGetInvite.Failure.notFound(payload)
+        default:
+            throw APIClient.WorkspaceInvitesGetInvite.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Accept an invite via the capability URL
+    public func invitesAcceptInvite(_ params: APIClient.WorkspaceInvitesAcceptInvite.Params, _ body: APIClient.WorkspaceInvitesAcceptInvite.Body) async throws(APIClient.WorkspaceInvitesAcceptInvite.Failure) -> APIClient.WorkspaceInvitesAcceptInvite.Result {
+        var path = "/invites/:token/accept"
+        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+        switch statusCode {
+        case 201:
+            let body = try Kizuna.decode(APIClient.WorkspaceInvitesAcceptInvite.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+            return APIClient.WorkspaceInvitesAcceptInvite.Result(body: body)
+        case 404:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+            throw APIClient.WorkspaceInvitesAcceptInvite.Failure.notFound(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+            throw APIClient.WorkspaceInvitesAcceptInvite.Failure.badRequest(payload)
+        default:
+            throw APIClient.WorkspaceInvitesAcceptInvite.Failure.unexpectedStatus(statusCode, data)
         }
     }
 }
