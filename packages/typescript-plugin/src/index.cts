@@ -173,11 +173,7 @@ function init(modules: { typescript: TypeScriptModule }): {
         const pathType = checker.getTypeOfSymbolAtLocation(pathSymbol, call);
         if (!pathType.isStringLiteral()) return undefined;
 
-        const methodSymbol = checker.getPropertyOfType(routeType, 'method');
-        const methodType = methodSymbol ? checker.getTypeOfSymbolAtLocation(methodSymbol, call) : undefined;
-        const method = methodType?.isStringLiteral() ? methodType.value : undefined;
-
-        return method ? `${method} ${pathType.value}` : pathType.value;
+        return pathType.value;
     };
 
     const create = (info: TypeScriptNamespace.server.PluginCreateInfo): TypeScriptNamespace.LanguageService => {
@@ -308,7 +304,7 @@ function init(modules: { typescript: TypeScriptModule }): {
                         const written = node.initializer.getText().replace(/^['"`]|['"`]$/g, '');
                         if (resolved !== undefined && !resolved.endsWith(` ${written}`)) {
                             hints.push({
-                                text: baseUrl ? resolved.replace(' /', ` ${baseUrl}/`) : resolved,
+                                text: `${baseUrl}${resolved}`,
                                 position: node.end,
                                 kind: typescript.InlayHintKind.Type,
                                 whitespaceBefore: true,

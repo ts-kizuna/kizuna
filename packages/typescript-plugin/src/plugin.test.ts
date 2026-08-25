@@ -166,11 +166,11 @@ describe('route path inlay hints', () => {
     };
 
     test('shows the URL a relative path resolves to', () => {
-        expect(hintAfter("listMembers: {\n        method: 'GET',\n        path: '/',")?.text).toBe('GET /workspace/members');
+        expect(hintAfter("listMembers: {\n        method: 'GET',\n        path: '/',")?.text).toBe('/workspace/members');
     });
 
     test('composes the group prefix with the route path', () => {
-        expect(hintAfter("getMember: {\n        method: 'GET',\n        path: '/:id',")?.text).toBe('GET /workspace/members/:id');
+        expect(hintAfter("getMember: {\n        method: 'GET',\n        path: '/:id',")?.text).toBe('/workspace/members/:id');
     });
 
     test('adds nothing when the written path is already the URL', () => {
