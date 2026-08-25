@@ -20,9 +20,40 @@ export const groups = Kizuna.groups({
     api: {
         title: 'API',
     },
+    workspace: {
+        title: 'Workspace',
+        pathPrefix: '/workspace',
+        groups: {
+            members: {
+                title: 'Members',
+                pathPrefix: '/members',
+            },
+        },
+    },
 });
 
 const k = new Kizuna({ groups });
+
+export const memberRoutes = k.routes.workspace.members({
+    listMembers: {
+        method: 'GET',
+        path: '/',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+    getMember: {
+        method: 'GET',
+        path: '/:id',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
 
 const routes = k.routes.api({
     oldRoute: {

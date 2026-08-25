@@ -134,6 +134,44 @@ function init(modules: { typescript: TypeScriptModule }): {
         return undefined;
     };
 
+    /**
+     * Whether a call is `k.routes(...)` or a group accessor beneath it.
+     */
+    const isRoutesCall = (call: TypeScriptNamespace.CallExpression): boolean => {
+        let current: TypeScriptNamespace.Node = call.expression;
+        while (typescript.isPropertyAccessExpression(current)) {
+            if (current.name.text === 'routes') return true;
+            current = current.expression;
+        }
+        return false;
+    };
+
+    /**
+     * The URL a route is served at, read off the type `k.routes` returns.
+     * The group's `pathPrefix` is already composed into it there.
+     */
+    const resolvedRoutePath = (
+        checker: TypeScriptNamespace.TypeChecker,
+        pathProperty: TypeScriptNamespace.PropertyAssignment
+    ): string | undefined => {
+        const route = pathProperty.parent;
+        if (!typescript.isObjectLiteralExpression(route)) return undefined;
+        const entry = route.parent;
+        if (!typescript.isPropertyAssignment(entry)) return undefined;
+        const routes = entry.parent;
+        if (!typescript.isObjectLiteralExpression(routes)) return undefined;
+        const call = routes.parent;
+        if (!typescript.isCallExpression(call) || !isRoutesCall(call)) return undefined;
+
+        const declared = checker.getTypeAtLocation(call);
+        const routeSymbol = checker.getPropertyOfType(declared, entry.name.getText());
+        if (!routeSymbol) return undefined;
+        const pathSymbol = checker.getPropertyOfType(checker.getTypeOfSymbolAtLocation(routeSymbol, call), 'path');
+        if (!pathSymbol) return undefined;
+        const pathType = checker.getTypeOfSymbolAtLocation(pathSymbol, call);
+        return pathType.isStringLiteral() ? pathType.value : undefined;
+    };
+
     const create = (info: TypeScriptNamespace.server.PluginCreateInfo): TypeScriptNamespace.LanguageService => {
         const languageService = info.languageService;
 
@@ -243,6 +281,34 @@ function init(modules: { typescript: TypeScriptModule }): {
                 entry.kindModifiers = entry.kindModifiers ? `${entry.kindModifiers},deprecated` : 'deprecated';
             }
             return prior;
+        };
+
+        proxy.provideInlayHints = (fileName, span, preferences) => {
+            const prior = languageService.provideInlayHints(fileName, span, preferences);
+            const context = fileContext(fileName);
+            if (!context) return prior;
+
+            const hints: TypeScriptNamespace.InlayHint[] = [];
+            const visit = (node: TypeScriptNamespace.Node): void => {
+                if (node.end >= span.start && node.pos <= span.start + span.length) {
+                    if (typescript.isPropertyAssignment(node) && node.name.getText() === 'path') {
+                        const resolved = resolvedRoutePath(context.checker, node);
+                        // Nothing to add when the written path is already the URL.
+                        if (resolved !== undefined && !node.initializer.getText().includes(`'${resolved}'`)) {
+                            hints.push({
+                                text: `→ ${resolved}`,
+                                position: node.end,
+                                kind: typescript.InlayHintKind.Type,
+                                whitespaceBefore: true,
+                            });
+                        }
+                    }
+                    node.forEachChild(visit);
+                }
+            };
+            visit(context.sourceFile);
+
+            return [...prior, ...hints];
         };
 
         return proxy;
