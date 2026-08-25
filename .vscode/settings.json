@@ -6,5 +6,10 @@
     "typescript.enablePromptUseWorkspaceTsdk": true,
     "typescript.inlayHints.parameterTypes.enabled": true,
     "typescript.inlayHints.variableTypes.enabled": false,
-    "typescript.inlayHints.propertyDeclarationTypes.enabled": false
+    "typescript.inlayHints.propertyDeclarationTypes.enabled": false,
+    "workbench.colorCustomizations": {
+        "editorInlayHint.background": "#00000000",
+        "editorInlayHint.typeBackground": "#00000000",
+        "editorInlayHint.parameterBackground": "#00000000"
+    }
 }
