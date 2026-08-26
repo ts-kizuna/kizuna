@@ -51,7 +51,7 @@
     background: transparent !important;
     font-size: 12px !important;
     line-height: 1.65 !important;
-    padding-block: 10px !important;
+    padding-block: 0 !important;
 }
 
 .small .code :global(pre) {

@@ -36,9 +36,7 @@ export default function HomePage() {
                     <ContractExplorer />
                 </Section>
 
-                <Section title="Inside a handler" description="Whatever the contract declares, the handler gets it validated and typed.">
-                    <HandlerExplorer />
-                </Section>
+                <HandlerExplorer />
 
                 <Section
                     title="Runs anywhere"
