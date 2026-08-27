@@ -17,14 +17,14 @@ catalog:
   '@types/express': ^5.0.0
   '@types/node': ^24
   '@types/react': ^19.2.18
-  '@types/react-dom': ^19.2.4
+  '@types/react-dom': ^19.2.5
   '@vitejs/plugin-react': ^6.0.0
   concurrently: ^9.1.0
   eslint: ^9.39.4
   express: ^5.0.0
   fastify: ^5.0.0
   hono: ^4.7.0
-  next: ~16.2.12
+  next: ^16.3.3
   react: ^19.2.8
   react-dom: ^19.2.8
   svelte: ^5.0.0
