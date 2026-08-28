@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/next",
-  "version": "1.57.0",
+  "version": "1.57.1",
   "description": "Next.js App Router adapter for ts-kizuna",
   "keywords": [
     "ts-kizuna",

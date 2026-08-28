@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/typescript-plugin",
-  "version": "1.57.0",
+  "version": "1.57.1",
   "description": "TypeScript language service plugin that surfaces ts-kizuna deprecations in editors",
   "keywords": [
     "ts-kizuna",
