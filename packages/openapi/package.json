@@ -1,6 +1,6 @@
 {
   "name": "@ts-kizuna/openapi",
-  "version": "1.56.1",
+  "version": "1.57.0",
   "description": "OpenAPI 3.1 generation for ts-kizuna contracts",
   "keywords": [
     "ts-kizuna",
