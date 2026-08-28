@@ -24,7 +24,8 @@
     "lint": "pnpm --filter @ts-kizuna/core --filter @ts-kizuna/eslint-plugin build && eslint .",
     "lint:fix": "pnpm --filter @ts-kizuna/eslint-plugin build && eslint . --fix",
     "docs": "pnpm --filter docs dev",
-    "release": "release-it"
+    "release": "release-it",
+    "package:vscode": "node tools/package-vscode.cjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.4",
@@ -32,6 +33,7 @@
     "@release-it/conventional-changelog": "^11.0.0",
     "@ts-kizuna/eslint-plugin": "workspace:*",
     "@types/supertest": "^6.0.2",
+    "@vscode/vsce": "^3.9.2",
     "concurrently": "catalog:",
     "esbuild": "^0.28.2",
     "eslint": "catalog:",
@@ -39,6 +41,7 @@
     "eslint-plugin-jsdoc": "^64.2.1",
     "eslint-plugin-prettier": "^5.5.5",
     "jest-expect-openapi": "^6.0.1",
+    "ovsx": "^1.1.1",
     "prettier": "^3.3.3",
     "publint": "^0.3.21",
     "release-it": "^20.0.1",

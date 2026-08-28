@@ -29,9 +29,7 @@ function init(modules: { typescript: TypeScriptModule }): {
     };
 
     /**
-     * Reads a `deprecated` value in every form the contract accepts: `true`, a
-     * message, or `{ message?, date?, link? }`. A form without a message still
-     * deprecates, it just has nothing to say.
+     * Every form the contract accepts: `true`, a message, or `{ message?, date?, link? }`.
      */
     const declaredDeprecation = (expression: TypeScriptNamespace.Expression): Deprecation | undefined => {
         if (expression.kind === typescript.SyntaxKind.TrueKeyword) {
