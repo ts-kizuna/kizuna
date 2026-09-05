@@ -1,17 +1,27 @@
 ---
 title: VS Code
-description: Deprecation strikethroughs, hovers, and completions in VS Code.
+description: A VS Code extension that strikes through deprecated routes and fields as you type.
 ---
 
-`@ts-kizuna/typescript-plugin` shows [deprecations](/docs/deprecations) as you type. A deprecated route or field is struck through everywhere the contract's types flow, `client.deleteUser(...)` at the call site and `user.email` on a response alike. Hovering shows the migration message, and completions strike through deprecated entries.
+<BetaNotice>
+
+The extension and `@ts-kizuna/typescript-plugin` are both new and still settling. What gets struck through, and how the plugin reads the contract, may change before v2, so pin the plugin version if you depend on it.
+
+</BetaNotice>
+
+<ExtensionCard />
+
+The ts-kizuna extension shows [deprecations](/docs/deprecations) as you type. A deprecated route or field is struck through everywhere the contract's types flow, `client.deleteUser(...)` at the call site and `user.email` on a response alike. Hovering shows the migration message.
+
+## Troubleshooting
+
+Deprecations not showing after a change to the contract or to `tsconfig.json`? Run **TypeScript: Restart TS Server** from the command palette.
+
+## Other editors
+
+Any editor that runs the TypeScript server can load the plugin itself. Zed, Neovim, and JetBrains are untested, but should work:
 
 <InstallTabs packageName="@ts-kizuna/typescript-plugin" dev />
-
-<Steps>
-
-<Step>
-
-## Declare the plugin
 
 ```json title="tsconfig.json"
 {
@@ -24,27 +34,3 @@ description: Deprecation strikethroughs, hovers, and completions in VS Code.
     }
 }
 ```
-
-</Step>
-
-<Step>
-
-## Use the workspace TypeScript version
-
-Run **TypeScript: Select TypeScript Version** from the command palette and pick **Use Workspace Version**, the copy of TypeScript that has the plugin. Cursor, Windsurf, and the other forks work the same way.
-
-</Step>
-
-<Step>
-
-## Restart the TypeScript server
-
-Run **TypeScript: Restart TS Server** from the command palette. Deprecated routes and fields are struck through from here on, and every later `tsconfig.json` change needs the same restart.
-
-</Step>
-
-</Steps>
-
-## How it works
-
-The plugin reads the `deprecated` declarations on your routes and schemas through the type checker, so it follows them through `z.infer`, generic wrappers, and the client's types. It stays inert in projects that don't use ts-kizuna.

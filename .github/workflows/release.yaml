@@ -145,3 +145,11 @@ jobs:
         uses: ./.github/workflows/deploy-docs.yaml
         secrets:
             VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+    publish-extension:
+        name: Publish extension
+        needs: release
+        uses: ./.github/workflows/publish-extension.yaml
+        secrets:
+            VSCE_PAT: ${{ secrets.VSCE_PAT }}
+            OVSX_PAT: ${{ secrets.OVSX_PAT }}

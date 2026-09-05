@@ -11,6 +11,7 @@ import { AlphaNotice } from './alpha-notice';
 import { BetaNotice } from './beta-notice';
 import { ContractNotice } from './contract-notice';
 import { InstallTabs } from './install-tabs';
+import { ExtensionCard } from './extension-card';
 import { FeatureList } from './feature-list';
 import { Supports } from './supports';
 
@@ -35,6 +36,7 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         BetaNotice,
         ContractNotice,
         InstallTabs,
+        ExtensionCard,
         FeatureList,
         Supports,
     };

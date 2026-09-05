@@ -1,0 +1,48 @@
+{
+  "name": "ts-kizuna-vscode",
+  "displayName": "ts-kizuna",
+  "version": "1.57.1",
+  "private": true,
+  "description": "Deprecation strikethroughs and hovers for ts-kizuna contracts",
+  "license": "MIT",
+  "homepage": "https://ts-kizuna.com/docs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "directory": "packages/vscode"
+  },
+  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "publisher": "ts-kizuna",
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#1c1c1c",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "ts-kizuna",
+    "typescript",
+    "zod",
+    "openapi",
+    "deprecations"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "contributes": {
+    "typescriptServerPlugins": [
+      {
+        "name": "@ts-kizuna/typescript-plugin",
+        "enableForWorkspaceTypeScriptVersions": true
+      }
+    ]
+  },
+  "dependencies": {
+    "@ts-kizuna/typescript-plugin": "workspace:*"
+  }
+}

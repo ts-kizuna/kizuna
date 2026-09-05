@@ -22,3 +22,7 @@ DerivedData/
 # generated openapi files
 apps/*/openapi.json
 apps/*/openapi.yaml
+*.vsix
+
+# vscode extension packaging
+build/

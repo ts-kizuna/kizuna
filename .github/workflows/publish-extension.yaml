@@ -1,0 +1,47 @@
+name: Publish extension
+
+on:
+    workflow_call:
+        secrets:
+            VSCE_PAT:
+                required: true
+            OVSX_PAT:
+                required: true
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    publish:
+        name: Publish ts-kizuna-vscode
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  ref: main
+
+            - uses: pnpm/action-setup@v6
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - run: pnpm install --frozen-lockfile
+
+            - name: Build the plugin
+              run: pnpm --filter @ts-kizuna/typescript-plugin build
+
+            - name: Package
+              run: pnpm package:vscode
+
+            - name: Publish to the VS Code Marketplace
+              env:
+                  VSCE_PAT: ${{ secrets.VSCE_PAT }}
+              run: pnpm exec vsce publish --packagePath build/vscode/*.vsix --skip-duplicate
+
+            - name: Publish to Open VSX
+              env:
+                  OVSX_PAT: ${{ secrets.OVSX_PAT }}
+              run: pnpm exec ovsx publish --packagePath build/vscode/*.vsix --skip-duplicate
