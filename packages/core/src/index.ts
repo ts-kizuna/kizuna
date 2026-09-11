@@ -130,6 +130,7 @@ export {
     type RouteToolInputValue,
     type RouteToolOutputValue,
     type ToolableRoute,
+    type RouteToolGroup,
     type ToolBuilderHelpers,
     type AuthoredToolsArg,
     type CompiledRouteTool,

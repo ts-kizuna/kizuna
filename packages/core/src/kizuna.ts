@@ -14,10 +14,12 @@ import {
     attachRouteKeys,
     buildTools,
     fromRoute,
+    fromRoutes,
     resolveAuthoredTools,
     type AuthoredToolsArg,
     type AuthoredTools,
     type CompiledTools,
+    type RouteToolGroup,
     type RouteToolMarker,
     type RouteToolOverrides,
     type ToolableRoute,
@@ -361,6 +363,16 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
          * });
          */
         fromRoute: <const R extends RouteDefinition>(route: R & ToolableRoute<R>, overrides?: RouteToolOverrides) => RouteToolMarker<R>;
+        /**
+         * Name every route in a group as a tool. The ones that cannot be tools,
+         * because they stream or read a form body, are simply not there.
+         *
+         * @example
+         * export const tools = k.tools(({ fromRoutes }) => ({
+         *     users: fromRoutes(routes.users),
+         * }));
+         */
+        fromRoutes: <const Group extends object>(group: Group) => RouteToolGroup<Group>;
     };
     /**
      * Assemble route groups into a contract. The `auth` map assigns each group
@@ -501,6 +513,7 @@ const createSurface = <
 
     const tools = Object.assign((definitions: AuthoredToolsArg<AuthoredTools>) => buildTools(resolveAuthoredTools(definitions)), {
         fromRoute,
+        fromRoutes,
     }) as K<Spec>['tools'];
 
     const contract = (definition: {

@@ -152,7 +152,7 @@ export const contract = k.contract({
 The handler receives that identity's context under `auth`:
 
 ```ts title="server/tools.ts"
-purgeCache: ({ auth }) => dropReportsFor(auth.member.workspaceId),
+purgeCache: ({ auth }) => dropReportsFor(auth.member.workspaceUserId),
 ```
 
 `auth.member` is typed, with `role` narrowed to `'owner'`. A caller holding `admin` is refused before the handler runs, and so is a caller holding nothing.
@@ -166,7 +166,7 @@ Outside a request nobody has been verified, so bind a caller yourself:
 ```ts
 const asOwner = tools.as({
     member: {
-        workspaceId: 'w_1',
+        workspaceUserId: 'wsu_1',
         role: 'owner',
     },
 });
@@ -204,7 +204,28 @@ export const tools = k.tools(({ fromRoute }) => ({
 }));
 ```
 
-`k.tools` hands the builder a `fromRoute`. `k.tools.fromRoute` is the same function, for when you want it once.
+Or take a whole group, when a model should reach all of it:
+
+```ts title="tools.ts"
+export const tools = k.tools(({ fromRoutes }) => ({
+    users: fromRoutes(routes.users),
+}));
+```
+
+Routes that cannot be tools, because they stream or read a form body, are simply not in the result. Spread it when one entry wants different words:
+
+```ts title="tools.ts"
+export const tools = k.tools(({ fromRoute, fromRoutes }) => ({
+    users: {
+        ...fromRoutes(routes.users),
+        archive: fromRoute(routes.users.archiveUser, {
+            description: 'Archive a user. They keep their data and lose access.',
+        }),
+    },
+}));
+```
+
+`k.tools` hands the builder both. `k.tools.fromRoute` and `k.tools.fromRoutes` are the same functions, for when you want one on its own.
 
 The tool takes the route's path parameters, query and body as its arguments, answers with the route's own responses, describes itself from the route's summary, and runs the route's handler. Its `readOnlyHint` and `destructiveHint` come from what RFC 9110 says about the method, so a `GET` is marked safe and a `DELETE` destructive.
 
@@ -237,8 +258,8 @@ fromRoute(routes.assistant.reply);
 A route's summary is written for a developer reading your docs. A model reads the description to decide whether to call the tool at all, so give it its own words when the two differ:
 
 ```ts title="tools.ts"
-pause: fromRoute(routes.meta.pauseAd, {
-    description: 'Pause a running ad. The spend stops within a minute.',
+archive: fromRoute(routes.users.archiveUser, {
+    description: 'Archive a user. They keep their data and lose access immediately.',
 }),
 ```
 

@@ -279,3 +279,76 @@ describe('the builder form', () => {
         expect(viaBuilder.users.find.route).toBe(routes.users.getUser);
     });
 });
+
+describe('k.tools.fromRoutes', () => {
+    const group = k.routes({
+        users: {
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                summary: 'Fetch one user',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
+            avatar: {
+                method: 'POST',
+                path: '/users/:id/avatar',
+                contentType: 'multipart/form-data',
+                body: z.object({
+                    file: z.string(),
+                }),
+                responses: {
+                    200: z.object({
+                        size: z.int(),
+                    }),
+                },
+            },
+            watch: {
+                method: 'GET',
+                path: '/users/watch',
+                responses: {
+                    200: {
+                        stream: {
+                            tick: z.object({
+                                at: z.string(),
+                            }),
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    it('takes every route in the group', () => {
+        const built = k.tools(({ fromRoutes }) => ({
+            users: fromRoutes(group.users),
+        }));
+
+        expect(Object.keys(built.users)).toEqual(['getUser']);
+    });
+
+    it('leaves out the routes that cannot be tools', () => {
+        const built = k.tools(({ fromRoutes }) => ({
+            users: fromRoutes(group.users),
+        }));
+
+        expect(built.users).not.toHaveProperty('avatar');
+        expect(built.users).not.toHaveProperty('watch');
+    });
+
+    it('spreads, so one entry can say something different', () => {
+        const built = k.tools(({ fromRoute, fromRoutes }) => ({
+            users: {
+                ...fromRoutes(group.users),
+                getUser: fromRoute(group.users.getUser, {
+                    description: 'Look a person up by id.',
+                }),
+            },
+        }));
+
+        expect(built.users.getUser.definition.description).toBe('Look a person up by id.');
+    });
+});

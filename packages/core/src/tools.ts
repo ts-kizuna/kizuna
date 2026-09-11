@@ -247,12 +247,65 @@ export const fromRoute = <const R extends RouteDefinition>(
 export const isRouteToolMarker = (value: unknown): value is RouteToolMarker => !!value && typeof value === 'object' && FROM_ROUTE in value;
 
 /**
+ * A route group as a tool group: every route in it that can be a tool, keyed
+ * the way the group keys it. The ones that cannot, because they stream or read
+ * a form body, are simply not there.
+ */
+export type RouteToolGroup<Group> = {
+    [Name in keyof Group as Group[Name] extends RouteDefinition
+        ? ToolableRoute<Group[Name]> extends RouteDefinition
+            ? Name
+            : never
+        : Name]: Group[Name] extends RouteDefinition ? RouteToolMarker<Group[Name]> : RouteToolGroup<Group[Name]>;
+};
+
+/**
+ * Name every route in a group as a tool. Use it when a model should reach all
+ * of something, and spread it when one entry wants different words:
+ *
+ * @example
+ * export const tools = k.tools(({ fromRoute, fromRoutes }) => ({
+ *     users: {
+ *         ...fromRoutes(routes.users),
+ *         archive: fromRoute(routes.users.archiveUser, {
+ *             description: 'Archive a user. They keep their data and lose access.',
+ *         }),
+ *     },
+ * }));
+ */
+export const fromRoutes = <const Group extends object>(group: Group): RouteToolGroup<Group> => {
+    const tools: Record<string, unknown> = {};
+    for (const [name, node] of Object.entries(group)) {
+        if (!node || typeof node !== 'object') continue;
+        if (isRouteDefinition(node)) {
+            if (!canBeTool(node)) continue;
+            tools[name] = fromRoute(node as never);
+            continue;
+        }
+        tools[name] = fromRoutes(node as object);
+    }
+    return tools as RouteToolGroup<Group>;
+};
+
+const isRouteDefinition = (value: object): value is RouteDefinition => 'method' in value && 'path' in value && 'responses' in value;
+
+/**
+ * A route streams, or reads a form body, and so has nothing a tool could carry.
+ * Naming one on its own is a compile error; taking a whole group skips it.
+ */
+const canBeTool = (route: RouteDefinition): boolean => {
+    if (route.contentType !== undefined && route.contentType !== 'application/json') return false;
+    return !Object.values(route.responses).some((response) => !!response && typeof response === 'object' && 'stream' in response);
+};
+
+/**
  * What `k.tools` hands a builder function. The helper is scoped to the tree it
  * builds, so `k.tools.fromRoute` need not be written on every line of a tree
  * that is already inside `k.tools`.
  */
 export interface ToolBuilderHelpers {
     fromRoute: typeof fromRoute;
+    fromRoutes: typeof fromRoutes;
 }
 
 /**
@@ -262,6 +315,7 @@ export type AuthoredToolsArg<T extends AuthoredTools> = T | ((helpers: ToolBuild
 
 const toolBuilderHelpers: ToolBuilderHelpers = {
     fromRoute,
+    fromRoutes,
 };
 
 /**
