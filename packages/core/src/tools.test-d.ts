@@ -244,11 +244,6 @@ describe('tool authorization', () => {
 
     const guarded = k.tools({
         purgeCache: {
-            auth: {
-                member: {
-                    role: 'owner',
-                },
-            },
             description: 'Drop every cached report',
             output: z.object({
                 dropped: z.int(),
@@ -265,8 +260,16 @@ describe('tool authorization', () => {
         },
     });
 
+    type GuardedAuth = {
+        purgeCache: {
+            member: {
+                role: 'owner';
+            };
+        };
+    };
+
     it('gives a handler the caller its tool requires, narrowed by the gate', () => {
-        const handlers: ToolHandlers<typeof guarded, Schemes> = {
+        const handlers: ToolHandlers<typeof guarded, Schemes, GuardedAuth> = {
             purgeCache: ({ auth }) => {
                 expectTypeOf(auth.member.workspaceId).toEqualTypeOf<string>();
                 expectTypeOf(auth.member.role).toEqualTypeOf<'owner'>();

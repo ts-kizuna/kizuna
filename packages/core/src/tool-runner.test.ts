@@ -494,13 +494,8 @@ describe('a tool that changes things', () => {
         },
     });
 
-    const guarded = secured.tools({
+    const declared = secured.tools({
         purgeCache: {
-            auth: {
-                member: {
-                    role: 'owner',
-                },
-            },
             description: 'Drop every cached report. There is no undo.',
             output: z.object({
                 dropped: z.int(),
@@ -520,6 +515,33 @@ describe('a tool that changes things', () => {
         },
     });
 
+    const guardedContract = secured.contract({
+        routes: secured.routes({
+            health: {
+                method: 'GET',
+                path: '/health',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        }),
+        tools: declared,
+        toolAuth: secured.auth.tools(declared, {
+            purgeCache: {
+                member: {
+                    role: 'owner',
+                },
+            },
+        }),
+        auth: {
+            health: false,
+        },
+    });
+
+    const guarded = guardedContract.tools!;
+
     const guardedHandlers = {
         purgeCache: () => ({
             dropped: 12,
@@ -535,7 +557,9 @@ describe('a tool that changes things', () => {
     };
 
     it('refuses to run when nobody has been bound', async () => {
-        await expect(bound().purgeCache.run()).rejects.toBeInstanceOf(ToolIdentityError);
+        await expect(
+            (bound() as never as typeof declared & { purgeCache: { run: () => Promise<unknown> } }).purgeCache.run()
+        ).rejects.toBeInstanceOf(ToolIdentityError);
     });
 
     it('refuses a caller whose role the access gate does not permit', async () => {

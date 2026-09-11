@@ -123,38 +123,43 @@ export const toolHandlers = server.tools({
 
 ## Say who may call it
 
-A tool that changes something, or reads someone's data, needs to know who is asking. Give it an [identity](/docs/authentication), narrowed by whatever the caller has to be:
+A tool that changes something, or reads someone's data, needs to know who is asking. Say so in the auth map, beside the routes:
 
-```ts title="tools.ts"
-export const tools = k.tools({
+```ts title="auth.ts"
+export const auth = k.auth(routes, {
+    users: false,
+    workspace: { '*': 'member' },
+});
+
+export const toolAuth = k.auth.tools(tools, {
     purgeCache: {
-        auth: {
-            member: {
-                role: 'owner',
-            },
-        },
-        description: 'Drop every cached report. There is no undo.',
-        output: z.object({
-            dropped: z.int(),
-        }),
-        annotations: {
-            destructiveHint: true,
+        member: {
+            role: 'owner',
         },
     },
 });
 ```
 
+```ts title="contract.ts"
+export const contract = k.contract({
+    routes,
+    tools,
+    auth,
+    toolAuth,
+});
+```
+
+The handler receives that identity's context under `auth`:
+
 ```ts title="server/tools.ts"
 purgeCache: ({ auth }) => dropReportsFor(auth.member.workspaceId),
 ```
 
-`auth.member` is that identity's context, typed, with `role` narrowed to `'owner'`. A caller holding `admin` is refused before the handler runs, and so is a caller holding nothing.
+`auth.member` is typed, with `role` narrowed to `'owner'`. A caller holding `admin` is refused before the handler runs, and so is a caller holding nothing.
 
-`auth` takes the same values a route's entry in the auth map takes: an identity name, several, or one narrowed by an access field.
+`k.auth.tools` takes the same values a route's entry takes: an identity name, several, or one narrowed by an access field. A tool naming a route with `fromRoute` gets no entry, because that route's own line already says who may call it.
 
 The workspace is not an `input` field. The model chooses `input`, so a selector declared there is a selector the model picks.
-
-A tool naming a route with `fromRoute` says nothing about who may call it. The route already does.
 
 Outside a request nobody has been verified, so bind a caller yourself:
 

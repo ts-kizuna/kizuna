@@ -10,6 +10,7 @@ import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { jobClaims, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, type JobsArg, type JobsConfig } from './jobs.js';
 import {
+    applyToolAuth,
     attachRouteKeys,
     buildTools,
     fromRoute,
@@ -38,6 +39,25 @@ import type { PathParamsCheck } from './path-params.js';
  * `{ role: ['owner', 'admin'] }`.
  */
 export type AccessConstraint = Record<string, unknown>;
+
+/**
+ * The auth map for a contract's tools, nested the way the tool tree is. A tool
+ * naming a route with `k.tools.fromRoute` takes that route's authorization, so
+ * it has no entry here.
+ */
+export type ToolAuthMap<Id extends string = string, T extends Tools = Tools> = {
+    [Name in keyof T & string]?: T[Name] extends {
+        route: unknown;
+    }
+        ? never
+        : T[Name] extends {
+                definition: unknown;
+            }
+          ? AuthValue<Id>
+          : T[Name] extends Tools
+            ? ToolAuthMap<Id, T[Name]>
+            : never;
+};
 
 /**
  * The auth a route or group resolves to:
@@ -245,10 +265,37 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *     members: 'user',
      * });
      */
-    auth<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>, const A extends AuthMap<IdentityNamesOf<Spec>, R>>(
-        routes: R,
-        map: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>
-    ): A;
+    auth: {
+        <const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>, const A extends AuthMap<IdentityNamesOf<Spec>, R>>(
+            routes: R,
+            map: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>
+        ): A;
+        /**
+         * The `auth` map for the contract's tools, typed against them. Keep it
+         * beside `k.auth`, then pass it to `k.contract` under `toolAuth`.
+         *
+         * A tool naming a route with `k.tools.fromRoute` has no entry: that
+         * route's own line already says who may call it.
+         *
+         * @example
+         * export const toolAuth = k.auth.tools(tools, {
+         *     purgeCache: { member: { role: 'owner' } },
+         * });
+         */
+        tools<const T extends Tools, const A extends ToolAuthMap<IdentityNamesOf<Spec>, T>>(tools: T, map: A): A;
+    };
+    /**
+     * The `auth` map for the contract's tools, typed against them. Keep it in
+     * the same file as `k.auth`, then pass it to `k.contract` under `toolAuth`.
+     *
+     * A tool naming a route with `k.tools.fromRoute` has no entry: that route's
+     * own line already says who may call it.
+     *
+     * @example
+     * export const toolAuth = k.auth.tools(tools, {
+     *     purgeCache: { member: { role: 'owner' } },
+     * });
+     */
     /**
      * Declare scheduled jobs. Pass the identity every job requires, the one
      * credential your scheduler sends, then the jobs themselves.
@@ -329,11 +376,13 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         const A extends AuthMap<IdentityNamesOf<Spec>, R>,
         const J extends Jobs = Record<string, never>,
         const T extends Tools = Record<string, never>,
+        const TA extends Record<string, unknown> = Record<string, never>,
         const P extends ContractPlugins = Record<string, never>,
     >(definition: {
         routes: R;
         jobs?: J;
         tools?: T;
+        toolAuth?: TA & ToolAuthMap<IdentityNamesOf<Spec>, T>;
         plugins?: ContractPluginsArg<R, P, T>;
         auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
     }): Contract<
@@ -345,17 +394,20 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         Spec['requestContext'],
         P,
         J,
-        T
+        T,
+        TA
     >;
     contract<
         const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
         const J extends Jobs = Record<string, never>,
         const T extends Tools = Record<string, never>,
+        const TA extends Record<string, unknown> = Record<string, never>,
         const P extends ContractPlugins = Record<string, never>,
     >(definition: {
         routes: R;
         jobs?: J;
         tools?: T;
+        toolAuth?: TA & ToolAuthMap<IdentityNamesOf<Spec>, T>;
         plugins?: ContractPluginsArg<R, P, T>;
     }): Contract<
         RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext'], PluginArgs<P> & JobsArg<J> & ToolsArg<T>>,
@@ -366,7 +418,8 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         Spec['requestContext'],
         P,
         J,
-        T
+        T,
+        TA
     >;
     /**
      * Emit a validation issue with a machine-readable `code`, checked against the
@@ -454,10 +507,11 @@ const createSurface = <
         routes: Routes;
         jobs?: Jobs;
         tools?: Tools;
+        toolAuth?: Record<string, unknown>;
         plugins?: ContractPluginsArg<Routes, ContractPlugins>;
         auth?: Record<string, GroupAuth>;
     }) => {
-        const { routes: contractRoutes, jobs: contractJobs, tools: contractTools, auth } = definition;
+        const { routes: contractRoutes, jobs: contractJobs, tools: contractTools, toolAuth, auth } = definition;
         const plugins =
             typeof definition.plugins === 'function'
                 ? definition.plugins({
@@ -473,6 +527,7 @@ const createSurface = <
         assertValidDeprecationDates(contractRoutes);
         assertValidDeprecationDates(pluginRouteTree(plugins));
         if (contractTools) {
+            if (toolAuth) applyToolAuth(contractTools, toolAuth);
             attachRouteKeys(
                 contractTools,
                 new Map(flattenRoutes(contractRoutes).map(({ route, routeKey, routeTags }) => [route, { routeKey, routeTags }]))
@@ -501,6 +556,7 @@ const createSurface = <
             routes: contractRoutes as Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
             jobs: contractJobs,
             tools: contractTools,
+            toolAuth,
             auth,
             tags: config?.tags,
             securitySchemes: config?.identities,
@@ -515,7 +571,9 @@ const createSurface = <
         routes,
         jobs,
         tools,
-        auth: (_routes, map) => map,
+        auth: Object.assign((_routes: unknown, map: unknown) => map, {
+            tools: (_tools: unknown, map: unknown) => map,
+        }) as K<Spec>['auth'],
         contract: contract as K<Spec>['contract'],
         issue: addCodedIssue,
     };

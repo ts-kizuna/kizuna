@@ -21,6 +21,7 @@ export interface Contract<
     Plugins extends ContractPlugins = ContractPlugins,
     Jobs_ extends Jobs = Jobs,
     Tools_ extends Tools = Tools,
+    ToolAuth extends Record<string, unknown> = Record<string, unknown>,
 > {
     /**
      * The API's route groups.
@@ -45,6 +46,11 @@ export interface Contract<
      * they are never routes, so nothing that walks `routes` sees them.
      */
     tools?: Tools_;
+    /**
+     * The tool `auth` map passed to `k.contract`, nested the way the tool tree
+     * is. Carried so the server surface can type each handler's `auth`.
+     */
+    toolAuth?: ToolAuth;
     /**
      * The `auth` map passed to `k.contract`, keyed by route group. Carried on the
      * contract so the adapters can resolve each route's required identities and
@@ -97,11 +103,13 @@ export function assembleContract<
     const Plugins extends ContractPlugins = Record<string, never>,
     const Jobs_ extends Jobs = Record<string, never>,
     const Tools_ extends Tools = Record<string, never>,
+    const ToolAuth extends Record<string, unknown> = Record<string, never>,
 >(config: {
     routes: R;
     jobs?: Jobs_;
     jobsConfig?: JobsConfig;
     tools?: Tools_;
+    toolAuth?: ToolAuth;
     auth?: Auth;
     tags?: TagSet<Tags>;
     securitySchemes?: Schemes;
@@ -110,13 +118,14 @@ export function assembleContract<
         issueCodes?: readonly Codes[];
     };
     plugins?: Plugins;
-}): Contract<R, Tags, Codes, Schemes, Auth, RequestContext, Plugins, Jobs_, Tools_> {
+}): Contract<R, Tags, Codes, Schemes, Auth, RequestContext, Plugins, Jobs_, Tools_, ToolAuth> {
     return {
         routes: config.routes,
         plugins: config.plugins,
         jobs: config.jobs,
         jobsConfig: config.jobsConfig,
         tools: config.tools,
+        toolAuth: config.toolAuth,
         auth: config.auth,
         tags: config.tags,
         securitySchemes: config.securitySchemes,
@@ -159,3 +168,8 @@ export type JobsOf<C extends Contract> = Exclude<C['jobs'], undefined>;
  * A contract's tools, or an empty map when it declares none.
  */
 export type ToolsOf<C extends Contract> = Exclude<C['tools'], undefined>;
+
+/**
+ * The tool auth map a contract was assembled with.
+ */
+export type ToolAuthOf<C extends Contract> = Exclude<C['toolAuth'], undefined>;

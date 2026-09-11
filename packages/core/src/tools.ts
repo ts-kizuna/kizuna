@@ -60,24 +60,6 @@ export interface ToolDefinition {
      * calling it.
      */
     annotations?: ToolAnnotations;
-    /**
-     * Who may call it, in the same vocabulary the `auth` map uses for a route:
-     * an identity name, several, or one narrowed by an access field.
-     *
-     * It sits here rather than in the auth map because a tool is a leaf. A
-     * route's authorization is centralised so its group's `'*'` cascade reads
-     * in one place, and a tool has no cascade.
-     *
-     * A tool naming a route with `k.tools.fromRoute` takes that route's
-     * authorization and declares none of its own.
-     *
-     * @example
-     * purgeCache: {
-     *     auth: { member: { role: 'owner' } },
-     *     description: 'Drop every cached report',
-     * },
-     */
-    auth?: AuthValue;
 }
 
 /**
@@ -397,19 +379,16 @@ export type NoTools = Record<string, never>;
  * The single object a tool handler receives: its own input, `throwError`, and
  * the identity it requires. Anything more it imports, as a route handler would.
  */
-export type ToolAuthArg<Definition extends ToolDefinition, Identities> = Definition extends {
-    auth: infer Value;
-}
-    ? ContextFromAuthValue<Value, Identities> extends infer Context
+export type ToolAuthArg<Value, Identities> =
+    ContextFromAuthValue<Value, Identities> extends infer Context
         ? [keyof Context] extends [never]
             ? {}
             : {
                   auth: Context;
               }
-        : never
-    : {};
+        : never;
 
-export type ToolHandlerArgs<Definition extends ToolDefinition, Identities = Record<string, never>> = {
+export type ToolHandlerArgs<Definition extends ToolDefinition, AuthValue_ = false, Identities = Record<string, never>> = {
     /**
      * The validated arguments, or `undefined` when the tool declares no
      * `input`.
@@ -426,7 +405,7 @@ export type ToolHandlerArgs<Definition extends ToolDefinition, Identities = Reco
      * This function throws internally and never returns.
      */
     throwError: (message: string) => never;
-} & ToolAuthArg<Definition, Identities>;
+} & ToolAuthArg<AuthValue_, Identities>;
 
 /**
  * What a tool handler returns: its `output`, or nothing when it declares none.
@@ -437,18 +416,18 @@ export type ToolHandlerReturn<Definition extends ToolDefinition> = Definition ex
     ? z.input<Definition['output']>
     : void;
 
-export type ToolHandler<Tool extends CompiledTool, Identities = Record<string, never>> = (
-    args: ToolHandlerArgs<Tool['definition'], Identities>
+export type ToolHandler<Tool extends CompiledTool, Identities = Record<string, never>, AuthValue_ = false> = (
+    args: ToolHandlerArgs<Tool['definition'], AuthValue_, Identities>
 ) => Promise<ToolHandlerReturn<Tool['definition']>> | ToolHandlerReturn<Tool['definition']>;
 
 /**
  * The handlers `server.tools` accepts: one per declared tool, keyed by name.
  */
-export type ToolHandlers<Tools_ extends Tools, Identities = Record<string, never>> = {
+export type ToolHandlers<Tools_ extends Tools, Identities = Record<string, never>, ToolAuth = {}> = {
     [Name in keyof Tools_ as NeedsToolHandler<Tools_[Name]> extends true ? Name : never]: Tools_[Name] extends CompiledTool
-        ? ToolHandler<Tools_[Name], Identities>
+        ? ToolHandler<Tools_[Name], Identities, Name extends keyof ToolAuth ? ToolAuth[Name] : false>
         : Tools_[Name] extends Tools
-          ? ToolHandlers<Tools_[Name], Identities>
+          ? ToolHandlers<Tools_[Name], Identities, Name extends keyof ToolAuth ? ToolAuth[Name] : {}>
           : never;
 };
 
@@ -456,7 +435,7 @@ export type ToolHandlers<Tools_ extends Tools, Identities = Record<string, never
  * Every field a tool may declare. A node carrying only these, with a
  * `description`, is a tool; anything else is a group of them.
  */
-const TOOL_FIELDS = ['title', 'description', 'input', 'output', 'annotations', 'auth'] as const;
+const TOOL_FIELDS = ['title', 'description', 'input', 'output', 'annotations'] as const;
 
 /**
  * Whether one field is shaped the way a tool declares it. Types are checked as
@@ -472,8 +451,6 @@ const isToolField = (name: string, value: unknown): boolean => {
             return value instanceof z.ZodType;
         case 'annotations':
             return !!value && typeof value === 'object';
-        case 'auth':
-            return value === false || typeof value === 'string' || (!!value && typeof value === 'object');
         default:
             return false;
     }
@@ -522,9 +499,10 @@ const compileRouteTool = (toolKey: string, marker: RouteToolMarker): CompiledToo
 };
 
 /**
- * A tool's `auth` in the shape a route carries, so one path checks both.
+ * One entry of a tool auth map, in the shape a route carries, so one path
+ * checks both.
  */
-const resolveToolAuth = (
+export const resolveToolAuth = (
     value: AuthValue | undefined
 ): {
     identity: string | undefined;
@@ -604,7 +582,9 @@ export const buildTools = (definitions: AuthoredTools): Tools => {
                 assertValidTool(toolKey, node);
                 tools[name] = {
                     definition: node,
-                    ...resolveToolAuth(node.auth),
+                    // Written by `k.contract` from the tool auth map, the one
+                    // place that says who may call what.
+                    identity: undefined,
                     input: node.input,
                     output: node.output,
                 } as unknown as CompiledTool;
@@ -651,6 +631,30 @@ export const attachRouteKeys = (
         };
         mutable.routeKey = found.routeKey;
         mutable.routeTags = found.routeTags;
+    }
+};
+
+/**
+ * Write a tool auth map onto the tools it names. A tool running a route is
+ * refused an entry: that route already says who may call it.
+ */
+export const applyToolAuth = (tools: Tools, map: Record<string, unknown>, path = ''): void => {
+    for (const [name, value] of Object.entries(map)) {
+        const toolKey = path ? `${path}.${name}` : name;
+        const node = tools[name];
+        if (node === undefined) {
+            throw new Error(`Tool auth map names "${toolKey}", which this contract does not declare.`);
+        }
+        if (isCompiledTool(node)) {
+            if (node.route !== undefined) {
+                throw new Error(
+                    `Tool "${toolKey}" runs a route, so the route's own entry in the auth map says who may call it. Remove this one.`
+                );
+            }
+            Object.assign(node, resolveToolAuth(value as AuthValue));
+            continue;
+        }
+        applyToolAuth(node as Tools, value as Record<string, unknown>, toolKey);
     }
 };
 

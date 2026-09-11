@@ -1,5 +1,15 @@
 import type { z } from 'zod';
-import type { Contract, RoutesOf, SchemesOf, AuthOf, RequestContextOf, ContractPluginsOf, JobsOf, ToolsOf } from './contract.js';
+import type {
+    Contract,
+    RoutesOf,
+    SchemesOf,
+    AuthOf,
+    RequestContextOf,
+    ContractPluginsOf,
+    JobsOf,
+    ToolsOf,
+    ToolAuthOf,
+} from './contract.js';
 import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { CredentialOf } from './identity.js';
@@ -56,7 +66,7 @@ export type ContractJobsRouter<C> = C extends Contract ? JobHandlers<JobsOf<C>> 
  * `input` and `throwError`, so the same handler runs however the tool is
  * reached.
  */
-export type ContractToolsRouter<C> = C extends Contract ? ToolHandlers<ToolsOf<C>, SchemesOf<C>> : never;
+export type ContractToolsRouter<C> = C extends Contract ? ToolHandlers<ToolsOf<C>, SchemesOf<C>, ToolAuthOf<C>> : never;
 
 /**
  * The handlers for a group named on the contract, or for a bare route group.
