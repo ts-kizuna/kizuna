@@ -65,69 +65,41 @@ The endpoint answers at `/mcp` by default. On Next.js it is served by the catch-
 
 ## Choosing which routes become tools
 
-Every tool's name, description, and input schema sits in the model's context on every turn, called or not, and the more tools there are the more often the model picks the wrong one. So trim the list.
+Every tool's name, description, and input schema sits in the model's context on every turn, called or not, and the more tools there are the more often the model picks the wrong one. Selection accuracy falls away somewhere past thirty, and some clients refuse more than forty outright. So the list is short on purpose.
 
-Pass the routes to `mcpPlugin` and name the ones to leave out. Write `plugins` as a function and `k.contract` hands the routes over:
+Name the routes you want in the contract's tool tree with [`k.tools.fromRoute`](/docs/tools):
 
-```ts title="contract.ts"
-export const contract = k.contract({
-    routes,
-    auth,
-    plugins: ({ routes }) => ({
-        mcp: mcpPlugin({
-            name: 'My API',
-            routes,
-            options: {
-                publishRoutes: {
-                    users: true,
-                    health: true,
-                },
-            },
-        }),
-    }),
+```ts title="tools.ts"
+export const tools = k.tools({
+    users: {
+        find: k.tools.fromRoute(routes.users.getUser),
+        list: k.tools.fromRoute(routes.users.listUsers),
+    },
 });
 ```
 
-A route the map never mentions is a tool, so the map only says what differs, and `false` on a group drops all of it.
+There is no map of what to exclude, because a route that is not written here is not a tool. Everything about the tool comes from the route: its arguments, its result, its description, its annotations, and the identity it requires.
 
-Set a group's own default with `'*'` to turn that around and name what to keep:
+Give the model different words when the route's summary was written for a developer reading your docs:
 
-```ts title="contract.ts"
-mcp: mcpPlugin({
-    routes,
-    options: {
-        publishRoutes: {
-            users: {
-                '*': true,
-                deleteUser: false,
-            },
-        },
-    },
+```ts title="tools.ts"
+pause: k.tools.fromRoute(routes.meta.pauseAd, {
+    description: 'Pause a running ad. The spend stops within a minute.',
 }),
 ```
 
-`onlyReadOnly` keeps only the safe methods, so nothing an assistant calls can change data:
+`onlyReadOnly` keeps only the tools that cannot change data, so nothing an assistant calls writes anything:
 
 ```ts title="contract.ts"
 mcp: mcpPlugin({
-    routes,
-    options: {
-        publishRoutes: {
-            '*': true,
-        },
-        onlyReadOnly: true,
-    },
+    name: 'My API',
+    onlyReadOnly: true,
 }),
 ```
 
-Keys are checked against those routes, so a name that does not exist is a compile error naming the one you meant:
+A route reads its safety from its method, per RFC 9110, so a `GET` declares `readOnlyHint` without you saying so and a `DELETE` declares `destructiveHint`.
 
-```text
-Object literal may only specify known properties, but 'helth' does not
-exist in type ToolMap<...>. Did you mean to write 'health'?
-```
-
-Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, because MCP tool input is JSON. Routes whose response [streams](/docs/streaming) are never tools either, because a tool result is one value.
+Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` cannot be tools, because MCP tool input is JSON. Routes whose response [streams](/docs/streaming) cannot either, because a tool result is one value. Naming one is a compile error where you named it, rather than a tool that quietly never appears.
 
 ### What to cut first
 
@@ -135,29 +107,28 @@ Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-u
 - **Ones that exist for your own infrastructure.** Health checks, readiness probes, webhook receivers.
 - **Ones you do not want reached by inference.** Deleting a workspace is a person's decision, guard or no guard.
 
-## Publishing tools you declared
+## Tools with no route behind them
 
-Routes are not the only thing that can be a tool. A tool declared with [`k.tools`](/docs/tools) already has a name, a description, an input schema, an output schema and a handler, which is what an MCP tool is, and unlike a route it does not have to pretend to be an endpoint first.
+Not everything a model calls has to be an endpoint. A tool declared with [`k.tools`](/docs/tools) has a name, a description, an input schema, an output schema and a handler, which is what an MCP tool is, and it never has to pretend to be a route first.
 
-Pass the contract's tools alongside its routes, then name the ones to publish:
+Both kinds sit in the same tree and publish the same way:
 
-```ts title="contract/index.ts"
-export const contract = k.contract({
-    routes,
-    tools,
-    plugins: ({ routes, tools }) => ({
-        mcp: mcpPlugin({
-            routes,
-            tools,
-            options: {
-                hideTools: ['countWords'],
-            },
+```ts title="tools.ts"
+export const tools = k.tools({
+    users: {
+        find: k.tools.fromRoute(routes.users.getUser),
+    },
+    countWords: {
+        description: 'Count the words in a piece of text',
+        input: z.object({
+            text: z.string(),
         }),
-    }),
+        output: z.object({
+            words: z.int(),
+        }),
+    },
 });
 ```
-
-Every declared tool is published, because a tool is already a tool. `hideTools` drops one you would rather keep to yourself.
 
 Two differences from a route published as a tool:
 
@@ -185,7 +156,7 @@ export const tools = k.tools('user', {
 | **Output**      | The success response's schema, so an assistant knows the shape before it calls      |
 | **Annotations** | The method's HTTP semantics, per [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) |
 
-The [specification](https://modelcontextprotocol.io/specification/latest/server/tools) allows the dot, but Claude Code and VS Code rewrite it before the name reaches the model, so publishing the rewritten form is what keeps your docs and the model's tool name the same. Names are capped at 128 characters. A key over that throws at startup, as do two keys that converge on one name.
+The [specification](https://modelcontextprotocol.io/specification/latest/server/tools) allows the dot, but Claude Code and VS Code rewrite it before the name reaches the model, so publishing the rewritten form is what keeps your docs and the model's tool name the same. Names are capped at 56 characters. The specification allows 128, but Cursor rejects anything over 60, and a client aggregating several servers prefixes every name with the server's, so a longer name reaches the model truncated. A key over the budget throws at startup, as do two keys that converge on one name.
 
 The annotations tell a client how careful to be with a tool before calling it:
 
@@ -330,9 +301,9 @@ All of them go on `mcpPlugin`. `mcpPluginServer()` takes nothing.
 | `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                           |
 | `version`      | `'1.0.0'`            | Semantic version string                                              |
 | `instructions` | built from your tags | Appended to the generated overview                                   |
-| `routes`       | none                 | The contract's routes, so `publishRoutes` is checked against them    |
-| `tools`        | none                 | The contract's tools, so `hideTools` is checked against them         |
-| `options`      | none                 | `publishRoutes`, `hideTools`, and `onlyReadOnly`                     |
+| `routes`       | none                 | The contract's routes                                                |
+| `tools`        | none                 | The contract's tools                                                 |
+| `onlyReadOnly` | `false`              | Publish only the tools that cannot change data                       |
 | `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([OAuth](#oauth)) |
 
 ## Connecting clients

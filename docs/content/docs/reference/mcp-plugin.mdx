@@ -37,43 +37,38 @@ mcpPluginServer(): PluginImplementation
 | `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                                    |
 | `version`      | `'1.0.0'`            | Semantic version string                                                       |
 | `instructions` | built from your tags | Appended to the generated overview                                            |
-| `routes`       | none                 | The contract's routes, so `options.publishRoutes` is checked against them     |
-| `tools`        | none                 | The contract's tools, so `options.hideTools` is checked against them          |
-| `options`      | none                 | `publishRoutes`, `hideTools`, and `onlyReadOnly`                              |
+| `routes`       | none                 | The contract's routes                                                         |
+| `tools`        | none                 | The contract's tools                                                          |
+| `onlyReadOnly` | `false`              | Publish only the tools that cannot change data                                |
 | `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([guide](/docs/mcp#oauth)) |
 
-Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, whatever `publishRoutes` says, because tool input is JSON.
+Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` cannot be tools, because tool input is JSON. Neither can a route whose response streams, since a tool result is one value. Naming one with `k.tools.fromRoute` is a compile error where you named it.
 
 Props are pure data. `mcpPluginServer()` takes nothing: declaring the plugin is where it is configured.
 
-## Options
+## Which tools are published
 
-`options` holds the choices; `routes` and `tools` beside it are what those choices are checked against. Write `plugins` as a function and `k.contract` hands both over:
+Everything in the contract's tool tree, and nothing else. A route reaches a model by being named there with `k.tools.fromRoute`, so there is no map of exclusions to keep in step with the routes:
 
-```ts title="contract.ts"
-export const contract = k.contract({
-    routes,
-    tools,
-    auth,
-    plugins: ({ routes, tools }) => ({
-        mcp: mcpPlugin({
-            routes,
-            tools,
-            options: {
-                publishRoutes: {
-                    users: {
-                        '*': true,
-                        exportUsers: false,
-                    },
-                },
-                hideTools: ['countWords'],
-            },
+```ts title="tools.ts"
+export const tools = k.tools({
+    users: {
+        find: k.tools.fromRoute(routes.users.getUser),
+        list: k.tools.fromRoute(routes.users.listUsers),
+    },
+    countWords: {
+        description: 'Count the words in a piece of text',
+        input: z.object({
+            text: z.string(),
         }),
-    }),
+        output: z.object({
+            words: z.int(),
+        }),
+    },
 });
 ```
 
-A route is an HTTP endpoint rather than a tool, so none are published until `publishRoutes` names them, and a group takes `'*'` for its own default. Every declared tool is published, and `hideTools` drops one by dotted key. Both are checked against the trees, so a name that does not exist is a compile error naming the one you meant.
+`onlyReadOnly` narrows that to the tools whose annotations declare `readOnlyHint`. A route-derived tool gets that from its method, per RFC 9110, so every `GET` qualifies and no `POST` does.
 
 ## Example
 

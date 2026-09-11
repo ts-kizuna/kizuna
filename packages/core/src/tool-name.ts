@@ -1,9 +1,14 @@
 /**
- * Set by the MCP specification.
+ * The specification says a name should be at most 128 characters, but that is
+ * the wrong budget to write against. Cursor rejects anything over 60, and a
+ * client that aggregates several servers prefixes every name with the server's,
+ * so the name a model sees is longer than the one published.
  *
- * @see https://modelcontextprotocol.io/specification/latest/server/tools
+ * 56 leaves room for that prefix. This is the same reasoning that rewrites the
+ * dot: publishing a name a client truncates means the tool is called something
+ * kizuna never chose.
  */
-const MAX_TOOL_NAME_LENGTH = 128;
+const MAX_TOOL_NAME_LENGTH = 56;
 
 /**
  * The specification allows a dot too, and kizuna's own route and tool keys are
@@ -64,8 +69,9 @@ export const deriveToolNames = (entries: ToolNameEntry[]): Map<string, string> =
         if (name.length > MAX_TOOL_NAME_LENGTH) {
             throw new Error(
                 `${sentenceLabel(origin)} "${key}" becomes the tool name "${name}", which is ${name.length} characters, ` +
-                    `exceeding the MCP maximum of ${MAX_TOOL_NAME_LENGTH}. ` +
-                    `Use a shorter key.`
+                    `over the ${MAX_TOOL_NAME_LENGTH} kizuna publishes within. ` +
+                    `The specification allows 128, but Cursor rejects anything over 60 and clients that aggregate servers ` +
+                    `prefix every name, so a longer one reaches the model truncated. Use a shorter key.`
             );
         }
 

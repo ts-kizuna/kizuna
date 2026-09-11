@@ -60,12 +60,12 @@ describe('deriveToolNames', () => {
         expect(deriveToolNames(toolsOf('weather.getForecast'))).toEqual(new Map([['weather.getForecast', 'weather_get_forecast']]));
     });
 
-    it('takes a name at the 128 character maximum', () => {
-        expect(() => deriveToolNames(routesOf('a'.repeat(128)))).not.toThrow();
+    it('takes a name at the 56 character budget', () => {
+        expect(() => deriveToolNames(routesOf('a'.repeat(56)))).not.toThrow();
     });
 
-    it('throws when a name exceeds the 128 character maximum', () => {
-        expect(() => deriveToolNames(routesOf('a'.repeat(129)))).toThrow(/exceeding the MCP maximum of 128/);
+    it('throws over the budget, leaving room for a client-side prefix', () => {
+        expect(() => deriveToolNames(routesOf('a'.repeat(57)))).toThrow(/over the 56 kizuna publishes within/);
     });
 
     it('throws when a route key carries a character no client accepts', () => {
