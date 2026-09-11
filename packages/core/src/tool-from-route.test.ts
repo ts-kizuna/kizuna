@@ -278,5 +278,4 @@ describe('the builder form', () => {
         );
         expect(viaBuilder.users.find.route).toBe(routes.users.getUser);
     });
-
 });

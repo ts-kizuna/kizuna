@@ -123,65 +123,35 @@ export const toolHandlers = server.tools({
 
 ## Take the caller, never ask for it
 
-An [identity](/docs/authentication) says what a verified caller looks like. This one carries the workspace they belong to:
-
-```ts title="identities.ts"
-export const member = Kizuna.identity.apiKey({
-    name: 'x-workspace-token',
-    in: 'header',
-    context: z.object({
-        workspaceId: z.string(),
-    }),
-});
-```
-
-Say in the [auth map](/docs/authentication) which tools require it, beside the routes:
+A tool that reads someone's data, or changes it, needs to know who is asking. It takes that from the route behind it.
 
 ```ts title="auth.ts"
-export const auth = k.auth(routes, tools, {
-    users: false,
-    members: 'user',
-    listMembers: 'member',
-});
-```
-
-The handler receives that identity's context under `auth`:
-
-```ts title="tools.ts"
-export const tools = k.tools({
+export const auth = k.auth(routes, {
     workspace: {
-        listMembers: {
-            description: 'List the members of the current workspace',
-            input: z.object({
-                role: z.enum(['owner', 'admin']).optional(),
-            }),
-            output: z.array(MemberSchema),
+        '*': 'member',
+        deleteWorkspace: {
+            member: {
+                role: 'owner',
+            },
         },
     },
 });
 ```
 
-```ts title="server/tools.ts"
-export const toolHandlers = server.tools({
+```ts title="tools.ts"
+export const tools = k.tools(({ fromRoute }) => ({
     workspace: {
-        listMembers: ({ input, auth }) => membersOf(auth.member.workspaceId, input.role),
+        members: fromRoute(workspaceRoutes.listMembers),
+        remove: fromRoute(workspaceRoutes.deleteWorkspace),
     },
-});
+}));
 ```
 
-`auth.member` is the identity's `context`, typed. The workspace comes from there rather than from `input`, because the model chooses `input`.
+`remove` requires a `member` whose `role` is `owner`, because its route does. A caller holding `admin` is refused, over MCP and in process alike. Nothing about that is written twice.
 
-Whoever calls the tool supplies the identity, and a tool that declares one will not run without it. In a script, bind it yourself:
+The workspace itself never becomes an `input` field. The model chooses `input`, so a selector declared there is a selector the model picks. It comes from the caller's identity instead, which the route handler already receives under `auth`.
 
-```ts
-const asMember = tools.as({
-    member: {
-        workspaceId: 'w_1',
-    },
-});
-
-await asMember.workspace.listMembers.run({});
-```
+A tool you declare inline has no route, so it has no caller and no role. Keep those to computation. Anything that touches your data is a route, and `fromRoute` puts it in front of a model.
 
 </Step>
 
