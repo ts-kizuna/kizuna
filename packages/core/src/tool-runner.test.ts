@@ -421,7 +421,7 @@ const secured = new Kizuna({
     },
 });
 
-const securedTools = secured.tools('member', {
+const securedTools = secured.tools({
     listMembers: {
         description: 'List the members of the current workspace',
         output: z.object({
@@ -429,6 +429,27 @@ const securedTools = secured.tools('member', {
             role: z.string(),
         }),
     },
+});
+
+const securedRoutes = secured.routes({
+    health: {
+        method: 'GET',
+        path: '/health',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+
+const securedContract = secured.contract({
+    routes: securedRoutes,
+    tools: securedTools,
+    auth: secured.auth(securedRoutes, securedTools, {
+        health: false,
+        listMembers: 'member',
+    }),
 });
 
 const securedRouter = {
@@ -439,7 +460,7 @@ const securedRouter = {
 };
 
 describe('identity binding', () => {
-    const unbound = () => createToolRunner({ tools: securedTools }, securedRouter as never);
+    const unbound = () => createToolRunner({ tools: securedContract.tools! }, securedRouter as never);
 
     it('refuses to run a tool that requires an identity nobody bound', async () => {
         await expect(unbound().listMembers.run()).rejects.toBeInstanceOf(ToolIdentityError);

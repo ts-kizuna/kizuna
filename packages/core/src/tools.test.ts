@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { buildTools, flattenTools, isCompiledTool, isToolDefinition, toolAt } from './tools.js';
 
 const weatherTools = () =>
-    buildTools(undefined, {
+    buildTools({
         weather: {
             getForecast: {
                 description: 'Look up the forecast for one city',
@@ -58,18 +58,18 @@ describe('buildTools', () => {
         expect(tool.output).toBeUndefined();
     });
 
-    it('carries the group identity onto every tool', () => {
-        const tools = buildTools('assistant', {
+    it('leaves identity for the auth map to write', () => {
+        const tools = buildTools({
             ping: {
                 description: 'Answer that the server is up',
             },
         });
-        expect(toolAt(tools, 'ping')!.identity).toBe('assistant');
+        expect(toolAt(tools, 'ping')!.identity).toBeUndefined();
     });
 
     it('throws on an empty description', () => {
         expect(() =>
-            buildTools(undefined, {
+            buildTools({
                 ping: {
                     description: '   ',
                 },
@@ -79,7 +79,7 @@ describe('buildTools', () => {
 
     it('throws when a top-level name would shadow the runner', () => {
         expect(() =>
-            buildTools(undefined, {
+            buildTools({
                 call: {
                     description: 'Place a call',
                 },
@@ -88,7 +88,7 @@ describe('buildTools', () => {
     });
 
     it('takes a runner name nested in a group', () => {
-        const tools = buildTools(undefined, {
+        const tools = buildTools({
             phone: {
                 call: {
                     description: 'Place a call',
@@ -100,7 +100,7 @@ describe('buildTools', () => {
 
     it('throws when a node is neither a tool nor a group', () => {
         expect(() =>
-            buildTools(undefined, {
+            buildTools({
                 ping: 'not a tool' as unknown as { description: string },
             })
         ).toThrow(/Tool "ping" is not an object/);

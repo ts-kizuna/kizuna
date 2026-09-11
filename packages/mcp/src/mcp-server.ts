@@ -173,7 +173,12 @@ const publishedDescription = (published: PublishedTool): string => {
         const described = requirements.map(({ scheme, scopes }) => describeRequirement(route, scheme, scopes)).join(', ');
         return `${published.description}\nRequires: ${described}`;
     }
-    return published.identity === undefined ? published.description : `${published.description}\nRequires: ${published.identity}`;
+    const requirements = resolveSecurityRequirements({ security: published.security } as RouteDefinition);
+    if (requirements.length === 0) return published.description;
+    const described = requirements
+        .map(({ scheme, scopes }) => describeRequirement({ accessGate: published.accessGate } as RouteDefinition, scheme, scopes))
+        .join(', ');
+    return `${published.description}\nRequires: ${described}`;
 };
 
 /**
@@ -365,16 +370,8 @@ export const toolRequirements = (
         };
     }
     return {
-        requirements:
-            definition.identity === undefined
-                ? []
-                : [
-                      {
-                          scheme: definition.identity,
-                          scopes: [],
-                      },
-                  ],
-        accessGate: undefined,
+        requirements: resolveSecurityRequirements({ security: definition.security } as RouteDefinition),
+        accessGate: definition.accessGate,
     };
 };
 

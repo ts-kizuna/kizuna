@@ -5,7 +5,7 @@ import { toolEvents } from './tool-events.js';
 import { formatEvent } from './stream.js';
 import { Kizuna } from './kizuna.js';
 
-const tools = buildTools(undefined, {
+const tools = buildTools({
     weather: {
         getForecast: {
             description: 'Look up the forecast for one city',
@@ -28,7 +28,7 @@ describe('toolEvents', () => {
     });
 
     it('throws on a tool set with no tools in it', () => {
-        expect(() => toolEvents(buildTools(undefined, {}))).toThrow(/a tool set with no tools in it/);
+        expect(() => toolEvents(buildTools({}))).toThrow(/a tool set with no tools in it/);
     });
 
     it('parses a call for the tool it names', () => {
@@ -136,7 +136,7 @@ describe('toolEvents', () => {
 
     it('builds a union even for a single tool', () => {
         const events = toolEvents(
-            buildTools(undefined, {
+            buildTools({
                 ping: {
                     description: 'Answer that the server is up',
                 },

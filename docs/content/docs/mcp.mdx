@@ -136,10 +136,8 @@ Two differences from a route published as a tool:
 Give the group an identity and its guard runs on every call, the way a route's `security` does. The context it resolves reaches the handler under `auth`, keyed by the identity's name, exactly as a route handler receives it:
 
 ```ts
-export const tools = k.tools('user', {
-    weather: {
-        getForecast: { ... },
-    },
+export const auth = k.auth(routes, tools, {
+    getForecast: 'user',
 });
 ```
 

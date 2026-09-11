@@ -221,7 +221,7 @@ describe('tool identity', () => {
         member: typeof member;
     };
 
-    const securedTools = secured.tools('member', {
+    const securedTools = secured.tools({
         listMembers: {
             description: 'List the members of the current workspace',
             output: z.object({
@@ -237,7 +237,7 @@ describe('tool identity', () => {
     });
 
     it('gives a handler the identity its tool requires, keyed by name', () => {
-        const handlers: ToolHandlers<typeof securedTools, Schemes> = {
+        const handlers: ToolHandlers<typeof securedTools, Schemes, { listMembers: 'member' }> = {
             listMembers: ({ auth }) => {
                 expectTypeOf(auth.member.workspaceId).toEqualTypeOf<string>();
                 expectTypeOf(auth.member.role).toEqualTypeOf<'owner' | 'admin'>();
@@ -250,7 +250,7 @@ describe('tool identity', () => {
     });
 
     it('gives a handler no auth when its tool requires no identity', () => {
-        const handlers: ToolHandlers<typeof openTools, Schemes> = {
+        const handlers: ToolHandlers<typeof openTools, Schemes, { ping: false }> = {
             ping: (args) => {
                 expectTypeOf<keyof typeof args>().toEqualTypeOf<'input' | 'throwError'>();
             },

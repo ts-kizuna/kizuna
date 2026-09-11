@@ -12,7 +12,7 @@ import {
 } from './tools.js';
 import { toToolName } from './tool-name.js';
 import type { ToolCall, ToolError, ToolKeys, ToolResult } from './tool-events.js';
-import type { RouteDefinition } from './types.js';
+import type { AccessGate, RouteDefinition, SecurityRequirement } from './types.js';
 
 /**
  * The arguments a tool takes when run in code: its input when it declares one,
@@ -71,9 +71,15 @@ export interface PublishedTool {
     output: z.ZodType | undefined;
     annotations: ToolAnnotations | undefined;
     /**
-     * The identity every tool in the group requires, or `undefined`.
+     * The identity the tool's handler receives, or `undefined` when it needs
+     * none.
      */
     identity: string | undefined;
+    /**
+     * What the auth map resolved to, in the same shape a route carries.
+     */
+    security: readonly SecurityRequirement[] | undefined;
+    accessGate: AccessGate | undefined;
     /**
      * The route this tool runs, when it was named with `k.tools.fromRoute`. Its
      * own `security` and `accessGate` say who may call the tool.
@@ -393,6 +399,8 @@ export const publishedTools = (tools: FlattenedTool[]): PublishedTool[] =>
         output: tool.output,
         annotations: tool.definition.annotations,
         identity: tool.identity,
+        security: tool.security,
+        accessGate: tool.accessGate,
         route: tool.route,
         routeTags: tool.routeTags,
     }));

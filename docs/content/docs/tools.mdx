@@ -135,10 +135,20 @@ export const member = Kizuna.identity.apiKey({
 });
 ```
 
-Name it when you declare the tools, and every handler in the tree receives that context under `auth`:
+Say in the [auth map](/docs/authentication) which tools require it, beside the routes:
+
+```ts title="auth.ts"
+export const auth = k.auth(routes, tools, {
+    users: false,
+    members: 'user',
+    listMembers: 'member',
+});
+```
+
+The handler receives that identity's context under `auth`:
 
 ```ts title="tools.ts"
-export const tools = k.tools('member', {
+export const tools = k.tools({
     workspace: {
         listMembers: {
             description: 'List the members of the current workspace',
@@ -567,10 +577,8 @@ Every tool in the tree is published, both the ones you declared and the routes y
 A published tool answers with its own output, where a route published as a tool answers with the `{ status, body }` envelope its HTTP shape implies. Give the group an identity and its guard runs on every call, and the context it resolves reaches the handler under `auth`:
 
 ```ts
-export const tools = k.tools('user', {
-    weather: {
-        getForecast: { ... },
-    },
+export const auth = k.auth(routes, tools, {
+    getForecast: 'user',
 });
 ```
 
