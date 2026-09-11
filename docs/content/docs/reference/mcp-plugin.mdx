@@ -42,19 +42,19 @@ mcpPluginServer(): PluginImplementation
 | `onlyReadOnly` | `false`              | Publish only the tools that cannot change data                                |
 | `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([guide](/docs/mcp#oauth)) |
 
-Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` cannot be tools, because tool input is JSON. Neither can a route whose response streams, since a tool result is one value. Naming one with `fromRoute` is a compile error where you named it.
+Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` cannot be tools, because tool input is JSON. Neither can a route whose response streams, since a tool result is one value. Naming one with `fromRoutes` is a compile error where you named it.
 
 Props are pure data. `mcpPluginServer()` takes nothing: declaring the plugin is where it is configured.
 
 ## Which tools are published
 
-Everything in the contract's tool tree. A route is published when it is named there with `fromRoute`:
+Everything in the contract's tool tree. A route is published when it is named there with `fromRoutes`:
 
 ```ts title="tools.ts"
-export const tools = k.tools(({ fromRoute }) => ({
+export const tools = k.tools(({ fromRoutes }) => ({
     users: {
-        find: fromRoute(routes.users.getUser),
-        list: fromRoute(routes.users.listUsers),
+        find: fromRoutes(routes.users.getUser),
+        list: fromRoutes(routes.users.listUsers),
     },
     countWords: {
         description: 'Count the words in a piece of text',

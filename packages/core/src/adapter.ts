@@ -546,7 +546,7 @@ export interface ToolsMeta {
     tools: Tools;
     handlers: Record<string, unknown>;
     /**
-     * The contract's router, so a `k.tools.fromRoute` tool can reach the
+     * The contract's router, so a `k.tools.fromRoutes` tool can reach the
      * handler its route already has.
      */
     router?: Record<string, unknown>;
@@ -567,7 +567,7 @@ const resolveRouteHandler = (router: Record<string, unknown> | undefined, routeK
 };
 
 /**
- * Run the route behind a `k.tools.fromRoute` tool, answering the
+ * Run the route behind a `k.tools.fromRoutes` tool, answering the
  * `{ status, body }` envelope the tool publishes.
  *
  * The route's own `security` and `accessGate` decide whether the caller may

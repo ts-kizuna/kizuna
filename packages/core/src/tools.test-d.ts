@@ -214,8 +214,8 @@ describe('tool authorization', () => {
         },
     });
 
-    const declared = k.tools(({ fromRoute }) => ({
-        find: fromRoute(routes.users.getUser),
+    const declared = k.tools(({ fromRoutes }) => ({
+        find: fromRoutes(routes.users.getUser),
         countWords: {
             description: 'Count the words in a piece of text',
             input: z.object({
@@ -345,15 +345,15 @@ describe('routes that cannot be tools', () => {
 
     it('refuses a streamed route where it is named', () => {
         // @ts-expect-error a stream has no single value to answer with
-        k.tools.fromRoute(streamRoutes.reply);
+        k.tools.fromRoutes(streamRoutes.reply);
     });
 
     it('refuses a route that reads a form body', () => {
         // @ts-expect-error a tool sends JSON, so there is nowhere to put a form
-        k.tools.fromRoute(streamRoutes.upload);
+        k.tools.fromRoutes(streamRoutes.upload);
     });
 
     it('takes an ordinary JSON route', () => {
-        expectTypeOf(k.tools.fromRoute(streamRoutes.ping)).not.toBeNever();
+        expectTypeOf(k.tools.fromRoutes(streamRoutes.ping)).not.toBeNever();
     });
 });

@@ -65,13 +65,13 @@ The endpoint answers at `/mcp` by default. On Next.js it is served by the catch-
 
 ## Choosing which routes become tools
 
-Name the routes a model may call with [`fromRoute`](/docs/tools):
+Name the routes a model may call with [`fromRoutes`](/docs/tools):
 
 ```ts title="tools.ts"
-export const tools = k.tools(({ fromRoute }) => ({
+export const tools = k.tools(({ fromRoutes }) => ({
     users: {
-        find: fromRoute(routes.users.getUser),
-        list: fromRoute(routes.users.listUsers),
+        find: fromRoutes(routes.users.getUser),
+        list: fromRoutes(routes.users.listUsers),
     },
 }));
 ```
@@ -81,7 +81,7 @@ A route is a tool when it is written here. Everything about it comes from the ro
 Give the model its own words when the route's summary is written for a developer reading your docs:
 
 ```ts title="tools.ts"
-archive: fromRoute(routes.users.archiveUser, {
+archive: fromRoutes(routes.users.archiveUser, {
     description: 'Archive a user. They keep their data and lose access immediately.',
 }),
 ```
@@ -112,9 +112,9 @@ Every tool costs the model context on every turn, whether it calls it or not, an
 A tool declared with [`k.tools`](/docs/tools) has a name, a description, an input schema, an output schema and a handler, which is what an MCP tool is. Both kinds sit in the same tree and publish the same way:
 
 ```ts title="tools.ts"
-export const tools = k.tools(({ fromRoute }) => ({
+export const tools = k.tools(({ fromRoutes }) => ({
     users: {
-        find: fromRoute(routes.users.getUser),
+        find: fromRoutes(routes.users.getUser),
     },
     countWords: {
         description: 'Count the words in a piece of text',

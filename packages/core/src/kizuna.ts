@@ -13,16 +13,11 @@ import {
     applyToolAuth,
     attachRouteKeys,
     buildTools,
-    fromRoute,
     fromRoutes,
     resolveAuthoredTools,
     type AuthoredToolsArg,
     type AuthoredTools,
     type CompiledTools,
-    type RouteToolGroup,
-    type RouteToolMarker,
-    type RouteToolOverrides,
-    type ToolableRoute,
     type Tools,
 } from './tools.js';
 import type { ToolsArg } from './tool-runner.js';
@@ -44,7 +39,7 @@ export type AccessConstraint = Record<string, unknown>;
 
 /**
  * The auth map for a contract's tools, nested the way the tool tree is. A tool
- * naming a route with `k.tools.fromRoute` takes that route's authorization, so
+ * naming a route with `k.tools.fromRoutes` takes that route's authorization, so
  * it has no entry here.
  */
 export type ToolAuthMap<Id extends string = string, T extends Tools = Tools> = {
@@ -276,7 +271,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
          * The `auth` map for the contract's tools, typed against them. Keep it
          * beside `k.auth`, then pass it to `k.contract` under `toolAuth`.
          *
-         * A tool naming a route with `k.tools.fromRoute` has no entry: that
+         * A tool naming a route with `k.tools.fromRoutes` has no entry: that
          * route's own line already says who may call it.
          *
          * @example
@@ -290,7 +285,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      * The `auth` map for the contract's tools, typed against them. Keep it in
      * the same file as `k.auth`, then pass it to `k.contract` under `toolAuth`.
      *
-     * A tool naming a route with `k.tools.fromRoute` has no entry: that route's
+     * A tool naming a route with `k.tools.fromRoutes` has no entry: that route's
      * own line already says who may call it.
      *
      * @example
@@ -356,23 +351,11 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
          * requires, so a route is never restated to put it in front of a model.
          *
          * @example
-         * export const tools = k.tools({
-         *     users: {
-         *         find: k.tools.fromRoute(routes.users.getUser),
-         *     },
-         * });
-         */
-        fromRoute: <const R extends RouteDefinition>(route: R & ToolableRoute<R>, overrides?: RouteToolOverrides) => RouteToolMarker<R>;
-        /**
-         * Name every route in a group as a tool. The ones that cannot be tools,
-         * because they stream or read a form body, are simply not there.
-         *
-         * @example
          * export const tools = k.tools(({ fromRoutes }) => ({
          *     users: fromRoutes(routes.users),
          * }));
          */
-        fromRoutes: <const Group extends object>(group: Group) => RouteToolGroup<Group>;
+        fromRoutes: typeof fromRoutes;
     };
     /**
      * Assemble route groups into a contract. The `auth` map assigns each group
@@ -512,7 +495,6 @@ const createSurface = <
             : buildJobs(identityOrDefinitions as string, definitions)) as K<Spec>['jobs'];
 
     const tools = Object.assign((definitions: AuthoredToolsArg<AuthoredTools>) => buildTools(resolveAuthoredTools(definitions)), {
-        fromRoute,
         fromRoutes,
     }) as K<Spec>['tools'];
 

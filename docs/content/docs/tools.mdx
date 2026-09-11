@@ -157,7 +157,7 @@ purgeCache: ({ auth }) => dropReportsFor(auth.member.workspaceUserId),
 
 `auth.member` is typed, with `role` narrowed to `'owner'`. A caller holding `admin` is refused before the handler runs, and so is a caller holding nothing.
 
-`k.auth.tools` takes the same values a route's entry takes: an identity name, several, or one narrowed by an access field. A tool naming a route with `fromRoute` gets no entry, because that route's own line already says who may call it.
+`k.auth.tools` takes the same values a route's entry takes: an identity name, several, or one narrowed by an access field. A tool naming a route with `fromRoutes` gets no entry, because that route's own line already says who may call it.
 
 The workspace is not an `input` field. The model chooses `input`, so a selector declared there is a selector the model picks.
 
@@ -196,15 +196,15 @@ export const api = server.api({
 A route already has an input schema, an output schema, a handler, and an identity it requires, which is everything a tool is. Name it:
 
 ```ts title="tools.ts"
-export const tools = k.tools(({ fromRoute }) => ({
+export const tools = k.tools(({ fromRoutes }) => ({
     users: {
-        find: fromRoute(routes.users.getUser),
-        list: fromRoute(routes.users.listUsers),
+        find: fromRoutes(routes.users.getUser),
+        list: fromRoutes(routes.users.listUsers),
     },
 }));
 ```
 
-Or take a whole group, when a model should reach all of it:
+Hand it a whole group when a model should reach all of it:
 
 ```ts title="tools.ts"
 export const tools = k.tools(({ fromRoutes }) => ({
@@ -212,20 +212,22 @@ export const tools = k.tools(({ fromRoutes }) => ({
 }));
 ```
 
-Routes that cannot be tools, because they stream or read a form body, are simply not in the result. Spread it when one entry wants different words:
+Routes that cannot be tools, because they stream or read a form body, are simply not in the result.
+
+A second argument says what differs. `false` leaves a route out, and an object gives the model different words:
 
 ```ts title="tools.ts"
-export const tools = k.tools(({ fromRoute, fromRoutes }) => ({
-    users: {
-        ...fromRoutes(routes.users),
-        archive: fromRoute(routes.users.archiveUser, {
+export const tools = k.tools(({ fromRoutes }) => ({
+    users: fromRoutes(routes.users, {
+        exportUsers: false,
+        archiveUser: {
             description: 'Archive a user. They keep their data and lose access.',
-        }),
-    },
+        },
+    }),
 }));
 ```
 
-`k.tools` hands the builder both. `k.tools.fromRoute` and `k.tools.fromRoutes` are the same functions, for when you want one on its own.
+`k.tools` hands the builder a `fromRoutes`. `k.tools.fromRoutes` is the same function, for when you want it on its own.
 
 The tool takes the route's path parameters, query and body as its arguments, answers with the route's own responses, describes itself from the route's summary, and runs the route's handler. Its `readOnlyHint` and `destructiveHint` come from what RFC 9110 says about the method, so a `GET` is marked safe and a `DELETE` destructive.
 
@@ -248,7 +250,7 @@ The route's own `security` and `accessGate` decide, so authorization stays in [`
 A route whose response [streams](/docs/streaming) has no single value to answer with, and one that reads a form body has nowhere to put JSON arguments. Naming either is a compile error where you named it:
 
 ```ts
-fromRoute(routes.assistant.reply);
+fromRoutes(routes.assistant.reply);
 //        ~~~~~~~~~~~~~~~~~~~~~
 // This route streams, so it cannot be a tool.
 ```
@@ -258,12 +260,12 @@ fromRoute(routes.assistant.reply);
 A route's summary is written for a developer reading your docs. A model reads the description to decide whether to call the tool at all, so give it its own words when the two differ:
 
 ```ts title="tools.ts"
-archive: fromRoute(routes.users.archiveUser, {
+archive: fromRoutes(routes.users.archiveUser, {
     description: 'Archive a user. They keep their data and lose access immediately.',
 }),
 ```
 
-`title` and `annotations` take an override the same way.
+`title` and `annotations` take an override the same way, on a single route or on one inside a group.
 
 ## Driving the model
 
@@ -584,7 +586,7 @@ export const contract = k.contract({
 });
 ```
 
-Every tool in the tree is published, both the ones you declared and the routes you named with `fromRoute`.
+Every tool in the tree is published, both the ones you declared and the routes you named with `fromRoutes`.
 
 A published tool answers with its own output, where a route published as a tool answers with the `{ status, body }` envelope its HTTP shape implies. Give the group an identity and its guard runs on every call, and the context it resolves reaches the handler under `auth`:
 

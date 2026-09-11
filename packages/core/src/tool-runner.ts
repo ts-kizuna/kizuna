@@ -81,7 +81,7 @@ export interface ResolvedTool {
     security: readonly SecurityRequirement[] | undefined;
     accessGate: AccessGate | undefined;
     /**
-     * The route this tool runs, when it was named with `k.tools.fromRoute`. Its
+     * The route this tool runs, when it was named with `k.tools.fromRoutes`. Its
      * own `security` and `accessGate` say who may call the tool.
      */
     route: RouteDefinition | undefined;
@@ -194,7 +194,7 @@ export type ToolRunner<Tools_ extends Tools> = ToolTree<Tools_> & {
 export type BoundToolAuth = Record<string, unknown>;
 
 /**
- * Runs the route behind a tool named with `k.tools.fromRoute`, answering its
+ * Runs the route behind a tool named with `k.tools.fromRoutes`, answering its
  * `{ status, body }` envelope.
  *
  * Injected rather than imported, because running a route needs the adapter and
@@ -448,7 +448,7 @@ export const createToolRunner = <Tools_ extends Tools, Identities = Record<strin
      */
     boundAuth?: BoundToolAuth,
     /**
-     * Runs the route behind a `k.tools.fromRoute` tool. Without one, such a
+     * Runs the route behind a `k.tools.fromRoutes` tool. Without one, such a
      * tool has no way to answer.
      */
     runRoute?: RouteToolExecutor

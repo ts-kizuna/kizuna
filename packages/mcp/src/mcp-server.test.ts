@@ -124,14 +124,14 @@ const contractRoutes = k.routes('api', {
  */
 const contractTools = k.tools({
     users: {
-        listUsers: k.tools.fromRoute(contractRoutes.users.listUsers),
-        getUser: k.tools.fromRoute(contractRoutes.users.getUser),
-        createUser: k.tools.fromRoute(contractRoutes.users.createUser),
+        listUsers: k.tools.fromRoutes(contractRoutes.users.listUsers),
+        getUser: k.tools.fromRoutes(contractRoutes.users.getUser),
+        createUser: k.tools.fromRoutes(contractRoutes.users.createUser),
     },
-    health: k.tools.fromRoute(contractRoutes.health),
-    pingUser: k.tools.fromRoute(contractRoutes.pingUser),
-    deleteUser: k.tools.fromRoute(contractRoutes.deleteUser),
-    updateUser: k.tools.fromRoute(contractRoutes.updateUser),
+    health: k.tools.fromRoutes(contractRoutes.health),
+    pingUser: k.tools.fromRoutes(contractRoutes.pingUser),
+    deleteUser: k.tools.fromRoutes(contractRoutes.deleteUser),
+    updateUser: k.tools.fromRoutes(contractRoutes.updateUser),
 });
 
 const contract = k.contract({
@@ -654,9 +654,9 @@ describe('MCP server: guards', () => {
 
     const securedTools = securedK.tools({
         api: {
-            publicRoute: securedK.tools.fromRoute(securedRoutes.publicRoute),
-            whoAmI: securedK.tools.fromRoute(securedRoutes.whoAmI),
-            ownerOnly: securedK.tools.fromRoute(securedRoutes.ownerOnly),
+            publicRoute: securedK.tools.fromRoutes(securedRoutes.publicRoute),
+            whoAmI: securedK.tools.fromRoutes(securedRoutes.whoAmI),
+            ownerOnly: securedK.tools.fromRoutes(securedRoutes.ownerOnly),
         },
     });
 

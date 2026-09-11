@@ -140,10 +140,10 @@ const apiRoutes = k.routes('api', {
 
 const apiTools = k.tools({
     api: {
-        getUser: k.tools.fromRoute(apiRoutes.getUser),
-        createUser: k.tools.fromRoute(apiRoutes.createUser),
-        adminReport: k.tools.fromRoute(apiRoutes.adminReport),
-        memberFacts: k.tools.fromRoute(apiRoutes.memberFacts),
+        getUser: k.tools.fromRoutes(apiRoutes.getUser),
+        createUser: k.tools.fromRoutes(apiRoutes.createUser),
+        adminReport: k.tools.fromRoutes(apiRoutes.adminReport),
+        memberFacts: k.tools.fromRoutes(apiRoutes.memberFacts),
     },
 });
 

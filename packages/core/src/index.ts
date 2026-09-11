@@ -131,6 +131,7 @@ export {
     type RouteToolOutputValue,
     type ToolableRoute,
     type RouteToolGroup,
+    type RouteToolEntries,
     type ToolBuilderHelpers,
     type AuthoredToolsArg,
     type CompiledRouteTool,
@@ -140,6 +141,7 @@ export {
     isCompiledTool,
     isToolDefinition,
     isRouteToolMarker,
+    fromRoutes,
     flattenTools,
     toolAt,
 } from './tools.js';

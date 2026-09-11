@@ -168,10 +168,10 @@ export interface RouteToolDefinition<R extends RouteDefinition> {
     annotations?: ToolAnnotations;
 }
 
-const FROM_ROUTE: unique symbol = Symbol('ts-kizuna.tool.fromRoute');
+const FROM_ROUTE: unique symbol = Symbol('ts-kizuna.tool.fromRoutes');
 
 /**
- * A route named inside a tool tree with `k.tools.fromRoute`. It carries the
+ * A route named inside a tool tree with `k.tools.fromRoutes`. It carries the
  * route itself, so the tool's schemas, description and annotations are derived
  * from the one place they are already declared.
  */
@@ -224,67 +224,73 @@ type StreamingResponse<R extends RouteDefinition> = {
 }[keyof R['responses']];
 
 /**
- * Name a route as a tool. Its arguments, result, description and annotations
- * come from the route, and so does the identity it requires, so a route is
- * never restated to put it in front of a model.
+ * Name a route as a tool, or a whole group of them. Arguments, result,
+ * description and annotations come from the route, and so does the identity it
+ * requires, so a route is never restated to put it in front of a model.
+ *
+ * A group takes a second argument saying what differs: `false` leaves a route
+ * out, and an object gives the model different words.
  *
  * @example
- * export const tools = k.tools({
- *     users: {
- *         find: k.tools.fromRoute(routes.users.getUser),
- *     },
- * });
+ * export const tools = k.tools(({ fromRoutes }) => ({
+ *     find: fromRoutes(routes.users.getUser),
+ *     users: fromRoutes(routes.users, {
+ *         exportUsers: false,
+ *         archiveUser: {
+ *             description: 'Archive a user. They keep their data and lose access.',
+ *         },
+ *     }),
+ * }));
  */
-export const fromRoute = <const R extends RouteDefinition>(
+export function fromRoutes<const R extends RouteDefinition>(
     route: R & ToolableRoute<R>,
-    overrides: RouteToolOverrides = {}
-): RouteToolMarker<R> => ({
-    [FROM_ROUTE]: true,
-    route: route as R,
-    overrides,
-});
+    overrides?: RouteToolOverrides
+): RouteToolMarker<R>;
+export function fromRoutes<const Group extends object, const Entries extends RouteToolEntries<Group> = {}>(
+    // A single route takes the overload above, so the compile error it carries
+    // for a streamed or form-body route is not swallowed here.
+    group: Group extends RouteDefinition ? never : Group,
+    entries?: Entries
+): RouteToolGroup<Group, Entries>;
+export function fromRoutes(given: object, second: unknown = {}): unknown {
+    if (isRouteDefinition(given)) {
+        return {
+            [FROM_ROUTE]: true,
+            route: given,
+            overrides: (second ?? {}) as RouteToolOverrides,
+        };
+    }
+    return groupFromRoutes(given, (second ?? {}) as Record<string, unknown>);
+}
 
 export const isRouteToolMarker = (value: unknown): value is RouteToolMarker => !!value && typeof value === 'object' && FROM_ROUTE in value;
 
 /**
  * A route group as a tool group: every route in it that can be a tool, keyed
  * the way the group keys it. The ones that cannot, because they stream or read
- * a form body, are simply not there.
+ * a form body, are simply not there, and so is anything the second argument
+ * sets to `false`.
  */
-export type RouteToolGroup<Group> = {
+export type RouteToolGroup<Group, Entries> = {
     [Name in keyof Group as Group[Name] extends RouteDefinition
         ? ToolableRoute<Group[Name]> extends RouteDefinition
-            ? Name
+            ? Name extends keyof Entries
+                ? Entries[Name] extends false
+                    ? never
+                    : Name
+                : Name
             : never
-        : Name]: Group[Name] extends RouteDefinition ? RouteToolMarker<Group[Name]> : RouteToolGroup<Group[Name]>;
+        : Name]: Group[Name] extends RouteDefinition
+        ? RouteToolMarker<Group[Name]>
+        : RouteToolGroup<Group[Name], Name extends keyof Entries ? Entries[Name] : {}>;
 };
 
 /**
- * Name every route in a group as a tool. Use it when a model should reach all
- * of something, and spread it when one entry wants different words:
- *
- * @example
- * export const tools = k.tools(({ fromRoute, fromRoutes }) => ({
- *     users: {
- *         ...fromRoutes(routes.users),
- *         archive: fromRoute(routes.users.archiveUser, {
- *             description: 'Archive a user. They keep their data and lose access.',
- *         }),
- *     },
- * }));
+ * What a group's second argument says about each route in it: `false` to leave
+ * it out, or the wording to give the model instead of the route's own.
  */
-export const fromRoutes = <const Group extends object>(group: Group): RouteToolGroup<Group> => {
-    const tools: Record<string, unknown> = {};
-    for (const [name, node] of Object.entries(group)) {
-        if (!node || typeof node !== 'object') continue;
-        if (isRouteDefinition(node)) {
-            if (!canBeTool(node)) continue;
-            tools[name] = fromRoute(node as never);
-            continue;
-        }
-        tools[name] = fromRoutes(node as object);
-    }
-    return tools as RouteToolGroup<Group>;
+export type RouteToolEntries<Group> = {
+    [Name in keyof Group]?: Group[Name] extends RouteDefinition ? false | RouteToolOverrides : RouteToolEntries<Group[Name]>;
 };
 
 const isRouteDefinition = (value: object): value is RouteDefinition => 'method' in value && 'path' in value && 'responses' in value;
@@ -298,13 +304,28 @@ const canBeTool = (route: RouteDefinition): boolean => {
     return !Object.values(route.responses).some((response) => !!response && typeof response === 'object' && 'stream' in response);
 };
 
+const groupFromRoutes = (group: object, entries: Record<string, unknown>): Record<string, unknown> => {
+    const tools: Record<string, unknown> = {};
+    for (const [name, node] of Object.entries(group)) {
+        if (!node || typeof node !== 'object') continue;
+        const entry = entries[name];
+        if (entry === false) continue;
+        if (isRouteDefinition(node)) {
+            if (!canBeTool(node)) continue;
+            tools[name] = fromRoutes(node as never, (entry ?? {}) as RouteToolOverrides);
+            continue;
+        }
+        tools[name] = groupFromRoutes(node, (entry ?? {}) as Record<string, unknown>);
+    }
+    return tools;
+};
+
 /**
  * What `k.tools` hands a builder function. The helper is scoped to the tree it
- * builds, so `k.tools.fromRoute` need not be written on every line of a tree
+ * builds, so `k.tools.fromRoutes` need not be written on every line of a tree
  * that is already inside `k.tools`.
  */
 export interface ToolBuilderHelpers {
-    fromRoute: typeof fromRoute;
     fromRoutes: typeof fromRoutes;
 }
 
@@ -314,7 +335,6 @@ export interface ToolBuilderHelpers {
 export type AuthoredToolsArg<T extends AuthoredTools> = T | ((helpers: ToolBuilderHelpers) => T);
 
 const toolBuilderHelpers: ToolBuilderHelpers = {
-    fromRoute,
     fromRoutes,
 };
 
@@ -351,7 +371,7 @@ export interface CompiledTool<
      */
     output: z.ZodType | undefined;
     /**
-     * The route this tool runs, when it was named with `k.tools.fromRoute`.
+     * The route this tool runs, when it was named with `k.tools.fromRoutes`.
      * Its handler answers the call, and its own `security` and `accessGate`
      * govern who may make one.
      */
@@ -522,7 +542,7 @@ export const isToolDefinition = (value: unknown): value is ToolDefinition => {
 };
 
 /**
- * A route named with `k.tools.fromRoute`, compiled into the same shape a
+ * A route named with `k.tools.fromRoutes`, compiled into the same shape a
  * declared tool takes. Everything is derived from the route, so the two are
  * indistinguishable to everything downstream.
  *
@@ -675,7 +695,7 @@ export const attachRouteKeys = (
         const found = keyByRoute.get(tool.route);
         if (found === undefined) {
             throw new Error(
-                `Tool "${toolKey}" names a route with \`k.tools.fromRoute\`, but that route is not on this contract. ` +
+                `Tool "${toolKey}" names a route with \`k.tools.fromRoutes\`, but that route is not on this contract. ` +
                     `Pass the route from the same tree you pass to \`k.contract\`.`
             );
         }

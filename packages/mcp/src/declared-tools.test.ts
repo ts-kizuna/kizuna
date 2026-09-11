@@ -47,7 +47,7 @@ const tools = k.tools({
     reindex: {
         description: 'Rebuild the search index',
     },
-    health: k.tools.fromRoute(routes.health),
+    health: k.tools.fromRoutes(routes.health),
 });
 
 const contract = k.contract({

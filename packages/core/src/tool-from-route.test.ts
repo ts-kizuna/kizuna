@@ -47,8 +47,8 @@ const routes = k.routes({
 
 const tools = k.tools({
     users: {
-        find: k.tools.fromRoute(routes.users.getUser),
-        remove: k.tools.fromRoute(routes.users.deleteUser, {
+        find: k.tools.fromRoutes(routes.users.getUser),
+        remove: k.tools.fromRoutes(routes.users.deleteUser, {
             description: 'Permanently remove a user. There is no undo.',
         }),
     },
@@ -105,7 +105,7 @@ const runner = () =>
         router: router as unknown as Record<string, unknown>,
     }) as unknown as ToolRunner<typeof tools>;
 
-describe('k.tools.fromRoute', () => {
+describe('k.tools.fromRoutes', () => {
     it('derives the description from the route, and says which call it makes', () => {
         const definition = runner().definitions.find((tool) => tool.name === 'users_find');
         expect(definition?.description).toBe('Fetch one user\n\nHTTP: GET /users/:id');
@@ -246,7 +246,7 @@ describe('k.tools.fromRoute', () => {
             k.contract({
                 routes,
                 tools: k.tools({
-                    ping: k.tools.fromRoute(stray.other.ping),
+                    ping: k.tools.fromRoutes(stray.other.ping),
                 }),
                 auth: {
                     users: false,
@@ -258,15 +258,15 @@ describe('k.tools.fromRoute', () => {
 
 describe('the builder form', () => {
     it('builds the same tree as naming the helper in full', () => {
-        const viaBuilder = k.tools(({ fromRoute }) => ({
+        const viaBuilder = k.tools(({ fromRoutes }) => ({
             users: {
-                find: fromRoute(routes.users.getUser),
+                find: fromRoutes(routes.users.getUser),
             },
         }));
 
         const viaHelper = k.tools({
             users: {
-                find: k.tools.fromRoute(routes.users.getUser),
+                find: k.tools.fromRoutes(routes.users.getUser),
             },
         });
 
@@ -280,7 +280,7 @@ describe('the builder form', () => {
     });
 });
 
-describe('k.tools.fromRoutes', () => {
+describe('k.tools.fromRoutes, given a group', () => {
     const group = k.routes({
         users: {
             getUser: {
@@ -290,6 +290,16 @@ describe('k.tools.fromRoutes', () => {
                 responses: {
                     200: z.object({
                         id: z.string(),
+                    }),
+                },
+            },
+            exportUsers: {
+                method: 'GET',
+                path: '/users/export',
+                summary: 'Export users',
+                responses: {
+                    200: z.object({
+                        url: z.string(),
                     }),
                 },
             },
@@ -327,7 +337,7 @@ describe('k.tools.fromRoutes', () => {
             users: fromRoutes(group.users),
         }));
 
-        expect(Object.keys(built.users)).toEqual(['getUser']);
+        expect(Object.keys(built.users)).toEqual(['getUser', 'exportUsers']);
     });
 
     it('leaves out the routes that cannot be tools', () => {
@@ -339,16 +349,26 @@ describe('k.tools.fromRoutes', () => {
         expect(built.users).not.toHaveProperty('watch');
     });
 
-    it('spreads, so one entry can say something different', () => {
-        const built = k.tools(({ fromRoute, fromRoutes }) => ({
-            users: {
-                ...fromRoutes(group.users),
-                getUser: fromRoute(group.users.getUser, {
+    it('drops the ones set to false', () => {
+        const built = k.tools(({ fromRoutes }) => ({
+            users: fromRoutes(group.users, {
+                exportUsers: false,
+            }),
+        }));
+
+        expect(Object.keys(built.users)).toEqual(['getUser']);
+    });
+
+    it('gives one of them different words without naming it twice', () => {
+        const built = k.tools(({ fromRoutes }) => ({
+            users: fromRoutes(group.users, {
+                getUser: {
                     description: 'Look a person up by id.',
-                }),
-            },
+                },
+            }),
         }));
 
         expect(built.users.getUser.definition.description).toBe('Look a person up by id.');
+        expect(built.users.exportUsers.definition.description).toContain('Export users');
     });
 });

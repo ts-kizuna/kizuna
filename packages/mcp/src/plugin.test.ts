@@ -30,7 +30,7 @@ const routes = k.routes('api', {
 });
 
 const tools = k.tools({
-    getUser: k.tools.fromRoute(routes.getUser),
+    getUser: k.tools.fromRoutes(routes.getUser),
 });
 
 const contract = k.contract({
@@ -168,7 +168,7 @@ const selective = k.routes('api', {
  * `health` out is the whole mechanism: there is nothing to switch off.
  */
 const selectiveTools = k.tools({
-    listUsers: k.tools.fromRoute(selective.listUsers),
+    listUsers: k.tools.fromRoutes(selective.listUsers),
 });
 
 const selectiveContract = k.contract({

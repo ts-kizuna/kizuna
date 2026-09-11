@@ -11,18 +11,18 @@ const TemperatureUnit = z.enum(['celsius', 'fahrenheit']);
  * The tools the assistant may call while it streams a reply. They are also
  * published as MCP tools, so the same declaration serves both.
  *
- * A route named with `fromRoute` restates nothing: its arguments,
+ * A route named with `fromRoutes` restates nothing: its arguments,
  * result, description and annotations come from the route, and so does the
  * identity it requires.
  */
-export const tools = k.tools(({ fromRoute }) => ({
+export const tools = k.tools(({ fromRoutes }) => ({
     users: {
-        find: fromRoute(usersRoutes.getUser),
-        list: fromRoute(usersRoutes.listUsers),
-        create: fromRoute(usersRoutes.createUser),
+        find: fromRoutes(usersRoutes.getUser),
+        list: fromRoutes(usersRoutes.listUsers),
+        create: fromRoutes(usersRoutes.createUser),
     },
     workspace: {
-        read: fromRoute(workspaceRoutes.info.getWorkspace),
+        read: fromRoutes(workspaceRoutes.info.getWorkspace),
     },
     weather: {
         getForecast: {
