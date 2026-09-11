@@ -66,63 +66,6 @@ A tool declares no path and no method, so nothing that walks `contract.routes` s
 
 <Step>
 
-</Steps>
-
-## A route your model can call
-
-Most of what a model needs to do, your API already does. A route has an input schema, an output schema, a handler, and an identity it requires, which is everything a tool is. Restating one as a tool means two declarations to keep in step, and a stream route very often needs to look up something a route already serves.
-
-Name the route instead:
-
-```ts title="tools.ts"
-export const tools = k.tools({
-    users: {
-        find: k.tools.fromRoute(routes.users.getUser),
-        list: k.tools.fromRoute(routes.users.listUsers),
-    },
-});
-```
-
-Nothing is restated. The tool takes the route's path parameters, query and body as its arguments, answers with the route's own responses, describes itself from the route's summary, and runs the route's handler. Its `readOnlyHint` and `destructiveHint` come from what RFC 9110 says about the method, so a `GET` is marked safe and a `DELETE` destructive without you saying so.
-
-The key is yours, not the route's. `find` reads better to a model than `getUser`, and the route keeps its own name.
-
-### What it answers with
-
-A route has several success statuses where a tool has one result, so a route-derived tool answers with the envelope:
-
-```json
-{ "status": 200, "body": { "id": "1", "name": "Ada" } }
-```
-
-A `404` arrives the same way, with `status: 404`, which is what lets a model tell "no such user" apart from a failure it should retry. A route answering both `200` and `201` needs no union: the envelope carries either.
-
-### Who may call it
-
-The route's own `security` and `accessGate` decide, so authorization stays in [`k.auth`](/docs/authentication) and governs both surfaces from one declaration. A caller who does not carry the identity a route requires cannot reach it by going through a tool.
-
-### Routes that cannot be tools
-
-A route whose response [streams](/docs/streaming) has no single value to answer with, and one that reads a form body has nowhere to put JSON arguments. Naming either is a compile error where you named it:
-
-```ts
-k.tools.fromRoute(routes.assistant.reply);
-//                ~~~~~~~~~~~~~~~~~~~~~
-// This route streams, so it cannot be a tool.
-```
-
-### Saying it differently for a model
-
-A route's summary was written for a developer reading your docs. A model reads the description to decide whether to call the tool at all, so override it when the two want different words:
-
-```ts title="tools.ts"
-pause: k.tools.fromRoute(routes.meta.pauseAd, {
-    description: 'Pause a running ad. The spend stops within a minute.',
-}),
-```
-
-`title` and `annotations` take an override the same way.
-
 ## Put them on a stream
 
 Naming `tools` on a streamed response adds three events:
@@ -233,6 +176,62 @@ export const api = server.api({
 </Step>
 
 </Steps>
+
+## A route your model can call
+
+Most of what a model needs to do, your API already does. A route has an input schema, an output schema, a handler, and an identity it requires, which is everything a tool is. Restating one as a tool means two declarations to keep in step, and a stream route very often needs to look up something a route already serves.
+
+Name the route instead:
+
+```ts title="tools.ts"
+export const tools = k.tools({
+    users: {
+        find: k.tools.fromRoute(routes.users.getUser),
+        list: k.tools.fromRoute(routes.users.listUsers),
+    },
+});
+```
+
+Nothing is restated. The tool takes the route's path parameters, query and body as its arguments, answers with the route's own responses, describes itself from the route's summary, and runs the route's handler. Its `readOnlyHint` and `destructiveHint` come from what RFC 9110 says about the method, so a `GET` is marked safe and a `DELETE` destructive without you saying so.
+
+The key is yours, not the route's. `find` reads better to a model than `getUser`, and the route keeps its own name.
+
+### What it answers with
+
+A route has several success statuses where a tool has one result, so a route-derived tool answers with the envelope:
+
+```json
+{ "status": 200, "body": { "id": "1", "name": "Ada" } }
+```
+
+A `404` arrives the same way, with `status: 404`, which is what lets a model tell "no such user" apart from a failure it should retry. A route answering both `200` and `201` needs no union: the envelope carries either.
+
+### Who may call it
+
+The route's own `security` and `accessGate` decide, so authorization stays in [`k.auth`](/docs/authentication) and governs both surfaces from one declaration. A caller who does not carry the identity a route requires cannot reach it by going through a tool.
+
+### Routes that cannot be tools
+
+A route whose response [streams](/docs/streaming) has no single value to answer with, and one that reads a form body has nowhere to put JSON arguments. Naming either is a compile error where you named it:
+
+```ts
+k.tools.fromRoute(routes.assistant.reply);
+//                ~~~~~~~~~~~~~~~~~~~~~
+// This route streams, so it cannot be a tool.
+```
+
+### Saying it differently for a model
+
+A route's summary was written for a developer reading your docs. A model reads the description to decide whether to call the tool at all, so override it when the two want different words:
+
+```ts title="tools.ts"
+pause: k.tools.fromRoute(routes.meta.pauseAd, {
+    description: 'Pause a running ad. The spend stops within a minute.',
+}),
+```
+
+`title` and `annotations` take an override the same way.
+
 
 ## Driving the model
 
