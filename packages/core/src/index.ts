@@ -11,6 +11,7 @@ export {
     type GroupAuth,
     type AuthValue,
     type AccessConstraint,
+    type ToolAuthMap,
 } from './kizuna.js';
 export {
     type Contract,
@@ -20,6 +21,8 @@ export {
     type RequestContextOf,
     type ContractPluginsOf,
     type JobsOf,
+    type ToolsOf,
+    type ToolAuthOf,
 } from './contract.js';
 export {
     createPlugin,
