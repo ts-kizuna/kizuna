@@ -199,7 +199,7 @@ describe('readToolCalls', () => {
     });
 });
 
-describe('a tool carries no authorization of its own', () => {
+describe('tool authorization', () => {
     const routes = k.routes({
         users: {
             getUser: {
@@ -227,7 +227,61 @@ describe('a tool carries no authorization of its own', () => {
         },
     }));
 
-    it('gives a handler its input and throwError, and nothing else', () => {
+    const member = Kizuna.identity.apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            workspaceId: z.string(),
+        }),
+        access: z.object({
+            role: z.enum(['owner', 'admin']),
+        }),
+    });
+
+    type Schemes = {
+        member: typeof member;
+    };
+
+    const guarded = k.tools({
+        purgeCache: {
+            auth: {
+                member: {
+                    role: 'owner',
+                },
+            },
+            description: 'Drop every cached report',
+            output: z.object({
+                dropped: z.int(),
+            }),
+        },
+        countWords: {
+            description: 'Count the words in a piece of text',
+            input: z.object({
+                text: z.string(),
+            }),
+            output: z.object({
+                words: z.int(),
+            }),
+        },
+    });
+
+    it('gives a handler the caller its tool requires, narrowed by the gate', () => {
+        const handlers: ToolHandlers<typeof guarded, Schemes> = {
+            purgeCache: ({ auth }) => {
+                expectTypeOf(auth.member.workspaceId).toEqualTypeOf<string>();
+                expectTypeOf(auth.member.role).toEqualTypeOf<'owner'>();
+                return {
+                    dropped: 1,
+                };
+            },
+            countWords: ({ input }) => ({
+                words: input.text.split(' ').length,
+            }),
+        };
+        expectTypeOf(handlers).not.toBeNever();
+    });
+
+    it('gives a handler no auth when its tool needs nobody', () => {
         const handlers: ToolHandlers<typeof declared> = {
             countWords: (args) => {
                 expectTypeOf<keyof typeof args>().toEqualTypeOf<'input' | 'throwError'>();

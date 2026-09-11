@@ -121,37 +121,53 @@ export const toolHandlers = server.tools({
 
 <Step>
 
-## Take the caller, never ask for it
+## Say who may call it
 
-A tool that reads someone's data, or changes it, needs to know who is asking. It takes that from the route behind it.
+A tool that changes something, or reads someone's data, needs to know who is asking. Give it an [identity](/docs/authentication), narrowed by whatever the caller has to be:
 
-```ts title="auth.ts"
-export const auth = k.auth(routes, {
-    workspace: {
-        '*': 'member',
-        deleteWorkspace: {
+```ts title="tools.ts"
+export const tools = k.tools({
+    purgeCache: {
+        auth: {
             member: {
                 role: 'owner',
             },
+        },
+        description: 'Drop every cached report. There is no undo.',
+        output: z.object({
+            dropped: z.int(),
+        }),
+        annotations: {
+            destructiveHint: true,
         },
     },
 });
 ```
 
-```ts title="tools.ts"
-export const tools = k.tools(({ fromRoute }) => ({
-    workspace: {
-        members: fromRoute(workspaceRoutes.listMembers),
-        remove: fromRoute(workspaceRoutes.deleteWorkspace),
-    },
-}));
+```ts title="server/tools.ts"
+purgeCache: ({ auth }) => dropReportsFor(auth.member.workspaceId),
 ```
 
-`remove` requires a `member` whose `role` is `owner`, because its route does. A caller holding `admin` is refused, over MCP and in process alike. Nothing about that is written twice.
+`auth.member` is that identity's context, typed, with `role` narrowed to `'owner'`. A caller holding `admin` is refused before the handler runs, and so is a caller holding nothing.
 
-The workspace itself never becomes an `input` field. The model chooses `input`, so a selector declared there is a selector the model picks. It comes from the caller's identity instead, which the route handler already receives under `auth`.
+`auth` takes the same values a route's entry in the auth map takes: an identity name, several, or one narrowed by an access field.
 
-A tool you declare inline has no route, so it has no caller and no role. Keep those to computation. Anything that touches your data is a route, and `fromRoute` puts it in front of a model.
+The workspace is not an `input` field. The model chooses `input`, so a selector declared there is a selector the model picks.
+
+A tool naming a route with `fromRoute` says nothing about who may call it. The route already does.
+
+Outside a request nobody has been verified, so bind a caller yourself:
+
+```ts
+const asOwner = tools.as({
+    member: {
+        workspaceId: 'w_1',
+        role: 'owner',
+    },
+});
+
+await asOwner.purgeCache.run();
+```
 
 </Step>
 

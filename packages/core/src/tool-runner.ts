@@ -12,7 +12,7 @@ import {
 } from './tools.js';
 import { toToolName } from './tool-name.js';
 import type { ToolCall, ToolError, ToolKeys, ToolResult } from './tool-events.js';
-import type { RouteDefinition } from './types.js';
+import type { AccessGate, RouteDefinition, SecurityRequirement } from './types.js';
 
 /**
  * The arguments a tool takes when run in code: its input when it declares one,
@@ -71,9 +71,15 @@ export interface ResolvedTool {
     output: z.ZodType | undefined;
     annotations: ToolAnnotations | undefined;
     /**
-     * Always `undefined`. Authorization comes from the route a tool runs.
+     * The identity whose context the handler receives.
      */
     identity: string | undefined;
+    /**
+     * Who may call it, in the shape a route carries. A tool running a route has
+     * none of its own: the route's govern.
+     */
+    security: readonly SecurityRequirement[] | undefined;
+    accessGate: AccessGate | undefined;
     /**
      * The route this tool runs, when it was named with `k.tools.fromRoute`. Its
      * own `security` and `accessGate` say who may call the tool.
@@ -292,7 +298,7 @@ export class ToolIdentityError extends Error {
 
     constructor(tool: string, identity: string) {
         super(
-            `Tool "${tool}" runs a route that requires the "${identity}" identity, and nothing has been bound. ` +
+            `Tool "${tool}" requires the "${identity}" identity, and nothing has been bound. ` +
                 `Adapters bind the calling route's own identity; outside a request, bind one with \`tools.as({ ${identity}: ... })\`.`
         );
         this.name = 'ToolIdentityError';
@@ -394,6 +400,8 @@ export const resolveTools = (tools: FlattenedTool[]): ResolvedTool[] =>
         output: tool.output,
         annotations: tool.definition.annotations,
         identity: tool.identity,
+        security: tool.security,
+        accessGate: tool.accessGate,
         route: tool.route,
         routeTags: tool.routeTags,
     }));
@@ -427,13 +435,13 @@ const handlerAt = (handlers: unknown, toolKey: string): unknown => {
  * Every handler already receives this as `tools`, so reach for it directly only
  * outside a request: in a script, a seed, or a test.
  */
-export const createToolRunner = <Tools_ extends Tools>(
+export const createToolRunner = <Tools_ extends Tools, Identities = Record<string, never>>(
     source:
         | Tools_
         | {
               tools?: Tools_;
           },
-    handlers: ToolHandlers<Tools_>,
+    handlers: ToolHandlers<Tools_, Identities>,
     /**
      * Identity context already verified for this request, keyed by scheme. A
      * tool requiring an identity cannot run without the matching entry.
@@ -451,6 +459,38 @@ export const createToolRunner = <Tools_ extends Tools>(
         const tool = toolAt(tools, toolKey);
         if (!tool) throw new Error(`No tool named "${toolKey}" on this contract.`);
         return tool;
+    };
+
+    /**
+     * The `auth` a tool's handler receives. A tool declaring one refuses to run
+     * unbound: the alternative is a handler reading a selector out of the input
+     * a model chose.
+     */
+    const authFor = (toolKey: string, tool: CompiledTool): Record<string, unknown> | undefined => {
+        const requirements = tool.security ?? [];
+        if (requirements.length === 0) return undefined;
+
+        const context: Record<string, unknown> = {};
+        for (const entry of requirements) {
+            const schemes = typeof entry === 'string' ? [entry] : Object.keys(entry);
+            for (const scheme of schemes) {
+                const given = boundAuth?.[scheme];
+                if (given === undefined) throw new ToolIdentityError(toolKey, scheme);
+                for (const [field, allowed] of Object.entries(tool.accessGate?.[scheme] ?? {})) {
+                    const held = (given as Record<string, unknown>)[field];
+                    const permitted = Array.isArray(allowed)
+                        ? allowed.includes(held)
+                        : Array.isArray(held)
+                          ? held.includes(allowed)
+                          : held === allowed;
+                    if (!permitted) {
+                        throw new ToolExecutionError(toolKey, `You do not have access to this. Required: ${scheme}.${field}.`);
+                    }
+                }
+                context[scheme] = given;
+            }
+        }
+        return context;
     };
 
     const invoke = async (toolKey: string, input: unknown): Promise<unknown> => {
@@ -475,6 +515,8 @@ export const createToolRunner = <Tools_ extends Tools>(
         const handler = handlerAt(handlers, toolKey);
         if (typeof handler !== 'function') throw new Error(`No handler was bound for tool "${toolKey}".`);
 
+        const auth = authFor(toolKey, tool);
+
         let validatedInput: unknown = undefined;
         if (tool.input) {
             const parsed = tool.input.safeParse(input);
@@ -487,6 +529,11 @@ export const createToolRunner = <Tools_ extends Tools>(
             throwError: (message: string): never => {
                 throw new ToolExecutionError(toolKey, message);
             },
+            ...(auth === undefined
+                ? {}
+                : {
+                      auth,
+                  }),
         });
 
         if (!tool.output) return undefined;

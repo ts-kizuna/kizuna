@@ -56,7 +56,7 @@ export type ContractJobsRouter<C> = C extends Contract ? JobHandlers<JobsOf<C>> 
  * `input` and `throwError`, so the same handler runs however the tool is
  * reached.
  */
-export type ContractToolsRouter<C> = C extends Contract ? ToolHandlers<ToolsOf<C>> : never;
+export type ContractToolsRouter<C> = C extends Contract ? ToolHandlers<ToolsOf<C>, SchemesOf<C>> : never;
 
 /**
  * The handlers for a group named on the contract, or for a bare route group.

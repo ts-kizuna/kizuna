@@ -169,7 +169,12 @@ const describeTool = (published: ResolvedTool): string => {
         const described = requirements.map(({ scheme, scopes }) => describeRequirement(route, scheme, scopes)).join(', ');
         return `${published.description}\nRequires: ${described}`;
     }
-    return published.description;
+    const requirements = resolveSecurityRequirements({ security: published.security } as RouteDefinition);
+    if (requirements.length === 0) return published.description;
+    const described = requirements
+        .map(({ scheme, scopes }) => describeRequirement({ accessGate: published.accessGate } as RouteDefinition, scheme, scopes))
+        .join(', ');
+    return `${published.description}\nRequires: ${described}`;
 };
 
 /**
@@ -360,10 +365,9 @@ export const toolRequirements = (
             accessGate: definition.route.accessGate,
         };
     }
-    // A tool with no route behind it carries no authorization of its own.
     return {
-        requirements: [],
-        accessGate: undefined,
+        requirements: resolveSecurityRequirements({ security: definition.security } as RouteDefinition),
+        accessGate: definition.accessGate,
     };
 };
 

@@ -477,3 +477,131 @@ const securedRouter = {
         role: auth.member.role,
     }),
 };
+
+describe('a tool that changes things', () => {
+    const secured = new Kizuna({
+        identities: {
+            member: Kizuna.identity.apiKey({
+                name: 'x-workspace-token',
+                in: 'header',
+                context: z.object({
+                    workspaceId: z.string(),
+                }),
+                access: z.object({
+                    role: z.enum(['owner', 'admin']),
+                }),
+            }),
+        },
+    });
+
+    const guarded = secured.tools({
+        purgeCache: {
+            auth: {
+                member: {
+                    role: 'owner',
+                },
+            },
+            description: 'Drop every cached report. There is no undo.',
+            output: z.object({
+                dropped: z.int(),
+            }),
+            annotations: {
+                destructiveHint: true,
+            },
+        },
+        countWords: {
+            description: 'Count the words in a piece of text',
+            input: z.object({
+                text: z.string(),
+            }),
+            output: z.object({
+                words: z.int(),
+            }),
+        },
+    });
+
+    const guardedHandlers = {
+        purgeCache: () => ({
+            dropped: 12,
+        }),
+        countWords: ({ input }: { input: { text: string } }) => ({
+            words: input.text.split(' ').length,
+        }),
+    };
+
+    const bound = (auth?: Record<string, unknown>) => {
+        const base = createToolRunner({ tools: guarded }, guardedHandlers as never);
+        return auth === undefined ? base : base.as(auth);
+    };
+
+    it('refuses to run when nobody has been bound', async () => {
+        await expect(bound().purgeCache.run()).rejects.toBeInstanceOf(ToolIdentityError);
+    });
+
+    it('refuses a caller whose role the access gate does not permit', async () => {
+        const outcome = await bound({
+            member: {
+                workspaceId: 'w_1',
+                role: 'admin',
+            },
+        }).dispatch({
+            id: 'call_1',
+            name: 'purgeCache',
+        });
+
+        expect(outcome.ok).toBe(false);
+        expect(outcome.ok === false && outcome.message).toContain('member.role');
+    });
+
+    it('runs for a caller the gate permits', async () => {
+        await expect(
+            bound({
+                member: {
+                    workspaceId: 'w_1',
+                    role: 'owner',
+                },
+            }).purgeCache.run()
+        ).resolves.toEqual({
+            dropped: 12,
+        });
+    });
+
+    it('hands the verified caller to the handler under its own name', async () => {
+        const seen: unknown[] = [];
+        const runner = createToolRunner({ tools: guarded }, {
+            purgeCache: ({ auth }: { auth: unknown }) => {
+                seen.push(auth);
+                return {
+                    dropped: 0,
+                };
+            },
+            countWords: guardedHandlers.countWords,
+        } as never).as({
+            member: {
+                workspaceId: 'w_1',
+                role: 'owner',
+            },
+        });
+
+        await runner.purgeCache.run();
+
+        expect(seen).toEqual([
+            {
+                member: {
+                    workspaceId: 'w_1',
+                    role: 'owner',
+                },
+            },
+        ]);
+    });
+
+    it('leaves a tool that needs nobody runnable unbound', async () => {
+        await expect(
+            bound().countWords.run({
+                text: 'a b c',
+            })
+        ).resolves.toEqual({
+            words: 3,
+        });
+    });
+});

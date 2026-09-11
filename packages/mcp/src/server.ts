@@ -25,13 +25,7 @@ import { mcpPlugin } from './plugin.js';
 import { assertCanonicalResource, protectedResourceMetadataUrl, type McpOAuthProps } from './oauth.js';
 import { denialResponse, enforceOAuth } from './oauth-enforcement.js';
 
-export {
-    createMcpServer,
-    toolsOffered,
-    buildInstructions,
-    type McpServerOptions,
-    type ToolDefinition,
-} from './mcp-server.js';
+export { createMcpServer, toolsOffered, buildInstructions, type McpServerOptions, type ToolDefinition } from './mcp-server.js';
 
 type HandlerArgs = {
     body: unknown;
@@ -84,10 +78,7 @@ const prepareOAuth = (oauth: McpOAuthProps, endpointPath: `/${string}`, api: Api
         // challenged with no scopes at all, which is how a declared tool used to
         // slip past the scope check entirely.
         tools: new Map(
-            toolsOffered(contractOf<Contract | undefined>(api)?.tools, { onlyReadOnly }).map((definition) => [
-                definition.name,
-                definition,
-            ])
+            toolsOffered(contractOf<Contract | undefined>(api)?.tools, { onlyReadOnly }).map((definition) => [definition.name, definition])
         ),
     };
 };
