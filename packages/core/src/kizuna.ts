@@ -10,7 +10,6 @@ import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { jobClaims, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, type JobsArg, type JobsConfig } from './jobs.js';
 import {
-    applyToolAuth,
     attachRouteKeys,
     buildTools,
     fromRoute,
@@ -39,49 +38,6 @@ import type { PathParamsCheck } from './path-params.js';
  * `{ role: ['owner', 'admin'] }`.
  */
 export type AccessConstraint = Record<string, unknown>;
-
-/**
- * Where the tool half of an `auth` map rides. `k.contract` reads it off the map
- * it was handed, so authorization stays one call and one file.
- */
-export const TOOL_AUTH: unique symbol = Symbol('ts-kizuna.auth.tools');
-
-/**
- * The auth map for a contract's tools, keyed the way the tool tree is nested.
- * A route named with `k.tools.fromRoute` takes its route's authorization, so it
- * has no entry here.
- */
-export type ToolAuthMap<Id extends string = string, T extends Tools = Tools> = {
-    [Name in keyof T & string]?: T[Name] extends {
-        route: unknown;
-    }
-        ? never
-        : T[Name] extends CompiledToolNode
-          ? AuthValue<Id>
-          : T[Name] extends Tools
-            ? ToolAuthMap<Id, T[Name]>
-            : AuthValue<Id>;
-};
-
-type CompiledToolNode = {
-    definition: unknown;
-};
-
-/**
- * Rejects an entry for a tool that runs a route, because that route already
- * says who may call it.
- */
-export type ValidToolAuthMap<A, T> = {
-    [Name in keyof A]: Name extends keyof T
-        ? T[Name] extends {
-              route: unknown;
-          }
-            ? never
-            : T[Name] extends Tools
-              ? ValidToolAuthMap<A[Name], T[Name]>
-              : A[Name]
-        : never;
-};
 
 /**
  * The auth a route or group resolves to:
@@ -160,21 +116,13 @@ type ValidGroupAuth<Entry, Group, Id extends string> = Group extends RouteDefini
  * Apply one {@link AuthValue} to a single route, setting its `security` and,
  * when fields are constrained, its `accessGate`.
  */
-const resolveAuthValue = (
-    route: {
-        security?: readonly SecurityRequirement[];
-        accessGate?: AccessGate;
-        identity?: string;
-    },
-    value: AuthValue
-): void => {
+const resolveAuthValue = (route: RouteDefinition, value: AuthValue): void => {
     if (value === false) {
         route.security = [];
         return;
     }
     if (typeof value === 'string') {
         route.security = [value];
-        route.identity = value;
         return;
     }
     const requirement: Record<string, readonly string[]> = {};
@@ -191,9 +139,6 @@ const resolveAuthValue = (
         }
     }
     route.security = [requirement as SecurityRequirement];
-    // A tool reads one identity for its handler args; the first is the one whose
-    // context it receives.
-    route.identity = Object.keys(requirement)[0];
     if (Object.keys(gate).length > 0) route.accessGate = gate;
 };
 
@@ -304,17 +249,6 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         routes: R,
         map: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>
     ): A;
-    auth<
-        const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
-        const T extends Tools,
-        const A extends AuthMap<IdentityNamesOf<Spec>, R> & ToolAuthMap<IdentityNamesOf<Spec>, T>,
-    >(
-        routes: R,
-        tools: T,
-        map: A & ValidAuthMap<Omit<A, keyof T>, R, IdentityNamesOf<Spec>> & ValidToolAuthMap<Omit<A, keyof R>, T>
-    ): A & {
-        [TOOL_AUTH]: Omit<A, keyof R>;
-    };
     /**
      * Declare scheduled jobs. Pass the identity every job requires, the one
      * credential your scheduler sends, then the jobs themselves.
@@ -539,12 +473,6 @@ const createSurface = <
         assertValidDeprecationDates(contractRoutes);
         assertValidDeprecationDates(pluginRouteTree(plugins));
         if (contractTools) {
-            const toolAuth = (auth as Record<symbol, unknown> | undefined)?.[TOOL_AUTH];
-            if (toolAuth !== undefined) {
-                applyToolAuth(contractTools, toolAuth as Record<string, unknown>, (target, value) =>
-                    resolveAuthValue(target, value as AuthValue)
-                );
-            }
             attachRouteKeys(
                 contractTools,
                 new Map(flattenRoutes(contractRoutes).map(({ route, routeKey, routeTags }) => [route, { routeKey, routeTags }]))
@@ -587,23 +515,7 @@ const createSurface = <
         routes,
         jobs,
         tools,
-        auth: (routeTree: object, toolsOrMap: object, maybeMap?: Record<string, unknown>) => {
-            if (maybeMap === undefined) return toolsOrMap;
-
-            // One map covers both trees. A key is a route group when the route
-            // tree has it, and a tool otherwise. The tool half rides under a
-            // symbol so `k.contract` finds it without a second parameter.
-            const routeAuth: Record<string, unknown> = {};
-            const toolAuth: Record<string, unknown> = {};
-            for (const [key, value] of Object.entries(maybeMap)) {
-                if (key in routeTree) routeAuth[key] = value;
-                else if (key in toolsOrMap) toolAuth[key] = value;
-                else throw new Error(`Auth map key '${key}' does not match a route group or a tool on the contract.`);
-            }
-            return Object.assign(routeAuth, {
-                [TOOL_AUTH]: toolAuth,
-            });
-        },
+        auth: (_routes, map) => map,
         contract: contract as K<Spec>['contract'],
         issue: addCodedIssue,
     };

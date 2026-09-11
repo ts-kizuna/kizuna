@@ -12,7 +12,7 @@ import {
 } from './tools.js';
 import { toToolName } from './tool-name.js';
 import type { ToolCall, ToolError, ToolKeys, ToolResult } from './tool-events.js';
-import type { AccessGate, RouteDefinition, SecurityRequirement } from './types.js';
+import type { RouteDefinition } from './types.js';
 
 /**
  * The arguments a tool takes when run in code: its input when it declares one,
@@ -71,15 +71,9 @@ export interface PublishedTool {
     output: z.ZodType | undefined;
     annotations: ToolAnnotations | undefined;
     /**
-     * The identity the tool's handler receives, or `undefined` when it needs
-     * none.
+     * Always `undefined`. Authorization comes from the route a tool runs.
      */
     identity: string | undefined;
-    /**
-     * What the auth map resolved to, in the same shape a route carries.
-     */
-    security: readonly SecurityRequirement[] | undefined;
-    accessGate: AccessGate | undefined;
     /**
      * The route this tool runs, when it was named with `k.tools.fromRoute`. Its
      * own `security` and `accessGate` say who may call the tool.
@@ -288,8 +282,9 @@ export class ToolOutputError extends Error {
 }
 
 /**
- * A tool requiring an identity was run without one. A tool never authenticates,
- * so an unbound call is a mistake in the caller rather than a denial.
+ * A tool ran the route behind it without the identity that route requires. A
+ * tool never authenticates: it carries the caller it was given, so an unbound
+ * call is a mistake in the caller rather than a denial.
  */
 export class ToolIdentityError extends Error {
     readonly tool: string;
@@ -297,7 +292,7 @@ export class ToolIdentityError extends Error {
 
     constructor(tool: string, identity: string) {
         super(
-            `Tool "${tool}" requires the "${identity}" identity, and nothing has been bound. ` +
+            `Tool "${tool}" runs a route that requires the "${identity}" identity, and nothing has been bound. ` +
                 `Adapters bind the calling route's own identity; outside a request, bind one with \`tools.as({ ${identity}: ... })\`.`
         );
         this.name = 'ToolIdentityError';
@@ -399,8 +394,6 @@ export const publishedTools = (tools: FlattenedTool[]): PublishedTool[] =>
         output: tool.output,
         annotations: tool.definition.annotations,
         identity: tool.identity,
-        security: tool.security,
-        accessGate: tool.accessGate,
         route: tool.route,
         routeTags: tool.routeTags,
     }));
@@ -440,7 +433,7 @@ export const createToolRunner = <Tools_ extends Tools>(
         | {
               tools?: Tools_;
           },
-    handlers: ToolHandlers<Tools_, never>,
+    handlers: ToolHandlers<Tools_>,
     /**
      * Identity context already verified for this request, keyed by scheme. A
      * tool requiring an identity cannot run without the matching entry.
@@ -458,22 +451,6 @@ export const createToolRunner = <Tools_ extends Tools>(
         const tool = toolAt(tools, toolKey);
         if (!tool) throw new Error(`No tool named "${toolKey}" on this contract.`);
         return tool;
-    };
-
-    /**
-     * The `auth` a tool's handler receives. A tool that requires an identity
-     * refuses to run unbound, because the alternative is a handler reading a
-     * selector out of input the model chose.
-     */
-    const authFor = (toolKey: string, identity: string | undefined): Record<string, unknown> | undefined => {
-        if (identity === undefined) return undefined;
-        const context = boundAuth?.[identity];
-        if (context === undefined) {
-            throw new ToolIdentityError(toolKey, identity);
-        }
-        return {
-            [identity]: context,
-        };
     };
 
     const invoke = async (toolKey: string, input: unknown): Promise<unknown> => {
@@ -498,8 +475,6 @@ export const createToolRunner = <Tools_ extends Tools>(
         const handler = handlerAt(handlers, toolKey);
         if (typeof handler !== 'function') throw new Error(`No handler was bound for tool "${toolKey}".`);
 
-        const auth = authFor(toolKey, tool.identity);
-
         let validatedInput: unknown = undefined;
         if (tool.input) {
             const parsed = tool.input.safeParse(input);
@@ -512,11 +487,6 @@ export const createToolRunner = <Tools_ extends Tools>(
             throwError: (message: string): never => {
                 throw new ToolExecutionError(toolKey, message);
             },
-            ...(auth === undefined
-                ? {}
-                : {
-                      auth,
-                  }),
         });
 
         if (!tool.output) return undefined;

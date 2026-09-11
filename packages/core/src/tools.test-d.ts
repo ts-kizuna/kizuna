@@ -199,63 +199,48 @@ describe('readToolCalls', () => {
     });
 });
 
-describe('tool identity', () => {
-    const member = Kizuna.identity.apiKey({
-        name: 'x-workspace-token',
-        in: 'header',
-        context: z.object({
-            workspaceId: z.string(),
-        }),
-        access: z.object({
-            role: z.enum(['owner', 'admin']),
-        }),
-    });
-
-    const secured = new Kizuna({
-        identities: {
-            member,
+describe('a tool carries no authorization of its own', () => {
+    const routes = k.routes({
+        users: {
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            },
         },
     });
 
-    type Schemes = {
-        member: typeof member;
-    };
-
-    const securedTools = secured.tools({
-        listMembers: {
-            description: 'List the members of the current workspace',
+    const declared = k.tools(({ fromRoute }) => ({
+        find: fromRoute(routes.users.getUser),
+        countWords: {
+            description: 'Count the words in a piece of text',
+            input: z.object({
+                text: z.string(),
+            }),
             output: z.object({
-                count: z.int(),
+                words: z.int(),
             }),
         },
-    });
+    }));
 
-    const openTools = secured.tools({
-        ping: {
-            description: 'Answer that the server is up',
-        },
-    });
-
-    it('gives a handler the identity its tool requires, keyed by name', () => {
-        const handlers: ToolHandlers<typeof securedTools, Schemes, { listMembers: 'member' }> = {
-            listMembers: ({ auth }) => {
-                expectTypeOf(auth.member.workspaceId).toEqualTypeOf<string>();
-                expectTypeOf(auth.member.role).toEqualTypeOf<'owner' | 'admin'>();
+    it('gives a handler its input and throwError, and nothing else', () => {
+        const handlers: ToolHandlers<typeof declared> = {
+            countWords: (args) => {
+                expectTypeOf<keyof typeof args>().toEqualTypeOf<'input' | 'throwError'>();
                 return {
-                    count: 1,
+                    words: args.input.text.split(' ').length,
                 };
             },
         };
         expectTypeOf(handlers).not.toBeNever();
     });
 
-    it('gives a handler no auth when its tool requires no identity', () => {
-        const handlers: ToolHandlers<typeof openTools, Schemes, { ping: false }> = {
-            ping: (args) => {
-                expectTypeOf<keyof typeof args>().toEqualTypeOf<'input' | 'throwError'>();
-            },
-        };
-        expectTypeOf(handlers).not.toBeNever();
+    it('asks for no handler for a tool that runs a route', () => {
+        expectTypeOf<keyof ToolHandlers<typeof declared>>().toEqualTypeOf<'countWords'>();
     });
 });
 

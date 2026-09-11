@@ -1,6 +1,5 @@
 import type { z } from 'zod';
 import type { Contract, RoutesOf, SchemesOf, AuthOf, RequestContextOf, ContractPluginsOf, JobsOf, ToolsOf } from './contract.js';
-import type { TOOL_AUTH } from './kizuna.js';
 import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { CredentialOf } from './identity.js';
@@ -57,13 +56,7 @@ export type ContractJobsRouter<C> = C extends Contract ? JobHandlers<JobsOf<C>> 
  * `input` and `throwError`, so the same handler runs however the tool is
  * reached.
  */
-export type ContractToolsRouter<C> = C extends Contract ? ToolHandlers<ToolsOf<C>, SchemesOf<C>, ToolAuthOf<C>> : never;
-
-/**
- * The tool half of a contract's auth map, which `k.auth` stows under a symbol
- * so one call covers both trees.
- */
-export type ToolAuthOf<C extends Contract> = AuthOf<C> extends Record<typeof TOOL_AUTH, infer Map> ? Map : Record<string, never>;
+export type ContractToolsRouter<C> = C extends Contract ? ToolHandlers<ToolsOf<C>> : never;
 
 /**
  * The handlers for a group named on the contract, or for a bare route group.

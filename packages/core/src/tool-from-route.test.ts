@@ -279,31 +279,4 @@ describe('the builder form', () => {
         expect(viaBuilder.users.find.route).toBe(routes.users.getUser);
     });
 
-    it('takes a declared tool identity from the auth map', () => {
-        const declared = k.tools(({ fromRoute }) => ({
-            countWords: {
-                description: 'Count the words in a piece of text',
-                input: z.object({
-                    text: z.string(),
-                }),
-            },
-            find: fromRoute(routes.users.getUser),
-        }));
-
-        const built = k.contract({
-            routes,
-            tools: declared,
-            auth: k.auth(routes, declared,
-                {
-                    users: false,
-                    countWords: 'member',
-                }
-            ),
-        });
-
-        const compiled = built.tools as unknown as typeof declared;
-        expect(compiled.countWords.identity).toBe('member');
-        // A route carries its own authorization, so nothing is written onto it here.
-        expect(compiled.find.identity).toBeUndefined();
-    });
 });

@@ -121,7 +121,6 @@ export {
     type ToolHandlers,
     type ToolHandlerArgs,
     type ToolHandlerReturn,
-    type ToolAuthArg,
     type RouteToolMarker,
     type RouteToolOverrides,
     type RouteToolDefinition,
