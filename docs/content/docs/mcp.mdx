@@ -65,9 +65,7 @@ The endpoint answers at `/mcp` by default. On Next.js it is served by the catch-
 
 ## Choosing which routes become tools
 
-Every tool's name, description, and input schema sits in the model's context on every turn, called or not, and the more tools there are the more often the model picks the wrong one. Selection accuracy falls away somewhere past thirty, and some clients refuse more than forty outright. So the list is short on purpose.
-
-Name the routes you want in the contract's tool tree with [`k.tools.fromRoute`](/docs/tools):
+Name the routes a model may call with [`fromRoute`](/docs/tools):
 
 ```ts title="tools.ts"
 export const tools = k.tools(({ fromRoute }) => ({
@@ -78,9 +76,9 @@ export const tools = k.tools(({ fromRoute }) => ({
 }));
 ```
 
-There is no map of what to exclude, because a route that is not written here is not a tool. Everything about the tool comes from the route: its arguments, its result, its description, its annotations, and the identity it requires.
+A route is a tool when it is written here. Everything about it comes from the route: its arguments, its result, its description, its annotations, and the identity it requires.
 
-Give the model different words when the route's summary was written for a developer reading your docs:
+Give the model its own words when the route's summary is written for a developer reading your docs:
 
 ```ts title="tools.ts"
 pause: fromRoute(routes.meta.pauseAd, {
@@ -97,11 +95,13 @@ mcp: mcpPlugin({
 }),
 ```
 
-A route reads its safety from its method, per RFC 9110, so a `GET` declares `readOnlyHint` without you saying so and a `DELETE` declares `destructiveHint`.
+A route reads its safety from its method, per RFC 9110, so a `GET` declares `readOnlyHint` and a `DELETE` declares `destructiveHint`.
 
-Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` cannot be tools, because MCP tool input is JSON. Routes whose response [streams](/docs/streaming) cannot either, because a tool result is one value. Naming one is a compile error where you named it, rather than a tool that quietly never appears.
+Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` cannot be tools, because MCP tool input is JSON. Routes whose response [streams](/docs/streaming) cannot either, because a tool result is one value. Naming one is a compile error where you named it.
 
-### What to cut first
+### What to leave out
+
+Every tool costs the model context on every turn, whether it calls it or not, and it chooses less well from a long list. Some clients take no more than forty.
 
 - **Ones an assistant cannot use.** File uploads, CSV exports, anything returning bytes.
 - **Ones that exist for your own infrastructure.** Health checks, readiness probes, webhook receivers.
@@ -109,9 +109,7 @@ Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-u
 
 ## Tools with no route behind them
 
-Not everything a model calls has to be an endpoint. A tool declared with [`k.tools`](/docs/tools) has a name, a description, an input schema, an output schema and a handler, which is what an MCP tool is, and it never has to pretend to be a route first.
-
-Both kinds sit in the same tree and publish the same way:
+A tool declared with [`k.tools`](/docs/tools) has a name, a description, an input schema, an output schema and a handler, which is what an MCP tool is. Both kinds sit in the same tree and publish the same way:
 
 ```ts title="tools.ts"
 export const tools = k.tools(({ fromRoute }) => ({
@@ -156,7 +154,7 @@ export const tools = k.tools('user', {
 | **Output**      | The success response's schema, so an assistant knows the shape before it calls      |
 | **Annotations** | The method's HTTP semantics, per [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) |
 
-The [specification](https://modelcontextprotocol.io/specification/latest/server/tools) allows the dot, but Claude Code and VS Code rewrite it before the name reaches the model, so publishing the rewritten form is what keeps your docs and the model's tool name the same. Names are capped at 56 characters. The specification allows 128, but Cursor rejects anything over 60, and a client aggregating several servers prefixes every name with the server's, so a longer name reaches the model truncated. A key over the budget throws at startup, as do two keys that converge on one name.
+The [specification](https://modelcontextprotocol.io/specification/latest/server/tools) allows the dot, but Claude Code and VS Code rewrite it before the name reaches the model, so publishing the rewritten form is what keeps your docs and the model's tool name the same. Names are capped at 56 characters, which leaves room for the prefix a client adds when it aggregates several servers. Cursor rejects anything longer than 60. A key over the budget throws at startup, as do two keys that converge on one name.
 
 The annotations tell a client how careful to be with a tool before calling it:
 

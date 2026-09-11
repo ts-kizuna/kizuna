@@ -179,9 +179,7 @@ export const api = server.api({
 
 ## A route your model can call
 
-Most of what a model needs to do, your API already does. A route has an input schema, an output schema, a handler, and an identity it requires, which is everything a tool is. Restating one as a tool means two declarations to keep in step, and a stream route very often needs to look up something a route already serves.
-
-Name the route instead:
+A route already has an input schema, an output schema, a handler, and an identity it requires, which is everything a tool is. Name it:
 
 ```ts title="tools.ts"
 export const tools = k.tools(({ fromRoute }) => ({
@@ -192,25 +190,23 @@ export const tools = k.tools(({ fromRoute }) => ({
 }));
 ```
 
-`k.tools` hands the builder a `fromRoute`, so a tree that is already inside `k.tools` does not repeat it on every line. `k.tools.fromRoute` is the same function, for when you want it once.
+`k.tools` hands the builder a `fromRoute`. `k.tools.fromRoute` is the same function, for when you want it once.
 
-Nothing is restated. The tool takes the route's path parameters, query and body as its arguments, answers with the route's own responses, describes itself from the route's summary, and runs the route's handler. Its `readOnlyHint` and `destructiveHint` come from what RFC 9110 says about the method, so a `GET` is marked safe and a `DELETE` destructive without you saying so.
+The tool takes the route's path parameters, query and body as its arguments, answers with the route's own responses, describes itself from the route's summary, and runs the route's handler. Its `readOnlyHint` and `destructiveHint` come from what RFC 9110 says about the method, so a `GET` is marked safe and a `DELETE` destructive.
 
-The key is yours, not the route's. `find` reads better to a model than `getUser`, and the route keeps its own name.
+The key is yours. `find` reads better to a model than `getUser`, and the route keeps its own name.
 
 ### What it answers with
-
-A route has several success statuses where a tool has one result, so a route-derived tool answers with the envelope:
 
 ```json
 { "status": 200, "body": { "id": "1", "name": "Ada" } }
 ```
 
-A `404` arrives the same way, with `status: 404`, which is what lets a model tell "no such user" apart from a failure it should retry. A route answering both `200` and `201` needs no union: the envelope carries either.
+A `404` arrives the same way, with `status: 404`, which is what lets a model tell "no such user" apart from a failure worth retrying. The envelope carries every success status a route declares, so one answering both `200` and `201` still has one result type.
 
 ### Who may call it
 
-The route's own `security` and `accessGate` decide, so authorization stays in [`k.auth`](/docs/authentication) and governs both surfaces from one declaration. A caller who does not carry the identity a route requires cannot reach it by going through a tool.
+The route's own `security` and `accessGate` decide, so authorization stays in [`k.auth`](/docs/authentication) and governs both surfaces from one declaration. A caller has to carry the identity the route requires.
 
 ### Routes that cannot be tools
 
@@ -224,7 +220,7 @@ fromRoute(routes.assistant.reply);
 
 ### Saying it differently for a model
 
-A route's summary was written for a developer reading your docs. A model reads the description to decide whether to call the tool at all, so override it when the two want different words:
+A route's summary is written for a developer reading your docs. A model reads the description to decide whether to call the tool at all, so give it its own words when the two differ:
 
 ```ts title="tools.ts"
 pause: fromRoute(routes.meta.pauseAd, {
@@ -553,7 +549,7 @@ export const contract = k.contract({
 });
 ```
 
-Every tool in the tree is published, both the ones you declared and the routes you named with `k.tools.fromRoute`. There is nothing to configure: a route reaches a model by being written in the tree, so not publishing one is not writing the line.
+Every tool in the tree is published, both the ones you declared and the routes you named with `fromRoute`.
 
 A published tool answers with its own output, where a route published as a tool answers with the `{ status, body }` envelope its HTTP shape implies. Give the group an identity and its guard runs on every call, and the context it resolves reaches the handler under `auth`:
 

@@ -42,13 +42,13 @@ mcpPluginServer(): PluginImplementation
 | `onlyReadOnly` | `false`              | Publish only the tools that cannot change data                                |
 | `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([guide](/docs/mcp#oauth)) |
 
-Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` cannot be tools, because tool input is JSON. Neither can a route whose response streams, since a tool result is one value. Naming one with `k.tools.fromRoute` is a compile error where you named it.
+Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` cannot be tools, because tool input is JSON. Neither can a route whose response streams, since a tool result is one value. Naming one with `fromRoute` is a compile error where you named it.
 
 Props are pure data. `mcpPluginServer()` takes nothing: declaring the plugin is where it is configured.
 
 ## Which tools are published
 
-Everything in the contract's tool tree, and nothing else. A route reaches a model by being named there with `k.tools.fromRoute`, so there is no map of exclusions to keep in step with the routes:
+Everything in the contract's tool tree. A route is published when it is named there with `fromRoute`:
 
 ```ts title="tools.ts"
 export const tools = k.tools(({ fromRoute }) => ({
@@ -68,7 +68,7 @@ export const tools = k.tools(({ fromRoute }) => ({
 });
 ```
 
-`onlyReadOnly` narrows that to the tools whose annotations declare `readOnlyHint`. A route-derived tool gets that from its method, per RFC 9110, so every `GET` qualifies and no `POST` does.
+`onlyReadOnly` narrows that to the tools whose annotations declare `readOnlyHint`. A route-derived tool reads that from its method, per RFC 9110, so every `GET` qualifies and no `POST` does.
 
 ## Example
 
