@@ -163,23 +163,35 @@ reply: ({ body, tools }) => ({
             }
 
             if (event.type === 'content_block_stop' && event.content_block.type === 'tool_use') {
-                const call = {
+                yield* tools.emit({
                     id: event.content_block.id,
-                    name: tools.keyOf(event.content_block.name),
+                    name: event.content_block.name,
                     input: event.content_block.input,
-                };
-
-                yield { event: 'tool_call', data: call };
-                yield { event: 'tool_result', data: await tools.call(call) };
+                });
             }
         }
     },
 }),
 ```
 
-- `tools.definitions` is every tool in MCP's shape, `inputSchema` as JSON Schema.
-- `tools.keyOf` turns `weather_get_forecast` into the dotted key.
-- `tools.call` validates the input, runs the handler, validates the output, and answers the `tool_result` payload.
+- `tools.definitions` is every tool in MCP's shape, `inputSchema` as JSON Schema. It is typed as a JSON Schema object, so it goes straight into a provider's tool list without a cast.
+- `tools.emit` runs a call and yields `tool_call`, then either `tool_result` or `tool_error`, in the order the stream wants them. It takes the name the model chose, either spelling, and never throws.
+
+When you want the outcome rather than the events, `tools.dispatch` answers it directly:
+
+```ts
+const outcome = await tools.dispatch({
+    id: event.content_block.id,
+    name: event.content_block.name,
+    input: event.content_block.input,
+});
+
+if (outcome.ok && outcome.name === 'weather.getForecast') {
+    console.log(outcome.output.temperature);
+}
+```
+
+An unknown name, input that fails its schema, and a `throwError` from a handler all come back as `{ ok: false }` with a `message` written for the model to read and correct. `tools.keyOf` turns a published name like `weather_get_forecast` into the dotted key when you need it on its own, and `tools.call` is the typed form for a call you already know is valid.
 
 Reach one directly from a script or a test:
 
@@ -255,6 +267,12 @@ export function ToolCallView({ call }: { call: Call }) {
 final class ChatModel {
     var messages: [AssistantReply.Event] = []
 
+    var text: String {
+        messages.reduce(into: "") { reply, event in
+            if case .delta(let delta) = event { reply += delta.text }
+        }
+    }
+
     func send(_ prompt: String) async throws {
         messages = []
         let result = try await client.assistantReply(body: .init(prompt: prompt))
@@ -277,7 +295,7 @@ struct ChatView: View {
             ForEach(APIClient.AssistantReply.readToolCalls(model.messages)) { call in
                 ToolCallView(call: call)
             }
-            Text(model.messages.text)
+            Text(model.text)
         }
     }
 }
@@ -285,13 +303,15 @@ struct ChatView: View {
 
 ```swift title="ToolCallView.swift"
 struct ToolCallView: View {
-    let call: ToolCallRecord
+    let call: APIClient.AssistantReply.ToolCallRecord
 
     var body: some View {
-        switch call.name {
-        case "charts.plotSignups":
-            SignupChart(points: call.points)
-        default:
+        switch call.result {
+        case .charts_plotSignups(let payload):
+            SignupChart(points: payload.output.points)
+        case .weather_getForecast(let payload):
+            ForecastCard(summary: payload.output.summary)
+        case .countWords, .none:
             ToolPill(name: call.name, state: call.state)
         }
     }
@@ -306,6 +326,10 @@ struct ToolCallView: View {
 class ChatViewModel(private val client: APIClient) : ViewModel() {
     private val _messages = MutableStateFlow(emptyList<Event>())
     val messages: StateFlow<List<Event>> = _messages.asStateFlow()
+
+    val text: StateFlow<String> = _messages
+        .map { events -> events.filterIsInstance<Event.Delta>().joinToString("") { it.data.text } }
+        .stateIn(viewModelScope, SharingStarted.Lazily, "")
 
     fun send(prompt: String) = viewModelScope.launch {
         _messages.value = emptyList()
@@ -322,19 +346,21 @@ import com.kizuna.demo.APIClient
 @Composable
 fun ChatScreen(model: ChatViewModel = viewModel()) {
     val messages by model.messages.collectAsStateWithLifecycle()
+    val text by model.text.collectAsStateWithLifecycle()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         APIClient.AssistantReply.readToolCalls(messages).forEach { call -> ToolCallView(call) }
-        Text(messages.text())
+        Text(text)
     }
 }
 ```
 
 ```kotlin title="ToolCallView.kt"
 @Composable
-fun ToolCallView(call: ToolCallRecord) {
-    when (call.name) {
-        "charts.plotSignups" -> SignupChart(call.points)
+fun ToolCallView(call: APIClient.AssistantReply.ToolCallRecord) {
+    when (val result = call.result) {
+        is ToolResult.Charts_plotSignups -> SignupChart(result.value.output.points)
+        is ToolResult.Weather_getForecast -> ForecastCard(result.value.output.summary)
         else -> ToolPill(call.name, call.state)
     }
 }

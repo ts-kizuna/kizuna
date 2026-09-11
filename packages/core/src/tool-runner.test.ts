@@ -196,3 +196,212 @@ describe('publishTools', () => {
         ]);
     });
 });
+
+describe('dispatch', () => {
+    it('runs a call the model named by its published name', async () => {
+        await expect(
+            runner().dispatch({
+                id: 'call_1',
+                name: 'weather_get_forecast',
+                input: {
+                    city: 'Oslo',
+                },
+            })
+        ).resolves.toEqual({
+            ok: true,
+            id: 'call_1',
+            name: 'weather.getForecast',
+            output: {
+                tempC: 14,
+            },
+        });
+    });
+
+    it('runs a call the model named by its dotted key', async () => {
+        await expect(
+            runner().dispatch({
+                id: 'call_1',
+                name: 'weather.getForecast',
+                input: {
+                    city: 'Bergen',
+                },
+            })
+        ).resolves.toEqual({
+            ok: true,
+            id: 'call_1',
+            name: 'weather.getForecast',
+            output: {
+                tempC: 20,
+            },
+        });
+    });
+
+    it('answers an unknown name without throwing, and lists what there is', async () => {
+        const outcome = await runner().dispatch({
+            id: 'call_1',
+            name: 'weather_get_forecastt',
+        });
+
+        expect(outcome.ok).toBe(false);
+        expect(outcome).toMatchObject({
+            id: 'call_1',
+            name: 'weather_get_forecastt',
+        });
+        expect(outcome.ok === false && outcome.message).toContain('weather_get_forecast');
+    });
+
+    it('names the fields a model got wrong, so it can correct them', async () => {
+        const outcome = await runner().dispatch({
+            id: 'call_1',
+            name: 'weather.getForecast',
+            input: {
+                city: 42,
+            },
+        });
+
+        expect(outcome.ok).toBe(false);
+        expect(outcome.ok === false && outcome.message).toContain('city:');
+    });
+
+    it('passes a handler failure through as the sentence the model reads', async () => {
+        const failing = createToolRunner({ tools }, {
+            weather: {
+                getForecast: ({ throwError }) => throwError('Name a city to look the forecast up for.'),
+            },
+            ping: () => undefined,
+        } as Handlers);
+
+        const outcome = await failing.dispatch({
+            id: 'call_1',
+            name: 'weather.getForecast',
+            input: {
+                city: 'Oslo',
+            },
+        });
+
+        expect(outcome).toEqual({
+            ok: false,
+            id: 'call_1',
+            name: 'weather.getForecast',
+            message: 'Name a city to look the forecast up for.',
+        });
+    });
+
+    it('generates an id when the caller has none', async () => {
+        const outcome = await runner().dispatch({
+            name: 'ping',
+        });
+
+        expect(outcome.ok).toBe(true);
+        expect(typeof outcome.id).toBe('string');
+        expect(outcome.id.length).toBeGreaterThan(0);
+    });
+});
+
+describe('emit', () => {
+    const collect = async (messages: AsyncIterable<unknown>): Promise<unknown[]> => {
+        const seen: unknown[] = [];
+        for await (const message of messages) seen.push(message);
+        return seen;
+    };
+
+    it('yields the call, then the result', async () => {
+        await expect(
+            collect(
+                runner().emit({
+                    id: 'call_1',
+                    name: 'weather.getForecast',
+                    input: {
+                        city: 'Oslo',
+                    },
+                })
+            )
+        ).resolves.toEqual([
+            {
+                event: 'tool_call',
+                data: {
+                    id: 'call_1',
+                    name: 'weather.getForecast',
+                    input: {
+                        city: 'Oslo',
+                    },
+                },
+            },
+            {
+                event: 'tool_result',
+                data: {
+                    id: 'call_1',
+                    name: 'weather.getForecast',
+                    output: {
+                        tempC: 14,
+                    },
+                },
+            },
+        ]);
+    });
+
+    it('yields the call, then the error, and never throws', async () => {
+        await expect(
+            collect(
+                runner().emit({
+                    id: 'call_1',
+                    name: 'nope',
+                })
+            )
+        ).resolves.toMatchObject([
+            {
+                event: 'tool_call',
+                data: {
+                    id: 'call_1',
+                    name: 'nope',
+                },
+            },
+            {
+                event: 'tool_error',
+                data: {
+                    id: 'call_1',
+                    name: 'nope',
+                },
+            },
+        ]);
+    });
+
+    it('omits output for a tool that reports nothing', async () => {
+        await expect(
+            collect(
+                runner().emit({
+                    id: 'call_1',
+                    name: 'ping',
+                })
+            )
+        ).resolves.toEqual([
+            {
+                event: 'tool_call',
+                data: {
+                    id: 'call_1',
+                    name: 'ping',
+                },
+            },
+            {
+                event: 'tool_result',
+                data: {
+                    id: 'call_1',
+                    name: 'ping',
+                },
+            },
+        ]);
+    });
+});
+
+describe('publishTools', () => {
+    it('refuses an input schema that does not describe an object', () => {
+        const bad = k.tools({
+            shout: {
+                description: 'Shout a word back',
+                input: z.string(),
+            },
+        });
+
+        expect(() => publishTools(bad)).toThrow(/not an object/);
+    });
+});

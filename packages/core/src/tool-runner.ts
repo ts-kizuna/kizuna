@@ -11,7 +11,7 @@ import {
     type Tools,
 } from './tools.js';
 import { toToolName } from './tool-name.js';
-import type { ToolCall, ToolKeys, ToolResult } from './tool-events.js';
+import type { ToolCall, ToolError, ToolKeys, ToolResult } from './tool-events.js';
 
 /**
  * The arguments a tool takes when run in code: its input when it declares one,
@@ -76,6 +76,19 @@ export interface PublishedTool {
 }
 
 /**
+ * A JSON Schema describing an object, the shape MCP requires of a tool's
+ * `inputSchema`. Spelled out rather than left as a bare record so a provider
+ * SDK's own tool type accepts it without a cast.
+ */
+export interface JsonSchemaObject {
+    type: 'object';
+    properties?: Record<string, unknown>;
+    required?: string[];
+    additionalProperties?: boolean;
+    [key: string]: unknown;
+}
+
+/**
  * One tool in MCP's `Tool` shape, with its schemas as JSON Schema. What a model
  * is given.
  */
@@ -83,7 +96,11 @@ export interface ModelFacingTool {
     name: string;
     title?: string;
     description: string;
-    inputSchema: Record<string, unknown>;
+    inputSchema: JsonSchemaObject;
+    /**
+     * Any JSON Schema. A result is not required to be an object, so this is
+     * wider than {@link ModelFacingTool.inputSchema}.
+     */
     outputSchema?: Record<string, unknown>;
     annotations?: ToolAnnotations;
 }
@@ -98,10 +115,41 @@ export type ToolRunner<Tools_ extends Tools> = ToolTree<Tools_> & {
     /**
      * Run the tool one `tool_call` payload names and resolve to the matching
      * `tool_result` payload, ready to yield straight back onto the stream.
+     *
+     * Takes the input side of each tool's schema, so a field with a `.default()`
+     * may be left out, exactly as `run` and the `tool_call` event accept it.
      */
-    call: <const Call extends ToolCall<Tools_, 'output'>>(
+    call: <const Call extends ToolCall<Tools_, 'input'>>(
         call: Call
     ) => Promise<Extract<ToolResult<Tools_, 'output'>, { name: Call['name'] }>>;
+    /**
+     * Run a call whose name and input are not known to be valid, the shape a
+     * model hands you. Nothing throws: an unknown name, input that fails its
+     * schema, and a `throwError` from the handler all come back as
+     * `{ ok: false }` carrying the sentence to show the model.
+     *
+     * `name` takes either the dotted key or the published MCP name.
+     *
+     * @example
+     * const outcome = await tools.dispatch({
+     *     id: block.id,
+     *     name: block.name,
+     *     input: block.input,
+     * });
+     */
+    dispatch: (call: UntrustedToolCall) => Promise<ToolDispatchOutcome<Tools_>>;
+    /**
+     * Run a call and yield the `tool_call` event, then either `tool_result` or
+     * `tool_error`, in the order a stream wants them. Nothing throws.
+     *
+     * @example
+     * yield* tools.emit({
+     *     id: block.id,
+     *     name: block.name,
+     *     input: block.input,
+     * });
+     */
+    emit: (call: UntrustedToolCall) => AsyncGenerator<ToolEventMessage<Tools_>, void, undefined>;
     /**
      * Every tool in MCP's `Tool` shape, with `inputSchema` as JSON Schema. This
      * is what a model is given.
@@ -113,6 +161,61 @@ export type ToolRunner<Tools_ extends Tools> = ToolTree<Tools_> & {
      */
     keyOf: (publishedName: string) => ToolKeys<Tools_>;
 };
+
+/**
+ * A call as it arrives from a model: a name that may not be a tool, and input
+ * that has not been validated.
+ */
+export interface UntrustedToolCall {
+    /**
+     * Correlates the call with its result. Generated when left out.
+     */
+    id?: string;
+    name: string;
+    input?: unknown;
+}
+
+/**
+ * A call {@link ToolRunner.dispatch} could not complete. `name` stays a plain
+ * string, because an unknown name is one of the reasons to be here.
+ */
+export interface ToolDispatchFailure {
+    ok: false;
+    id: string;
+    name: string;
+    /**
+     * The sentence to show the model, so it can correct itself and retry.
+     */
+    message: string;
+}
+
+/**
+ * What {@link ToolRunner.dispatch} answers. The success arm is the tool's own
+ * `tool_result` payload, discriminated on `name`.
+ */
+export type ToolDispatchOutcome<Tools_ extends Tools> =
+    | ({
+          ok: true;
+      } & ToolResult<Tools_, 'output'>)
+    | ToolDispatchFailure;
+
+/**
+ * One of the three events a tool call puts on a stream, named the way a
+ * streamed response declares them.
+ */
+export type ToolEventMessage<Tools_ extends Tools> =
+    | {
+          event: 'tool_call';
+          data: ToolCall<Tools_, 'output'>;
+      }
+    | {
+          event: 'tool_result';
+          data: ToolResult<Tools_, 'output'>;
+      }
+    | {
+          event: 'tool_error';
+          data: ToolError<Tools_>;
+      };
 
 export class ToolInputError extends Error {
     readonly tool: string;
@@ -153,19 +256,65 @@ export class ToolExecutionError extends Error {
 }
 
 /**
+ * One Zod issue as a model reads it: the field it is about, then what is wrong.
+ */
+const describeIssue = (issue: z.core.$ZodIssue): string => {
+    const field = issue.path.map((segment) => String(segment)).join('.');
+    return field === '' ? issue.message : `${field}: ${issue.message}`;
+};
+
+/**
+ * Why a dispatched call failed, in the sentence the model reads. Input failures
+ * name the fields, so the model can correct them and try again; an output
+ * failure is the tool's fault, so it says that rather than leaking the schema.
+ */
+const dispatchMessage = (toolKey: string, error: unknown): string => {
+    if (error instanceof ToolExecutionError) return error.message;
+    if (error instanceof ToolInputError) {
+        return `Input for "${toolKey}" is not valid. ${error.issues.map(describeIssue).join('; ')}`;
+    }
+    if (error instanceof ToolOutputError) {
+        return `Tool "${toolKey}" returned something its own schema rejects. This is a fault in the tool, not in the call.`;
+    }
+    return error instanceof Error ? error.message : `Tool "${toolKey}" failed.`;
+};
+
+/**
  * MCP asks for an object schema even when a tool takes nothing, and this is the
  * form it recommends.
  */
-const NO_ARGUMENTS = {
+const NO_ARGUMENTS: JsonSchemaObject = {
     type: 'object',
     additionalProperties: false,
 };
 
+/**
+ * `cycles: 'throw'` because a self-referential schema converts to `{ $ref: '#' }`,
+ * and Gemini and Vertex reject any `$ref` in a tool schema. Failing here names
+ * the tool; failing at one provider's API does not.
+ */
 const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output'): Record<string, unknown> =>
     z.toJSONSchema(schema, {
         unrepresentable: 'any',
+        cycles: 'throw',
         io,
     }) as Record<string, unknown>;
+
+/**
+ * MCP requires a tool's arguments to be described by an object schema, so a
+ * tool declaring anything else is caught when the runner is built rather than
+ * when a model calls it.
+ */
+const toArgumentSchema = (schema: z.ZodType, toolKey: string): JsonSchemaObject => {
+    const converted = toJsonSchema(schema, 'input');
+    if (converted['type'] !== 'object') {
+        throw new Error(
+            `Tool "${toolKey}" declares an \`input\` that is not an object, so it converts to a JSON Schema of type ` +
+                `"${String(converted['type'])}". MCP describes a tool's arguments with an object schema, so wrap it in \`z.object({ ... })\`.`
+        );
+    }
+    return converted as JsonSchemaObject;
+};
 
 /**
  * Resolve tools for publication: the MCP name, and the declaration behind it.
@@ -193,7 +342,7 @@ export const publishTools = (tools: Tools): ModelFacingTool[] =>
         name: published.name,
         ...(published.title === undefined ? {} : { title: published.title }),
         description: published.description,
-        inputSchema: published.input ? toJsonSchema(published.input, 'input') : NO_ARGUMENTS,
+        inputSchema: published.input ? toArgumentSchema(published.input, published.toolKey) : NO_ARGUMENTS,
         ...(published.output === undefined ? {} : { outputSchema: toJsonSchema(published.output, 'output') }),
         ...(published.annotations === undefined ? {} : { annotations: published.annotations }),
     }));
@@ -280,6 +429,82 @@ export const createToolRunner = <Tools_ extends Tools>(
             id: call.id,
             name: call.name,
             ...(tool.output ? { output } : {}),
+        };
+    };
+
+    /**
+     * The dotted key a name refers to, taking either spelling, or `undefined`
+     * when it names no tool on this contract.
+     */
+    const resolveName = (name: string): string | undefined => (toolAt(tools, name) ? name : keys.get(name));
+
+    let dispatched = 0;
+
+    tree['dispatch'] = async (call: UntrustedToolCall) => {
+        const id = call.id ?? `tool_${(dispatched += 1)}`;
+        const toolKey = resolveName(call.name);
+        if (toolKey === undefined) {
+            const published = [...keys.keys()].join(', ');
+            return {
+                ok: false,
+                id,
+                name: call.name,
+                message: `No tool named "${call.name}". The tools available are: ${published}.`,
+            };
+        }
+
+        try {
+            const tool = toolFor(toolKey);
+            const output = await invoke(toolKey, call.input);
+            return {
+                ok: true,
+                id,
+                name: toolKey,
+                ...(tool.output ? { output } : {}),
+            };
+        } catch (error) {
+            return {
+                ok: false,
+                id,
+                name: toolKey,
+                message: dispatchMessage(toolKey, error),
+            };
+        }
+    };
+
+    tree['emit'] = async function* (call: UntrustedToolCall) {
+        const outcome = (await (tree['dispatch'] as (given: UntrustedToolCall) => Promise<ToolDispatchOutcome<Tools_>>)(
+            call
+        )) as ToolDispatchOutcome<Tools_> & {
+            id: string;
+            name: string;
+        };
+
+        yield {
+            event: 'tool_call',
+            data: {
+                id: outcome.id,
+                name: outcome.name,
+                ...(call.input === undefined ? {} : { input: call.input }),
+            },
+        };
+
+        if (outcome.ok) {
+            const { ok: _ok, ...result } = outcome;
+            yield {
+                event: 'tool_result',
+                data: result,
+            };
+            return;
+        }
+
+        yield {
+            event: 'tool_error',
+            data: {
+                id: outcome.id,
+                name: outcome.name,
+                message: outcome.message,
+            },
         };
     };
 

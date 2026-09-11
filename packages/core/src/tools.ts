@@ -206,7 +206,7 @@ const assertValidTool = (toolKey: string, definition: ToolDefinition): void => {
  * Names the tool runner puts on the root of the tree, so a top-level tool or
  * group cannot take them.
  */
-const RESERVED_ROOT_NAMES = ['call', 'definitions', 'keyOf'] as const;
+const RESERVED_ROOT_NAMES = ['call', 'dispatch', 'emit', 'definitions', 'keyOf'] as const;
 
 /**
  * Compile authored tool definitions into {@link Tools}, preserving nesting.

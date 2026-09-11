@@ -155,6 +155,11 @@ export {
     type ToolsArg,
     type PublishedTool,
     type ModelFacingTool,
+    type JsonSchemaObject,
+    type UntrustedToolCall,
+    type ToolDispatchOutcome,
+    type ToolDispatchFailure,
+    type ToolEventMessage,
 } from './tool-runner.js';
 export {
     createJobTransport,

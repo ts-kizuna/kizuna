@@ -21,8 +21,8 @@ import { contractOf } from '@ts-kizuna/core/adapter';
 import type { Contract, Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
 import { deriveToolNames } from '@ts-kizuna/core/generator';
-import { flattenTools, toolRunnerFrom, TOOLS_META, type ToolsMeta, type ToolRunner } from '@ts-kizuna/core/adapter';
-import { publishedTools, ToolExecutionError, ToolInputError, ToolOutputError, type PublishedTool, type Tools } from '@ts-kizuna/core';
+import { flattenTools, toolRunnerFrom, TOOLS_META, type ToolsMeta } from '@ts-kizuna/core/adapter';
+import { publishedTools, type PublishedTool, type Tools, type ToolDispatchOutcome, type UntrustedToolCall } from '@ts-kizuna/core';
 import { buildToolInputSchema, buildToolOutputSchema, type ToolInputSchema } from './schema.js';
 import { selectToolRoutes, selectTools, type ToolSelection } from './tool-selection.js';
 
@@ -145,8 +145,21 @@ export interface ToolDefinition {
     tags: string[];
 }
 
+/**
+ * The selection a server publishes from. `onlyReadOnly` is accepted at the top
+ * level as well as inside `options`, because it reads as a property of the
+ * server rather than of the selection; either spelling turns it on.
+ */
+const resolveSelection = (options?: McpServerOptions): ToolSelection | undefined => {
+    if (options?.onlyReadOnly !== true) return options?.options;
+    return {
+        ...options.options,
+        onlyReadOnly: true,
+    };
+};
+
 export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions): ToolDefinition[] => {
-    const selected = selectToolRoutes(flattenRoutes(routes), options?.options);
+    const selected = selectToolRoutes(flattenRoutes(routes), resolveSelection(options));
     const names = deriveToolNames(
         selected.map(({ routeKey }) => ({
             key: routeKey,
@@ -179,7 +192,7 @@ export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions)
  */
 export const buildDeclaredToolDefinitions = (tools: Tools | undefined, options?: McpServerOptions): PublishedTool[] => {
     if (!tools) return [];
-    const selected = publishedTools(selectTools(flattenTools(tools), options?.options));
+    const selected = publishedTools(selectTools(flattenTools(tools), resolveSelection(options)));
     // Names are derived once more here so a bad key fails at startup, not at call time.
     deriveToolNames(
         selected.map(({ toolKey }) => ({
@@ -492,20 +505,27 @@ const executeToolCall = async (
 };
 
 /**
+ * Dispatching a declared tool, pulled out as its own type because `ToolRunner`
+ * over the erased `Tools` reaches its own methods through the tool tree's index
+ * signature, which `noUncheckedIndexedAccess` then widens with `undefined`.
+ */
+type DeclaredToolDispatch = (call: UntrustedToolCall) => Promise<ToolDispatchOutcome<Tools>>;
+
+/**
  * Run one declared tool. There is no HTTP envelope here, so the result carries
  * the tool's own output and nothing more.
  */
 const executeDeclaredToolCall = async (
     definition: PublishedTool,
     args: Record<string, unknown>,
-    runner: ToolRunner<Tools> | undefined,
+    dispatch: DeclaredToolDispatch | undefined,
     handlerContext?: Record<string, unknown>,
     guards?: GuardMap,
     schemes?: Record<string, SecurityScheme>,
     credentialHeaders?: Record<string, string | string[] | undefined>,
     transportAuth?: McpServerOptions['transportAuth']
 ): Promise<ToolCallResult> => {
-    if (!runner) {
+    if (!dispatch) {
         return toolError(500, `No handler was bound for tool "${definition.toolKey}".`);
     }
 
@@ -530,45 +550,44 @@ const executeDeclaredToolCall = async (
         if (!guardOutcome.ok) return guardOutcome.result;
     }
 
-    try {
-        const output = await runner.call({
-            id: definition.name,
-            name: definition.toolKey,
-            input: args,
-        } as never);
-        const value = (output as { output?: unknown }).output;
+    // `dispatch` rather than `call`, because the runner here is typed over the
+    // erased `Tools`, where a call's name narrows to `never`. It also answers
+    // every failure as the sentence a model reads, which is what MCP asks a
+    // tool execution error to carry.
+    const outcome = await dispatch({
+        id: definition.name,
+        name: definition.toolKey,
+        input: args,
+    });
 
+    if (!outcome.ok) {
         return {
             content: [
                 {
                     type: 'text' as const,
-                    text: definition.output ? JSON.stringify(value, null, 2) : `${definition.toolKey} ran.`,
+                    text: outcome.message,
                 },
             ],
-            ...(definition.output
-                ? {
-                      structuredContent: value as Record<string, unknown>,
-                  }
-                : {}),
-            isError: false,
+            isError: true,
         };
-    } catch (error) {
-        if (error instanceof ToolExecutionError) {
-            return {
-                content: [
-                    {
-                        type: 'text' as const,
-                        text: error.message,
-                    },
-                ],
-                isError: true,
-            };
-        }
-        if (error instanceof ToolInputError || error instanceof ToolOutputError) {
-            return toolError(400, error.message);
-        }
-        return toolError(500, error instanceof Error ? error.message : 'Internal Server Error');
     }
+
+    const value = (outcome as { output?: unknown }).output;
+
+    return {
+        content: [
+            {
+                type: 'text' as const,
+                text: definition.output ? JSON.stringify(value, null, 2) : `${definition.toolKey} ran.`,
+            },
+        ],
+        ...(definition.output
+            ? {
+                  structuredContent: value as Record<string, unknown>,
+              }
+            : {}),
+        isError: false,
+    };
 };
 
 /**
@@ -592,7 +611,9 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
 
     const contract = contractOf<Contract | undefined>(api);
     const toolsMeta = (api as unknown as Record<typeof TOOLS_META, ToolsMeta | undefined>)[TOOLS_META];
-    const toolRunner = toolRunnerFrom(toolsMeta);
+    // Reached through the tool tree's index signature, so narrowed once here
+    // rather than at every call site.
+    const toolDispatch = toolRunnerFrom(toolsMeta)?.dispatch as DeclaredToolDispatch | undefined;
 
     const definitions = buildToolDefinitions(api.routes, options);
     const declared = buildDeclaredToolDefinitions(contract?.tools, options);
@@ -666,7 +687,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                 executeDeclaredToolCall(
                     definition,
                     (args ?? {}) as Record<string, unknown>,
-                    toolRunner,
+                    toolDispatch,
                     options?.handlerContext,
                     guards,
                     schemes,
