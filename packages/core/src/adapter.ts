@@ -39,7 +39,14 @@ import { encodeStreamBody, EVENT_STREAM_MEDIA_TYPE, streamContentType, type Enco
 import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from './jobs.js';
 import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
 import type { Tools } from './tools.js';
-import { createToolRunner, type ToolRunner } from './tool-runner.js';
+import {
+    createToolRunner,
+    ToolExecutionError,
+    ToolIdentityError,
+    ToolInputError,
+    type RouteToolExecutor,
+    type ToolRunner,
+} from './tool-runner.js';
 import {
     DispatchFailedSchema,
     DispatchResultSchema,
@@ -72,7 +79,7 @@ export {
 export type { CompiledJob, Jobs, JobHandler, JobHandlers, FlattenedJob } from './jobs.js';
 export type { CompiledTool, Tools, ToolHandler, ToolHandlers, FlattenedTool } from './tools.js';
 export { flattenTools, isCompiledTool, toolAt } from './tools.js';
-export { createToolRunner, publishTools, type ToolRunner } from './tool-runner.js';
+export { createToolRunner, publishTools, type ToolRunner, type RouteToolExecutor, type BoundToolAuth } from './tool-runner.js';
 export { flattenJobs, isCompiledJob, jobAt } from './jobs.js';
 export {
     createJobRunner,
@@ -532,15 +539,108 @@ export const jobRunnerFrom = (meta: JobsMeta | undefined): JobRunner<Jobs> | und
     meta ? createJobRunner(meta.jobs, meta.handlers as never, meta) : undefined;
 
 /**
- * What {@link TOOLS_META} carries: the contract's tools and the handler for each.
+ * What {@link TOOLS_META} carries: the contract's tools, the handler for each
+ * declared one, and what a route-derived one needs to run its route.
  */
 export interface ToolsMeta {
     tools: Tools;
     handlers: Record<string, unknown>;
+    /**
+     * The contract's router, so a `k.tools.fromRoute` tool can reach the
+     * handler its route already has.
+     */
+    router?: Record<string, unknown>;
+    /**
+     * Extra context every route handler receives, matching what the HTTP
+     * pipeline spreads in.
+     */
+    handlerContext?: Record<string, unknown>;
 }
 
+const resolveRouteHandler = (router: Record<string, unknown> | undefined, routeKey: string): unknown => {
+    let current: unknown = router;
+    for (const segment of routeKey.split('.')) {
+        if (!current || typeof current !== 'object') return undefined;
+        current = (current as Record<string, unknown>)[segment];
+    }
+    return current;
+};
+
+/**
+ * Run the route behind a `k.tools.fromRoute` tool, answering the
+ * `{ status, body }` envelope the tool publishes.
+ *
+ * The route's own `security` and `accessGate` decide whether the caller may
+ * make the call. No guard runs here: a guard verifies a credential, and there
+ * is no request to read one from. The identity the caller already had is
+ * checked against what the route requires, and a caller that does not carry it
+ * cannot reach the route by going through a tool.
+ */
+const routeToolExecutor =
+    (meta: ToolsMeta): RouteToolExecutor =>
+    async ({ toolKey, routeKey, route, input, auth }) => {
+        const handler = resolveRouteHandler(meta.router, routeKey);
+        if (typeof handler !== 'function') {
+            throw new Error(`No handler was bound for route "${routeKey}", which tool "${toolKey}" runs.`);
+        }
+
+        const securityContext: Record<string, unknown> = {};
+        for (const { scheme } of resolveSecurityRequirements(route)) {
+            const context = auth?.[scheme];
+            if (context === undefined) {
+                throw new ToolIdentityError(toolKey, scheme);
+            }
+            for (const [field, allowed] of Object.entries(route.accessGate?.[scheme] ?? {})) {
+                if (gatePermits((context as Record<string, unknown>)[field], allowed)) continue;
+                throw new ToolExecutionError(toolKey, `You do not have access to this. Required: ${scheme}.${field}.`);
+            }
+            securityContext[scheme] = context;
+        }
+
+        const given = (input ?? {}) as {
+            params?: Record<string, string>;
+            query?: Record<string, unknown>;
+            body?: unknown;
+        };
+        const validation = validateRequest(route, {
+            params: given.params ?? {},
+            query: given.query ?? {},
+            body: given.body,
+            headers: {},
+        });
+        if (!validation.ok) {
+            throw new ToolInputError(toolKey, validation.error.issues);
+        }
+
+        try {
+            const result = await (handler as (args: unknown) => Promise<{ status: number; body: unknown }>)({
+                params: validation.parsed.params,
+                query: validation.parsed.query,
+                body: validation.parsed.body,
+                headers: validation.parsed.headers,
+                throwError: (response: { status: number; body: unknown; headers?: ResponseHeaders }): never => {
+                    throw new ResponseError(response);
+                },
+                ...(meta.handlerContext ?? {}),
+                ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
+            });
+            return {
+                status: result.status,
+                ...(result.body === undefined ? {} : { body: result.body }),
+            };
+        } catch (error) {
+            if (error instanceof ResponseError) {
+                return {
+                    status: error.status,
+                    ...(error.body === undefined ? {} : { body: error.body }),
+                };
+            }
+            throw error;
+        }
+    };
+
 export const toolRunnerFrom = (meta: ToolsMeta | undefined): ToolRunner<Tools> | undefined =>
-    meta ? createToolRunner(meta.tools, meta.handlers as never) : undefined;
+    meta ? createToolRunner(meta.tools, meta.handlers as never, undefined, routeToolExecutor(meta)) : undefined;
 
 /**
  * The dotted keys of the jobs a handler was actually bound to. A job without one

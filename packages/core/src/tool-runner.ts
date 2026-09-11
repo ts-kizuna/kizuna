@@ -12,6 +12,7 @@ import {
 } from './tools.js';
 import { toToolName } from './tool-name.js';
 import type { ToolCall, ToolError, ToolKeys, ToolResult } from './tool-events.js';
+import type { RouteDefinition } from './types.js';
 
 /**
  * The arguments a tool takes when run in code: its input when it declares one,
@@ -73,6 +74,15 @@ export interface PublishedTool {
      * The identity every tool in the group requires, or `undefined`.
      */
     identity: string | undefined;
+    /**
+     * The route this tool runs, when it was named with `k.tools.fromRoute`. Its
+     * own `security` and `accessGate` say who may call the tool.
+     */
+    route: RouteDefinition | undefined;
+    /**
+     * The tags its route inherits, for grouping a model's overview.
+     */
+    routeTags: readonly string[] | undefined;
 }
 
 /**
@@ -176,6 +186,21 @@ export type ToolRunner<Tools_ extends Tools> = ToolTree<Tools_> & {
  * receives it under `auth`.
  */
 export type BoundToolAuth = Record<string, unknown>;
+
+/**
+ * Runs the route behind a tool named with `k.tools.fromRoute`, answering its
+ * `{ status, body }` envelope.
+ *
+ * Injected rather than imported, because running a route needs the adapter and
+ * the runner rides on the contract, which a browser bundles.
+ */
+export type RouteToolExecutor = (call: {
+    toolKey: string;
+    routeKey: string;
+    route: RouteDefinition;
+    input: unknown;
+    auth: BoundToolAuth | undefined;
+}) => Promise<unknown>;
 
 /**
  * A call as it arrives from a model: a name that may not be a tool, and input
@@ -368,6 +393,8 @@ export const publishedTools = (tools: FlattenedTool[]): PublishedTool[] =>
         output: tool.output,
         annotations: tool.definition.annotations,
         identity: tool.identity,
+        route: tool.route,
+        routeTags: tool.routeTags,
     }));
 
 /**
@@ -410,7 +437,12 @@ export const createToolRunner = <Tools_ extends Tools>(
      * Identity context already verified for this request, keyed by scheme. A
      * tool requiring an identity cannot run without the matching entry.
      */
-    boundAuth?: BoundToolAuth
+    boundAuth?: BoundToolAuth,
+    /**
+     * Runs the route behind a `k.tools.fromRoute` tool. Without one, such a
+     * tool has no way to answer.
+     */
+    runRoute?: RouteToolExecutor
 ): ToolRunner<Tools_> => {
     const tools = (source && 'tools' in source ? ((source.tools ?? {}) as Tools_) : (source as Tools_)) ?? ({} as Tools_);
 
@@ -438,6 +470,23 @@ export const createToolRunner = <Tools_ extends Tools>(
 
     const invoke = async (toolKey: string, input: unknown): Promise<unknown> => {
         const tool = toolFor(toolKey);
+
+        if (tool.route !== undefined) {
+            if (runRoute === undefined || tool.routeKey === undefined) {
+                throw new Error(
+                    `Tool "${toolKey}" runs the route "${tool.routeKey ?? tool.route.path}", and this runner was built without one. ` +
+                        `Reach it through the api rather than by calling \`createToolRunner\` directly.`
+                );
+            }
+            return runRoute({
+                toolKey,
+                routeKey: tool.routeKey,
+                route: tool.route,
+                input,
+                auth: boundAuth,
+            });
+        }
+
         const handler = handlerAt(handlers, toolKey);
         if (typeof handler !== 'function') throw new Error(`No handler was bound for tool "${toolKey}".`);
 
@@ -574,10 +623,15 @@ export const createToolRunner = <Tools_ extends Tools>(
     };
 
     tree['as'] = (auth: BoundToolAuth) =>
-        createToolRunner(source, handlers, {
-            ...boundAuth,
-            ...auth,
-        });
+        createToolRunner(
+            source,
+            handlers,
+            {
+                ...boundAuth,
+                ...auth,
+            },
+            runRoute
+        );
 
     tree['definitions'] = publishTools(tools);
 

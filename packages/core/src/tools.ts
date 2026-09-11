@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import type { ContextOf } from './security-scheme.js';
 import type { IdentityAccess } from './identity.js';
+import type { RouteDefinition, StreamResponseDefinition } from './types.js';
+import type { ExtractPathParams, HasPathParams } from './path-params.js';
+import { routeToolAnnotations, routeToolDescription, routeToolInput, routeToolOutput } from './tool-projection.js';
 
 /**
  * MCP's tool annotations, verbatim. A route derives these from its method's
@@ -60,6 +63,190 @@ export interface ToolDefinition {
 }
 
 /**
+ * Collapse an intersection into one object, so a derived shape reads as the
+ * record it is rather than as the pieces it was built from.
+ */
+type FlattenShape<Shape> = {
+    [Key in keyof Shape]: Shape[Key];
+} & {};
+
+/**
+ * The `params` a route takes as a tool: its declared `pathParams`, or a string
+ * per placeholder in its path.
+ */
+type RouteToolParams<R extends RouteDefinition> = R extends {
+    pathParams: z.ZodType;
+}
+    ? {
+          params: z.output<R['pathParams']>;
+      }
+    : HasPathParams<R['path']> extends true
+      ? {
+            params: ExtractPathParams<R['path']>;
+        }
+      : {};
+
+/**
+ * Present when the route declares one, and optional when the schema is happy
+ * with nothing, matching what the projection does at runtime.
+ */
+type RouteToolQuery<R extends RouteDefinition> = R extends {
+    query: z.ZodType;
+}
+    ? {} extends z.input<R['query']>
+        ? {
+              query?: z.output<R['query']>;
+          }
+        : {
+              query: z.output<R['query']>;
+          }
+    : {};
+
+type RouteToolBody<R extends RouteDefinition> = R extends {
+    body: z.ZodType;
+}
+    ? undefined extends z.input<R['body']>
+        ? {
+              body?: z.output<R['body']>;
+          }
+        : {
+              body: z.output<R['body']>;
+          }
+    : {};
+
+/**
+ * The arguments a route takes as a tool, kept under `params`, `query` and
+ * `body` so nothing collides and the model can see which values identify a
+ * resource.
+ */
+export type RouteToolInputValue<R extends RouteDefinition> = FlattenShape<RouteToolParams<R> & RouteToolQuery<R> & RouteToolBody<R>>;
+
+type IsSuccessStatus<Status> = `${Status & number}` extends `2${string}` ? true : false;
+
+type ResponseBodyValue<Response> = Response extends StreamResponseDefinition
+    ? never
+    : Response extends z.ZodType
+      ? z.output<Response>
+      : Response extends {
+              body: z.ZodType;
+          }
+        ? z.output<Response['body']>
+        : never;
+
+/**
+ * Every JSON body a route answers a success with. A route with several success
+ * statuses yields their union, which is what lets the `{ status, body }`
+ * envelope carry them all without a result type per status.
+ */
+type RouteSuccessBody<R extends RouteDefinition> = {
+    [Status in keyof R['responses']]: IsSuccessStatus<Status> extends true ? ResponseBodyValue<R['responses'][Status]> : never;
+}[keyof R['responses']];
+
+/**
+ * What a route answers with as a tool. `status` is the HTTP status it chose, so
+ * a model reads `400` or more as a failure, and `body` carries whichever
+ * success body it produced.
+ */
+export type RouteToolOutputValue<R extends RouteDefinition> = [RouteSuccessBody<R>] extends [never]
+    ? {
+          status: number;
+      }
+    : {
+          status: number;
+          body?: RouteSuccessBody<R>;
+      };
+
+/**
+ * The tool a route compiles into. Everything is derived, so naming a route in a
+ * tool tree costs one line and restates nothing.
+ */
+export interface RouteToolDefinition<R extends RouteDefinition> {
+    title?: string;
+    description: string;
+    input: z.ZodType<RouteToolInputValue<R>, RouteToolInputValue<R>>;
+    output: z.ZodType<RouteToolOutputValue<R>, RouteToolOutputValue<R>>;
+    annotations?: ToolAnnotations;
+}
+
+const FROM_ROUTE: unique symbol = Symbol('ts-kizuna.tool.fromRoute');
+
+/**
+ * A route named inside a tool tree with `k.tools.fromRoute`. It carries the
+ * route itself, so the tool's schemas, description and annotations are derived
+ * from the one place they are already declared.
+ */
+export interface RouteToolMarker<R extends RouteDefinition = RouteDefinition> {
+    readonly [FROM_ROUTE]: true;
+    readonly route: R;
+    readonly overrides: RouteToolOverrides;
+}
+
+/**
+ * What a route-derived tool may say differently from its route. Everything else
+ * comes from the route, and its authorization always does.
+ */
+export interface RouteToolOverrides {
+    /**
+     * A human-readable name for display. Defaults to the route's `summary`.
+     */
+    title?: string;
+    /**
+     * What the tool does, in the words the model reads. Defaults to the route's
+     * `summary` and `description`, followed by its method and path.
+     *
+     * Worth writing when the route's own summary was written for a developer
+     * reading your docs rather than for a model choosing between tools.
+     */
+    description?: string;
+    /**
+     * How the tool behaves. Defaults to what RFC 9110 says about the route's
+     * method, which is almost always what you want.
+     */
+    annotations?: ToolAnnotations;
+}
+
+/**
+ * A route that streams has no single value to answer with, and one reading a
+ * form body has nowhere to put JSON arguments. Either is a compile error where
+ * the route is named, rather than a tool that quietly never appears.
+ */
+export type ToolableRoute<R extends RouteDefinition> =
+    true extends StreamingResponse<R>
+        ? 'This route streams, so it cannot be a tool.'
+        : R extends {
+                contentType: 'multipart/form-data' | 'application/x-www-form-urlencoded';
+            }
+          ? 'This route reads a form body, so it cannot be a tool.'
+          : R;
+
+type StreamingResponse<R extends RouteDefinition> = {
+    [Status in keyof R['responses']]: R['responses'][Status] extends StreamResponseDefinition ? true : false;
+}[keyof R['responses']];
+
+/**
+ * Name a route as a tool. Its arguments, result, description and annotations
+ * come from the route, and so does the identity it requires, so a route is
+ * never restated to put it in front of a model.
+ *
+ * @example
+ * export const tools = k.tools({
+ *     users: {
+ *         find: k.tools.fromRoute(routes.users.getUser),
+ *     },
+ * });
+ */
+export const fromRoute = <const R extends RouteDefinition>(
+    route: R & ToolableRoute<R>,
+    overrides: RouteToolOverrides = {}
+): RouteToolMarker<R> => ({
+    [FROM_ROUTE]: true,
+    route: route as R,
+    overrides,
+});
+
+export const isRouteToolMarker = (value: unknown): value is RouteToolMarker => !!value && typeof value === 'object' && FROM_ROUTE in value;
+
+/**
  * A tool after `k.tools` compiles it.
  */
 export interface CompiledTool<
@@ -80,7 +267,51 @@ export interface CompiledTool<
      * The result schema, or `undefined` when the tool reports nothing.
      */
     output: z.ZodType | undefined;
+    /**
+     * The route this tool runs, when it was named with `k.tools.fromRoute`.
+     * Its handler answers the call, and its own `security` and `accessGate`
+     * govern who may make one.
+     */
+    route?: RouteDefinition;
+    /**
+     * The dotted key of {@link CompiledTool.route} in the contract's route
+     * tree, filled in by `k.contract` once it can see both trees.
+     */
+    routeKey?: string;
+    /**
+     * The tags the route inherits from its group. Tags sit on the route tree
+     * rather than on a route, so they are read in the same pass as the key.
+     */
+    routeTags?: readonly string[];
 }
+
+/**
+ * A route compiled into a tool. It carries the route it runs, which is how
+ * everything downstream tells it apart from a declared tool: it needs no
+ * handler of its own, and its authorization is the route's.
+ */
+export interface CompiledRouteTool<R extends RouteDefinition = RouteDefinition> extends CompiledTool<RouteToolDefinition<R>, undefined> {
+    route: R;
+    routeKey: string;
+}
+
+/**
+ * Whether a node in a compiled tool tree needs a handler written for it. A
+ * route-derived tool does not: its route already has one.
+ */
+export type NeedsToolHandler<Node> = Node extends {
+    route: RouteDefinition;
+}
+    ? false
+    : Node extends CompiledTool
+      ? true
+      : Node extends Tools
+        ? true extends {
+              [Name in keyof Node]: NeedsToolHandler<Node[Name]>;
+          }[keyof Node]
+            ? true
+            : false
+        : false;
 
 /**
  * A contract's tools. Nestable, like routes, so a large codebase can group
@@ -94,18 +325,20 @@ export interface Tools {
  * The shape `k.tools` accepts: tools, or groups of them, to any depth.
  */
 export interface AuthoredTools {
-    [key: string]: ToolDefinition | AuthoredTools;
+    [key: string]: ToolDefinition | RouteToolMarker | AuthoredTools;
 }
 
 /**
  * The compiled form of an authored tool tree, preserving its shape.
  */
 export type CompiledTools<Definitions extends AuthoredTools, IdentityName extends string | undefined> = {
-    [Name in keyof Definitions]: Definitions[Name] extends ToolDefinition
-        ? CompiledTool<Definitions[Name], IdentityName>
-        : Definitions[Name] extends AuthoredTools
-          ? CompiledTools<Definitions[Name], IdentityName>
-          : never;
+    [Name in keyof Definitions]: Definitions[Name] extends RouteToolMarker<infer R>
+        ? CompiledRouteTool<R>
+        : Definitions[Name] extends ToolDefinition
+          ? CompiledTool<Definitions[Name], IdentityName>
+          : Definitions[Name] extends AuthoredTools
+            ? CompiledTools<Definitions[Name], IdentityName>
+            : never;
 };
 
 /**
@@ -177,7 +410,7 @@ export type ToolHandler<Tool extends CompiledTool, Identities = Record<string, n
  * The handlers `server.tools` accepts: one per declared tool, keyed by name.
  */
 export type ToolHandlers<Tools_ extends Tools, Identities = Record<string, never>> = {
-    [Name in keyof Tools_]: Tools_[Name] extends CompiledTool
+    [Name in keyof Tools_ as NeedsToolHandler<Tools_[Name]> extends true ? Name : never]: Tools_[Name] extends CompiledTool
         ? ToolHandler<Tools_[Name], Identities>
         : Tools_[Name] extends Tools
           ? ToolHandlers<Tools_[Name], Identities>
@@ -220,6 +453,37 @@ export const isToolDefinition = (value: unknown): value is ToolDefinition => {
     return Object.entries(value).every(([name, field]) => isToolField(name, field));
 };
 
+/**
+ * A route named with `k.tools.fromRoute`, compiled into the same shape a
+ * declared tool takes. Everything is derived from the route, so the two are
+ * indistinguishable to everything downstream.
+ *
+ * The route object is kept rather than copied, because `k.contract` writes its
+ * `security` and `accessGate` from the auth map after this runs.
+ */
+const compileRouteTool = (toolKey: string, marker: RouteToolMarker): CompiledTool => {
+    const { route, overrides } = marker;
+    const input = routeToolInput(route);
+    const output = routeToolOutput(route);
+    const title = overrides.title ?? route.summary;
+    const definition: ToolDefinition = {
+        ...(title === undefined ? {} : { title }),
+        description: overrides.description ?? routeToolDescription(route),
+        ...(input === undefined ? {} : { input }),
+        output,
+        annotations: overrides.annotations ?? routeToolAnnotations(route),
+    };
+    assertValidTool(toolKey, definition);
+
+    return {
+        definition,
+        identity: undefined,
+        input,
+        output,
+        route,
+    } as unknown as CompiledTool;
+};
+
 const assertValidTool = (toolKey: string, definition: ToolDefinition): void => {
     if (definition.description.trim() === '') {
         throw new Error(
@@ -252,6 +516,10 @@ export const buildTools = (identity: string | undefined, definitions: AuthoredTo
         const tools: Tools = {};
         for (const [name, node] of Object.entries(nodes)) {
             const toolKey = prefix ? `${prefix}.${name}` : name;
+            if (isRouteToolMarker(node)) {
+                tools[name] = compileRouteTool(toolKey, node);
+                continue;
+            }
             if (isToolDefinition(node)) {
                 assertValidTool(toolKey, node);
                 tools[name] = {
@@ -273,6 +541,37 @@ export const buildTools = (identity: string | undefined, definitions: AuthoredTo
     };
 
     return walk(definitions, '');
+};
+
+/**
+ * Give every route-derived tool the dotted key of its route, matched by object
+ * identity against the contract's own route tree.
+ *
+ * A route value carries no key of its own, so this is where the two trees are
+ * put side by side. A route named in a tool tree but absent from the contract's
+ * routes is a mistake worth stopping at startup, since nothing could ever run
+ * it.
+ */
+export const attachRouteKeys = (
+    tools: Tools,
+    keyByRoute: Map<RouteDefinition, { routeKey: string; routeTags: readonly string[] }>
+): void => {
+    for (const { toolKey, tool } of flattenTools(tools)) {
+        if (tool.route === undefined) continue;
+        const found = keyByRoute.get(tool.route);
+        if (found === undefined) {
+            throw new Error(
+                `Tool "${toolKey}" names a route with \`k.tools.fromRoute\`, but that route is not on this contract. ` +
+                    `Pass the route from the same tree you pass to \`k.contract\`.`
+            );
+        }
+        const mutable = tool as {
+            routeKey?: string;
+            routeTags?: readonly string[];
+        };
+        mutable.routeKey = found.routeKey;
+        mutable.routeTags = found.routeTags;
+    }
 };
 
 export const isCompiledTool = (value: unknown): value is CompiledTool => {

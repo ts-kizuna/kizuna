@@ -191,7 +191,13 @@ export type ServerApiOptions<C extends Contract, HandlerContext> = {
     router: ContractRouter<C, HandlerContext>;
 } & (string extends keyof SchemesOf<C> ? { guards?: undefined } : { guards: NoInfer<GuardsFor<SchemesOf<C>, HandlerContext>> }) &
     (string extends keyof JobsOf<C> ? { jobs?: undefined } : { jobs: NoInfer<ContractJobsRouter<C>> }) &
-    (string extends keyof ToolsOf<C> ? { tools?: undefined } : { tools: NoInfer<ContractToolsRouter<C>> }) &
+    // Optional when every tool is route-derived, since those run the handler
+    // their route already has and there is nothing left to write.
+    (string extends keyof ToolsOf<C>
+        ? { tools?: undefined }
+        : [keyof ContractToolsRouter<C>] extends [never]
+          ? { tools?: undefined }
+          : { tools: NoInfer<ContractToolsRouter<C>> }) &
     (string extends keyof RequestContextOf<C>
         ? { requestContext?: undefined }
         : { requestContext: NoInfer<{ [Name in keyof RequestContextOf<C>]: RequestContextRun<HandlerContext> }> }) &
@@ -239,6 +245,7 @@ export const createServerSurface = <C extends Contract, HandlerContext, Api>(
                         ? {
                               tools: contract.tools,
                               handlers: (tools ?? {}) as Record<string, unknown>,
+                              router: router as Record<string, unknown>,
                           }
                         : undefined,
                 }),

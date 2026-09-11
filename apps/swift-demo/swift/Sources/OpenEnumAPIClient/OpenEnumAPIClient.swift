@@ -2032,9 +2032,25 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public enum ToolCall: Codable, Sendable, Equatable {
+            case users_find(ToolCallUsersFind)
+            case users_list(ToolCallUsersList)
+            case users_create(ToolCallUsersCreate)
+            case workspace_read(ToolCallWorkspaceRead)
             case weather_getForecast(ToolCallWeatherGetForecast)
             case charts_plotSignups(ToolCallChartsPlotSignups)
             case countWords(ToolCallCountWords)
+            public static func users_find(id: String, input: OpenEnumAPIClient.AssistantReply.ToolCallUsersFindInput) -> ToolCall {
+                .users_find(ToolCallUsersFind(id: id, name: "users.find", input: input))
+            }
+            public static func users_list(id: String, input: OpenEnumAPIClient.AssistantReply.ToolCallUsersListInput) -> ToolCall {
+                .users_list(ToolCallUsersList(id: id, name: "users.list", input: input))
+            }
+            public static func users_create(id: String, input: OpenEnumAPIClient.AssistantReply.ToolCallUsersCreateInput) -> ToolCall {
+                .users_create(ToolCallUsersCreate(id: id, name: "users.create", input: input))
+            }
+            public static func workspace_read(id: String) -> ToolCall {
+                .workspace_read(ToolCallWorkspaceRead(id: id, name: "workspace.read"))
+            }
             public static func weather_getForecast(id: String, input: OpenEnumAPIClient.AssistantReply.ToolCallWeatherGetForecastInput) -> ToolCall {
                 .weather_getForecast(ToolCallWeatherGetForecast(id: id, name: "weather.getForecast", input: input))
             }
@@ -2047,6 +2063,10 @@ public final class OpenEnumAPIClient: Sendable {
 
             public var id: String {
                 switch self {
+                case .users_find(let payload): return payload.id
+                case .users_list(let payload): return payload.id
+                case .users_create(let payload): return payload.id
+                case .workspace_read(let payload): return payload.id
                 case .weather_getForecast(let payload): return payload.id
                 case .charts_plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
@@ -2055,6 +2075,10 @@ public final class OpenEnumAPIClient: Sendable {
 
             public var name: String {
                 switch self {
+                case .users_find(let payload): return payload.name
+                case .users_list(let payload): return payload.name
+                case .users_create(let payload): return payload.name
+                case .workspace_read(let payload): return payload.name
                 case .weather_getForecast(let payload): return payload.name
                 case .charts_plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
@@ -2070,6 +2094,14 @@ public final class OpenEnumAPIClient: Sendable {
                 let kind = try container.decode(String.self, forKey: .discriminator)
                 let single = try decoder.singleValueContainer()
                 switch kind {
+                case "users.find":
+                    self = .users_find(try single.decode(ToolCallUsersFind.self))
+                case "users.list":
+                    self = .users_list(try single.decode(ToolCallUsersList.self))
+                case "users.create":
+                    self = .users_create(try single.decode(ToolCallUsersCreate.self))
+                case "workspace.read":
+                    self = .workspace_read(try single.decode(ToolCallWorkspaceRead.self))
                 case "weather.getForecast":
                     self = .weather_getForecast(try single.decode(ToolCallWeatherGetForecast.self))
                 case "charts.plotSignups":
@@ -2084,6 +2116,14 @@ public final class OpenEnumAPIClient: Sendable {
             public func encode(to encoder: Encoder) throws {
                 var single = encoder.singleValueContainer()
                 switch self {
+                case .users_find(let payload):
+                    try single.encode(payload)
+                case .users_list(let payload):
+                    try single.encode(payload)
+                case .users_create(let payload):
+                    try single.encode(payload)
+                case .workspace_read(let payload):
+                    try single.encode(payload)
                 case .weather_getForecast(let payload):
                     try single.encode(payload)
                 case .charts_plotSignups(let payload):
@@ -2091,6 +2131,114 @@ public final class OpenEnumAPIClient: Sendable {
                 case .countWords(let payload):
                     try single.encode(payload)
                 }
+            }
+        }
+
+        public struct ToolCallUsersFind: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersFindInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersFindInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersFindInput: Codable, Sendable, Equatable {
+            public let params: ToolCallUsersFindInputParams
+
+            public init(params: ToolCallUsersFindInputParams) {
+                self.params = params
+            }
+        }
+
+        public struct ToolCallUsersFindInputParams: Codable, Sendable, Equatable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+        }
+
+        public struct ToolCallUsersList: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersListInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersListInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersListInput: Codable, Sendable, Equatable {
+            public let query: ToolCallUsersListInputQuery?
+
+            public init(query: ToolCallUsersListInputQuery? = nil) {
+                self.query = query
+            }
+        }
+
+        public struct ToolCallUsersListInputQuery: Codable, Sendable, Equatable {
+            /// Page number, starting at 1
+            public let page: Int?
+            /// Page size (1–100)
+            public let limit: Int?
+
+            public init(
+                page: Int? = nil,
+                limit: Int? = nil
+            ) {
+                self.page = page
+                self.limit = limit
+            }
+        }
+
+        public struct ToolCallUsersCreate: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersCreateInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersCreateInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersCreateInput: Codable, Sendable, Equatable {
+            public let body: OpenEnumAPI.CreateUserInput
+
+            public init(body: OpenEnumAPI.CreateUserInput) {
+                self.body = body
+            }
+        }
+
+        public struct ToolCallWorkspaceRead: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+
+            public init(
+                id: String,
+                name: String
+            ) {
+                self.id = id
+                self.name = name
             }
         }
 
@@ -2204,9 +2352,25 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public enum ToolResult: Codable, Sendable, Equatable {
+            case users_find(ToolResultUsersFind)
+            case users_list(ToolResultUsersList)
+            case users_create(ToolResultUsersCreate)
+            case workspace_read(ToolResultWorkspaceRead)
             case weather_getForecast(ToolResultWeatherGetForecast)
             case charts_plotSignups(ToolResultChartsPlotSignups)
             case countWords(ToolResultCountWords)
+            public static func users_find(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultUsersFindOutput) -> ToolResult {
+                .users_find(ToolResultUsersFind(id: id, name: "users.find", output: output))
+            }
+            public static func users_list(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultUsersListOutput) -> ToolResult {
+                .users_list(ToolResultUsersList(id: id, name: "users.list", output: output))
+            }
+            public static func users_create(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultUsersCreateOutput) -> ToolResult {
+                .users_create(ToolResultUsersCreate(id: id, name: "users.create", output: output))
+            }
+            public static func workspace_read(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultWorkspaceReadOutput) -> ToolResult {
+                .workspace_read(ToolResultWorkspaceRead(id: id, name: "workspace.read", output: output))
+            }
             public static func weather_getForecast(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultWeatherGetForecastOutput) -> ToolResult {
                 .weather_getForecast(ToolResultWeatherGetForecast(id: id, name: "weather.getForecast", output: output))
             }
@@ -2219,6 +2383,10 @@ public final class OpenEnumAPIClient: Sendable {
 
             public var id: String {
                 switch self {
+                case .users_find(let payload): return payload.id
+                case .users_list(let payload): return payload.id
+                case .users_create(let payload): return payload.id
+                case .workspace_read(let payload): return payload.id
                 case .weather_getForecast(let payload): return payload.id
                 case .charts_plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
@@ -2227,6 +2395,10 @@ public final class OpenEnumAPIClient: Sendable {
 
             public var name: String {
                 switch self {
+                case .users_find(let payload): return payload.name
+                case .users_list(let payload): return payload.name
+                case .users_create(let payload): return payload.name
+                case .workspace_read(let payload): return payload.name
                 case .weather_getForecast(let payload): return payload.name
                 case .charts_plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
@@ -2242,6 +2414,14 @@ public final class OpenEnumAPIClient: Sendable {
                 let kind = try container.decode(String.self, forKey: .discriminator)
                 let single = try decoder.singleValueContainer()
                 switch kind {
+                case "users.find":
+                    self = .users_find(try single.decode(ToolResultUsersFind.self))
+                case "users.list":
+                    self = .users_list(try single.decode(ToolResultUsersList.self))
+                case "users.create":
+                    self = .users_create(try single.decode(ToolResultUsersCreate.self))
+                case "workspace.read":
+                    self = .workspace_read(try single.decode(ToolResultWorkspaceRead.self))
                 case "weather.getForecast":
                     self = .weather_getForecast(try single.decode(ToolResultWeatherGetForecast.self))
                 case "charts.plotSignups":
@@ -2256,6 +2436,14 @@ public final class OpenEnumAPIClient: Sendable {
             public func encode(to encoder: Encoder) throws {
                 var single = encoder.singleValueContainer()
                 switch self {
+                case .users_find(let payload):
+                    try single.encode(payload)
+                case .users_list(let payload):
+                    try single.encode(payload)
+                case .users_create(let payload):
+                    try single.encode(payload)
+                case .workspace_read(let payload):
+                    try single.encode(payload)
                 case .weather_getForecast(let payload):
                     try single.encode(payload)
                 case .charts_plotSignups(let payload):
@@ -2263,6 +2451,154 @@ public final class OpenEnumAPIClient: Sendable {
                 case .countWords(let payload):
                     try single.encode(payload)
                 }
+            }
+        }
+
+        public struct ToolResultUsersFind: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersFindOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersFindOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersFindOutput: Codable, Sendable, Equatable {
+            /// The HTTP status the route answered with
+            public let status: Int
+            /// A user in the system
+            public let body: OpenEnumAPI.User
+
+            public init(
+                status: Int,
+                body: OpenEnumAPI.User
+            ) {
+                self.status = status
+                self.body = body
+            }
+        }
+
+        public struct ToolResultUsersList: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersListOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersListOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersListOutput: Codable, Sendable, Equatable {
+            /// The HTTP status the route answered with
+            public let status: Int
+            public let body: ToolResultUsersListOutputBody
+
+            public init(
+                status: Int,
+                body: ToolResultUsersListOutputBody
+            ) {
+                self.status = status
+                self.body = body
+            }
+        }
+
+        public struct ToolResultUsersListOutputBody: Codable, Sendable, Equatable {
+            public let users: [OpenEnumAPI.User]
+            public let total: Double
+
+            public init(
+                users: [OpenEnumAPI.User],
+                total: Double
+            ) {
+                self.users = users
+                self.total = total
+            }
+        }
+
+        public struct ToolResultUsersCreate: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersCreateOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersCreateOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersCreateOutput: Codable, Sendable, Equatable {
+            /// The HTTP status the route answered with
+            public let status: Int
+            /// A user in the system
+            public let body: OpenEnumAPI.User
+
+            public init(
+                status: Int,
+                body: OpenEnumAPI.User
+            ) {
+                self.status = status
+                self.body = body
+            }
+        }
+
+        public struct ToolResultWorkspaceRead: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultWorkspaceReadOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultWorkspaceReadOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultWorkspaceReadOutput: Codable, Sendable, Equatable {
+            /// The HTTP status the route answered with
+            public let status: Int
+            public let body: ToolResultWorkspaceReadOutputBody
+
+            public init(
+                status: Int,
+                body: ToolResultWorkspaceReadOutputBody
+            ) {
+                self.status = status
+                self.body = body
+            }
+        }
+
+        public struct ToolResultWorkspaceReadOutputBody: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+
+            public init(
+                id: String,
+                name: String
+            ) {
+                self.id = id
+                self.name = name
             }
         }
 
@@ -2408,6 +2744,10 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public enum ToolErrorName: RawRepresentable, Codable, Sendable, Hashable {
+            case usersFind
+            case usersList
+            case usersCreate
+            case workspaceRead
             case weatherGetForecast
             case chartsPlotSignups
             case countWords
@@ -2415,6 +2755,10 @@ public final class OpenEnumAPIClient: Sendable {
 
             public init(rawValue: String) {
                 switch rawValue {
+                case "users.find": self = .usersFind
+                case "users.list": self = .usersList
+                case "users.create": self = .usersCreate
+                case "workspace.read": self = .workspaceRead
                 case "weather.getForecast": self = .weatherGetForecast
                 case "charts.plotSignups": self = .chartsPlotSignups
                 case "countWords": self = .countWords
@@ -2424,6 +2768,10 @@ public final class OpenEnumAPIClient: Sendable {
 
             public var rawValue: String {
                 switch self {
+                case .usersFind: return "users.find"
+                case .usersList: return "users.list"
+                case .usersCreate: return "users.create"
+                case .workspaceRead: return "workspace.read"
                 case .weatherGetForecast: return "weather.getForecast"
                 case .chartsPlotSignups: return "charts.plotSignups"
                 case .countWords: return "countWords"

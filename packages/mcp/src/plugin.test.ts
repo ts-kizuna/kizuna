@@ -29,18 +29,18 @@ const routes = k.routes('api', {
     },
 });
 
+const tools = k.tools({
+    getUser: k.tools.fromRoute(routes.getUser),
+});
+
 const contract = k.contract({
     plugins: {
         mcp: mcpPlugin({
             name: 'Test API',
-            options: {
-                publishRoutes: {
-                    '*': true,
-                },
-            },
         }),
     },
     routes,
+    tools,
 });
 
 const server = new KizunaServer(contract);
@@ -163,23 +163,26 @@ const selective = k.routes('api', {
     },
 });
 
+/**
+ * Only `listUsers` is named as a tool, so only it reaches a model. Leaving
+ * `health` out is the whole mechanism: there is nothing to switch off.
+ */
+const selectiveTools = k.tools({
+    listUsers: k.tools.fromRoute(selective.listUsers),
+});
+
 const selectiveContract = k.contract({
     routes: selective,
+    tools: selectiveTools,
     plugins: ({ routes: contractRoutes }) => ({
         mcp: mcpPlugin({
             name: 'Selective API',
             routes: contractRoutes,
-            options: {
-                publishRoutes: {
-                    '*': true,
-                    health: false,
-                },
-            },
         }),
     }),
 });
 
-describe('mcpPlugin: tool selection', () => {
+describe('mcpPlugin: which routes reach a model', () => {
     let running: Server | undefined;
     let client: Client | undefined;
 
@@ -193,7 +196,7 @@ describe('mcpPlugin: tool selection', () => {
         client = undefined;
     });
 
-    it('serves only the routes the declaration exposes', async () => {
+    it('serves only the routes the tool tree names', async () => {
         const selectiveApi = new KizunaServer(selectiveContract).api({
             router: {
                 listUsers: () => ({

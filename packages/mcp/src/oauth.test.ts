@@ -138,10 +138,20 @@ const apiRoutes = k.routes('api', {
     },
 });
 
+const apiTools = k.tools({
+    api: {
+        getUser: k.tools.fromRoute(apiRoutes.getUser),
+        createUser: k.tools.fromRoute(apiRoutes.createUser),
+        adminReport: k.tools.fromRoute(apiRoutes.adminReport),
+        memberFacts: k.tools.fromRoute(apiRoutes.memberFacts),
+    },
+});
+
 const contract = k.contract({
     routes: {
         api: apiRoutes,
     },
+    tools: apiTools,
     auth: {
         api: {
             '*': 'user',
@@ -159,11 +169,6 @@ const contract = k.contract({
     plugins: {
         mcp: mcpPlugin({
             name: 'OAuth API',
-            options: {
-                publishRoutes: {
-                    '*': true,
-                },
-            },
             oauth: {
                 resource: 'https://api.example.com/mcp',
                 scheme: 'user',

@@ -16,17 +16,6 @@ export const contract = k.contract({
             name: 'ts-kizuna demo',
             routes,
             tools,
-            options: {
-                publishRoutes: {
-                    users: {
-                        '*': true,
-                        exportUsers: false,
-                    },
-                    workspace: true,
-                    members: true,
-                },
-                hideTools: ['countWords'],
-            },
         }),
         openApi: openApiPlugin({
             info: {

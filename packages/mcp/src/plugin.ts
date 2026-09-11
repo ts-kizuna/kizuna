@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
 import { ProtectedResourceMetadataSchema } from '@ts-kizuna/core/schemas';
 import type { Routes, Tools } from '@ts-kizuna/core';
-import type { ToolSelection } from './tool-selection.js';
 import { protectedResourceMetadataPath, type McpOAuthProps } from './oauth.js';
 
 export interface McpPluginProps<R extends Routes = Routes, T extends Tools = Tools> {
@@ -18,10 +17,12 @@ export interface McpPluginProps<R extends Routes = Routes, T extends Tools = Too
     tools?: T;
 
     /**
-     * What the server offers: which routes to publish as tools, and which tools
-     * to hide.
+     * Keep only the tools that cannot change data, the ones whose annotations
+     * declare `readOnlyHint`. A route-derived tool gets that from its method.
+     *
+     * @default false
      */
-    options?: ToolSelection<R, T>;
+    onlyReadOnly?: boolean;
 
     /**
      * Path the endpoint is served from.

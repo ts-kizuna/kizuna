@@ -3,12 +3,23 @@ import { tagRoutes } from './routes.js';
 import { assembleContract, type Contract } from './contract.js';
 import { pluginRouteTree, type ContractPlugins, type ContractPluginsArg, type PluginArgs } from './plugin.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
+import { flattenRoutes } from './handler-pipeline.js';
 import { assertValidDeprecationDates } from './deprecation.js';
 import { assertValidCache } from './cache.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { jobClaims, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, type JobsArg, type JobsConfig } from './jobs.js';
-import { buildTools, type AuthoredTools, type CompiledTools, type Tools } from './tools.js';
+import {
+    attachRouteKeys,
+    buildTools,
+    fromRoute,
+    type AuthoredTools,
+    type CompiledTools,
+    type RouteToolMarker,
+    type RouteToolOverrides,
+    type ToolableRoute,
+    type Tools,
+} from './tools.js';
 import type { ToolsArg } from './tool-runner.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
 import { createIdentity } from './identity.js';
@@ -286,8 +297,23 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *     },
      * });
      */
-    tools<const T extends AuthoredTools, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: T): CompiledTools<T, Name>;
-    tools<const T extends AuthoredTools>(definitions: T): CompiledTools<T, undefined>;
+    tools: {
+        <const T extends AuthoredTools, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: T): CompiledTools<T, Name>;
+        <const T extends AuthoredTools>(definitions: T): CompiledTools<T, undefined>;
+        /**
+         * Name a route as a tool. Its arguments, result, description and
+         * annotations come from the route, and so does the identity it
+         * requires, so a route is never restated to put it in front of a model.
+         *
+         * @example
+         * export const tools = k.tools({
+         *     users: {
+         *         find: k.tools.fromRoute(routes.users.getUser),
+         *     },
+         * });
+         */
+        fromRoute: <const R extends RouteDefinition>(route: R & ToolableRoute<R>, overrides?: RouteToolOverrides) => RouteToolMarker<R>;
+    };
     /**
      * Assemble route groups into a contract. The `auth` map assigns each group
      * (and optionally each route, via a `'*'` cascade) the identity it requires;
@@ -419,10 +445,15 @@ const createSurface = <
             ? buildJobs(undefined, identityOrDefinitions as AuthoredJobs)
             : buildJobs(identityOrDefinitions as string, definitions)) as K<Spec>['jobs'];
 
-    const tools = ((identityOrDefinitions: string | AuthoredTools, definitions?: AuthoredTools) =>
-        definitions === undefined
-            ? buildTools(undefined, identityOrDefinitions as AuthoredTools)
-            : buildTools(identityOrDefinitions as string, definitions)) as K<Spec>['tools'];
+    const tools = Object.assign(
+        (identityOrDefinitions: string | AuthoredTools, definitions?: AuthoredTools) =>
+            definitions === undefined
+                ? buildTools(undefined, identityOrDefinitions as AuthoredTools)
+                : buildTools(identityOrDefinitions as string, definitions),
+        {
+            fromRoute,
+        }
+    ) as K<Spec>['tools'];
 
     const contract = (definition: {
         routes: Routes;
@@ -446,6 +477,12 @@ const createSurface = <
         ]);
         assertValidDeprecationDates(contractRoutes);
         assertValidDeprecationDates(pluginRouteTree(plugins));
+        if (contractTools) {
+            attachRouteKeys(
+                contractTools,
+                new Map(flattenRoutes(contractRoutes).map(({ route, routeKey, routeTags }) => [route, { routeKey, routeTags }]))
+            );
+        }
         if (auth) {
             for (const groupKey of Object.keys(auth)) {
                 if (!(groupKey in contractRoutes)) {
