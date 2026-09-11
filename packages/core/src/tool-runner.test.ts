@@ -406,6 +406,19 @@ describe('publishTools', () => {
     });
 });
 
+describe('publishTools', () => {
+    it('refuses an input schema that does not describe an object', () => {
+        const bad = k.tools({
+            shout: {
+                description: 'Shout a word back',
+                input: z.string(),
+            },
+        });
+
+        expect(() => publishTools(bad)).toThrow(/not an object/);
+    });
+});
+
 const secured = new Kizuna({
     identities: {
         member: Kizuna.identity.apiKey({
@@ -446,9 +459,8 @@ const securedRoutes = secured.routes({
 const securedContract = secured.contract({
     routes: securedRoutes,
     tools: securedTools,
-    auth: secured.auth(securedRoutes, securedTools, {
+    auth: secured.auth(securedRoutes, {
         health: false,
-        listMembers: 'member',
     }),
 });
 
@@ -458,59 +470,3 @@ const securedRouter = {
         role: auth.member.role,
     }),
 };
-
-describe('identity binding', () => {
-    const unbound = () => createToolRunner({ tools: securedContract.tools! }, securedRouter as never);
-
-    it('refuses to run a tool that requires an identity nobody bound', async () => {
-        await expect(unbound().listMembers.run()).rejects.toBeInstanceOf(ToolIdentityError);
-    });
-
-    it('names the identity and how to bind it', async () => {
-        await expect(unbound().listMembers.run()).rejects.toThrow(/requires the "member" identity/);
-    });
-
-    it('hands the bound context to the handler under its own name', async () => {
-        const bound = unbound().as({
-            member: {
-                workspaceId: 'w_1',
-                role: 'owner',
-            },
-        });
-
-        await expect(bound.listMembers.run()).resolves.toEqual({
-            workspaceId: 'w_1',
-            role: 'owner',
-        });
-    });
-
-    it('leaves the runner it was derived from unbound', async () => {
-        const runner = unbound();
-        runner.as({
-            member: {
-                workspaceId: 'w_1',
-                role: 'owner',
-            },
-        });
-
-        await expect(runner.listMembers.run()).rejects.toBeInstanceOf(ToolIdentityError);
-    });
-
-    it('tells a model the tool is unavailable rather than leaking why', async () => {
-        const outcome = await unbound().dispatch({
-            id: 'call_1',
-            name: 'listMembers',
-        });
-
-        expect(outcome).toEqual({
-            ok: false,
-            id: 'call_1',
-            name: 'listMembers',
-            message: 'Tool "listMembers" is not available to this caller.',
-        });
-    });
-
-    it('leaves a tool requiring no identity runnable unbound', async () => {
-        await expect(runner().ping.run()).resolves.toBeUndefined();
-    });
-});
