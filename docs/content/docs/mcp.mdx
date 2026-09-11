@@ -70,12 +70,12 @@ Every tool's name, description, and input schema sits in the model's context on 
 Name the routes you want in the contract's tool tree with [`k.tools.fromRoute`](/docs/tools):
 
 ```ts title="tools.ts"
-export const tools = k.tools({
+export const tools = k.tools(({ fromRoute }) => ({
     users: {
-        find: k.tools.fromRoute(routes.users.getUser),
-        list: k.tools.fromRoute(routes.users.listUsers),
+        find: fromRoute(routes.users.getUser),
+        list: fromRoute(routes.users.listUsers),
     },
-});
+}));
 ```
 
 There is no map of what to exclude, because a route that is not written here is not a tool. Everything about the tool comes from the route: its arguments, its result, its description, its annotations, and the identity it requires.
@@ -83,7 +83,7 @@ There is no map of what to exclude, because a route that is not written here is 
 Give the model different words when the route's summary was written for a developer reading your docs:
 
 ```ts title="tools.ts"
-pause: k.tools.fromRoute(routes.meta.pauseAd, {
+pause: fromRoute(routes.meta.pauseAd, {
     description: 'Pause a running ad. The spend stops within a minute.',
 }),
 ```
@@ -114,9 +114,9 @@ Not everything a model calls has to be an endpoint. A tool declared with [`k.too
 Both kinds sit in the same tree and publish the same way:
 
 ```ts title="tools.ts"
-export const tools = k.tools({
+export const tools = k.tools(({ fromRoute }) => ({
     users: {
-        find: k.tools.fromRoute(routes.users.getUser),
+        find: fromRoute(routes.users.getUser),
     },
     countWords: {
         description: 'Count the words in a piece of text',

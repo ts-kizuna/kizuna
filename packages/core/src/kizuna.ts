@@ -13,6 +13,8 @@ import {
     attachRouteKeys,
     buildTools,
     fromRoute,
+    resolveAuthoredTools,
+    type AuthoredToolsArg,
     type AuthoredTools,
     type CompiledTools,
     type RouteToolMarker,
@@ -298,8 +300,11 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      * });
      */
     tools: {
-        <const T extends AuthoredTools, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: T): CompiledTools<T, Name>;
-        <const T extends AuthoredTools>(definitions: T): CompiledTools<T, undefined>;
+        <const T extends AuthoredTools, const Name extends IdentityNamesOf<Spec>>(
+            identity: Name,
+            definitions: AuthoredToolsArg<T>
+        ): CompiledTools<T, Name>;
+        <const T extends AuthoredTools>(definitions: AuthoredToolsArg<T>): CompiledTools<T, undefined>;
         /**
          * Name a route as a tool. Its arguments, result, description and
          * annotations come from the route, and so does the identity it
@@ -446,10 +451,10 @@ const createSurface = <
             : buildJobs(identityOrDefinitions as string, definitions)) as K<Spec>['jobs'];
 
     const tools = Object.assign(
-        (identityOrDefinitions: string | AuthoredTools, definitions?: AuthoredTools) =>
+        (identityOrDefinitions: string | AuthoredToolsArg<AuthoredTools>, definitions?: AuthoredToolsArg<AuthoredTools>) =>
             definitions === undefined
-                ? buildTools(undefined, identityOrDefinitions as AuthoredTools)
-                : buildTools(identityOrDefinitions as string, definitions),
+                ? buildTools(undefined, resolveAuthoredTools(identityOrDefinitions as AuthoredToolsArg<AuthoredTools>))
+                : buildTools(identityOrDefinitions as string, resolveAuthoredTools(definitions)),
         {
             fromRoute,
         }

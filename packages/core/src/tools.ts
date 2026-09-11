@@ -247,6 +247,30 @@ export const fromRoute = <const R extends RouteDefinition>(
 export const isRouteToolMarker = (value: unknown): value is RouteToolMarker => !!value && typeof value === 'object' && FROM_ROUTE in value;
 
 /**
+ * What `k.tools` hands a builder function. The helper is scoped to the tree it
+ * builds, so `k.tools.fromRoute` need not be written on every line of a tree
+ * that is already inside `k.tools`.
+ */
+export interface ToolBuilderHelpers {
+    fromRoute: typeof fromRoute;
+}
+
+/**
+ * The tools themselves, or a function handed the helpers that build them.
+ */
+export type AuthoredToolsArg<T extends AuthoredTools> = T | ((helpers: ToolBuilderHelpers) => T);
+
+const toolBuilderHelpers: ToolBuilderHelpers = {
+    fromRoute,
+};
+
+/**
+ * A builder's tools, or the tools as given.
+ */
+export const resolveAuthoredTools = <T extends AuthoredTools>(given: AuthoredToolsArg<T>): T =>
+    typeof given === 'function' ? given(toolBuilderHelpers) : given;
+
+/**
  * A tool after `k.tools` compiles it.
  */
 export interface CompiledTool<

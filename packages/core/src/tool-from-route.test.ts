@@ -255,3 +255,44 @@ describe('k.tools.fromRoute', () => {
         ).toThrow(/not on this contract/);
     });
 });
+
+describe('the builder form', () => {
+    it('builds the same tree as naming the helper in full', () => {
+        const viaBuilder = k.tools(({ fromRoute }) => ({
+            users: {
+                find: fromRoute(routes.users.getUser),
+            },
+        }));
+
+        const viaHelper = k.tools({
+            users: {
+                find: k.tools.fromRoute(routes.users.getUser),
+            },
+        });
+
+        expect(viaBuilder.users.find.definition.description).toBe(viaHelper.users.find.definition.description);
+        expect(viaBuilder.users.find.definition.title).toBe(viaHelper.users.find.definition.title);
+        expect(viaBuilder.users.find.definition.annotations).toEqual(viaHelper.users.find.definition.annotations);
+        expect(z.toJSONSchema(viaBuilder.users.find.input!, { io: 'input' })).toEqual(
+            z.toJSONSchema(viaHelper.users.find.input!, { io: 'input' })
+        );
+        expect(viaBuilder.users.find.route).toBe(routes.users.getUser);
+    });
+
+    it('takes an identity alongside the builder', () => {
+        const secured = k.tools('member', ({ fromRoute }) => ({
+            countWords: {
+                description: 'Count the words in a piece of text',
+                input: z.object({
+                    text: z.string(),
+                }),
+            },
+            find: fromRoute(routes.users.getUser),
+        }));
+
+        expect(secured.countWords.identity).toBe('member');
+        // A route carries its own authorization, so the group identity is not
+        // pushed onto it.
+        expect(secured.find.identity).toBeUndefined();
+    });
+});

@@ -184,13 +184,15 @@ Most of what a model needs to do, your API already does. A route has an input sc
 Name the route instead:
 
 ```ts title="tools.ts"
-export const tools = k.tools({
+export const tools = k.tools(({ fromRoute }) => ({
     users: {
-        find: k.tools.fromRoute(routes.users.getUser),
-        list: k.tools.fromRoute(routes.users.listUsers),
+        find: fromRoute(routes.users.getUser),
+        list: fromRoute(routes.users.listUsers),
     },
-});
+}));
 ```
+
+`k.tools` hands the builder a `fromRoute`, so a tree that is already inside `k.tools` does not repeat it on every line. `k.tools.fromRoute` is the same function, for when you want it once.
 
 Nothing is restated. The tool takes the route's path parameters, query and body as its arguments, answers with the route's own responses, describes itself from the route's summary, and runs the route's handler. Its `readOnlyHint` and `destructiveHint` come from what RFC 9110 says about the method, so a `GET` is marked safe and a `DELETE` destructive without you saying so.
 
@@ -215,8 +217,8 @@ The route's own `security` and `accessGate` decide, so authorization stays in [`
 A route whose response [streams](/docs/streaming) has no single value to answer with, and one that reads a form body has nowhere to put JSON arguments. Naming either is a compile error where you named it:
 
 ```ts
-k.tools.fromRoute(routes.assistant.reply);
-//                ~~~~~~~~~~~~~~~~~~~~~
+fromRoute(routes.assistant.reply);
+//        ~~~~~~~~~~~~~~~~~~~~~
 // This route streams, so it cannot be a tool.
 ```
 
@@ -225,13 +227,12 @@ k.tools.fromRoute(routes.assistant.reply);
 A route's summary was written for a developer reading your docs. A model reads the description to decide whether to call the tool at all, so override it when the two want different words:
 
 ```ts title="tools.ts"
-pause: k.tools.fromRoute(routes.meta.pauseAd, {
+pause: fromRoute(routes.meta.pauseAd, {
     description: 'Pause a running ad. The spend stops within a minute.',
 }),
 ```
 
 `title` and `annotations` take an override the same way.
-
 
 ## Driving the model
 

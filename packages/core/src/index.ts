@@ -128,6 +128,8 @@ export {
     type RouteToolInputValue,
     type RouteToolOutputValue,
     type ToolableRoute,
+    type ToolBuilderHelpers,
+    type AuthoredToolsArg,
     type CompiledRouteTool,
     type NeedsToolHandler,
     type FlattenedTool,

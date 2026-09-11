@@ -51,10 +51,10 @@ Props are pure data. `mcpPluginServer()` takes nothing: declaring the plugin is 
 Everything in the contract's tool tree, and nothing else. A route reaches a model by being named there with `k.tools.fromRoute`, so there is no map of exclusions to keep in step with the routes:
 
 ```ts title="tools.ts"
-export const tools = k.tools({
+export const tools = k.tools(({ fromRoute }) => ({
     users: {
-        find: k.tools.fromRoute(routes.users.getUser),
-        list: k.tools.fromRoute(routes.users.listUsers),
+        find: fromRoute(routes.users.getUser),
+        list: fromRoute(routes.users.listUsers),
     },
     countWords: {
         description: 'Count the words in a piece of text',
