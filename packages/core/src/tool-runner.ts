@@ -52,13 +52,13 @@ export type ToolTree<Tools_ extends Tools> = {
 };
 
 /**
- * One tool resolved for publication: its MCP name alongside everything a
- * publisher needs. The schemas stay as Zod, because MCP's own SDK converts
+ * One tool resolved for a model: the name it answers to, alongside everything
+ * that describes it. The schemas stay as Zod, because MCP's own SDK converts
  * them and a model-facing list converts them differently.
  */
-export interface PublishedTool {
+export interface ResolvedTool {
     /**
-     * The MCP name, e.g. `weather_get_forecast`.
+     * The name a model calls it by, e.g. `weather_get_forecast`.
      */
     name: string;
     /**
@@ -380,11 +380,11 @@ const toArgumentSchema = (schema: z.ZodType, toolKey: string): JsonSchemaObject 
 };
 
 /**
- * Resolve tools for publication: the MCP name, and the declaration behind it.
- * Both `tools.definitions` and the MCP plugin build on this, so a tool is
- * named and described in exactly one place.
+ * Resolve a tool tree for a model: the name each one answers to, and the
+ * declaration behind it. Both `tools.definitions` and the MCP plugin build on
+ * this, so a tool is named and described in exactly one place.
  */
-export const publishedTools = (tools: FlattenedTool[]): PublishedTool[] =>
+export const resolveTools = (tools: FlattenedTool[]): ResolvedTool[] =>
     tools.map(({ toolKey, tool }) => ({
         name: toToolName(toolKey),
         toolKey,
@@ -399,11 +399,11 @@ export const publishedTools = (tools: FlattenedTool[]): PublishedTool[] =>
     }));
 
 /**
- * Every tool in MCP's `Tool` shape, schemas converted to JSON Schema. Backs
- * `tools.definitions`.
+ * Every tool in MCP's `Tool` shape, schemas converted to JSON Schema. This is
+ * what a model is given, and it backs `tools.definitions`.
  */
-export const publishTools = (tools: Tools): ModelFacingTool[] =>
-    publishedTools(flattenTools(tools)).map((published) => ({
+export const modelFacingTools = (tools: Tools): ModelFacingTool[] =>
+    resolveTools(flattenTools(tools)).map((published) => ({
         name: published.name,
         ...(published.title === undefined ? {} : { title: published.title }),
         description: published.description,
@@ -611,7 +611,7 @@ export const createToolRunner = <Tools_ extends Tools>(
             runRoute
         );
 
-    tree['definitions'] = publishTools(tools);
+    tree['definitions'] = modelFacingTools(tools);
 
     tree['keyOf'] = (publishedName: string): string => {
         const toolKey = keys.get(publishedName);

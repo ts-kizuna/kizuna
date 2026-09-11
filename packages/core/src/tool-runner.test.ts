@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
-import { createToolRunner, publishTools, ToolExecutionError, ToolIdentityError, ToolInputError, ToolOutputError } from './tool-runner.js';
+import {
+    createToolRunner,
+    modelFacingTools,
+    ToolExecutionError,
+    ToolIdentityError,
+    ToolInputError,
+    ToolOutputError,
+} from './tool-runner.js';
 import type { ToolHandlers } from './tools.js';
 
 const k = new Kizuna();
@@ -153,9 +160,9 @@ describe('keyOf', () => {
     });
 });
 
-describe('publishTools', () => {
+describe('modelFacingTools', () => {
     it('shapes every tool the way MCP declares one', () => {
-        expect(publishTools(tools)).toEqual([
+        expect(modelFacingTools(tools)).toEqual([
             {
                 name: 'weather_get_forecast',
                 title: 'Weather forecast',
@@ -393,7 +400,7 @@ describe('emit', () => {
     });
 });
 
-describe('publishTools', () => {
+describe('modelFacingTools', () => {
     it('refuses an input schema that does not describe an object', () => {
         const bad = k.tools({
             shout: {
@@ -402,11 +409,11 @@ describe('publishTools', () => {
             },
         });
 
-        expect(() => publishTools(bad)).toThrow(/not an object/);
+        expect(() => modelFacingTools(bad)).toThrow(/not an object/);
     });
 });
 
-describe('publishTools', () => {
+describe('modelFacingTools', () => {
     it('refuses an input schema that does not describe an object', () => {
         const bad = k.tools({
             shout: {
@@ -415,7 +422,7 @@ describe('publishTools', () => {
             },
         });
 
-        expect(() => publishTools(bad)).toThrow(/not an object/);
+        expect(() => modelFacingTools(bad)).toThrow(/not an object/);
     });
 });
 

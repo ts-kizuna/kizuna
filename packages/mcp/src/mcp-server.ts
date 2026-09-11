@@ -22,7 +22,7 @@ import type { Contract, Routes, RouteDefinition, SecurityScheme } from '@ts-kizu
 import { isIdempotentMethod, isSafeMethod } from './method.js';
 import { deriveToolNames } from '@ts-kizuna/core/generator';
 import { flattenTools, toolRunnerFrom, TOOLS_META, type ToolsMeta } from '@ts-kizuna/core/adapter';
-import { publishedTools, type PublishedTool, type Tools, type ToolDispatchOutcome, type UntrustedToolCall } from '@ts-kizuna/core';
+import { resolveTools, type ResolvedTool, type Tools, type ToolDispatchOutcome, type UntrustedToolCall } from '@ts-kizuna/core';
 import { buildToolInputSchema, buildToolOutputSchema, type ToolInputSchema } from './schema.js';
 
 export interface McpServerOptions {
@@ -139,15 +139,12 @@ export interface ToolDefinition {
 }
 
 /**
- * The tools a server publishes: everything the contract declares, less the ones
+ * What the server offers a model: every tool on the contract, less the ones
  * that change data when `onlyReadOnly` is set.
- *
- * There is no selection map. A route reaches a model by being named in the tool
- * tree with `k.tools.fromRoute`, so not publishing one is not writing the line.
  */
-export const buildDeclaredToolDefinitions = (tools: Tools | undefined, options?: McpServerOptions): PublishedTool[] => {
+export const toolsOffered = (tools: Tools | undefined, options?: McpServerOptions): ResolvedTool[] => {
     if (!tools) return [];
-    const selected = publishedTools(flattenTools(tools)).filter(
+    const selected = resolveTools(flattenTools(tools)).filter(
         (tool) => options?.onlyReadOnly !== true || tool.annotations?.readOnlyHint === true
     );
     // Names are derived once here so a bad key fails at startup, not at call time.
@@ -161,11 +158,10 @@ export const buildDeclaredToolDefinitions = (tools: Tools | undefined, options?:
 };
 
 /**
- * A tool's description with what it requires appended, so a model reads the
- * constraint alongside what the tool does. A route-derived tool takes the
- * route's own requirements; a declared one takes its identity.
+ * What a model reads before it picks the tool. A tool running a route names
+ * that route's requirements, so the constraint arrives with the description.
  */
-const publishedDescription = (published: PublishedTool): string => {
+const describeTool = (published: ResolvedTool): string => {
     if (published.route !== undefined) {
         const route = published.route;
         const requirements = resolveSecurityRequirements(route);
@@ -181,7 +177,7 @@ const publishedDescription = (published: PublishedTool): string => {
  */
 export const buildInstructions = (
     contract: Contract | undefined,
-    published: readonly PublishedTool[],
+    published: readonly ResolvedTool[],
     authored: string | undefined
 ): string => {
     const sections: string[] = [];
@@ -356,7 +352,7 @@ interface DeclaredToolRunner {
  * in the auth map and governs both surfaces.
  */
 export const toolRequirements = (
-    definition: PublishedTool
+    definition: ResolvedTool
 ): { requirements: ReturnType<typeof resolveSecurityRequirements>; accessGate: RouteDefinition['accessGate'] } => {
     if (definition.route !== undefined) {
         return {
@@ -377,7 +373,7 @@ export const toolRequirements = (
  * bound to the runner before the call.
  */
 const executeToolCall = async (
-    definition: PublishedTool,
+    definition: ResolvedTool,
     args: Record<string, unknown>,
     runner: DeclaredToolRunner | undefined,
     handlerContext?: Record<string, unknown>,
@@ -487,7 +483,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
               }
     ) as DeclaredToolRunner | undefined;
 
-    const published = buildDeclaredToolDefinitions(contract?.tools, options);
+    const published = toolsOffered(contract?.tools, options);
 
     const server = new McpServer(
         {
@@ -508,7 +504,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     : {
                           title: definition.title,
                       }),
-                description: publishedDescription(definition),
+                description: describeTool(definition),
                 inputSchema: definition.input,
                 outputSchema: definition.output,
                 annotations: definition.annotations ?? {},

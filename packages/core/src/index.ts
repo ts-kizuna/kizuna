@@ -153,8 +153,8 @@ export {
 export { readToolCalls, type ToolCallRecord, type ToolCallState, type ToolCallMessage } from './tool-records.js';
 export {
     createToolRunner,
-    publishTools,
-    publishedTools,
+    modelFacingTools,
+    resolveTools,
     ToolInputError,
     ToolOutputError,
     ToolExecutionError,
@@ -165,7 +165,7 @@ export {
     type ToolRunArgs,
     type ToolRunReturn,
     type ToolsArg,
-    type PublishedTool,
+    type ResolvedTool,
     type ModelFacingTool,
     type JsonSchemaObject,
     type UntrustedToolCall,

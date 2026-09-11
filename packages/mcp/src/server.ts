@@ -4,7 +4,7 @@ import {
     declaredScopes,
     type Contract,
     type ProtectedResourceMetadata,
-    type PublishedTool,
+    type ResolvedTool,
     type RouteDefinition,
     type SecurityScheme,
 } from '@ts-kizuna/core';
@@ -20,14 +20,14 @@ import {
     type GuardMap,
     type GuardRun,
 } from '@ts-kizuna/core/adapter';
-import { buildDeclaredToolDefinitions, createMcpServer, toolRequirements } from './mcp-server.js';
+import { toolsOffered, createMcpServer, toolRequirements } from './mcp-server.js';
 import { mcpPlugin } from './plugin.js';
 import { assertCanonicalResource, protectedResourceMetadataUrl, type McpOAuthProps } from './oauth.js';
 import { denialResponse, enforceOAuth } from './oauth-enforcement.js';
 
 export {
     createMcpServer,
-    buildDeclaredToolDefinitions,
+    toolsOffered,
     buildInstructions,
     type McpServerOptions,
     type ToolDefinition,
@@ -55,7 +55,7 @@ interface OAuthEnforcement {
     metadata: ProtectedResourceMetadata;
     metadataUrl: string;
     scopesSupported: readonly string[] | undefined;
-    tools: Map<string, PublishedTool>;
+    tools: Map<string, ResolvedTool>;
 }
 
 const prepareOAuth = (oauth: McpOAuthProps, endpointPath: `/${string}`, api: ApiWithRouter, onlyReadOnly?: boolean): OAuthEnforcement => {
@@ -84,7 +84,7 @@ const prepareOAuth = (oauth: McpOAuthProps, endpointPath: `/${string}`, api: Api
         // challenged with no scopes at all, which is how a declared tool used to
         // slip past the scope check entirely.
         tools: new Map(
-            buildDeclaredToolDefinitions(contractOf<Contract | undefined>(api)?.tools, { onlyReadOnly }).map((definition) => [
+            toolsOffered(contractOf<Contract | undefined>(api)?.tools, { onlyReadOnly }).map((definition) => [
                 definition.name,
                 definition,
             ])

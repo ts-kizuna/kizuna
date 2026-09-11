@@ -79,7 +79,7 @@ export {
 export type { CompiledJob, Jobs, JobHandler, JobHandlers, FlattenedJob } from './jobs.js';
 export type { CompiledTool, Tools, ToolHandler, ToolHandlers, FlattenedTool } from './tools.js';
 export { flattenTools, isCompiledTool, toolAt } from './tools.js';
-export { createToolRunner, publishTools, type ToolRunner, type RouteToolExecutor, type BoundToolAuth } from './tool-runner.js';
+export { createToolRunner, modelFacingTools, type ToolRunner, type RouteToolExecutor, type BoundToolAuth } from './tool-runner.js';
 export { flattenJobs, isCompiledJob, jobAt } from './jobs.js';
 export {
     createJobRunner,

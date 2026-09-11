@@ -566,7 +566,7 @@ Nothing here is a new transport. Every piece reduces to something kizuna already
 
 **Execution is one runner.** `createToolRunner` pairs the contract's tools with their handlers and hands the result to every route handler as `tools`, the same way `jobs` is threaded. `tools.call`, `tools.<key>.run` and the MCP endpoint all go through it, so input validation, the handler, and output validation happen in one place whoever asked.
 
-**Publishing is a projection.** `publishedTools` resolves the MCP name and the declaration behind it. `tools.definitions` converts its schemas to JSON Schema for a model; the MCP plugin hands the Zod schemas to the MCP SDK, which converts them itself. Both read the same derivation, so a tool is named and described in one place.
+**Publishing is a projection.** `resolveTools` resolves the MCP name and the declaration behind it. `tools.definitions` converts its schemas to JSON Schema for a model; the MCP plugin hands the Zod schemas to the MCP SDK, which converts them itself. Both read the same derivation, so a tool is named and described in one place.
 
 ## What kizuna leaves out
 

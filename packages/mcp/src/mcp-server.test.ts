@@ -4,7 +4,7 @@ import { Kizuna } from '@ts-kizuna/core';
 import { assembleApi, TOOLS_META, type GuardDeny } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/client';
-import { buildInstructions, buildDeclaredToolDefinitions, createMcpServer } from './mcp-server.js';
+import { buildInstructions, toolsOffered, createMcpServer } from './mcp-server.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -830,14 +830,14 @@ describe('MCP server: guards', () => {
 
 describe('instructions', () => {
     it('explains the envelope and lists the contract tag groups', () => {
-        const instructions = buildInstructions(contract, buildDeclaredToolDefinitions(contract.tools), undefined);
+        const instructions = buildInstructions(contract, toolsOffered(contract.tools), undefined);
 
         expect(instructions).toContain('{ status, body }');
         expect(instructions).toContain('- API');
     });
 
     it('appends the authored text after the generated overview', () => {
-        const instructions = buildInstructions(contract, buildDeclaredToolDefinitions(contract.tools), 'Every timestamp is UTC.');
+        const instructions = buildInstructions(contract, toolsOffered(contract.tools), 'Every timestamp is UTC.');
 
         expect(instructions.indexOf('- API')).toBeLessThan(instructions.indexOf('Every timestamp is UTC.'));
     });
@@ -864,7 +864,7 @@ describe('instructions', () => {
             }),
         });
 
-        const instructions = buildInstructions(declaredOnly, buildDeclaredToolDefinitions(declaredOnly.tools), undefined);
+        const instructions = buildInstructions(declaredOnly, toolsOffered(declaredOnly.tools), undefined);
 
         expect(instructions).toContain('return their own result directly');
         expect(instructions).not.toContain('{ status, body }');
