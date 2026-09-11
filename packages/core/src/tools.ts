@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import type { ContextOf } from './security-scheme.js';
+import type { IdentityAccess } from './identity.js';
 
 /**
  * MCP's tool annotations, verbatim. A route derives these from its method's
@@ -112,10 +114,34 @@ export type CompiledTools<Definitions extends AuthoredTools, IdentityName extend
 export type NoTools = Record<string, never>;
 
 /**
- * The single object a tool handler receives: its own input and `throwError`,
- * and nothing else. Anything more it imports, as a route handler would.
+ * The verified identity a tool receives, keyed by the identity's own name so it
+ * reads exactly as a route handler's does. Absent when the tool requires no
+ * identity, and absent when that identity carries nothing to hand over.
+ *
+ * A tool never verifies anything. Whoever calls it supplies the context its
+ * guard already resolved.
  */
-export type ToolHandlerArgs<Definition extends ToolDefinition> = {
+export type ToolAuthArg<IdentityName extends string | undefined, Identities> = IdentityName extends string
+    ? IdentityName extends keyof Identities
+        ? [keyof (ContextOf<Identities[IdentityName]> & IdentityAccess<Identities[IdentityName]>)] extends [never]
+            ? {}
+            : {
+                  auth: {
+                      [Name in IdentityName]: ContextOf<Identities[Name]> & IdentityAccess<Identities[Name]>;
+                  };
+              }
+        : {}
+    : {};
+
+/**
+ * The single object a tool handler receives: its own input, `throwError`, and
+ * the identity it requires. Anything more it imports, as a route handler would.
+ */
+export type ToolHandlerArgs<
+    Definition extends ToolDefinition,
+    IdentityName extends string | undefined = undefined,
+    Identities = Record<string, never>,
+> = {
     /**
      * The validated arguments, or `undefined` when the tool declares no
      * `input`.
@@ -132,7 +158,7 @@ export type ToolHandlerArgs<Definition extends ToolDefinition> = {
      * This function throws internally and never returns.
      */
     throwError: (message: string) => never;
-};
+} & ToolAuthArg<IdentityName, Identities>;
 
 /**
  * What a tool handler returns: its `output`, or nothing when it declares none.
@@ -143,18 +169,18 @@ export type ToolHandlerReturn<Definition extends ToolDefinition> = Definition ex
     ? z.input<Definition['output']>
     : void;
 
-export type ToolHandler<Tool extends CompiledTool> = (
-    args: ToolHandlerArgs<Tool['definition']>
+export type ToolHandler<Tool extends CompiledTool, Identities = Record<string, never>> = (
+    args: ToolHandlerArgs<Tool['definition'], Tool['identity'], Identities>
 ) => Promise<ToolHandlerReturn<Tool['definition']>> | ToolHandlerReturn<Tool['definition']>;
 
 /**
  * The handlers `server.tools` accepts: one per declared tool, keyed by name.
  */
-export type ToolHandlers<Tools_ extends Tools> = {
+export type ToolHandlers<Tools_ extends Tools, Identities = Record<string, never>> = {
     [Name in keyof Tools_]: Tools_[Name] extends CompiledTool
-        ? ToolHandler<Tools_[Name]>
+        ? ToolHandler<Tools_[Name], Identities>
         : Tools_[Name] extends Tools
-          ? ToolHandlers<Tools_[Name]>
+          ? ToolHandlers<Tools_[Name], Identities>
           : never;
 };
 
@@ -206,7 +232,7 @@ const assertValidTool = (toolKey: string, definition: ToolDefinition): void => {
  * Names the tool runner puts on the root of the tree, so a top-level tool or
  * group cannot take them.
  */
-const RESERVED_ROOT_NAMES = ['call', 'dispatch', 'emit', 'definitions', 'keyOf'] as const;
+const RESERVED_ROOT_NAMES = ['call', 'dispatch', 'emit', 'as', 'definitions', 'keyOf'] as const;
 
 /**
  * Compile authored tool definitions into {@link Tools}, preserving nesting.

@@ -512,23 +512,33 @@ const executeToolCall = async (
 type DeclaredToolDispatch = (call: UntrustedToolCall) => Promise<ToolDispatchOutcome<Tools>>;
 
 /**
+ * The two methods a declared tool call needs: binding the identity this request
+ * verified, then dispatching against it.
+ */
+interface DeclaredToolRunner {
+    dispatch: DeclaredToolDispatch;
+    as: (auth: Record<string, unknown>) => DeclaredToolRunner;
+}
+
+/**
  * Run one declared tool. There is no HTTP envelope here, so the result carries
  * the tool's own output and nothing more.
  */
 const executeDeclaredToolCall = async (
     definition: PublishedTool,
     args: Record<string, unknown>,
-    dispatch: DeclaredToolDispatch | undefined,
+    runner: DeclaredToolRunner | undefined,
     handlerContext?: Record<string, unknown>,
     guards?: GuardMap,
     schemes?: Record<string, SecurityScheme>,
     credentialHeaders?: Record<string, string | string[] | undefined>,
     transportAuth?: McpServerOptions['transportAuth']
 ): Promise<ToolCallResult> => {
-    if (!dispatch) {
+    if (!runner) {
         return toolError(500, `No handler was bound for tool "${definition.toolKey}".`);
     }
 
+    let bound = runner;
     const { identity } = definition;
     if (identity !== undefined) {
         const guardOutcome = await runGuards(
@@ -548,13 +558,16 @@ const executeDeclaredToolCall = async (
             transportAuth
         );
         if (!guardOutcome.ok) return guardOutcome.result;
+        // The guard resolved who is calling. The handler needs it, so bind it
+        // rather than letting the tool read a selector out of model input.
+        bound = runner.as(guardOutcome.securityContext);
     }
 
     // `dispatch` rather than `call`, because the runner here is typed over the
     // erased `Tools`, where a call's name narrows to `never`. It also answers
     // every failure as the sentence a model reads, which is what MCP asks a
     // tool execution error to carry.
-    const outcome = await dispatch({
+    const outcome = await bound.dispatch({
         id: definition.name,
         name: definition.toolKey,
         input: args,
@@ -613,7 +626,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
     const toolsMeta = (api as unknown as Record<typeof TOOLS_META, ToolsMeta | undefined>)[TOOLS_META];
     // Reached through the tool tree's index signature, so narrowed once here
     // rather than at every call site.
-    const toolDispatch = toolRunnerFrom(toolsMeta)?.dispatch as DeclaredToolDispatch | undefined;
+    const toolRunner = toolRunnerFrom(toolsMeta) as DeclaredToolRunner | undefined;
 
     const definitions = buildToolDefinitions(api.routes, options);
     const declared = buildDeclaredToolDefinitions(contract?.tools, options);
@@ -687,7 +700,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                 executeDeclaredToolCall(
                     definition,
                     (args ?? {}) as Record<string, unknown>,
-                    toolDispatch,
+                    toolRunner,
                     options?.handlerContext,
                     guards,
                     schemes,

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
-import { createToolRunner, publishTools, ToolExecutionError, ToolInputError, ToolOutputError } from './tool-runner.js';
+import { createToolRunner, publishTools, ToolExecutionError, ToolIdentityError, ToolInputError, ToolOutputError } from './tool-runner.js';
 import type { ToolHandlers } from './tools.js';
 
 const k = new Kizuna();
@@ -403,5 +403,93 @@ describe('publishTools', () => {
         });
 
         expect(() => publishTools(bad)).toThrow(/not an object/);
+    });
+});
+
+const secured = new Kizuna({
+    identities: {
+        member: Kizuna.identity.apiKey({
+            name: 'x-workspace-token',
+            in: 'header',
+            context: z.object({
+                workspaceId: z.string(),
+            }),
+            access: z.object({
+                role: z.enum(['owner', 'admin']),
+            }),
+        }),
+    },
+});
+
+const securedTools = secured.tools('member', {
+    listMembers: {
+        description: 'List the members of the current workspace',
+        output: z.object({
+            workspaceId: z.string(),
+            role: z.string(),
+        }),
+    },
+});
+
+const securedRouter = {
+    listMembers: ({ auth }: { auth: { member: { workspaceId: string; role: string } } }) => ({
+        workspaceId: auth.member.workspaceId,
+        role: auth.member.role,
+    }),
+};
+
+describe('identity binding', () => {
+    const unbound = () => createToolRunner({ tools: securedTools }, securedRouter as never);
+
+    it('refuses to run a tool that requires an identity nobody bound', async () => {
+        await expect(unbound().listMembers.run()).rejects.toBeInstanceOf(ToolIdentityError);
+    });
+
+    it('names the identity and how to bind it', async () => {
+        await expect(unbound().listMembers.run()).rejects.toThrow(/requires the "member" identity/);
+    });
+
+    it('hands the bound context to the handler under its own name', async () => {
+        const bound = unbound().as({
+            member: {
+                workspaceId: 'w_1',
+                role: 'owner',
+            },
+        });
+
+        await expect(bound.listMembers.run()).resolves.toEqual({
+            workspaceId: 'w_1',
+            role: 'owner',
+        });
+    });
+
+    it('leaves the runner it was derived from unbound', async () => {
+        const runner = unbound();
+        runner.as({
+            member: {
+                workspaceId: 'w_1',
+                role: 'owner',
+            },
+        });
+
+        await expect(runner.listMembers.run()).rejects.toBeInstanceOf(ToolIdentityError);
+    });
+
+    it('tells a model the tool is unavailable rather than leaking why', async () => {
+        const outcome = await unbound().dispatch({
+            id: 'call_1',
+            name: 'listMembers',
+        });
+
+        expect(outcome).toEqual({
+            ok: false,
+            id: 'call_1',
+            name: 'listMembers',
+            message: 'Tool "listMembers" is not available to this caller.',
+        });
+    });
+
+    it('leaves a tool requiring no identity runnable unbound', async () => {
+        await expect(runner().ping.run()).resolves.toBeUndefined();
     });
 });

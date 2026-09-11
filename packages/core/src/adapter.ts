@@ -1254,7 +1254,10 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             throwError,
             ...handlerContext,
             ...(jobRunner ? { jobs: jobRunner } : {}),
-            ...(toolRunner ? { tools: toolRunner } : {}),
+            // The route's own guards already ran, so a tool it calls receives
+            // that verified identity rather than re-authenticating or, worse,
+            // reading a selector out of model-chosen input.
+            ...(toolRunner ? { tools: Object.keys(securityContext).length > 0 ? toolRunner.as(securityContext) : toolRunner } : {}),
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
             ...(pluginExports && Object.keys(pluginExports).length > 0 ? { plugins: pluginExports } : {}),

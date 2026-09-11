@@ -121,6 +121,7 @@ export {
     type ToolHandlers,
     type ToolHandlerArgs,
     type ToolHandlerReturn,
+    type ToolAuthArg,
     type FlattenedTool,
     type NoTools,
     isCompiledTool,
@@ -147,6 +148,7 @@ export {
     ToolInputError,
     ToolOutputError,
     ToolExecutionError,
+    ToolIdentityError,
     type ToolRunner,
     type ToolTree,
     type ToolFn,
@@ -160,6 +162,7 @@ export {
     type ToolDispatchOutcome,
     type ToolDispatchFailure,
     type ToolEventMessage,
+    type BoundToolAuth,
 } from './tool-runner.js';
 export {
     createJobTransport,

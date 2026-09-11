@@ -97,7 +97,7 @@ responses: {
 
 ## Write the handlers
 
-A handler receives the validated `input` and `throwError`. Anything else it imports, the way a route handler does.
+A handler receives the validated `input`, `throwError`, and the identity its tool requires. Anything else it imports, the way a route handler does.
 
 ```ts title="server/tools.ts"
 import { forecastFor } from '../weather';
@@ -116,6 +116,49 @@ export const toolHandlers = server.tools({
 ```
 
 `throwError` takes a message rather than a `{ status, body }` envelope, since a tool has no HTTP status. It reaches the client as a `tool_error`, and a model over MCP reads it as an execution error it can retry.
+
+</Step>
+
+<Step>
+
+## Take the caller, never ask for it
+
+Give the group an identity and every handler in it receives that identity's context under `auth`, typed exactly as a route handler's is:
+
+```ts title="tools.ts"
+export const tools = k.tools('member', {
+    workspace: {
+        listMembers: {
+            description: 'List the members of the current workspace',
+            input: z.object({
+                role: RoleSchema.optional(),
+            }),
+            output: MemberListSchema,
+        },
+    },
+});
+```
+
+```ts title="server/tools.ts"
+listMembers: ({ input, auth }) => membersOf(auth.member.workspaceId, input.role),
+```
+
+A tool never authenticates. By the time it runs, whoever called it has been verified: the MCP transport ran the guard, or the route handler's own guard already did. That context is bound to the runner before your handler sees it.
+
+This is why the workspace is not an `input` field. Input is what the model chooses, so a selector declared there lets the model pick whose data it reads. `auth` arrives out of band, and a tool requiring an identity refuses to run without one.
+
+Outside a request there is no guard to run, so bind one yourself:
+
+```ts
+const asMember = tools.as({
+    member: {
+        workspaceId: 'w_1',
+        role: 'owner',
+    },
+});
+
+await asMember.workspace.listMembers.run({});
+```
 
 </Step>
 
@@ -464,7 +507,7 @@ export const contract = k.contract({
 
 A route is an HTTP endpoint rather than a tool, so turning one into a tool is the opt in: name it under `publishRoutes`, with `'*'` to take a whole group. `hideTools` goes the other way, dropping a declared tool you would rather keep to yourself.
 
-A published tool answers with its own output, where a route published as a tool answers with the `{ status, body }` envelope its HTTP shape implies. Give the group an identity and its guard runs on every call:
+A published tool answers with its own output, where a route published as a tool answers with the `{ status, body }` envelope its HTTP shape implies. Give the group an identity and its guard runs on every call, and the context it resolves reaches the handler under `auth`:
 
 ```ts
 export const tools = k.tools('user', {

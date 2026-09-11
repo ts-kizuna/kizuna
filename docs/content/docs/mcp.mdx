@@ -164,7 +164,7 @@ Two differences from a route published as a tool:
 - It answers with its own `output`, where a route answers with the `{ status, body }` envelope its HTTP shape implies.
 - `onlyReadOnly` keeps it only when it declares `annotations.readOnlyHint`, since a tool has no method to read safety from.
 
-Give the group an identity and its guard runs on every call, the way a route's `security` does:
+Give the group an identity and its guard runs on every call, the way a route's `security` does. The context it resolves reaches the handler under `auth`, keyed by the identity's name, exactly as a route handler receives it:
 
 ```ts
 export const tools = k.tools('user', {

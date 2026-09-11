@@ -156,11 +156,26 @@ export type ToolRunner<Tools_ extends Tools> = ToolTree<Tools_> & {
      */
     definitions: ModelFacingTool[];
     /**
+     * A runner bound to an identity this request already verified, keyed by
+     * scheme. Every adapter does this for you before a handler sees `tools`, so
+     * reach for it only outside a request: in a script, a seed, or a job.
+     *
+     * @example
+     * const asMember = tools.as({ member: { workspaceId: 'w_1', role: 'owner' } });
+     */
+    as: (auth: BoundToolAuth) => ToolRunner<Tools_>;
+    /**
      * The dotted key behind a published tool name, so a name the model chose
      * becomes the key the rest of kizuna addresses a tool by.
      */
     keyOf: (publishedName: string) => ToolKeys<Tools_>;
 };
+
+/**
+ * Verified identity context, keyed by scheme name, exactly as a route handler
+ * receives it under `auth`.
+ */
+export type BoundToolAuth = Record<string, unknown>;
 
 /**
  * A call as it arrives from a model: a name that may not be a tool, and input
@@ -242,6 +257,25 @@ export class ToolOutputError extends Error {
 }
 
 /**
+ * A tool requiring an identity was run without one. A tool never authenticates,
+ * so an unbound call is a mistake in the caller rather than a denial.
+ */
+export class ToolIdentityError extends Error {
+    readonly tool: string;
+    readonly identity: string;
+
+    constructor(tool: string, identity: string) {
+        super(
+            `Tool "${tool}" requires the "${identity}" identity, and nothing has been bound. ` +
+                `Adapters bind the calling route's own identity; outside a request, bind one with \`tools.as({ ${identity}: ... })\`.`
+        );
+        this.name = 'ToolIdentityError';
+        this.tool = tool;
+        this.identity = identity;
+    }
+}
+
+/**
  * What `throwError` raises: the sentence the model reads, and the tool that
  * produced it.
  */
@@ -270,6 +304,9 @@ const describeIssue = (issue: z.core.$ZodIssue): string => {
  */
 const dispatchMessage = (toolKey: string, error: unknown): string => {
     if (error instanceof ToolExecutionError) return error.message;
+    if (error instanceof ToolIdentityError) {
+        return `Tool "${toolKey}" is not available to this caller.`;
+    }
     if (error instanceof ToolInputError) {
         return `Input for "${toolKey}" is not valid. ${error.issues.map(describeIssue).join('; ')}`;
     }
@@ -368,7 +405,12 @@ export const createToolRunner = <Tools_ extends Tools>(
         | {
               tools?: Tools_;
           },
-    handlers: ToolHandlers<Tools_>
+    handlers: ToolHandlers<Tools_, never>,
+    /**
+     * Identity context already verified for this request, keyed by scheme. A
+     * tool requiring an identity cannot run without the matching entry.
+     */
+    boundAuth?: BoundToolAuth
 ): ToolRunner<Tools_> => {
     const tools = (source && 'tools' in source ? ((source.tools ?? {}) as Tools_) : (source as Tools_)) ?? ({} as Tools_);
 
@@ -378,10 +420,28 @@ export const createToolRunner = <Tools_ extends Tools>(
         return tool;
     };
 
+    /**
+     * The `auth` a tool's handler receives. A tool that requires an identity
+     * refuses to run unbound, because the alternative is a handler reading a
+     * selector out of input the model chose.
+     */
+    const authFor = (toolKey: string, identity: string | undefined): Record<string, unknown> | undefined => {
+        if (identity === undefined) return undefined;
+        const context = boundAuth?.[identity];
+        if (context === undefined) {
+            throw new ToolIdentityError(toolKey, identity);
+        }
+        return {
+            [identity]: context,
+        };
+    };
+
     const invoke = async (toolKey: string, input: unknown): Promise<unknown> => {
         const tool = toolFor(toolKey);
         const handler = handlerAt(handlers, toolKey);
         if (typeof handler !== 'function') throw new Error(`No handler was bound for tool "${toolKey}".`);
+
+        const auth = authFor(toolKey, tool.identity);
 
         let validatedInput: unknown = undefined;
         if (tool.input) {
@@ -395,6 +455,11 @@ export const createToolRunner = <Tools_ extends Tools>(
             throwError: (message: string): never => {
                 throw new ToolExecutionError(toolKey, message);
             },
+            ...(auth === undefined
+                ? {}
+                : {
+                      auth,
+                  }),
         });
 
         if (!tool.output) return undefined;
@@ -507,6 +572,12 @@ export const createToolRunner = <Tools_ extends Tools>(
             },
         };
     };
+
+    tree['as'] = (auth: BoundToolAuth) =>
+        createToolRunner(source, handlers, {
+            ...boundAuth,
+            ...auth,
+        });
 
     tree['definitions'] = publishTools(tools);
 

@@ -4,6 +4,7 @@ import { Kizuna } from './kizuna.js';
 import type { StreamBody, StreamMessageOf } from './stream.js';
 import { readToolCalls } from './tool-records.js';
 import { createToolRunner } from './tool-runner.js';
+import type { ToolHandlers } from './tools.js';
 
 const k = new Kizuna();
 
@@ -195,5 +196,65 @@ describe('readToolCalls', () => {
 
         const tracked = readToolCalls([] as Message[]);
         expectTypeOf(tracked[0]!.name).toEqualTypeOf<'weather.getForecast' | 'ping'>();
+    });
+});
+
+describe('tool identity', () => {
+    const member = Kizuna.identity.apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            workspaceId: z.string(),
+        }),
+        access: z.object({
+            role: z.enum(['owner', 'admin']),
+        }),
+    });
+
+    const secured = new Kizuna({
+        identities: {
+            member,
+        },
+    });
+
+    type Schemes = {
+        member: typeof member;
+    };
+
+    const securedTools = secured.tools('member', {
+        listMembers: {
+            description: 'List the members of the current workspace',
+            output: z.object({
+                count: z.int(),
+            }),
+        },
+    });
+
+    const openTools = secured.tools({
+        ping: {
+            description: 'Answer that the server is up',
+        },
+    });
+
+    it('gives a handler the identity its tool requires, keyed by name', () => {
+        const handlers: ToolHandlers<typeof securedTools, Schemes> = {
+            listMembers: ({ auth }) => {
+                expectTypeOf(auth.member.workspaceId).toEqualTypeOf<string>();
+                expectTypeOf(auth.member.role).toEqualTypeOf<'owner' | 'admin'>();
+                return {
+                    count: 1,
+                };
+            },
+        };
+        expectTypeOf(handlers).not.toBeNever();
+    });
+
+    it('gives a handler no auth when its tool requires no identity', () => {
+        const handlers: ToolHandlers<typeof openTools, Schemes> = {
+            ping: (args) => {
+                expectTypeOf<keyof typeof args>().toEqualTypeOf<'input' | 'throwError'>();
+            },
+        };
+        expectTypeOf(handlers).not.toBeNever();
     });
 });
