@@ -123,7 +123,19 @@ export const toolHandlers = server.tools({
 
 ## Take the caller, never ask for it
 
-Give the group an identity and every handler in it receives that identity's context under `auth`, typed exactly as a route handler's is:
+An [identity](/docs/authentication) says what a verified caller looks like. This one carries the workspace they belong to:
+
+```ts title="identities.ts"
+export const member = Kizuna.identity.apiKey({
+    name: 'x-workspace-token',
+    in: 'header',
+    context: z.object({
+        workspaceId: z.string(),
+    }),
+});
+```
+
+Name it when you declare the tools, and every handler in the tree receives that context under `auth`:
 
 ```ts title="tools.ts"
 export const tools = k.tools('member', {
@@ -131,29 +143,30 @@ export const tools = k.tools('member', {
         listMembers: {
             description: 'List the members of the current workspace',
             input: z.object({
-                role: RoleSchema.optional(),
+                role: z.enum(['owner', 'admin']).optional(),
             }),
-            output: MemberListSchema,
+            output: z.array(MemberSchema),
         },
     },
 });
 ```
 
 ```ts title="server/tools.ts"
-listMembers: ({ input, auth }) => membersOf(auth.member.workspaceId, input.role),
+export const toolHandlers = server.tools({
+    workspace: {
+        listMembers: ({ input, auth }) => membersOf(auth.member.workspaceId, input.role),
+    },
+});
 ```
 
-A tool never authenticates. By the time it runs, whoever called it has been verified: the MCP transport ran the guard, or the route handler's own guard already did. That context is bound to the runner before your handler sees it.
+`auth.member` is the identity's `context`, typed. The workspace comes from there rather than from `input`, because the model chooses `input`.
 
-This is why the workspace is not an `input` field. Input is what the model chooses, so a selector declared there lets the model pick whose data it reads. `auth` arrives out of band, and a tool requiring an identity refuses to run without one.
-
-Outside a request there is no guard to run, so bind one yourself:
+Whoever calls the tool supplies the identity, and a tool that declares one will not run without it. In a script, bind it yourself:
 
 ```ts
 const asMember = tools.as({
     member: {
         workspaceId: 'w_1',
-        role: 'owner',
     },
 });
 
