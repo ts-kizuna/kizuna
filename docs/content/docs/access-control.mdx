@@ -1,6 +1,6 @@
 ---
 title: Access Control
-description: Name every permission that exists, bundle them into roles, and say which one each route needs. kizuna checks the caller's role against the route before the handler runs.
+description: Role-based access control (RBAC) on every route, relationship-based access control (ReBAC) for the caller's own rows, and attribute-based (ABAC) checks in the handler and the database. Name every permission, bundle them into roles, and say which one each route needs.
 ---
 
 <BetaNotice>
@@ -220,6 +220,10 @@ A permission says whether the caller may call the route. `update:own` says which
 | Row-level security | In the database, inside the query | Which rows this request may see at all |
 
 kizuna runs the first two. The third is the database's.
+
+### RBAC, ReBAC and ABAC
+
+These are the three models the layers go by. Roles are role-based access control, RBAC: what a caller may do follows from the role they hold. A relationship such as `own` or `shared` is relationship-based access control, ReBAC: what a caller may do to a row follows from how they are connected to it, which is the model relationship engines such as SpiceDB and OpenFGA implement. A decision made from the row's own fields is attribute-based access control, ABAC: `workspace_id` in a row-level security policy, or `archived` in a handler. kizuna gives RBAC and ReBAC a declaration each, and leaves ABAC to the two places that hold the attributes, the handler and the database.
 
 ### One row
 
