@@ -105,14 +105,12 @@ export const access = k.accessControl(routes, {
             requires: {
                 project: ['update'],
             },
-            id: ({ params }) => params.projectId,
         },
         deleteProject: {
             auth: 'member',
             requires: {
                 project: ['delete'],
             },
-            id: ({ params }) => params.projectId,
         },
     },
     invites: {
@@ -135,7 +133,7 @@ export const contract = k.contract({
 
 A permission a route names must exist in the list, so a typo does not compile. Routes never name a role.
 
-A member holds `update:own`, so a route requiring `update` has to say which row: `id` reads it from that route's own `params`, `query` or `body`, and leaving it out does not compile. `createProject` has no row yet, and `read` carries no relationship, so neither names one.
+A member holds `update:own`, so a route requiring `update` has to carry the row's id. kizuna reads `projectId`, the resource name plus `Id`, from the route's `params`, `query` or `body`. A route that names it differently says so with `id: 'ref'`, and a route that has none does not compile.
 
 </Step>
 
@@ -202,12 +200,12 @@ The result mirrors the route tree. A leaf is `true`, `false`, or the relationshi
 
 ## What an entry can say
 
-| Entry                               | Meaning                                            |
-| ----------------------------------- | -------------------------------------------------- |
-| `false`                             | Public                                             |
-| `'member'`                          | Requires the `member` identity, any permissions    |
-| `{ auth, requires?, id?, scopes? }` | The same, narrowed                                 |
-| `{ '*': ..., login: false }`        | `'*'` is the group default, named keys override it |
+| Entry                               | Meaning                                                          |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| `false`                             | Public                                                           |
+| `'member'`                          | Requires the `member` identity, any permissions                  |
+| `{ auth, requires?, id?, scopes? }` | The same, narrowed, `id` when the row's id is not `<resource>Id` |
+| `{ '*': ..., login: false }`        | `'*'` is the group default, named keys override it               |
 
 `'member'` is shorthand for `{ auth: 'member' }`. A subgroup key covers its whole subtree, and can nest its own `'*'`. A key matching nothing in the group is an error.
 
@@ -244,7 +242,7 @@ Row-level security on `workspace_id` is ABAC too, at the one layer that sees eve
 
 ### One row
 
-A role names the relationship, `update:own`, and the route names the row with `id`. The server says once, per resource, what `own` means for an id:
+A role names the relationship, `update:own`, and the route carries the row's id. The server says once, per resource, what `own` means for an id:
 
 ```ts title="server/relationships.ts"
 export const relationships = roles.relationships({
@@ -286,7 +284,7 @@ export const api = server.api({
 });
 ```
 
-That is all. `updateProject` requires `project: ['update']`, so for a caller whose role holds `update:own`, kizuna reads the route's `id`, runs the project's `own` with it, and answers `403` before the handler. An admin holds plain `update`, so nothing runs. The handler never checks:
+That is all. `updateProject` requires `project: ['update']`, so for a caller whose role holds `update:own`, kizuna reads `projectId` from the request, runs the project's `own` with it, and answers `403` before the handler. An admin holds plain `update`, so nothing runs. The handler never checks:
 
 ```ts title="server/router/projects.ts"
 updateProject: async ({ params, body }) => {
