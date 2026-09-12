@@ -5,7 +5,7 @@ description: Name every permission that exists, bundle them into roles, and say 
 
 <BetaNotice>
 
-Access control is still settling. `Kizuna.permissions`, `permissions.roles` and `k.accessControl` may change before v2, so pin your version if you depend on them.
+Access control is still settling. `Kizuna.permissions`, `permissions.roles`, `roles.rules` and `k.accessControl` may change before v2, so pin your version if you depend on them.
 
 </BetaNotice>
 
@@ -203,72 +203,68 @@ A permission says whether the caller may call the route. It says nothing about o
 
 | Layer              | Runs                                    | Answers                                |
 | ------------------ | --------------------------------------- | -------------------------------------- |
-| Access map         | In the guard, before the handler        | May this role call this kind of route  |
-| Object check       | In the handler, after the row is loaded | May this caller act on this row        |
+| Roles              | In the guard, before the handler        | May this role call this kind of route  |
+| Rules              | In the handler, after the row is loaded | May this caller act on this row        |
 | Row-level security | In the database, inside the query       | Which rows this request may see at all |
 
-kizuna is the first layer. This section shows the smallest shape of the other two.
+kizuna is the first layer and hands the handler `can` for the second. The third is the database's.
 
 ### One row
 
-Write the rules once, per resource and action, with the same groups and verbs as the permission list. An action is `true` when passing the access map is enough, and a predicate over the row when it comes down to ownership. `allow(user)` binds them to the caller and returns `can`:
+`roles.rules` takes the row type of each resource once and a function of the caller. The keys are the resources and verbs the permission list declared, so a rule for a permission that does not exist, or a permission with no rule, does not compile. An action is `true` when passing the access map is enough, and a predicate over the row when it comes down to ownership:
 
-```ts title="server/authorization.ts"
+```ts title="server/rules.ts"
 import type { Invite, Project, Workspace } from './db/schema';
 
-type User = {
-    userId: string;
-    role: 'member' | 'admin' | 'owner';
-};
-
-const rulesFor = (user: User) => {
+export const rules = roles.rules<{
+    workspace: Workspace;
+    project: Project;
+    invite: Invite;
+}>((user) => {
     const isAdmin = user.role === 'admin' || user.role === 'owner';
 
     return {
         workspace: {
             read: true,
             update: true,
-            delete: (workspace: Workspace) => workspace.ownerId === user.userId,
+            delete: (workspace) => workspace.ownerId === user.userId,
         },
         project: {
             create: true,
             read: true,
-            update: (project: Project) => isAdmin || project.ownerId === user.userId,
-            delete: (project: Project) => isAdmin || project.ownerId === user.userId,
-            share: (project: Project) => isAdmin || project.ownerId === user.userId,
+            update: (project) => isAdmin || project.ownerId === user.userId,
+            delete: (project) => isAdmin || project.ownerId === user.userId,
+            share: (project) => isAdmin || project.ownerId === user.userId,
         },
         invite: {
             send: true,
-            cancel: (invite: Invite) => isAdmin || invite.sentBy === user.userId,
+            cancel: (invite) => isAdmin || invite.sentBy === user.userId,
             accept: true,
         },
     };
-};
-
-type Rules = ReturnType<typeof rulesFor>;
-
-export const allow = (user: User) => {
-    const rules = rulesFor(user);
-
-    return <Resource extends keyof Rules, Action extends keyof Rules[Resource]>(
-        action: Action,
-        resource: Resource,
-        row: unknown
-    ): boolean => {
-        const rule = rules[resource][action] as boolean | ((row: unknown) => boolean);
-
-        return typeof rule === 'function' ? rule(row) : rule;
-    };
-};
+});
 ```
 
-`can` takes the action first, then the resource, then the row. An action or resource the rules do not name does not compile. The row stays `unknown` because the rule that reads it already knows its type.
+`user` is the caller the guard returns for the identity these roles are on, so `user.role` is `'member' | 'admin' | 'owner'`. Each predicate's parameter is the row type named for its resource.
 
-A guard returns the identity's `context` and nothing beside it, so the handler builds `can` from `auth.member`. It loads the row, answers `404` when there is none, and asks before writing:
+Register the rules beside the guards:
+
+```ts title="server/api.ts"
+export const api = server.api({
+    router,
+    guards: {
+        member: requireMember,
+    },
+    rules,
+});
+```
+
+Every guarded handler then receives `can`, bound to the caller the guard returned. It takes the action first, then the resource, then the row. An action or resource the list does not name does not compile, and the row has to be that resource's row.
+
+The handler loads the row, answers `404` when there is none, and asks before writing:
 
 ```ts title="server/router/projects.ts"
-updateProject: async ({ auth, params, body }) => {
-    const can = allow(auth.member);
+updateProject: async ({ auth, params, can, body }) => {
     const project = await db.query.projects.findFirst({
         where: eq(projects.id, params.projectId),
     });
@@ -298,7 +294,7 @@ updateProject: async ({ auth, params, body }) => {
 },
 ```
 
-The role check ran in the guard, so the handler checks ownership alone.
+The role check ran in the guard, so the handler checks ownership alone. `roles` says which routes a role may call, `rules` says which rows a caller may touch, and a rule only runs for a caller whose role already passed the route.
 
 `can(action, resource, row)` is the whole surface a handler sees. The rules behind it can grow, to a folder a project inherits from or to an engine that answers over a graph, without a handler changing.
 
