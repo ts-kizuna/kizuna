@@ -98,11 +98,19 @@ export const access = k.accessControl(routes, {
                 project: ['create'],
             },
         },
+        updateProject: {
+            auth: 'member',
+            requires: {
+                project: ['update'],
+            },
+            id: ({ params }) => params.projectId,
+        },
         deleteProject: {
             auth: 'member',
             requires: {
                 project: ['delete'],
             },
+            id: ({ params }) => params.projectId,
         },
     },
     invites: {
@@ -124,6 +132,8 @@ export const contract = k.contract({
 ```
 
 A permission a route names must exist in the list, so a typo does not compile. Routes never name a role.
+
+A member holds `update:own`, so a route requiring `update` has to say which row: `id` reads it from that route's own `params`, `query` or `body`, and leaving it out does not compile. `createProject` has no row yet, and `read` carries no relationship, so neither names one.
 
 </Step>
 
@@ -190,12 +200,12 @@ The result mirrors the route tree. A leaf is `true`, `false`, or the relationshi
 
 ## What an entry can say
 
-| Entry                          | Meaning                                            |
-| ------------------------------ | -------------------------------------------------- |
-| `false`                        | Public                                             |
-| `'member'`                     | Requires the `member` identity, any permissions    |
-| `{ auth, requires?, scopes? }` | The same, narrowed                                 |
-| `{ '*': ..., login: false }`   | `'*'` is the group default, named keys override it |
+| Entry                               | Meaning                                            |
+| ----------------------------------- | -------------------------------------------------- |
+| `false`                             | Public                                             |
+| `'member'`                          | Requires the `member` identity, any permissions    |
+| `{ auth, requires?, id?, scopes? }` | The same, narrowed                                 |
+| `{ '*': ..., login: false }`        | `'*'` is the group default, named keys override it |
 
 `'member'` is shorthand for `{ auth: 'member' }`. A subgroup key covers its whole subtree, and can nest its own `'*'`. A key matching nothing in the group is an error.
 
@@ -213,23 +223,35 @@ kizuna runs the first two. The third is the database's.
 
 ### One row
 
-A role names the relationship, `update:own`. The server says once, per resource, what `own` means. The predicate receives the route's path parameters and the caller:
+A role names the relationship, `update:own`, and the route names the row with `id`. The server says once, per resource, what `own` means for an id:
 
 ```ts title="server/relationships.ts"
 export const relationships = roles.relationships({
     workspace: {
-        own: async (params, user) => ownsWorkspace(params.workspaceId, user.userId),
+        own: async (workspaceId, user) => ownsWorkspace(workspaceId, user.userId),
     },
     project: {
-        own: async (params, user) => ownsProject(params.projectId, user.userId),
+        own: async (projectId, user) => ownsProject(projectId, user.userId),
     },
     invite: {
-        own: async (params, user) => sentInvite(params.inviteId, user.userId),
+        own: async (inviteId, user) => sentInvite(inviteId, user.userId),
     },
 });
 ```
 
-Every relationship a role names must be defined here, so `update:own` on a resource with no `own` does not compile. `params` is typed from the routes that require a `project` permission, and `user` is the caller the guard returned. The predicate works from an id rather than a loaded row, so it can be one `exists` query today and a call to a relationship engine later, with no role or route changing.
+`ownsProject` and the others are your queries. Each is one lookup by id and owner:
+
+```ts title="server/relationships.ts"
+const ownsProject = async (projectId: string, userId: string) => {
+    const project = await db.query.projects.findFirst({
+        where: and(eq(projects.id, projectId), eq(projects.ownerId, userId)),
+    });
+
+    return project !== undefined;
+};
+```
+
+Every relationship a role names must be defined here, so `update:own` on a resource with no `own` does not compile. `user` is the caller the guard returned. The predicate takes an id rather than a loaded row, so it can be one lookup today and a call to a relationship engine later, with no role or route changing.
 
 Register them beside the guards:
 
@@ -243,7 +265,7 @@ export const api = server.api({
 });
 ```
 
-That is all. `updateProject` requires `project: ['update']`, so for a caller whose role holds `update:own`, kizuna runs the project's `own` with the route's `params` and answers `403` before the handler. An admin holds plain `update`, so nothing runs. The handler never checks:
+That is all. `updateProject` requires `project: ['update']`, so for a caller whose role holds `update:own`, kizuna reads the route's `id`, runs the project's `own` with it, and answers `403` before the handler. An admin holds plain `update`, so nothing runs. The handler never checks:
 
 ```ts title="server/router/projects.ts"
 updateProject: async ({ params, body }) => {
