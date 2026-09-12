@@ -1,13 +1,15 @@
 ---
 title: Access Control
-description: Role-based access control (RBAC) on every route, relationship-based access control (ReBAC) for the caller's own rows, and attribute-based (ABAC) checks in the handler and the database. Name every permission, bundle them into roles, and say which one each route needs.
+description: Role-based access control (RBAC) on every route, relationship-based access control (ReBAC) for the caller's own rows, and attribute-based access control (ABAC) from a row's fields, each one word in the roles table.
 ---
 
-<BetaNotice>
+<Supports items={['RBAC', 'ReBAC', 'ABAC']} />
 
-Access control is still settling. `Kizuna.permissions`, `permissions.roles`, `roles.relationships` and `k.accessControl` may change before v2, so pin your version if you depend on them.
+<AlphaNotice>
 
-</BetaNotice>
+Access control is new. `Kizuna.permissions`, `permissions.roles`, `roles.relationships` and `k.accessControl` will likely change before v2, so pin your version if you depend on them.
+
+</AlphaNotice>
 
 [Authentication](/docs/authentication) turns a credential into the caller. This page decides what that caller may do.
 
@@ -223,7 +225,22 @@ kizuna runs the first two. The third is the database's.
 
 ### RBAC, ReBAC and ABAC
 
-These are the three models the layers go by. Roles are role-based access control, RBAC: what a caller may do follows from the role they hold. A relationship such as `own` or `shared` is relationship-based access control, ReBAC: what a caller may do to a row follows from how they are connected to it, which is the model relationship engines such as SpiceDB and OpenFGA implement. A decision made from the row's own fields is attribute-based access control, ABAC: `workspace_id` in a row-level security policy, or `archived` in a handler. kizuna gives RBAC and ReBAC a declaration each, and leaves ABAC to the two places that hold the attributes, the handler and the database.
+These are the three models the layers go by, and the word after the colon in a role decides which one a permission uses.
+
+Roles alone are role-based access control, RBAC: what a caller may do follows from the role they hold. `update` on the admin is RBAC.
+
+A condition that reads who the row belongs to is relationship-based access control, ReBAC: `own`, or `shared` through a shares table. This is the model relationship engines such as SpiceDB and OpenFGA implement, which is why a condition can later become a call to one.
+
+A condition that reads a field on the row is attribute-based access control, ABAC. A member who may edit projects until they are published holds `update:draft`, and `draft` is defined beside `own`:
+
+```ts title="server/relationships.ts"
+project: {
+    own: async (projectId, user) => ownsProject(projectId, user.userId),
+    draft: async (projectId) => isDraft(projectId),
+},
+```
+
+Row-level security on `workspace_id` is ABAC too, at the one layer that sees every query.
 
 ### One row
 

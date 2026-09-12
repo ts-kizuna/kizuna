@@ -8,7 +8,7 @@ import { Badge } from '@/components/shared/badge';
  */
 const badges: Record<string, string> = {
     '/docs/authentication': 'Beta',
-    '/docs/access-control': 'Beta',
+    '/docs/access-control': 'Alpha',
     '/docs/oauth': 'Alpha',
     '/docs/jobs': 'Alpha',
     '/docs/caching': 'Beta',
