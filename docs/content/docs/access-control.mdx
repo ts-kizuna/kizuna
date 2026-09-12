@@ -174,7 +174,7 @@ return {
 };
 ```
 
-kizuna checks the route against the role and the grants together.
+kizuna checks the route against the role and the grants together. Roles that live in a table return grants alone, see [Roles your customers define](#roles-your-customers-define).
 
 </Step>
 
@@ -457,6 +457,60 @@ if access.projects.deleteProject {
     interface compares the row's owner itself, once it has the row. Whether a project is in the caller's workspace at all is a `404` from
     the handler.
 </Callout>
+
+## Roles your customers define
+
+When roles are rows in a table your users edit, `permissions.roles` has nothing to declare. The permission list still holds, because it is the list of things the code can do and a role can only hand out what exists. What moves to the database is the bundle.
+
+Leave `roles` off the identity, or keep the built-in ones, and have the guard return the caller's grants:
+
+```ts title="server/guards.ts"
+return {
+    userId: membership.userId,
+    workspaceId: membership.workspaceId,
+    permissions: membership.role.grants,
+};
+```
+
+`membership.role` is the row, and `grants` is its list of permission strings, `'project:read'` or `'project:update'`. kizuna checks the route's `requires` against them exactly as it checks a declared role. Built-in roles and table roles side by side return `role` for the first and `permissions` for the second, and kizuna checks against the union.
+
+A grant carries a condition the way a role does, `'project:update:own'`. Since no role names the conditions, declare them beside the permissions so the contract knows them:
+
+```ts title="contract/permissions.ts"
+export const permissions = Kizuna.permissions(
+    {
+        workspace: ['read', 'update', 'delete'],
+        project: ['create', 'read', 'update', 'delete', 'share'],
+        invite: ['send', 'cancel', 'accept'],
+    },
+    {
+        conditions: {
+            project: ['own', 'draft'],
+        },
+    }
+);
+```
+
+The role editor reads the list from the contract, and the route that saves a role validates against it:
+
+```ts title="contract/routes/roles.ts"
+createRole: {
+    method: 'POST',
+    path: '/roles',
+    body: z.object({
+        name: z.string(),
+        grants: z.array(permissions.schema),
+    }),
+},
+```
+
+`permissions.schema` is the zod enum of every permission and condition the code declares, so a stored grant always names something the code can do, and a permission removed from the code fails the routes that still require it at compile time and the grants that still name it at the door.
+
+The client answers from the grants the same way it answers from a role:
+
+```ts title="projects-page.ts"
+const access = checkAccess(contract, me.body.permissions);
+```
 
 ## Reference
 
