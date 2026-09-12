@@ -199,31 +199,148 @@ The result mirrors the route tree and each leaf is a boolean. [Checking on the c
 
 ## Rows are the handler's
 
-A permission says whether the caller may call the route. Which rows they may see goes in the query, with `auth` in hand:
+A permission says whether the caller may call the route. It says nothing about one row, so whether this caller may update this project is decided in the handler, after the row is loaded, and which rows a query may see at all is decided inside the query. Three layers, each answering one question:
+
+| Layer              | Runs                                    | Answers                                |
+| ------------------ | --------------------------------------- | -------------------------------------- |
+| Access map         | In the guard, before the handler        | May this role call this kind of route  |
+| Object check       | In the handler, after the row is loaded | May this caller act on this row        |
+| Row-level security | In the database, inside the query       | Which rows this request may see at all |
+
+kizuna is the first layer. This section shows the smallest shape of the other two.
+
+### One row
+
+Write the rules once, per resource and action, with the same groups and verbs as the permission list. An action is `true` when passing the access map is enough, and a predicate over the row when it comes down to ownership. `allow(user)` binds them to the caller and returns `can`:
+
+```ts title="server/authorization.ts"
+import type { Invite, Project, Workspace } from './db/schema';
+
+type User = {
+    userId: string;
+    role: 'member' | 'admin' | 'owner';
+};
+
+const rulesFor = (user: User) => {
+    const isAdmin = user.role === 'admin' || user.role === 'owner';
+
+    return {
+        workspace: {
+            read: true,
+            update: true,
+            delete: (workspace: Workspace) => workspace.ownerId === user.userId,
+        },
+        project: {
+            create: true,
+            read: true,
+            update: (project: Project) => isAdmin || project.ownerId === user.userId,
+            delete: (project: Project) => isAdmin || project.ownerId === user.userId,
+            share: (project: Project) => isAdmin || project.ownerId === user.userId,
+        },
+        invite: {
+            send: true,
+            cancel: (invite: Invite) => isAdmin || invite.sentBy === user.userId,
+            accept: true,
+        },
+    };
+};
+
+type Rules = ReturnType<typeof rulesFor>;
+
+export const allow = (user: User) => {
+    const rules = rulesFor(user);
+
+    return <Resource extends keyof Rules, Action extends keyof Rules[Resource]>(
+        action: Action,
+        resource: Resource,
+        row: unknown
+    ): boolean => {
+        const rule = rules[resource][action] as boolean | ((row: unknown) => boolean);
+
+        return typeof rule === 'function' ? rule(row) : rule;
+    };
+};
+```
+
+`can` takes the action first, then the resource, then the row. An action or resource the rules do not name does not compile. The row stays `unknown` because the rule that reads it already knows its type.
+
+A guard returns the identity's `context` and nothing beside it, so the handler builds `can` from `auth.member`. It loads the row, answers `404` when there is none, and asks before writing:
+
+```ts title="server/router/projects.ts"
+updateProject: async ({ auth, params, body }) => {
+    const can = allow(auth.member);
+    const project = await db.query.projects.findFirst({
+        where: eq(projects.id, params.projectId),
+    });
+
+    if (!project) {
+        return {
+            status: 404,
+            body: {
+                detail: 'Project not found',
+            },
+        };
+    }
+
+    if (!can('update', 'project', project)) {
+        return {
+            status: 403,
+            body: {
+                detail: 'Only the owner can update this project',
+            },
+        };
+    }
+
+    return {
+        status: 200,
+        body: await saveProject(project.id, body),
+    };
+},
+```
+
+The role check ran in the guard, so the handler checks ownership alone.
+
+`can(action, resource, row)` is the whole surface a handler sees. The rules behind it can grow, to a folder a project inherits from or to an engine that answers over a graph, without a handler changing.
+
+### Every row
+
+<Callout type="warn" title="kizuna cannot enforce a tenant filter">
+    It runs before the query, never inside it. A list that forgets its `where` returns every tenant's rows.
+</Callout>
+
+Postgres row-level security enforces it at the one layer that sees every query:
+
+```sql title="migrations/0007_projects_rls.sql"
+alter table projects enable row level security;
+alter table projects force row level security;
+
+create policy "own workspace" on projects
+    using (workspace_id = current_setting('app.workspace_id', true));
+```
+
+`force` applies the policy to the table's owner as well, so it holds when the app connects as the role that ran the migration. The `true` on `current_setting` makes a request that set nothing see no rows, where the default would fail the query.
+
+Set the id per request, inside a transaction, with the third argument of `set_config` `true` so the value is local to that transaction:
+
+```ts title="server/db/with-workspace.ts"
+export const withWorkspace = <Result>(workspaceId: string, run: (tx: Transaction) => Promise<Result>) =>
+    db.transaction(async (tx) => {
+        await tx.execute(sql`select set_config('app.workspace_id', ${workspaceId}, true)`);
+
+        return run(tx);
+    });
+```
 
 ```ts title="server/router/projects.ts"
 listProjects: async ({ auth }) => ({
     status: 200,
     body: {
-        projects: await db.query.projects.findMany({
-            where: eq(projects.workspaceId, auth.member.workspaceId),
-        }),
+        projects: await withWorkspace(auth.member.workspaceId, (tx) => tx.query.projects.findMany()),
     },
 }),
 ```
 
-<Callout type="warn" title="kizuna cannot enforce this">
-    It runs before the query, never inside it. A list that forgets its tenant filter returns every tenant's rows.
-</Callout>
-
-To enforce it rather than remember it, Postgres row-level security does that at the one layer that sees every query:
-
-```sql
-create policy "own workspace" on projects
-    using (workspace_id = current_setting('app.workspace_id')::text);
-```
-
-Set `app.workspace_id` from `auth.member.workspaceId` at the start of the request.
+A pooled connection serves the next request the moment this one ends. A session-level `set` rides along with it, and a transaction-local one ends with the transaction.
 
 ## Scopes
 

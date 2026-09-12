@@ -218,6 +218,8 @@ users: {
 
 A handler in its own file keeps the typed `auth` via [`RouteHandler`](/docs/reference/server-router)`<typeof contract.routes.users.listUsers>`.
 
+A guard returns the identity's `context`, field for field. Anything derived from the caller, such as a [per-row check](/docs/access-control#one-row), is built in the handler from `auth`.
+
 </Step>
 
 </Steps>
