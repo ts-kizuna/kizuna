@@ -213,26 +213,23 @@ kizuna runs the first two. The third is the database's.
 
 ### One row
 
-A role names the relationship, `update:own`. The server says once, per resource, which path parameter carries the row's id and what `own` means for it:
+A role names the relationship, `update:own`. The server says once, per resource, what `own` means. The predicate receives the route's path parameters and the caller:
 
 ```ts title="server/relationships.ts"
 export const relationships = roles.relationships({
     workspace: {
-        param: 'workspaceId',
-        own: async (workspaceId, user) => ownsWorkspace(workspaceId, user.userId),
+        own: async (params, user) => ownsWorkspace(params.workspaceId, user.userId),
     },
     project: {
-        param: 'projectId',
-        own: async (projectId, user) => ownsProject(projectId, user.userId),
+        own: async (params, user) => ownsProject(params.projectId, user.userId),
     },
     invite: {
-        param: 'inviteId',
-        own: async (inviteId, user) => sentInvite(inviteId, user.userId),
+        own: async (params, user) => sentInvite(params.inviteId, user.userId),
     },
 });
 ```
 
-Every relationship a role names must be defined here, so `update:own` on a resource with no `own` does not compile. `user` is the caller the guard returned. The predicate takes an id rather than a row, so it can be one `exists` query today and a call to a relationship engine later, with no role or route changing.
+Every relationship a role names must be defined here, so `update:own` on a resource with no `own` does not compile. `params` is typed from the routes that require a `project` permission, and `user` is the caller the guard returned. The predicate works from an id rather than a loaded row, so it can be one `exists` query today and a call to a relationship engine later, with no role or route changing.
 
 Register them beside the guards:
 
@@ -246,7 +243,7 @@ export const api = server.api({
 });
 ```
 
-That is all. `updateProject` requires `project: ['update']`, so for a caller whose role holds `update:own`, kizuna reads `params.projectId`, runs `own`, and answers `403` before the handler. An admin holds plain `update`, so nothing runs. The handler never checks:
+That is all. `updateProject` requires `project: ['update']`, so for a caller whose role holds `update:own`, kizuna runs the project's `own` with the route's `params` and answers `403` before the handler. An admin holds plain `update`, so nothing runs. The handler never checks:
 
 ```ts title="server/router/projects.ts"
 updateProject: async ({ params, body }) => {
@@ -269,8 +266,6 @@ updateProject: async ({ params, body }) => {
     };
 },
 ```
-
-A route requiring a relationship whose `param` is not in its path does not compile.
 
 <Callout title="Something about the row alone is a conflict">
     An archived project that cannot be updated reads the row and never the caller. That is a `409` from the handler, since no role could
