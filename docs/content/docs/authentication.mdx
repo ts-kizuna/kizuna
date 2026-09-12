@@ -218,7 +218,7 @@ users: {
 
 A handler in its own file keeps the typed `auth` via [`RouteHandler`](/docs/reference/server-router)`<typeof contract.routes.users.listUsers>`.
 
-A guard returns the identity's `context`, field for field. What a handler receives beside `auth`, such as the per-row [`can`](/docs/access-control#one-row), kizuna derives from that.
+A guard returns the identity's `context`, field for field. Which rows that caller may touch is decided from it before the handler runs, in [Access Control](/docs/access-control#one-row).
 
 </Step>
 

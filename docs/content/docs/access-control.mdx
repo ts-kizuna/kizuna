@@ -199,43 +199,40 @@ The result mirrors the route tree. A leaf is `true`, `false`, or the relationshi
 
 `'member'` is shorthand for `{ auth: 'member' }`. A subgroup key covers its whole subtree, and can nest its own `'*'`. A key matching nothing in the group is an error.
 
-## Rows are the handler's
+## Rows
 
-A permission says whether the caller may call the route. Whether this caller may update this project needs the row, and which rows a query may see at all is decided inside the query. Three layers, each answering one question:
+A permission says whether the caller may call the route. `update:own` says which rows, and row-level security says which rows a query may see at all. Three layers, each answering one question:
 
-| Layer              | Runs                                    | Answers                                |
-| ------------------ | --------------------------------------- | -------------------------------------- |
-| Roles              | In the guard, before the handler        | May this role call this kind of route  |
-| Relationships      | In the handler, after the row is loaded | Is this row the caller's               |
-| Row-level security | In the database, inside the query       | Which rows this request may see at all |
+| Layer              | Runs                              | Answers                                |
+| ------------------ | --------------------------------- | -------------------------------------- |
+| Roles              | In the guard, before the handler  | May this role call this kind of route  |
+| Relationships      | In the guard, before the handler  | Is this row the caller's               |
+| Row-level security | In the database, inside the query | Which rows this request may see at all |
 
 kizuna runs the first two. The third is the database's.
 
 ### One row
 
-A role names the relationship, `update:own`. The server says once, per resource, what `own` means. `roles.relationships` takes the row type of each resource and a predicate over the row and the caller:
+A role names the relationship, `update:own`. The server says once, per resource, which path parameter carries the row's id and what `own` means for it:
 
 ```ts title="server/relationships.ts"
-import type { Invite, Project, Workspace } from './db/schema';
-
-export const relationships = roles.relationships<{
-    workspace: Workspace;
-    project: Project;
-    invite: Invite;
-}>({
+export const relationships = roles.relationships({
     workspace: {
-        own: (workspace, user) => workspace.ownerId === user.userId,
+        param: 'workspaceId',
+        own: async (workspaceId, user) => ownsWorkspace(workspaceId, user.userId),
     },
     project: {
-        own: (project, user) => project.ownerId === user.userId,
+        param: 'projectId',
+        own: async (projectId, user) => ownsProject(projectId, user.userId),
     },
     invite: {
-        own: (invite, user) => invite.sentBy === user.userId,
+        param: 'inviteId',
+        own: async (inviteId, user) => sentInvite(inviteId, user.userId),
     },
 });
 ```
 
-Every relationship a role names must be defined here, so `update:own` on a resource with no `own` does not compile. `user` is the caller the guard returned.
+Every relationship a role names must be defined here, so `update:own` on a resource with no `own` does not compile. `user` is the caller the guard returned. The predicate takes an id rather than a row, so it can be one `exists` query today and a call to a relationship engine later, with no role or route changing.
 
 Register them beside the guards:
 
@@ -249,12 +246,10 @@ export const api = server.api({
 });
 ```
 
-Every guarded handler then receives `can`, with one method per verb: `can.update(project)`. The row's type says which resource it is, so a verb that resource does not declare does not compile. It answers from the caller's role: an admin holds `update`, so it says yes without reading the row, and a member holds `update:own`, so it runs the project's `own`.
-
-The handler loads the row, answers `404` when there is none, and asks before writing:
+That is all. `updateProject` requires `project: ['update']`, so for a caller whose role holds `update:own`, kizuna reads `params.projectId`, runs `own`, and answers `403` before the handler. An admin holds plain `update`, so nothing runs. The handler never checks:
 
 ```ts title="server/router/projects.ts"
-updateProject: async ({ auth, params, can, body }) => {
+updateProject: async ({ params, body }) => {
     const project = await db.query.projects.findFirst({
         where: eq(projects.id, params.projectId),
     });
@@ -268,15 +263,6 @@ updateProject: async ({ auth, params, can, body }) => {
         };
     }
 
-    if (!can.update(project)) {
-        return {
-            status: 403,
-            body: {
-                detail: 'Only the owner can update this project',
-            },
-        };
-    }
-
     return {
         status: 200,
         body: await saveProject(project.id, body),
@@ -284,9 +270,7 @@ updateProject: async ({ auth, params, can, body }) => {
 },
 ```
 
-The role check ran in the guard, so a `403` here can only mean the row is someone else's.
-
-A relationship the row does not carry, such as `shared` through a shares table, is an async predicate, and `can` for that resource is awaited. It can start as a query and later become a call to a relationship engine, with no role or handler changing.
+A route requiring a relationship whose `param` is not in its path does not compile.
 
 <Callout title="Something about the row alone is a conflict">
     An archived project that cannot be updated reads the row and never the caller. That is a `409` from the handler, since no role could
