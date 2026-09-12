@@ -5,7 +5,7 @@ description: Name every permission that exists, bundle them into roles, and say 
 
 <BetaNotice>
 
-Access control is still settling. `Kizuna.permissions`, `permissions.roles`, `roles.rules` and `k.accessControl` may change before v2, so pin your version if you depend on them.
+Access control is still settling. `Kizuna.permissions`, `permissions.roles`, `roles.relationships` and `k.accessControl` may change before v2, so pin your version if you depend on them.
 
 </BetaNotice>
 
@@ -43,7 +43,7 @@ Every entry is checked against the list. `'all'` means every permission declared
 export const roles = permissions.roles({
     member: {
         workspace: ['read'],
-        project: ['read'],
+        project: ['read', 'update:own', 'delete:own'],
     },
     admin: {
         workspace: ['read', 'update'],
@@ -55,6 +55,8 @@ export const roles = permissions.roles({
 ```
 
 Anything not listed is denied, so a new permission reaches no role until you add it.
+
+`update` is any project. `update:own` is the caller's own, and the word after the colon is a relationship the server defines once per resource, in [One row](#one-row).
 
 Put the roles on the identity whose callers hold them:
 
@@ -180,7 +182,7 @@ if (access.projects.deleteProject) {
 }
 ```
 
-The result mirrors the route tree and each leaf is a boolean. [Checking on the client](#checking-on-the-client) covers where the role comes from.
+The result mirrors the route tree. A leaf is `true`, `false`, or the relationship the role named, such as `'own'`. [Checking on the client](#checking-on-the-client) covers where the role comes from.
 
 </Step>
 
@@ -199,55 +201,43 @@ The result mirrors the route tree and each leaf is a boolean. [Checking on the c
 
 ## Rows are the handler's
 
-A permission says whether the caller may call the route. It says nothing about one row, so whether this caller may update this project is decided in the handler, after the row is loaded, and which rows a query may see at all is decided inside the query. Three layers, each answering one question:
+A permission says whether the caller may call the route. Whether this caller may update this project needs the row, and which rows a query may see at all is decided inside the query. Three layers, each answering one question:
 
 | Layer              | Runs                                    | Answers                                |
 | ------------------ | --------------------------------------- | -------------------------------------- |
 | Roles              | In the guard, before the handler        | May this role call this kind of route  |
-| Rules              | In the handler, after the row is loaded | May this caller act on this row        |
+| Relationships      | In the handler, after the row is loaded | Is this row the caller's               |
 | Row-level security | In the database, inside the query       | Which rows this request may see at all |
 
-kizuna is the first layer and hands the handler `can` for the second. The third is the database's.
+kizuna runs the first two. The third is the database's.
 
 ### One row
 
-`roles.rules` takes the row type of each resource once and a function of the caller. The keys are the resources and verbs the permission list declared, so a rule for a permission that does not exist, or a permission with no rule, does not compile. An action is `true` when passing the access map is enough, and a predicate over the row when it comes down to ownership:
+A role names the relationship, `update:own`. The server says once, per resource, what `own` means. `roles.relationships` takes the row type of each resource and a predicate over the row and the caller:
 
-```ts title="server/rules.ts"
+```ts title="server/relationships.ts"
 import type { Invite, Project, Workspace } from './db/schema';
 
-export const rules = roles.rules<{
+export const relationships = roles.relationships<{
     workspace: Workspace;
     project: Project;
     invite: Invite;
-}>((user) => {
-    const isAdmin = user.role === 'admin' || user.role === 'owner';
-
-    return {
-        workspace: {
-            read: true,
-            update: true,
-            delete: (workspace) => workspace.ownerId === user.userId,
-        },
-        project: {
-            create: true,
-            read: true,
-            update: (project) => isAdmin || project.ownerId === user.userId,
-            delete: (project) => isAdmin || project.ownerId === user.userId,
-            share: (project) => isAdmin || project.ownerId === user.userId,
-        },
-        invite: {
-            send: true,
-            cancel: (invite) => isAdmin || invite.sentBy === user.userId,
-            accept: true,
-        },
-    };
+}>({
+    workspace: {
+        own: (workspace, user) => workspace.ownerId === user.userId,
+    },
+    project: {
+        own: (project, user) => project.ownerId === user.userId,
+    },
+    invite: {
+        own: (invite, user) => invite.sentBy === user.userId,
+    },
 });
 ```
 
-`user` is the caller the guard returns for the identity these roles are on, so `user.role` is `'member' | 'admin' | 'owner'`. Each predicate's parameter is the row type named for its resource.
+Every relationship a role names must be defined here, so `update:own` on a resource with no `own` does not compile. `user` is the caller the guard returned.
 
-Register the rules beside the guards:
+Register them beside the guards:
 
 ```ts title="server/api.ts"
 export const api = server.api({
@@ -255,11 +245,11 @@ export const api = server.api({
     guards: {
         member: requireMember,
     },
-    rules,
+    relationships,
 });
 ```
 
-Every guarded handler then receives `can`, bound to the caller the guard returned. It takes the action first, then the resource, then the row. An action or resource the list does not name does not compile, and the row has to be that resource's row.
+Every guarded handler then receives `can`, with one method per verb: `can.update(project)`. The row's type says which resource it is, so a verb that resource does not declare does not compile. It answers from the caller's role: an admin holds `update`, so it says yes without reading the row, and a member holds `update:own`, so it runs the project's `own`.
 
 The handler loads the row, answers `404` when there is none, and asks before writing:
 
@@ -278,7 +268,7 @@ updateProject: async ({ auth, params, can, body }) => {
         };
     }
 
-    if (!can('update', 'project', project)) {
+    if (!can.update(project)) {
         return {
             status: 403,
             body: {
@@ -294,9 +284,14 @@ updateProject: async ({ auth, params, can, body }) => {
 },
 ```
 
-The role check ran in the guard, so the handler checks ownership alone. `roles` says which routes a role may call, `rules` says which rows a caller may touch, and a rule only runs for a caller whose role already passed the route.
+The role check ran in the guard, so a `403` here can only mean the row is someone else's.
 
-`can(action, resource, row)` is the whole surface a handler sees. The rules behind it can grow, to a folder a project inherits from or to an engine that answers over a graph, without a handler changing.
+A relationship the row does not carry, such as `shared` through a shares table, is an async predicate, and `can` for that resource is awaited. It can start as a query and later become a call to a relationship engine, with no role or handler changing.
+
+<Callout title="Something about the row alone is a conflict">
+    An archived project that cannot be updated reads the row and never the caller. That is a `409` from the handler, since no role could
+    ever get past it.
+</Callout>
 
 ### Every row
 
@@ -436,8 +431,9 @@ if access.projects.deleteProject {
 ```
 
 <Callout title="It is the same answer the server gives">
-    `checkAccess` reads the map and roles the server reads, so for "may I call this route" it is exact. It knows nothing about one record,
-    such as whether this project is in the caller's workspace. That is a `404` from the handler.
+    `checkAccess` reads the map and roles the server reads, so for "may I call this route" it is exact. A leaf of `'own'` means the
+    interface compares the row's owner itself, once it has the row. Whether a project is in the caller's workspace at all is a `404` from
+    the handler.
 </Callout>
 
 ## Reference
