@@ -1,0 +1,176 @@
+---
+title: OAuth
+description: Verify tokens from an authorization server. Declare the identity, secure the routes, verify in the guard, and serve the discovery document.
+---
+
+<AlphaNotice>
+
+OAuth support is new. How an identity declares its authorization server, and how the discovery document is served, will likely change before v2, so pin your version if you depend on it.
+
+</AlphaNotice>
+
+When your tokens come from an authorization server such as better-auth, Auth0 or Keycloak, your API verifies them rather than issuing them. OAuth 2.1 calls that a resource server.
+
+Four steps: declare the identity, secure the routes, verify in the guard, and serve the discovery document.
+
+## Declare where tokens come from
+
+The identity carries everything about the authorization server, declared once. `issuer` is the server's identifier ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)), `flows` names its endpoints for the OpenAPI spec, and the flow's `scopes` are the catalogue your routes may require:
+
+```ts title="identities.ts"
+import { z } from 'zod';
+import { Kizuna } from '@ts-kizuna/core';
+
+export const user = Kizuna.identity.oauth2({
+    issuer: 'https://auth.example.com',
+    flows: {
+        authorizationCode: {
+            authorizationUrl: 'https://auth.example.com/oauth2/authorize',
+            tokenUrl: 'https://auth.example.com/oauth2/token',
+            scopes: {
+                'users:read': 'Read users',
+                'users:write': 'Create and update users',
+            },
+        },
+    },
+    context: z.object({
+        userId: z.string(),
+    }),
+});
+```
+
+For an OpenID Connect server, `Kizuna.identity.openIdConnect({ openIdConnectUrl })` is the whole declaration; the issuer derives from the discovery URL.
+
+## Secure the routes
+
+[Access](/docs/access-control) works as for any identity. Name the identity to require a valid token, or attach scopes from the catalogue:
+
+```ts title="access.ts"
+export const access = k.accessControl(routes, {
+    users: {
+        '*': 'user',
+        createUser: {
+            user: ['users:write'],
+        },
+    },
+});
+```
+
+## Verify in the guard
+
+The guard receives the token as `oauth2` and the route's required `scopes`. Check the signature against the authorization server's JWKS, the issuer, and the audience. Deny a missing scope with the `insufficient_scope` challenge ([RFC 6750](https://www.rfc-editor.org/rfc/rfc6750)):
+
+```ts title="guards.ts"
+import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { bearerChallenge } from '@ts-kizuna/core/adapter';
+import { server } from './server';
+
+const jwks = createRemoteJWKSet(new URL('https://auth.example.com/oauth2/jwks'));
+
+export const requireUser = server.guard('user', async ({ oauth2, scopes, deny }) => {
+    if (!oauth2) {
+        return deny(401, 'Unauthorized');
+    }
+
+    let claims;
+    try {
+        ({ payload: claims } = await jwtVerify(oauth2.token, jwks, {
+            issuer: 'https://auth.example.com',
+            audience: 'https://api.example.com',
+        }));
+    } catch {
+        return deny(401, 'Invalid or expired token');
+    }
+
+    const granted = typeof claims.scope === 'string' ? claims.scope.split(' ') : [];
+    if (!scopes.every((scope) => granted.includes(scope))) {
+        return deny(403, 'The token is missing a required scope', {
+            'www-authenticate': bearerChallenge({
+                error: 'insufficient_scope',
+                scope: scopes.join(' '),
+                resource_metadata: 'https://api.example.com/.well-known/oauth-protected-resource',
+            }),
+        });
+    }
+
+    return {
+        userId: String(claims.sub),
+    };
+});
+```
+
+A `401` from `deny` carries the `Bearer` challenge automatically; the third argument is only needed when the challenge has something to say, as with missing scopes.
+
+## Serve the discovery document
+
+Clients that do not know your authorization server find it through [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) Protected Resource Metadata at `/.well-known/oauth-protected-resource`. Serve it on the framework, next to `api.mount`:
+
+```ts title="src/metadata.ts"
+import { buildProtectedResourceMetadata } from '@ts-kizuna/core';
+import { user } from './identities';
+
+export const metadata = buildProtectedResourceMetadata({
+    resource: 'https://api.example.com',
+    scheme: user,
+});
+```
+
+<Tabs groupId="adapter" items={['Express', 'Fastify', 'Hono', 'Next.js']}>
+
+<Tab value="Express">
+
+```ts title="src/index.ts"
+app.get('/.well-known/oauth-protected-resource', (_req, res) => {
+    res.json(metadata);
+});
+
+api.mount(app);
+```
+
+</Tab>
+
+<Tab value="Fastify">
+
+```ts title="src/index.ts"
+app.get('/.well-known/oauth-protected-resource', async () => metadata);
+
+await api.mount(app);
+```
+
+</Tab>
+
+<Tab value="Hono">
+
+```ts title="src/index.ts"
+app.get('/.well-known/oauth-protected-resource', (c) => c.json(metadata));
+
+api.mount(app);
+```
+
+</Tab>
+
+<Tab value="Next.js">
+
+```ts title="app/.well-known/oauth-protected-resource/route.ts"
+import { metadata } from '@/server/metadata';
+
+export function GET() {
+    return Response.json(metadata);
+}
+```
+
+</Tab>
+
+</Tabs>
+
+The document builds from the identity, so it says what the contract says. `resource` is the canonical URI of your API, the same value your guard checks as the token audience.
+
+Serve it when OAuth clients discover your API rather than being configured for it. A first-party app with a hardcoded authorization server never looks at it.
+
+See [`ProtectedResourceMetadataSchema`](/docs/reference/protected-resource-metadata-schema) for the document's fields and builders.
+
+## Reference
+
+- [Authentication](/docs/authentication) for identities, guards and the access map
+- [`Kizuna.identity`](/docs/reference/kizuna-identity)
+- [`ProtectedResourceMetadataSchema`](/docs/reference/protected-resource-metadata-schema)

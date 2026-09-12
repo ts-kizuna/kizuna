@@ -1,0 +1,335 @@
+---
+title: Access Control
+description: Name every permission that exists, bundle them into roles, and say which one each route needs. kizuna checks the caller's role against the route before the handler runs.
+---
+
+<BetaNotice>
+
+Access control is still settling. `Kizuna.permissions`, `permissions.roles` and `k.accessControl` may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
+[Authentication](/docs/authentication) turns a credential into the caller. This page decides what that caller may do.
+
+A user holds a role. A role holds permissions. A route needs one. kizuna checks that the role covers it before the handler runs.
+
+<Steps>
+
+<Step>
+
+## Declare your permissions
+
+A permission is one thing that can be done to one kind of thing. List every one that exists, grouped by what it acts on:
+
+```ts title="contract/permissions.ts"
+export const permissions = Kizuna.permissions({
+    workspace: ['read', 'update', 'delete'],
+    project: ['create', 'read', 'update', 'delete', 'share'],
+    invite: ['send', 'cancel', 'accept'],
+});
+```
+
+Use the verb the route uses, so an invite is `send` rather than `create`.
+
+</Step>
+
+<Step>
+
+## Bundle them into roles
+
+Every entry is checked against the list. `'all'` means every permission declared:
+
+```ts title="contract/roles.ts"
+export const roles = permissions.roles({
+    member: {
+        workspace: ['read'],
+        project: ['read'],
+    },
+    admin: {
+        workspace: ['read', 'update'],
+        project: ['create', 'read', 'update', 'delete', 'share'],
+        invite: ['send', 'cancel'],
+    },
+    owner: 'all',
+});
+```
+
+Anything not listed is denied, so a new permission reaches no role until you add it.
+
+Put the roles on the identity whose callers hold them:
+
+```ts title="contract/identities.ts"
+export const member = Kizuna.identity.apiKey({
+    name: 'x-workspace-token',
+    in: 'header',
+    context: z.object({
+        userId: z.string(),
+        workspaceId: z.string(),
+    }),
+    roles,
+});
+```
+
+That adds `role` to what the guard returns and what handlers receive, typed as `'member' | 'admin' | 'owner'`.
+
+</Step>
+
+<Step>
+
+## Say what each route needs
+
+Every group must appear in the map, so public is an explicit `false`. A route names the permission it needs:
+
+```ts title="contract/access.ts"
+export const access = k.accessControl(routes, {
+    health: false,
+    projects: {
+        '*': {
+            auth: 'member',
+            requires: {
+                project: ['read'],
+            },
+        },
+        createProject: {
+            auth: 'member',
+            requires: {
+                project: ['create'],
+            },
+        },
+        deleteProject: {
+            auth: 'member',
+            requires: {
+                project: ['delete'],
+            },
+        },
+    },
+    invites: {
+        cancelInvite: {
+            auth: 'member',
+            requires: {
+                invite: ['cancel'],
+            },
+        },
+    },
+});
+```
+
+```ts title="contract/index.ts"
+export const contract = k.contract({
+    routes,
+    access,
+});
+```
+
+A permission a route names must exist in the list, so a typo does not compile. Routes never name a role.
+
+</Step>
+
+<Step>
+
+## Return the caller's role from the guard
+
+The role is a column on the membership row or a claim in the token. The guard reads it:
+
+```ts title="server/guards.ts"
+export const requireMember = server.guard('member', async ({ apiKey, params, deny }) => {
+    const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
+
+    if (!membership) {
+        return deny(403, 'Forbidden');
+    }
+
+    return {
+        userId: membership.userId,
+        workspaceId: membership.workspaceId,
+        role: membership.role,
+    };
+});
+```
+
+kizuna checks that the role holds every permission the route requires and answers `403` before the handler otherwise.
+
+A caller with several roles returns them as an array, and holds all of them. A caller granted more than their role says, rows in a table beside the role, returns those as `permissions` next to it:
+
+```ts title="server/guards.ts"
+return {
+    userId: membership.userId,
+    workspaceId: membership.workspaceId,
+    role: membership.role,
+    permissions: membership.grants,
+};
+```
+
+kizuna checks the route against the role and the grants together.
+
+</Step>
+
+<Step>
+
+## Check on the client (optional)
+
+The contract carries the map and the roles, so the client answers from the caller's role with no request:
+
+```ts title="projects-page.ts"
+import { checkAccess } from '@ts-kizuna/fetch';
+
+const access = checkAccess(contract, me.body.role);
+
+if (access.projects.deleteProject) {
+    showDeleteButton();
+}
+```
+
+The result mirrors the route tree and each leaf is a boolean. [Checking on the client](#checking-on-the-client) covers where the role comes from.
+
+</Step>
+
+</Steps>
+
+## What an entry can say
+
+| Entry                          | Meaning                                            |
+| ------------------------------ | -------------------------------------------------- |
+| `false`                        | Public                                             |
+| `'member'`                     | Requires the `member` identity, any permissions    |
+| `{ auth, requires?, scopes? }` | The same, narrowed                                 |
+| `{ '*': ..., login: false }`   | `'*'` is the group default, named keys override it |
+
+`'member'` is shorthand for `{ auth: 'member' }`. A subgroup key covers its whole subtree, and can nest its own `'*'`. A key matching nothing in the group is an error.
+
+## Rows are the handler's
+
+A permission says whether the caller may call the route. Which rows they may see goes in the query, with `auth` in hand:
+
+```ts title="server/router/projects.ts"
+listProjects: async ({ auth }) => ({
+    status: 200,
+    body: {
+        projects: await db.query.projects.findMany({
+            where: eq(projects.workspaceId, auth.member.workspaceId),
+        }),
+    },
+}),
+```
+
+<Callout type="warn" title="kizuna cannot enforce this">
+    It runs before the query, never inside it. A list that forgets its tenant filter returns every tenant's rows.
+</Callout>
+
+To enforce it rather than remember it, Postgres row-level security does that at the one layer that sees every query:
+
+```sql
+create policy "own workspace" on projects
+    using (workspace_id = current_setting('app.workspace_id')::text);
+```
+
+Set `app.workspace_id` from `auth.member.workspaceId` at the start of the request.
+
+## Scopes
+
+An oauth2 identity carries the scopes its token was granted. A route can require one:
+
+```ts title="contract/access.ts"
+events: {
+    listEvents: {
+        auth: 'user',
+        scopes: ['read:events'],
+    },
+},
+```
+
+A scope is what the token may attempt and `requires` is what the person may do, so a route can carry both. See [OAuth](/docs/oauth).
+
+## What it drives
+
+`k.contract` puts `401` and `403` on every route this map guards, as [Problem Details](/docs/reference/problem-details-schema), both `no-store`. A public route gets neither:
+
+```ts title="delete-project.ts"
+const result = await apiClient.projects.deleteProject({
+    params: {
+        projectId: 'prj_42',
+    },
+});
+
+if (result.status === 403) {
+    console.log(result.body.detail);
+}
+```
+
+[`generateOpenApi`](/docs/reference/generate-openapi) emits each route's `security` and the permission it requires:
+
+```yaml title="openapi.yaml"
+# generated
+paths:
+    /projects/{projectId}:
+        delete:
+            security:
+                - member: []
+            x-kizuna-requires:
+                project: [delete]
+```
+
+## Checking on the client
+
+Each client ships `checkAccess`. `@ts-kizuna/fetch` exports it, and the Swift and Kotlin generators emit it.
+
+It takes the caller's role. Put `role` on whatever route tells the interface who is signed in:
+
+```ts title="contract/routes/me.ts"
+export const meRoutes = k.routes('me', {
+    getMe: {
+        method: 'GET',
+        path: '/me',
+        responses: {
+            200: z.object({
+                userId: z.string(),
+                role: roles.schema,
+            }),
+        },
+    },
+});
+```
+
+```json title="GET /me"
+{
+    "userId": "usr_3",
+    "role": "admin"
+}
+```
+
+`roles.schema` is the zod enum of the role names.
+
+The wire carries one word because the contract says what it means:
+
+```
+wire     "role": "admin"
+roles    admin: { project: ['create', 'read', 'update', 'delete'] }
+map      updateProject: { requires: { project: ['update'] } }
+answer   admin holds project:update, so allowed
+```
+
+A caller with grants beside the role sends those too, and `checkAccess` takes them as the second argument.
+
+A public route is `true` for anyone. A route needing an identity with no `requires` is `true` for any caller of that identity.
+
+Swift and Kotlin answer from the same data:
+
+```swift
+let access = checkAccess(role: me.role)
+
+if access.projects.deleteProject {
+    showDeleteButton()
+}
+```
+
+<Callout title="It is the same answer the server gives">
+    `checkAccess` reads the map and roles the server reads, so for "may I call this route" it is exact. It knows nothing about one record,
+    such as whether this project is in the caller's workspace. That is a `404` from the handler.
+</Callout>
+
+## Reference
+
+- [`k.contract`](/docs/reference/k-contract#the-access-map)
+- [`server.api`](/docs/reference/server-api)
+- [`checkAccess`](/docs/reference/check-access)
+- [Authentication](/docs/authentication)

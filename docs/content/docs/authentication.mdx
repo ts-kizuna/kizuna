@@ -1,9 +1,9 @@
 ---
 title: Authentication
-description: Declare who can call your API. Identities describe the credential, guards verify it, and the handler receives the caller typed.
+description: Say who can call your API. An identity is a credential you accept, a guard turns it into the caller, and the handler receives them typed.
 ---
 
-<Supports items={['Bearer', 'API Key', 'Basic', 'OAuth 2.0', 'OpenID Connect']} />
+<Supports items={['Bearer', 'API Key', 'Basic', 'Custom', 'OAuth 2.0', 'OpenID Connect']} />
 
 <BetaNotice>
 
@@ -11,20 +11,23 @@ Authentication is still settling. `Kizuna.identity` and `server.guard` may chang
 
 </BetaNotice>
 
-An **identity** describes a credential your API accepts. A **guard** verifies it and returns who the caller is. The **auth map** says which routes need which identity.
+An **identity** is a credential your API accepts. A **guard** turns it into the caller. What that caller may do is [Access Control](/docs/access-control), and tokens you did not issue are [OAuth](/docs/oauth).
 
 <Steps>
 
 <Step>
 
-## Declare an identity
+## Pick your credential
 
-`Kizuna.identity` picks the credential's shape. Its `context` schema is what a guard returns and handlers receive:
+An identity and its guard go together:
+
+<Tabs groupId="credential" items={['Bearer', 'API key', 'Basic', 'Custom']}>
+
+<Tab value="Bearer">
+
+A token in the `Authorization` header.
 
 ```ts title="identities.ts"
-import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-
 export const user = Kizuna.identity.bearer({
     context: z.object({
         userId: z.string(),
@@ -32,77 +35,136 @@ export const user = Kizuna.identity.bearer({
 });
 ```
 
-Register it on `new Kizuna()` under the name the rest of the contract refers to it by:
-
-```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
-import { tags } from './tags';
-import { user } from './identities';
-
-export const k = new Kizuna({
-    identities: {
-        user,
-    },
-    tags,
-});
-```
-
-</Step>
-
-<Step>
-
-## Say which routes need it
-
-`k.auth` types the map against your routes and identities. Every group must appear, so public is an explicit `false`:
-
-```ts title="auth.ts"
-import { k } from './k';
-import { routes } from './routes';
-
-export const auth = k.auth(routes, {
-    health: false,
-    members: 'user',
-});
-```
-
-```ts title="contract/index.ts"
-import { k } from './k';
-import { routes } from './routes';
-import { auth } from './auth';
-
-export const contract = k.contract({
-    routes,
-    auth,
-});
-```
-
-</Step>
-
-<Step>
-
-## Verify the credential with a guard
-
-One guard per identity, registered on `server.api`. It returns the identity's context, or denies:
-
 ```ts title="guards.ts"
-import { server } from './server';
-
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
     const session = bearer ? await verifySession(bearer.token) : undefined;
+
     if (!session) {
         return deny(401, 'Unauthorized');
     }
+
     return {
         userId: session.userId,
     };
 });
 ```
 
-```ts title="api.ts"
-import { server } from './server';
-import { router } from './router';
-import { requireUser } from './guards';
+</Tab>
 
+<Tab value="API key">
+
+A value in a header, a query parameter or a cookie. A browser session is `in: 'cookie'`.
+
+```ts title="identities.ts"
+export const member = Kizuna.identity.apiKey({
+    name: 'x-workspace-token',
+    in: 'header',
+    context: z.object({
+        workspaceUserId: z.string(),
+    }),
+});
+```
+
+```ts title="guards.ts"
+export const requireMember = server.guard('member', async ({ apiKey, deny }) => {
+    const membership = apiKey ? await findMembership(apiKey.value) : undefined;
+
+    if (!membership) {
+        return deny(403, 'Forbidden');
+    }
+
+    return {
+        workspaceUserId: membership.userId,
+    };
+});
+```
+
+<Callout type="warn" title="A cookie travels on its own">
+    The browser attaches it to any request, including ones another site triggers. Set `SameSite` on the cookie and check the `Origin` header
+    on unsafe methods.
+</Callout>
+
+</Tab>
+
+<Tab value="Basic">
+
+A username and password, decoded from the `Authorization` header.
+
+```ts title="identities.ts"
+export const operator = Kizuna.identity.basic({
+    context: z.object({
+        operatorId: z.string(),
+    }),
+});
+```
+
+```ts title="guards.ts"
+export const requireOperator = server.guard('operator', async ({ basic, deny }) => {
+    const operator = basic ? await verifyOperator(basic.username, basic.password) : undefined;
+
+    if (!operator) {
+        return deny(401, 'Unauthorized');
+    }
+
+    return {
+        operatorId: operator.id,
+    };
+});
+```
+
+</Tab>
+
+<Tab value="Custom">
+
+A credential no OpenAPI scheme describes, such as a token in a path segment. The guard reads it itself.
+
+```ts title="identities.ts"
+export const inviteToken = Kizuna.identity.custom({
+    context: z.object({
+        inviteId: z.string(),
+    }),
+});
+```
+
+```ts title="guards.ts"
+export const requireInviteToken = server.guard('inviteToken', async ({ params, deny }) => {
+    const invite = params.token ? await findInvite(params.token) : undefined;
+
+    if (!invite) {
+        return deny(404, 'Not found');
+    }
+
+    return {
+        inviteId: invite.id,
+    };
+});
+```
+
+</Tab>
+
+</Tabs>
+
+`oauth2` and `openIdConnect` are on [OAuth](/docs/oauth).
+
+An identity with no `context` only proves the caller is known. Its guard returns nothing and handlers get no argument for it.
+
+</Step>
+
+<Step>
+
+## Register both
+
+The identity on `new Kizuna()`, the guard on `server.api`:
+
+```ts title="k.ts"
+export const k = new Kizuna({
+    identities: {
+        user,
+    },
+});
+```
+
+```ts title="api.ts"
 export const api = server.api({
     router,
     guards: {
@@ -115,367 +177,71 @@ export const api = server.api({
 
 <Step>
 
-## Read the caller in the handler
+## Say which routes need it
 
-Every route under `members` now runs the guard, and its handler receives the guard's return, typed, under `auth`, keyed by the identity's name:
+Every group must appear in the map, so public is an explicit `false` and a forgotten route is a type error:
 
-```ts title="members.ts"
-members: {
-    listMembers: ({ auth }) => ({
+```ts title="access.ts"
+export const access = k.accessControl(routes, {
+    health: false,
+    users: 'user',
+});
+```
+
+```ts title="contract/index.ts"
+export const contract = k.contract({
+    routes,
+    access,
+});
+```
+
+The rest of what an entry can say is on [Access Control](/docs/access-control).
+
+</Step>
+
+<Step>
+
+## Read the caller
+
+Every guarded route hands its handler what the guard returned, typed, under `auth`:
+
+```ts title="router/users.ts"
+users: {
+    listUsers: async ({ auth }) => ({
         status: 200,
         body: {
-            members: findMembersExcept(auth.user.userId),
+            users: await findUsersExcept(auth.user.userId),
         },
     }),
 },
 ```
 
-Split into its own file, a handler keeps the typed `auth` via [`RouteHandler`](/docs/reference/server-router)`<typeof contract.routes.members.listMembers>`.
+A handler in its own file keeps the typed `auth` via [`RouteHandler`](/docs/reference/server-router)`<typeof contract.routes.users.listUsers>`.
 
 </Step>
 
 </Steps>
 
-## Identities
+## Denying
 
-One builder per authentication method: `bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`, and `custom`. Each optionally takes `context` (what a guard returns and handlers receive) and `access` (fields the auth map may gate per route):
+`deny(status, detail)` answers with [Problem Details](/docs/reference/problem-details-schema). A `401` carries the `WWW-Authenticate` challenge RFC 9110 requires, named after the identity that denied it. A cookie or API key has no challenge to send, so those answer `403`.
 
-```ts title="identities.ts"
-export const member = Kizuna.identity.apiKey({
-    name: 'x-workspace-token',
-    in: 'header',
-    context: z.object({
-        workspaceUserId: z.string(),
-    }),
-    access: z.object({
-        role: z.enum(['owner', 'admin']),
-    }),
-});
-```
+## What else a guard gets
 
-Omit `context` for an authentication-only identity, a pure gate like an API key that only proves the caller is a known client. Its guard returns nothing on success (or `deny(...)`), and routes secured by it receive no handler arg for it:
+The route's path `params`, the adapter's native request objects, oauth2 `scopes`, and any [request context](/docs/request-context) the contract declares. A request-scoped value that gates nothing, such as a logger, is a [request context](/docs/request-context) rather than an identity.
 
-```ts title="identities.ts"
-export const apiConsumer = Kizuna.identity.apiKey({
-    name: 'x-api-key',
-    in: 'header',
-});
-```
+## What it drives
 
-When the credential doesn't fit any OpenAPI scheme, a capability-URL token in a path segment for instance, use `custom`. Its guard reads the credential itself, and the route stays explicitly guarded:
+`k.contract` puts `401` on every guarded route, as [Problem Details](/docs/reference/problem-details-schema), with `WWW-Authenticate` required when every identity on the route has a challenge and optional when only some do. Declaring a `401` yourself is an error.
 
-```ts title="identities.ts"
-export const inviteToken = Kizuna.identity.custom({
-    context: z.object({
-        inviteId: z.string(),
-    }),
-});
-```
+[`generateOpenApi`](/docs/reference/generate-openapi) emits your identities as `components.securitySchemes`. A `custom` identity has no scheme, so its routes carry an `x-kizuna-guarded` extension instead.
 
-All builders and their fields, including how `custom` shows up in the spec: [`Kizuna.identity`](/docs/reference/kizuna-identity).
-
-## The auth map
-
-Keyed by route group; every group must appear, so public is always an explicit `false`. Each entry is one of:
-
-| Value                             | Meaning                                                                             |
-| --------------------------------- | ----------------------------------------------------------------------------------- |
-| `false`                           | Public, no auth                                                                     |
-| `'user'`                          | Requires the `user` identity                                                        |
-| `{ member: { role: 'owner' } }`   | Access gate. Requires `member` with `role` limited to a value (or an array)         |
-| `{ user: ['read:events'] }`       | Requires `user` with these oauth2 scopes                                            |
-| `{ user: true, member: { ... } }` | Multiple identities, all must pass                                                  |
-| `{ '*': ..., login: false }`      | Cascade. `'*'` sets the group default, named keys override its routes and subgroups |
-
-```ts title="auth.ts"
-export const auth = k.auth(routes, {
-    users: false,
-    health: false,
-    members: 'user',
-    workspace: {
-        '*': 'member',
-        deleteWorkspace: {
-            member: {
-                role: 'owner',
-            },
-        },
-        transfer: {
-            member: {
-                role: 'owner',
-            },
-        },
-    },
-});
-```
-
-A route entry inherits the `'*'` default and only states its delta. `deleteWorkspace` above keeps requiring `member`, tightened to `role: 'owner'`. Adding another identity (`{ user: true }`) requires both; `false` opts the route out. Identity names are type-checked, and `security` can't be written inline in `k.routes`.
-
-### Nested groups
-
-A subgroup key covers its whole subtree, or nests its own cascade to opt out deeper. A key that matches nothing in the group is an error:
-
-```ts title="auth.ts"
-members: {
-    '*': 'user',
-    session: {
-        '*': 'user',
-        login: false,
-    },
-    invites: false,
-},
-```
-
-### Access gates
-
-`{ member: { role: 'owner' } }` rejects other roles with a `403` before the handler runs, and inside the handler `auth.member.role` narrows to `'owner'`. Array fields pass when they contain the value (`{ member: { permissions: 'invoicing' } }`):
-
-```ts title="workspace.ts"
-workspace: {
-    deleteWorkspace: ({ auth }) => ({
-        status: 200,
-        body: {
-            ok: auth.member.role === 'owner',
-        },
-    }),
-},
-```
-
-A route requiring several identities receives all of them under `auth`, as in `transfer: ({ body, auth }) => ...`.
-
-## Guards
-
-A guard receives the credential extracted and typed, along with the route's path `params`. For a request to `/workspaces/ws_42/members`, `params.workspaceId` is `'ws_42'`, so the guard can check that the caller belongs to that workspace, not just that the token is valid:
-
-```ts title="guards.ts"
-export const requireMember = server.guard('member', async ({ apiKey, params, deny }) => {
-    const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
-    if (!membership) {
-        return deny(403, 'Forbidden');
-    }
-    return membership;
-});
-```
-
-The return is checked against the identity's schemas. `deny(status, detail, headers?)` responds with RFC 9457 Problem Details. A `401` also carries the `WWW-Authenticate` challenge RFC 9110 requires, named after the identity that denied: `Bearer`, or `Basic` for a basic one. An API key is not HTTP authentication and has no challenge to send, so `403` is the honest refusal for one. Guards also get the adapter's native request objects, oauth2 `scopes`, and whatever [request context](/docs/request-context) the contract declares, resolved before the guard runs. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), declare a request context rather than an identity.
-
-## What the declaration drives
-
-### The 401 and 403 on every guarded route
-
-`k.contract` puts `401` and `403` on every route the auth map guards, as [Problem Details](/docs/reference/problem-details-schema), both `no-store`. A public route gets neither.
-
-```ts title="delete-workspace.ts"
-const result = await apiClient.workspace.deleteWorkspace();
-
-if (result.status === 401) {
-    console.log(result.body.detail);
-}
-```
-
-The `401` also declares `WWW-Authenticate`, required when every identity on the route has a challenge and optional when only some do. An API key has none, so a route behind one declares no header. The header reaches the OpenAPI document; the Swift and Kotlin clients turn an error status into an enum case, which carries no headers.
-
-Declaring a `401` on a guarded route is an error, since refusing an unauthenticated caller is the guard's. A `403` you may declare, for a refusal the guard cannot make because it runs before the handler loads the resource. That body then sits beside the guard's, and [`isProblemDetails`](/docs/reference/problem-details-schema#checking-for-a-problem-details-body) tells them apart.
-
-### OpenAPI security
-
-[`generateOpenApi`](/docs/reference/generate-openapi) emits `securitySchemes` and per-route `security` from the auth map:
-
-```yaml title="openapi.yaml"
-# generated
-components:
-    securitySchemes:
-        member:
-            type: apiKey
-            name: x-workspace-token
-            in: header
-paths:
-    /workspace:
-        get:
-            security:
-                - member: []
-```
-
-A `custom` identity has no scheme to emit, so its routes carry an `x-kizuna-guarded` extension instead of `security`, which keeps them distinguishable from public ones.
-
-### Client
-
-The [`new KizunaClient()`](/docs/reference/kizuna-client) client sends the credential in `baseHeaders`:
-
-```ts title="api-client.ts"
-const apiClient = new KizunaClient(contract, {
-    baseUrl,
-    baseHeaders: {
-        Authorization: `Bearer ${token}`,
-    },
-});
-```
-
-### MCP
-
-[MCP endpoints](/docs/mcp) run the same guards per tool call.
-
-## OAuth
-
-When your tokens come from an authorization server (better-auth, Auth0, Keycloak), your API verifies tokens rather than issuing them. OAuth 2.1 calls that a resource server, and setting one up with kizuna is four steps: declare the identity, secure the routes, verify in the guard, and serve the discovery document.
-
-### Declare where tokens come from
-
-The identity carries everything about the authorization server, declared once. `issuer` is the server's identifier ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)), `flows` names its endpoints for the OpenAPI spec, and the flow's `scopes` are the catalogue your routes may require:
-
-```ts title="identities.ts"
-import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-
-export const user = Kizuna.identity.oauth2({
-    issuer: 'https://auth.example.com',
-    flows: {
-        authorizationCode: {
-            authorizationUrl: 'https://auth.example.com/oauth2/authorize',
-            tokenUrl: 'https://auth.example.com/oauth2/token',
-            scopes: {
-                'users:read': 'Read users',
-                'users:write': 'Create and update users',
-            },
-        },
-    },
-    context: z.object({
-        userId: z.string(),
-    }),
-});
-```
-
-For an OpenID Connect server, `Kizuna.identity.openIdConnect({ openIdConnectUrl })` is the whole declaration; the issuer derives from the discovery URL.
-
-### Secure the routes
-
-The [auth map](#the-auth-map) works as for any identity. Name the identity to require a valid token, or attach scopes from the catalogue:
-
-```ts title="auth.ts"
-export const auth = k.auth(routes, {
-    users: {
-        '*': 'user',
-        createUser: {
-            user: ['users:write'],
-        },
-    },
-});
-```
-
-### Verify in the guard
-
-The guard receives the token as `oauth2` and the route's required `scopes`. Check the signature against the authorization server's JWKS, the issuer, and the audience. Deny a missing scope with the `insufficient_scope` challenge ([RFC 6750](https://www.rfc-editor.org/rfc/rfc6750)):
-
-```ts title="guards.ts"
-import { createRemoteJWKSet, jwtVerify } from 'jose';
-import { bearerChallenge } from '@ts-kizuna/core/adapter';
-import { server } from './server';
-
-const jwks = createRemoteJWKSet(new URL('https://auth.example.com/oauth2/jwks'));
-
-export const requireUser = server.guard('user', async ({ oauth2, scopes, deny }) => {
-    if (!oauth2) {
-        return deny(401, 'Unauthorized');
-    }
-
-    let claims;
-    try {
-        ({ payload: claims } = await jwtVerify(oauth2.token, jwks, {
-            issuer: 'https://auth.example.com',
-            audience: 'https://api.example.com',
-        }));
-    } catch {
-        return deny(401, 'Invalid or expired token');
-    }
-
-    const granted = typeof claims.scope === 'string' ? claims.scope.split(' ') : [];
-    if (!scopes.every((scope) => granted.includes(scope))) {
-        return deny(403, 'The token is missing a required scope', {
-            'www-authenticate': bearerChallenge({
-                error: 'insufficient_scope',
-                scope: scopes.join(' '),
-                resource_metadata: 'https://api.example.com/.well-known/oauth-protected-resource',
-            }),
-        });
-    }
-
-    return {
-        userId: String(claims.sub),
-    };
-});
-```
-
-A `401` from `deny` carries the `Bearer` challenge automatically; the third argument is only needed when the challenge has something to say, as with missing scopes.
-
-### Serve the discovery document
-
-Clients that do not know your authorization server find it through [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) Protected Resource Metadata at `/.well-known/oauth-protected-resource`. Serve it on the framework, next to `api.mount`:
-
-```ts title="src/metadata.ts"
-import { buildProtectedResourceMetadata } from '@ts-kizuna/core';
-import { user } from './identities';
-
-export const metadata = buildProtectedResourceMetadata({
-    resource: 'https://api.example.com',
-    scheme: user,
-});
-```
-
-<Tabs groupId="adapter" items={['Express', 'Fastify', 'Hono', 'Next.js']}>
-
-<Tab value="Express">
-
-```ts title="src/index.ts"
-app.get('/.well-known/oauth-protected-resource', (_req, res) => {
-    res.json(metadata);
-});
-
-api.mount(app);
-```
-
-</Tab>
-
-<Tab value="Fastify">
-
-```ts title="src/index.ts"
-app.get('/.well-known/oauth-protected-resource', async () => metadata);
-
-await api.mount(app);
-```
-
-</Tab>
-
-<Tab value="Hono">
-
-```ts title="src/index.ts"
-app.get('/.well-known/oauth-protected-resource', (c) => c.json(metadata));
-
-api.mount(app);
-```
-
-</Tab>
-
-<Tab value="Next.js">
-
-```ts title="app/.well-known/oauth-protected-resource/route.ts"
-import { metadata } from '@/server/metadata';
-
-export function GET() {
-    return Response.json(metadata);
-}
-```
-
-</Tab>
-
-</Tabs>
-
-The document builds from the identity, so it says what the contract says. `resource` is the canonical URI of your API, the same value your guard checks as the token audience. First-party apps with a hardcoded authorization server never look at it; serve it when OAuth clients discover your API rather than being configured for it.
-
-See [`ProtectedResourceMetadataSchema`](/docs/reference/protected-resource-metadata-schema) for the document's fields and builders.
+[`new KizunaClient()`](/docs/reference/kizuna-client) sends the credential in `baseHeaders`, and [MCP endpoints](/docs/mcp) run the same guards per tool call.
 
 ## Reference
 
 - [`Kizuna.identity`](/docs/reference/kizuna-identity)
-- [`k.contract`](/docs/reference/k-contract#the-auth-map) for the auth map's value forms
 - [`server.guard`](/docs/reference/server-guard)
 - [`server.api`](/docs/reference/server-api)
-- [`new KizunaClient()`](/docs/reference/kizuna-client)
+- [Access Control](/docs/access-control)
+- [OAuth](/docs/oauth)
