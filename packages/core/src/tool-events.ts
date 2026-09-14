@@ -1,11 +1,10 @@
 import { z } from 'zod';
-import { flattenTools, type CompiledTool, type Tools } from './tools.js';
+import { flattenTools, type CompiledTool, type ToolOutputValue, type Tools } from './tools.js';
 import type { RouteDefinition, StreamDefinition, StreamResponseDefinition } from './types.js';
 import { isStreamResponse, isZodSchema } from './generator-utils.js';
 
 /**
- * Every tool in a tree as its dotted key, e.g. `'weather.getForecast'`. A tool
- * is addressed by that key everywhere, the way a job is.
+ * Every tool in a tree as its dotted key, e.g. `'weather.getForecast'`.
  */
 export type ToolKeys<Tools_ extends Tools, Prefix extends string = ''> = {
     [Name in keyof Tools_ & string]: Tools_[Name] extends CompiledTool
@@ -48,15 +47,12 @@ type InputField<Tool extends CompiledTool, Io extends 'input' | 'output'> = Tool
     : {};
 
 /**
- * The `output` field of a result, absent for a tool that reports nothing.
+ * The `output` field of a result. Every tool answers the envelope, so a result
+ * always carries one.
  */
-type OutputField<Tool extends CompiledTool, Io extends 'input' | 'output'> = Tool['definition'] extends {
-    output: z.ZodType;
-}
-    ? {
-          output: SchemaSide<Tool['definition']['output'], Io>;
-      }
-    : {};
+type OutputField<Tool extends CompiledTool, _Io extends 'input' | 'output'> = {
+    output: ToolOutputValue<Tool['definition']>;
+};
 
 /**
  * One tool call, discriminated on `name` so `input` narrows to the tool's own
@@ -171,8 +167,7 @@ export type StreamWithTools<Def extends StreamResponseDefinition> = Def extends 
 
 /**
  * Fold a response's `tools` into its `stream`, so everything downstream reads
- * one record of named events and never learns a tool was involved. Called by
- * `k.routes` before a route is validated.
+ * one record of named events. Called by `k.routes` before a route is validated.
  */
 export const expandStreamTools = (route: RouteDefinition, routeKey: string): void => {
     for (const [status, response] of Object.entries(route.responses)) {

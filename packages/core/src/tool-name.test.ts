@@ -64,8 +64,8 @@ describe('deriveToolNames', () => {
         expect(() => deriveToolNames(routesOf('a'.repeat(128)))).not.toThrow();
     });
 
-    it('throws when a name exceeds the 128 character maximum', () => {
-        expect(() => deriveToolNames(routesOf('a'.repeat(129)))).toThrow(/exceeding the MCP maximum of 128/);
+    it('throws over the MCP maximum', () => {
+        expect(() => deriveToolNames(routesOf('a'.repeat(129)))).toThrow(/over the MCP maximum of 128/);
     });
 
     it('throws when a route key carries a character no client accepts', () => {

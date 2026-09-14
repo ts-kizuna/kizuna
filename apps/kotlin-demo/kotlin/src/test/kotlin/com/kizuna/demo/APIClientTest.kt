@@ -428,7 +428,10 @@ class APIClientTest {
                     APIClient.AssistantReply.ToolResultCountWords(
                         id = "toolu_01",
                         name = "countWords",
-                        output = APIClient.AssistantReply.ToolResultCountWordsOutput(words = 3),
+                        output = APIClient.AssistantReply.ToolResultCountWordsOutput(
+                            status = 200,
+                            body = APIClient.AssistantReply.ToolResultCountWordsOutputBody(words = 3),
+                        ),
                     )
                 )
             ),
@@ -441,7 +444,8 @@ class APIClientTest {
 
         val result = tracked[0].result
         assertTrue(result is APIClient.AssistantReply.ToolResult.CountWords)
-        assertEquals(3, result.value.output.words)
+        assertEquals(200, result.value.output.status)
+        assertEquals(3, result.value.output.body?.words)
     }
 
     @Test

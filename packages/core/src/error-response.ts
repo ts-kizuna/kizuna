@@ -62,7 +62,7 @@ export const ProblemDetailsSchema = createModel({
         /**
          * HTTP status code repeated inside the body for clients that cannot inspect headers.
          */
-        status: z.number().int(),
+        status: z.int().min(100).max(599),
         /**
          * Human-readable explanation specific to this occurrence of the problem.
          */

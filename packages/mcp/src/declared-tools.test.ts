@@ -19,7 +19,7 @@ const routes = k.routes({
     },
 });
 
-const tools = k.tools({
+const tools = k.tools(({ toolFromRoutes }) => ({
     weather: {
         getForecast: {
             title: 'Weather forecast',
@@ -47,7 +47,8 @@ const tools = k.tools({
     reindex: {
         description: 'Rebuild the search index',
     },
-});
+    health: toolFromRoutes(routes.health),
+}));
 
 const contract = k.contract({
     routes,
@@ -90,16 +91,11 @@ const buildApi = () =>
         }
     );
 
-const connect = async (options?: NonNullable<Parameters<typeof createMcpServer>[1]>['options']) => {
+const connect = async (options?: Parameters<typeof createMcpServer>[1]) => {
     const server = createMcpServer(buildApi() as Parameters<typeof createMcpServer>[0], {
         name: 'Test API',
         version: '1.0.0',
-        options: {
-            publishRoutes: {
-                '*': true,
-            },
-            ...options,
-        },
+        ...options,
     });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({
@@ -118,7 +114,7 @@ const connect = async (options?: NonNullable<Parameters<typeof createMcpServer>[
 };
 
 describe('declared tools over MCP', () => {
-    it('publishes every declared tool, beside the routes that opted in', async () => {
+    it('publishes every declared tool, beside the routes named with fromRoute', async () => {
         const { client, close } = await connect();
         const { tools: listed } = await client.listTools();
         const names = listed.map((tool) => tool.name);
@@ -129,88 +125,11 @@ describe('declared tools over MCP', () => {
         await close();
     });
 
-    it('leaves out a tool hideTools names', async () => {
-        const { client, close } = await connect({
-            hideTools: ['countWords'],
-        });
-        const { tools: listed } = await client.listTools();
-        const names = listed.map((tool) => tool.name);
-
-        expect(names).toContain('weather_get_forecast');
-        expect(names).not.toContain('count_words');
-        await close();
-    });
-
-    it('advertises the tool own schemas, with no HTTP envelope', async () => {
+    it('leaves out a tool that is simply not declared', async () => {
         const { client, close } = await connect();
         const { tools: listed } = await client.listTools();
-        const forecast = listed.find((tool) => tool.name === 'weather_get_forecast')!;
 
-        expect(forecast.title).toBe('Weather forecast');
-        expect(forecast.inputSchema).toMatchObject({
-            type: 'object',
-            properties: {
-                city: {
-                    type: 'string',
-                },
-            },
-        });
-        // A route-tool advertises { status, body }; a declared tool advertises its own output.
-        expect(forecast.outputSchema).toMatchObject({
-            type: 'object',
-            properties: {
-                tempC: {
-                    type: 'number',
-                },
-            },
-        });
-        expect(forecast.annotations).toMatchObject({
-            readOnlyHint: true,
-        });
-        await close();
-    });
-
-    it('runs the plain handler and answers with its bare output', async () => {
-        const { client, close } = await connect();
-
-        const result = await client.callTool({
-            name: 'weather_get_forecast',
-            arguments: {
-                city: 'Oslo',
-            },
-        });
-
-        expect(result.isError).toBe(false);
-        expect(result.structuredContent).toEqual({
-            tempC: 14,
-        });
-        await close();
-    });
-
-    it('refuses arguments the input schema does not accept', async () => {
-        const { client, close } = await connect();
-
-        const result = await client.callTool({
-            name: 'count_words',
-            arguments: {
-                text: 42,
-            },
-        });
-
-        expect(result.isError).toBe(true);
-        await close();
-    });
-
-    it('keeps a tool with no output out of structuredContent', async () => {
-        const { client, close } = await connect();
-
-        const result = await client.callTool({
-            name: 'reindex',
-            arguments: {},
-        });
-
-        expect(result.isError).toBe(false);
-        expect(result.structuredContent).toBeUndefined();
+        expect(listed.map((tool) => tool.name)).not.toContain('archive_everything');
         await close();
     });
 

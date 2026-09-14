@@ -23,6 +23,7 @@ export interface Contract<
     Jobs_ extends Jobs = Jobs,
     Tools_ extends Tools = Tools,
     GuardSchema extends z.ZodType | undefined = z.ZodType | undefined,
+    ToolAccessControl extends Record<string, unknown> = Record<string, unknown>,
 > {
     /**
      * The API's route groups.
@@ -53,6 +54,12 @@ export interface Contract<
      * they are never routes, so nothing that walks `routes` sees them.
      */
     tools?: Tools_;
+    /**
+     * The tool access control map passed to `k.contract`, nested the way the
+     * tool tree is. Carried so the server surface can type each handler's
+     * `auth`.
+     */
+    toolAccessControl?: ToolAccessControl;
     /**
      * The access control map passed to `k.contract`, keyed by route group. Carried on
      * the contract so the adapters can resolve each route's required identities
@@ -106,12 +113,14 @@ export function assembleContract<
     const Jobs_ extends Jobs = Record<string, never>,
     const Tools_ extends Tools = Record<string, never>,
     GuardSchema extends z.ZodType | undefined = undefined,
+    const ToolAccessControl extends Record<string, unknown> = Record<string, never>,
 >(config: {
     routes: R;
     guardSchema?: GuardSchema;
     jobs?: Jobs_;
     jobsConfig?: JobsConfig;
     tools?: Tools_;
+    toolAccessControl?: ToolAccessControl;
     accessControl?: AccessControl;
     tags?: TagSet<Tags>;
     securitySchemes?: Schemes;
@@ -120,7 +129,7 @@ export function assembleContract<
         issueCodes?: readonly Codes[];
     };
     plugins?: Plugins;
-}): Contract<R, Tags, Codes, Schemes, AccessControl, RequestContext, Plugins, Jobs_, Tools_, GuardSchema> {
+}): Contract<R, Tags, Codes, Schemes, AccessControl, RequestContext, Plugins, Jobs_, Tools_, GuardSchema, ToolAccessControl> {
     return {
         routes: config.routes,
         guardSchema: config.guardSchema,
@@ -128,6 +137,7 @@ export function assembleContract<
         jobs: config.jobs,
         jobsConfig: config.jobsConfig,
         tools: config.tools,
+        toolAccessControl: config.toolAccessControl,
         accessControl: config.accessControl,
         tags: config.tags,
         securitySchemes: config.securitySchemes,
@@ -172,3 +182,8 @@ export type GuardSchemaOf<C extends Contract> = Extract<C['guardSchema'], z.ZodT
  * A contract's tools, or an empty map when it declares none.
  */
 export type ToolsOf<C extends Contract> = Exclude<C['tools'], undefined>;
+
+/**
+ * The tool access control map a contract was assembled with.
+ */
+export type ToolAccessControlOf<C extends Contract> = Exclude<C['toolAccessControl'], undefined>;

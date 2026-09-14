@@ -29,10 +29,12 @@ test('conforms to the shared adapter type catalogue', () => {
                     const counted = await tools.countWords.run({
                         text: body.text,
                     });
-                    expectTypeOf(counted).toEqualTypeOf<{ words: number }>();
+                    expectTypeOf(counted).toEqualTypeOf<{ status: number; body?: { words: number }; detail?: string }>();
                     return {
                         status: 200,
-                        body: counted,
+                        body: {
+                            words: counted.body?.words ?? 0,
+                        },
                     };
                 },
             });

@@ -36,14 +36,15 @@ createMcpServer(api: Api, options?: McpServerOptions): McpServer
 | ------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `name`              | `'MCP Server'`       | Human-readable name shown to AI assistants                                                                          |
 | `version`           | `'1.0.0'`            | Semantic version string                                                                                             |
-| `options`           | none                 | `publishRoutes`, `hideTools`, and `onlyReadOnly`, as on [`mcpPlugin`](/docs/reference/mcp-plugin)                   |
-| `onlyReadOnly`      | `false`              | Keep only `GET`, `HEAD`, and `OPTIONS`                                                                              |
+| `onlyReadOnly`      | `false`              | Publish only the tools that cannot change data                                                                      |
 | `instructions`      | built from your tags | Appended to the generated overview                                                                                  |
 | `handlerContext`    | none                 | Extra context spread into every handler call                                                                        |
 | `credentialHeaders` | none                 | Headers of the MCP transport request, used to run guards on secured tools                                           |
 | `transportAuth`     | none                 | A scheme the transport already verified: its guard is skipped, and `context` reaches handlers under `auth.<scheme>` |
 
-Every tool declared with `k.tools` is published unless `options.hideTools` lists it. No route is published until `options.publishRoutes` names it, keyed by the route tree, with `'*'` for a group default. See [Choosing which routes become tools](/docs/mcp#choosing-which-routes-become-tools).
+Every route marked `tool: true` is published, and a route without it is not a tool. See [Choosing which routes become tools](/docs/mcp#choosing-which-routes-become-tools).
+
+`onlyReadOnly` narrows that to the tools whose annotations declare `readOnlyHint`. A route-derived tool reads that from its method, per RFC 9110, so every `GET` qualifies and no `POST` does.
 
 Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, because MCP tool input is JSON.
 

@@ -374,7 +374,7 @@ Every `GET` route answers `HEAD`, a stream route included: the status and header
 
 ## Tools
 
-A streamed response can name the tools the model may call, adding `tool_call`, `tool_result` and `tool_error` to the events it declares:
+A streamed response names the routes the model may call, adding `tool_call`, `tool_result` and `tool_error` to the events it declares:
 
 ```ts
 200: {
@@ -383,11 +383,11 @@ A streamed response can name the tools the model may call, adding `tool_call`, `
             text: z.string(),
         }),
     },
-    tools,
+    tools: [routes.users.getUser, routes.charts.plotSignups],
 },
 ```
 
-Each is discriminated on the tool's dotted key. See [tools](/docs/tools).
+Each is discriminated on the tool's dotted key, so a `for await` narrows the payload to the route that produced it. Name the handful your client draws rather than everything your API publishes, and name them from another module: a stream cannot name a route from its own `k.routes` call. See [tools](/docs/tools).
 
 ## Reference
 

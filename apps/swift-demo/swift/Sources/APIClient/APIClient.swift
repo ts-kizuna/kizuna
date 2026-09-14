@@ -2036,9 +2036,57 @@ public final class APIClient: Sendable {
         }
 
         public enum ToolCall: Codable, Sendable, Equatable {
+            case users_find(ToolCallUsersFind)
+            case users_list(ToolCallUsersList)
+            case users_create(ToolCallUsersCreate)
+            case users_remove(ToolCallUsersRemove)
+            case users_archive(ToolCallUsersArchive)
+            case users_countActive(ToolCallUsersCountActive)
+            case users_search_byName(ToolCallUsersSearchByName)
+            case users_search_suggest(ToolCallUsersSearchSuggest)
+            case users_records_profile(ToolCallUsersRecordsProfile)
+            case users_records_activity_forYear(ToolCallUsersRecordsActivityForYear)
+            case users_records_activity_summarize(ToolCallUsersRecordsActivitySummarize)
+            case workspace_read(ToolCallWorkspaceRead)
             case weather_getForecast(ToolCallWeatherGetForecast)
             case charts_plotSignups(ToolCallChartsPlotSignups)
             case countWords(ToolCallCountWords)
+            public static func users_find(id: String, input: APIClient.AssistantReply.ToolCallUsersFindInput) -> ToolCall {
+                .users_find(ToolCallUsersFind(id: id, name: "users.find", input: input))
+            }
+            public static func users_list(id: String, input: APIClient.AssistantReply.ToolCallUsersListInput) -> ToolCall {
+                .users_list(ToolCallUsersList(id: id, name: "users.list", input: input))
+            }
+            public static func users_create(id: String, input: APIClient.AssistantReply.ToolCallUsersCreateInput) -> ToolCall {
+                .users_create(ToolCallUsersCreate(id: id, name: "users.create", input: input))
+            }
+            public static func users_remove(id: String, input: APIClient.AssistantReply.ToolCallUsersRemoveInput) -> ToolCall {
+                .users_remove(ToolCallUsersRemove(id: id, name: "users.remove", input: input))
+            }
+            public static func users_archive(id: String, input: APIClient.AssistantReply.ToolCallUsersArchiveInput) -> ToolCall {
+                .users_archive(ToolCallUsersArchive(id: id, name: "users.archive", input: input))
+            }
+            public static func users_countActive(id: String) -> ToolCall {
+                .users_countActive(ToolCallUsersCountActive(id: id, name: "users.countActive"))
+            }
+            public static func users_search_byName(id: String, input: APIClient.AssistantReply.ToolCallUsersSearchByNameInput) -> ToolCall {
+                .users_search_byName(ToolCallUsersSearchByName(id: id, name: "users.search.byName", input: input))
+            }
+            public static func users_search_suggest(id: String, input: APIClient.AssistantReply.ToolCallUsersSearchSuggestInput) -> ToolCall {
+                .users_search_suggest(ToolCallUsersSearchSuggest(id: id, name: "users.search.suggest", input: input))
+            }
+            public static func users_records_profile(id: String, input: APIClient.AssistantReply.ToolCallUsersRecordsProfileInput) -> ToolCall {
+                .users_records_profile(ToolCallUsersRecordsProfile(id: id, name: "users.records.profile", input: input))
+            }
+            public static func users_records_activity_forYear(id: String, input: APIClient.AssistantReply.ToolCallUsersRecordsActivityForYearInput) -> ToolCall {
+                .users_records_activity_forYear(ToolCallUsersRecordsActivityForYear(id: id, name: "users.records.activity.forYear", input: input))
+            }
+            public static func users_records_activity_summarize(id: String, input: APIClient.AssistantReply.ToolCallUsersRecordsActivitySummarizeInput) -> ToolCall {
+                .users_records_activity_summarize(ToolCallUsersRecordsActivitySummarize(id: id, name: "users.records.activity.summarize", input: input))
+            }
+            public static func workspace_read(id: String) -> ToolCall {
+                .workspace_read(ToolCallWorkspaceRead(id: id, name: "workspace.read"))
+            }
             public static func weather_getForecast(id: String, input: APIClient.AssistantReply.ToolCallWeatherGetForecastInput) -> ToolCall {
                 .weather_getForecast(ToolCallWeatherGetForecast(id: id, name: "weather.getForecast", input: input))
             }
@@ -2051,6 +2099,18 @@ public final class APIClient: Sendable {
 
             public var id: String {
                 switch self {
+                case .users_find(let payload): return payload.id
+                case .users_list(let payload): return payload.id
+                case .users_create(let payload): return payload.id
+                case .users_remove(let payload): return payload.id
+                case .users_archive(let payload): return payload.id
+                case .users_countActive(let payload): return payload.id
+                case .users_search_byName(let payload): return payload.id
+                case .users_search_suggest(let payload): return payload.id
+                case .users_records_profile(let payload): return payload.id
+                case .users_records_activity_forYear(let payload): return payload.id
+                case .users_records_activity_summarize(let payload): return payload.id
+                case .workspace_read(let payload): return payload.id
                 case .weather_getForecast(let payload): return payload.id
                 case .charts_plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
@@ -2059,6 +2119,18 @@ public final class APIClient: Sendable {
 
             public var name: String {
                 switch self {
+                case .users_find(let payload): return payload.name
+                case .users_list(let payload): return payload.name
+                case .users_create(let payload): return payload.name
+                case .users_remove(let payload): return payload.name
+                case .users_archive(let payload): return payload.name
+                case .users_countActive(let payload): return payload.name
+                case .users_search_byName(let payload): return payload.name
+                case .users_search_suggest(let payload): return payload.name
+                case .users_records_profile(let payload): return payload.name
+                case .users_records_activity_forYear(let payload): return payload.name
+                case .users_records_activity_summarize(let payload): return payload.name
+                case .workspace_read(let payload): return payload.name
                 case .weather_getForecast(let payload): return payload.name
                 case .charts_plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
@@ -2074,6 +2146,30 @@ public final class APIClient: Sendable {
                 let kind = try container.decode(String.self, forKey: .discriminator)
                 let single = try decoder.singleValueContainer()
                 switch kind {
+                case "users.find":
+                    self = .users_find(try single.decode(ToolCallUsersFind.self))
+                case "users.list":
+                    self = .users_list(try single.decode(ToolCallUsersList.self))
+                case "users.create":
+                    self = .users_create(try single.decode(ToolCallUsersCreate.self))
+                case "users.remove":
+                    self = .users_remove(try single.decode(ToolCallUsersRemove.self))
+                case "users.archive":
+                    self = .users_archive(try single.decode(ToolCallUsersArchive.self))
+                case "users.countActive":
+                    self = .users_countActive(try single.decode(ToolCallUsersCountActive.self))
+                case "users.search.byName":
+                    self = .users_search_byName(try single.decode(ToolCallUsersSearchByName.self))
+                case "users.search.suggest":
+                    self = .users_search_suggest(try single.decode(ToolCallUsersSearchSuggest.self))
+                case "users.records.profile":
+                    self = .users_records_profile(try single.decode(ToolCallUsersRecordsProfile.self))
+                case "users.records.activity.forYear":
+                    self = .users_records_activity_forYear(try single.decode(ToolCallUsersRecordsActivityForYear.self))
+                case "users.records.activity.summarize":
+                    self = .users_records_activity_summarize(try single.decode(ToolCallUsersRecordsActivitySummarize.self))
+                case "workspace.read":
+                    self = .workspace_read(try single.decode(ToolCallWorkspaceRead.self))
                 case "weather.getForecast":
                     self = .weather_getForecast(try single.decode(ToolCallWeatherGetForecast.self))
                 case "charts.plotSignups":
@@ -2088,6 +2184,30 @@ public final class APIClient: Sendable {
             public func encode(to encoder: Encoder) throws {
                 var single = encoder.singleValueContainer()
                 switch self {
+                case .users_find(let payload):
+                    try single.encode(payload)
+                case .users_list(let payload):
+                    try single.encode(payload)
+                case .users_create(let payload):
+                    try single.encode(payload)
+                case .users_remove(let payload):
+                    try single.encode(payload)
+                case .users_archive(let payload):
+                    try single.encode(payload)
+                case .users_countActive(let payload):
+                    try single.encode(payload)
+                case .users_search_byName(let payload):
+                    try single.encode(payload)
+                case .users_search_suggest(let payload):
+                    try single.encode(payload)
+                case .users_records_profile(let payload):
+                    try single.encode(payload)
+                case .users_records_activity_forYear(let payload):
+                    try single.encode(payload)
+                case .users_records_activity_summarize(let payload):
+                    try single.encode(payload)
+                case .workspace_read(let payload):
+                    try single.encode(payload)
                 case .weather_getForecast(let payload):
                     try single.encode(payload)
                 case .charts_plotSignups(let payload):
@@ -2095,6 +2215,353 @@ public final class APIClient: Sendable {
                 case .countWords(let payload):
                     try single.encode(payload)
                 }
+            }
+        }
+
+        public struct ToolCallUsersFind: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersFindInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersFindInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersFindInput: Codable, Sendable, Equatable {
+            public let params: ToolCallUsersFindInputParams
+
+            public init(params: ToolCallUsersFindInputParams) {
+                self.params = params
+            }
+        }
+
+        public struct ToolCallUsersFindInputParams: Codable, Sendable, Equatable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+        }
+
+        public struct ToolCallUsersList: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersListInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersListInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersListInput: Codable, Sendable, Equatable {
+            public let query: ToolCallUsersListInputQuery?
+
+            public init(query: ToolCallUsersListInputQuery? = nil) {
+                self.query = query
+            }
+        }
+
+        public struct ToolCallUsersListInputQuery: Codable, Sendable, Equatable {
+            /// Page number, starting at 1
+            public let page: Int?
+            /// Page size (1–100)
+            public let limit: Int?
+
+            public init(
+                page: Int? = nil,
+                limit: Int? = nil
+            ) {
+                self.page = page
+                self.limit = limit
+            }
+        }
+
+        public struct ToolCallUsersCreate: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersCreateInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersCreateInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersCreateInput: Codable, Sendable, Equatable {
+            public let body: API.CreateUserInput
+
+            public init(body: API.CreateUserInput) {
+                self.body = body
+            }
+        }
+
+        public struct ToolCallUsersRemove: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersRemoveInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersRemoveInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersRemoveInput: Codable, Sendable, Equatable {
+            public let params: ToolCallUsersRemoveInputParams
+
+            public init(params: ToolCallUsersRemoveInputParams) {
+                self.params = params
+            }
+        }
+
+        public struct ToolCallUsersRemoveInputParams: Codable, Sendable, Equatable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+        }
+
+        public struct ToolCallUsersArchive: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersArchiveInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersArchiveInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersArchiveInput: Codable, Sendable, Equatable {
+            public let params: ToolCallUsersArchiveInputParams
+
+            public init(params: ToolCallUsersArchiveInputParams) {
+                self.params = params
+            }
+        }
+
+        public struct ToolCallUsersArchiveInputParams: Codable, Sendable, Equatable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+        }
+
+        public struct ToolCallUsersCountActive: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+
+            public init(
+                id: String,
+                name: String
+            ) {
+                self.id = id
+                self.name = name
+            }
+        }
+
+        public struct ToolCallUsersSearchByName: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersSearchByNameInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersSearchByNameInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersSearchByNameInput: Codable, Sendable, Equatable {
+            public let query: ToolCallUsersSearchByNameInputQuery
+
+            public init(query: ToolCallUsersSearchByNameInputQuery) {
+                self.query = query
+            }
+        }
+
+        public struct ToolCallUsersSearchByNameInputQuery: Codable, Sendable, Equatable {
+            public let q: String
+            public let limit: Int
+            public let cursor: Int
+
+            public init(
+                q: String,
+                limit: Int,
+                cursor: Int
+            ) {
+                self.q = q
+                self.limit = limit
+                self.cursor = cursor
+            }
+        }
+
+        public struct ToolCallUsersSearchSuggest: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersSearchSuggestInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersSearchSuggestInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersSearchSuggestInput: Codable, Sendable, Equatable {
+            public let prefix: String
+
+            public init(prefix: String) {
+                self.prefix = prefix
+            }
+        }
+
+        public struct ToolCallUsersRecordsProfile: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersRecordsProfileInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersRecordsProfileInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersRecordsProfileInput: Codable, Sendable, Equatable {
+            public let params: ToolCallUsersRecordsProfileInputParams
+
+            public init(params: ToolCallUsersRecordsProfileInputParams) {
+                self.params = params
+            }
+        }
+
+        public struct ToolCallUsersRecordsProfileInputParams: Codable, Sendable, Equatable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+        }
+
+        public struct ToolCallUsersRecordsActivityForYear: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersRecordsActivityForYearInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersRecordsActivityForYearInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersRecordsActivityForYearInput: Codable, Sendable, Equatable {
+            public let params: ToolCallUsersRecordsActivityForYearInputParams
+
+            public init(params: ToolCallUsersRecordsActivityForYearInputParams) {
+                self.params = params
+            }
+        }
+
+        public struct ToolCallUsersRecordsActivityForYearInputParams: Codable, Sendable, Equatable {
+            public let id: String
+            public let year: Int
+
+            public init(
+                id: String,
+                year: Int
+            ) {
+                self.id = id
+                self.year = year
+            }
+        }
+
+        public struct ToolCallUsersRecordsActivitySummarize: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallUsersRecordsActivitySummarizeInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallUsersRecordsActivitySummarizeInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallUsersRecordsActivitySummarizeInput: Codable, Sendable, Equatable {
+            public let userId: String
+            public let year: Int
+
+            public init(
+                userId: String,
+                year: Int
+            ) {
+                self.userId = userId
+                self.year = year
+            }
+        }
+
+        public struct ToolCallWorkspaceRead: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+
+            public init(
+                id: String,
+                name: String
+            ) {
+                self.id = id
+                self.name = name
             }
         }
 
@@ -2181,9 +2648,57 @@ public final class APIClient: Sendable {
         }
 
         public enum ToolResult: Codable, Sendable, Equatable {
+            case users_find(ToolResultUsersFind)
+            case users_list(ToolResultUsersList)
+            case users_create(ToolResultUsersCreate)
+            case users_remove(ToolResultUsersRemove)
+            case users_archive(ToolResultUsersArchive)
+            case users_countActive(ToolResultUsersCountActive)
+            case users_search_byName(ToolResultUsersSearchByName)
+            case users_search_suggest(ToolResultUsersSearchSuggest)
+            case users_records_profile(ToolResultUsersRecordsProfile)
+            case users_records_activity_forYear(ToolResultUsersRecordsActivityForYear)
+            case users_records_activity_summarize(ToolResultUsersRecordsActivitySummarize)
+            case workspace_read(ToolResultWorkspaceRead)
             case weather_getForecast(ToolResultWeatherGetForecast)
             case charts_plotSignups(ToolResultChartsPlotSignups)
             case countWords(ToolResultCountWords)
+            public static func users_find(id: String, output: APIClient.AssistantReply.ToolResultUsersFindOutput) -> ToolResult {
+                .users_find(ToolResultUsersFind(id: id, name: "users.find", output: output))
+            }
+            public static func users_list(id: String, output: APIClient.AssistantReply.ToolResultUsersListOutput) -> ToolResult {
+                .users_list(ToolResultUsersList(id: id, name: "users.list", output: output))
+            }
+            public static func users_create(id: String, output: APIClient.AssistantReply.ToolResultUsersCreateOutput) -> ToolResult {
+                .users_create(ToolResultUsersCreate(id: id, name: "users.create", output: output))
+            }
+            public static func users_remove(id: String, output: APIClient.AssistantReply.ToolResultUsersRemoveOutput) -> ToolResult {
+                .users_remove(ToolResultUsersRemove(id: id, name: "users.remove", output: output))
+            }
+            public static func users_archive(id: String, output: APIClient.AssistantReply.ToolResultUsersArchiveOutput) -> ToolResult {
+                .users_archive(ToolResultUsersArchive(id: id, name: "users.archive", output: output))
+            }
+            public static func users_countActive(id: String, output: APIClient.AssistantReply.ToolResultUsersCountActiveOutput) -> ToolResult {
+                .users_countActive(ToolResultUsersCountActive(id: id, name: "users.countActive", output: output))
+            }
+            public static func users_search_byName(id: String, output: APIClient.AssistantReply.ToolResultUsersSearchByNameOutput) -> ToolResult {
+                .users_search_byName(ToolResultUsersSearchByName(id: id, name: "users.search.byName", output: output))
+            }
+            public static func users_search_suggest(id: String, output: APIClient.AssistantReply.ToolResultUsersSearchSuggestOutput) -> ToolResult {
+                .users_search_suggest(ToolResultUsersSearchSuggest(id: id, name: "users.search.suggest", output: output))
+            }
+            public static func users_records_profile(id: String, output: APIClient.AssistantReply.ToolResultUsersRecordsProfileOutput) -> ToolResult {
+                .users_records_profile(ToolResultUsersRecordsProfile(id: id, name: "users.records.profile", output: output))
+            }
+            public static func users_records_activity_forYear(id: String, output: APIClient.AssistantReply.ToolResultUsersRecordsActivityForYearOutput) -> ToolResult {
+                .users_records_activity_forYear(ToolResultUsersRecordsActivityForYear(id: id, name: "users.records.activity.forYear", output: output))
+            }
+            public static func users_records_activity_summarize(id: String, output: APIClient.AssistantReply.ToolResultUsersRecordsActivitySummarizeOutput) -> ToolResult {
+                .users_records_activity_summarize(ToolResultUsersRecordsActivitySummarize(id: id, name: "users.records.activity.summarize", output: output))
+            }
+            public static func workspace_read(id: String, output: APIClient.AssistantReply.ToolResultWorkspaceReadOutput) -> ToolResult {
+                .workspace_read(ToolResultWorkspaceRead(id: id, name: "workspace.read", output: output))
+            }
             public static func weather_getForecast(id: String, output: APIClient.AssistantReply.ToolResultWeatherGetForecastOutput) -> ToolResult {
                 .weather_getForecast(ToolResultWeatherGetForecast(id: id, name: "weather.getForecast", output: output))
             }
@@ -2196,6 +2711,18 @@ public final class APIClient: Sendable {
 
             public var id: String {
                 switch self {
+                case .users_find(let payload): return payload.id
+                case .users_list(let payload): return payload.id
+                case .users_create(let payload): return payload.id
+                case .users_remove(let payload): return payload.id
+                case .users_archive(let payload): return payload.id
+                case .users_countActive(let payload): return payload.id
+                case .users_search_byName(let payload): return payload.id
+                case .users_search_suggest(let payload): return payload.id
+                case .users_records_profile(let payload): return payload.id
+                case .users_records_activity_forYear(let payload): return payload.id
+                case .users_records_activity_summarize(let payload): return payload.id
+                case .workspace_read(let payload): return payload.id
                 case .weather_getForecast(let payload): return payload.id
                 case .charts_plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
@@ -2204,6 +2731,18 @@ public final class APIClient: Sendable {
 
             public var name: String {
                 switch self {
+                case .users_find(let payload): return payload.name
+                case .users_list(let payload): return payload.name
+                case .users_create(let payload): return payload.name
+                case .users_remove(let payload): return payload.name
+                case .users_archive(let payload): return payload.name
+                case .users_countActive(let payload): return payload.name
+                case .users_search_byName(let payload): return payload.name
+                case .users_search_suggest(let payload): return payload.name
+                case .users_records_profile(let payload): return payload.name
+                case .users_records_activity_forYear(let payload): return payload.name
+                case .users_records_activity_summarize(let payload): return payload.name
+                case .workspace_read(let payload): return payload.name
                 case .weather_getForecast(let payload): return payload.name
                 case .charts_plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
@@ -2219,6 +2758,30 @@ public final class APIClient: Sendable {
                 let kind = try container.decode(String.self, forKey: .discriminator)
                 let single = try decoder.singleValueContainer()
                 switch kind {
+                case "users.find":
+                    self = .users_find(try single.decode(ToolResultUsersFind.self))
+                case "users.list":
+                    self = .users_list(try single.decode(ToolResultUsersList.self))
+                case "users.create":
+                    self = .users_create(try single.decode(ToolResultUsersCreate.self))
+                case "users.remove":
+                    self = .users_remove(try single.decode(ToolResultUsersRemove.self))
+                case "users.archive":
+                    self = .users_archive(try single.decode(ToolResultUsersArchive.self))
+                case "users.countActive":
+                    self = .users_countActive(try single.decode(ToolResultUsersCountActive.self))
+                case "users.search.byName":
+                    self = .users_search_byName(try single.decode(ToolResultUsersSearchByName.self))
+                case "users.search.suggest":
+                    self = .users_search_suggest(try single.decode(ToolResultUsersSearchSuggest.self))
+                case "users.records.profile":
+                    self = .users_records_profile(try single.decode(ToolResultUsersRecordsProfile.self))
+                case "users.records.activity.forYear":
+                    self = .users_records_activity_forYear(try single.decode(ToolResultUsersRecordsActivityForYear.self))
+                case "users.records.activity.summarize":
+                    self = .users_records_activity_summarize(try single.decode(ToolResultUsersRecordsActivitySummarize.self))
+                case "workspace.read":
+                    self = .workspace_read(try single.decode(ToolResultWorkspaceRead.self))
                 case "weather.getForecast":
                     self = .weather_getForecast(try single.decode(ToolResultWeatherGetForecast.self))
                 case "charts.plotSignups":
@@ -2233,6 +2796,30 @@ public final class APIClient: Sendable {
             public func encode(to encoder: Encoder) throws {
                 var single = encoder.singleValueContainer()
                 switch self {
+                case .users_find(let payload):
+                    try single.encode(payload)
+                case .users_list(let payload):
+                    try single.encode(payload)
+                case .users_create(let payload):
+                    try single.encode(payload)
+                case .users_remove(let payload):
+                    try single.encode(payload)
+                case .users_archive(let payload):
+                    try single.encode(payload)
+                case .users_countActive(let payload):
+                    try single.encode(payload)
+                case .users_search_byName(let payload):
+                    try single.encode(payload)
+                case .users_search_suggest(let payload):
+                    try single.encode(payload)
+                case .users_records_profile(let payload):
+                    try single.encode(payload)
+                case .users_records_activity_forYear(let payload):
+                    try single.encode(payload)
+                case .users_records_activity_summarize(let payload):
+                    try single.encode(payload)
+                case .workspace_read(let payload):
+                    try single.encode(payload)
                 case .weather_getForecast(let payload):
                     try single.encode(payload)
                 case .charts_plotSignups(let payload):
@@ -2240,6 +2827,490 @@ public final class APIClient: Sendable {
                 case .countWords(let payload):
                     try single.encode(payload)
                 }
+            }
+        }
+
+        public struct ToolResultUsersFind: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersFindOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersFindOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersFindOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: API.User?
+            public let detail: String?
+
+            public init(
+                status: Int,
+                body: API.User? = nil,
+                detail: String? = nil
+            ) {
+                self.status = status
+                self.body = body
+                self.detail = detail
+            }
+        }
+
+        public struct ToolResultUsersList: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersListOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersListOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersListOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultUsersListOutputBody
+
+            public init(
+                status: Int,
+                body: ToolResultUsersListOutputBody
+            ) {
+                self.status = status
+                self.body = body
+            }
+        }
+
+        public struct ToolResultUsersListOutputBody: Codable, Sendable, Equatable {
+            public let users: [API.User]
+            public let total: Double
+
+            public init(
+                users: [API.User],
+                total: Double
+            ) {
+                self.users = users
+                self.total = total
+            }
+        }
+
+        public struct ToolResultUsersCreate: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersCreateOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersCreateOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersCreateOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: API.User?
+            public let detail: String?
+
+            public init(
+                status: Int,
+                body: API.User? = nil,
+                detail: String? = nil
+            ) {
+                self.status = status
+                self.body = body
+                self.detail = detail
+            }
+        }
+
+        public struct ToolResultUsersRemove: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersRemoveOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersRemoveOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersRemoveOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultUsersRemoveOutputBody?
+            public let detail: String?
+
+            public init(
+                status: Int,
+                body: ToolResultUsersRemoveOutputBody? = nil,
+                detail: String? = nil
+            ) {
+                self.status = status
+                self.body = body
+                self.detail = detail
+            }
+        }
+
+        public struct ToolResultUsersRemoveOutputBody: Codable, Sendable, Equatable {
+            public let success: Bool
+
+            public init(success: Bool) {
+                self.success = success
+            }
+        }
+
+        public struct ToolResultUsersArchive: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersArchiveOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersArchiveOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersArchiveOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultUsersArchiveOutputBody
+
+            public init(
+                status: Int,
+                body: ToolResultUsersArchiveOutputBody
+            ) {
+                self.status = status
+                self.body = body
+            }
+        }
+
+        public struct ToolResultUsersArchiveOutputBody: Codable, Sendable, Equatable {
+            public let alreadyArchived: Bool
+            public let userId: String
+
+            public init(
+                alreadyArchived: Bool,
+                userId: String
+            ) {
+                self.alreadyArchived = alreadyArchived
+                self.userId = userId
+            }
+        }
+
+        public struct ToolResultUsersCountActive: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersCountActiveOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersCountActiveOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersCountActiveOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultUsersCountActiveOutputBody?
+            public let detail: String?
+
+            public init(
+                status: Int,
+                body: ToolResultUsersCountActiveOutputBody? = nil,
+                detail: String? = nil
+            ) {
+                self.status = status
+                self.body = body
+                self.detail = detail
+            }
+        }
+
+        public struct ToolResultUsersCountActiveOutputBody: Codable, Sendable, Equatable {
+            public let users: Int
+
+            public init(users: Int) {
+                self.users = users
+            }
+        }
+
+        public struct ToolResultUsersSearchByName: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersSearchByNameOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersSearchByNameOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersSearchByNameOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultUsersSearchByNameOutputBody
+
+            public init(
+                status: Int,
+                body: ToolResultUsersSearchByNameOutputBody
+            ) {
+                self.status = status
+                self.body = body
+            }
+        }
+
+        public struct ToolResultUsersSearchByNameOutputBody: Codable, Sendable, Equatable {
+            public let users: [API.User]
+            public let nextCursor: Double?
+
+            public init(
+                users: [API.User],
+                nextCursor: Double? = nil
+            ) {
+                self.users = users
+                self.nextCursor = nextCursor
+            }
+        }
+
+        public struct ToolResultUsersSearchSuggest: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersSearchSuggestOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersSearchSuggestOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersSearchSuggestOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultUsersSearchSuggestOutputBody?
+            public let detail: String?
+
+            public init(
+                status: Int,
+                body: ToolResultUsersSearchSuggestOutputBody? = nil,
+                detail: String? = nil
+            ) {
+                self.status = status
+                self.body = body
+                self.detail = detail
+            }
+        }
+
+        public struct ToolResultUsersSearchSuggestOutputBody: Codable, Sendable, Equatable {
+            public let names: [String]
+
+            public init(names: [String]) {
+                self.names = names
+            }
+        }
+
+        public struct ToolResultUsersRecordsProfile: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersRecordsProfileOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersRecordsProfileOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersRecordsProfileOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: API.User?
+            public let detail: String?
+
+            public init(
+                status: Int,
+                body: API.User? = nil,
+                detail: String? = nil
+            ) {
+                self.status = status
+                self.body = body
+                self.detail = detail
+            }
+        }
+
+        public struct ToolResultUsersRecordsActivityForYear: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersRecordsActivityForYearOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersRecordsActivityForYearOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersRecordsActivityForYearOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultUsersRecordsActivityForYearOutputBody?
+            public let detail: String?
+
+            public init(
+                status: Int,
+                body: ToolResultUsersRecordsActivityForYearOutputBody? = nil,
+                detail: String? = nil
+            ) {
+                self.status = status
+                self.body = body
+                self.detail = detail
+            }
+        }
+
+        public struct ToolResultUsersRecordsActivityForYearOutputBody: Codable, Sendable, Equatable {
+            public let userId: String
+            public let year: Int
+            public let events: Int
+
+            public init(
+                userId: String,
+                year: Int,
+                events: Int
+            ) {
+                self.userId = userId
+                self.year = year
+                self.events = events
+            }
+        }
+
+        public struct ToolResultUsersRecordsActivitySummarize: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultUsersRecordsActivitySummarizeOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultUsersRecordsActivitySummarizeOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultUsersRecordsActivitySummarizeOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultUsersRecordsActivitySummarizeOutputBody?
+            public let detail: String?
+
+            public init(
+                status: Int,
+                body: ToolResultUsersRecordsActivitySummarizeOutputBody? = nil,
+                detail: String? = nil
+            ) {
+                self.status = status
+                self.body = body
+                self.detail = detail
+            }
+        }
+
+        public struct ToolResultUsersRecordsActivitySummarizeOutputBody: Codable, Sendable, Equatable {
+            public let summary: String
+
+            public init(summary: String) {
+                self.summary = summary
+            }
+        }
+
+        public struct ToolResultWorkspaceRead: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultWorkspaceReadOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultWorkspaceReadOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultWorkspaceReadOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultWorkspaceReadOutputBody
+
+            public init(
+                status: Int,
+                body: ToolResultWorkspaceReadOutputBody
+            ) {
+                self.status = status
+                self.body = body
+            }
+        }
+
+        public struct ToolResultWorkspaceReadOutputBody: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+
+            public init(
+                id: String,
+                name: String
+            ) {
+                self.id = id
+                self.name = name
             }
         }
 
@@ -2260,13 +3331,30 @@ public final class APIClient: Sendable {
         }
 
         public struct ToolResultWeatherGetForecastOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultWeatherGetForecastOutputBody?
+            public let detail: String?
+
+            public init(
+                status: Int,
+                body: ToolResultWeatherGetForecastOutputBody? = nil,
+                detail: String? = nil
+            ) {
+                self.status = status
+                self.body = body
+                self.detail = detail
+            }
+        }
+
+        public struct ToolResultWeatherGetForecastOutputBody: Codable, Sendable, Equatable {
             public let temperature: Double
-            public let unit: ToolResultWeatherGetForecastOutputUnit
+            public let unit: ToolResultWeatherGetForecastOutputBodyUnit
             public let summary: String
 
             public init(
                 temperature: Double,
-                unit: ToolResultWeatherGetForecastOutputUnit,
+                unit: ToolResultWeatherGetForecastOutputBodyUnit,
                 summary: String
             ) {
                 self.temperature = temperature
@@ -2275,7 +3363,7 @@ public final class APIClient: Sendable {
             }
         }
 
-        public enum ToolResultWeatherGetForecastOutputUnit: String, Codable, Sendable {
+        public enum ToolResultWeatherGetForecastOutputBodyUnit: String, Codable, Sendable {
             case celsius = "celsius"
             case fahrenheit = "fahrenheit"
         }
@@ -2297,14 +3385,31 @@ public final class APIClient: Sendable {
         }
 
         public struct ToolResultChartsPlotSignupsOutput: Codable, Sendable, Equatable {
-            public let points: [ToolResultChartsPlotSignupsOutputPointsItem]
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultChartsPlotSignupsOutputBody?
+            public let detail: String?
 
-            public init(points: [ToolResultChartsPlotSignupsOutputPointsItem]) {
+            public init(
+                status: Int,
+                body: ToolResultChartsPlotSignupsOutputBody? = nil,
+                detail: String? = nil
+            ) {
+                self.status = status
+                self.body = body
+                self.detail = detail
+            }
+        }
+
+        public struct ToolResultChartsPlotSignupsOutputBody: Codable, Sendable, Equatable {
+            public let points: [ToolResultChartsPlotSignupsOutputBodyPointsItem]
+
+            public init(points: [ToolResultChartsPlotSignupsOutputBodyPointsItem]) {
                 self.points = points
             }
         }
 
-        public struct ToolResultChartsPlotSignupsOutputPointsItem: Codable, Sendable, Equatable {
+        public struct ToolResultChartsPlotSignupsOutputBodyPointsItem: Codable, Sendable, Equatable {
             public let date: String
             public let signups: Int
 
@@ -2334,6 +3439,23 @@ public final class APIClient: Sendable {
         }
 
         public struct ToolResultCountWordsOutput: Codable, Sendable, Equatable {
+            /// The status the call answered with
+            public let status: Int
+            public let body: ToolResultCountWordsOutputBody?
+            public let detail: String?
+
+            public init(
+                status: Int,
+                body: ToolResultCountWordsOutputBody? = nil,
+                detail: String? = nil
+            ) {
+                self.status = status
+                self.body = body
+                self.detail = detail
+            }
+        }
+
+        public struct ToolResultCountWordsOutputBody: Codable, Sendable, Equatable {
             public let words: Int
 
             public init(words: Int) {
@@ -2358,6 +3480,18 @@ public final class APIClient: Sendable {
         }
 
         public enum ToolErrorName: String, Codable, Sendable {
+            case usersFind = "users.find"
+            case usersList = "users.list"
+            case usersCreate = "users.create"
+            case usersRemove = "users.remove"
+            case usersArchive = "users.archive"
+            case usersCountActive = "users.countActive"
+            case usersSearchByName = "users.search.byName"
+            case usersSearchSuggest = "users.search.suggest"
+            case usersRecordsProfile = "users.records.profile"
+            case usersRecordsActivityForYear = "users.records.activity.forYear"
+            case usersRecordsActivitySummarize = "users.records.activity.summarize"
+            case workspaceRead = "workspace.read"
             case weatherGetForecast = "weather.getForecast"
             case chartsPlotSignups = "charts.plotSignups"
             case countWords = "countWords"

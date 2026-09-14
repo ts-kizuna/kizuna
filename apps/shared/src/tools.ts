@@ -1,13 +1,71 @@
 import { z } from 'zod';
 import { k } from './k';
+import { usersRoutes } from './routes/users';
+import { workspaceRoutes } from './routes/workspace';
 
 const TemperatureUnit = z.enum(['celsius', 'fahrenheit']);
 
 /**
  * The tools the assistant may call while it streams a reply. They are also
- * published as MCP tools, so the same declaration serves both.
+ * offered over MCP, so the same declaration serves both.
  */
-export const tools = k.tools({
+export const tools = k.tools(({ toolFromRoutes }) => ({
+    users: {
+        find: toolFromRoutes(usersRoutes.getUser),
+        list: toolFromRoutes(usersRoutes.listUsers),
+        create: toolFromRoutes(usersRoutes.createUser),
+        remove: toolFromRoutes(usersRoutes.deleteUser),
+        archive: toolFromRoutes(usersRoutes.archiveUser, {
+            description: 'Archive a user. Their data stays, and they stop appearing in lists.',
+        }),
+        countActive: {
+            description: 'Count how many users are on the workspace right now',
+            output: z.object({
+                users: z.int(),
+            }),
+            annotations: {
+                readOnlyHint: true,
+            },
+        },
+        search: {
+            byName: toolFromRoutes(usersRoutes.searchUsers),
+            suggest: {
+                description: 'Suggest names that start with a prefix, before the caller commits to a search',
+                input: z.object({
+                    prefix: z.string().min(1),
+                }),
+                output: z.object({
+                    names: z.array(z.string()),
+                }),
+                failures: [404],
+                annotations: {
+                    readOnlyHint: true,
+                },
+            },
+        },
+        records: {
+            profile: toolFromRoutes(usersRoutes.userProfile),
+            activity: {
+                forYear: toolFromRoutes(usersRoutes.userActivity),
+                summarize: {
+                    description: 'Say in one sentence what a user did over a year',
+                    input: z.object({
+                        userId: z.string(),
+                        year: z.int(),
+                    }),
+                    output: z.object({
+                        summary: z.string(),
+                    }),
+                    annotations: {
+                        readOnlyHint: true,
+                    },
+                },
+            },
+        },
+    },
+    workspace: {
+        read: toolFromRoutes(workspaceRoutes.info.getWorkspace),
+    },
     weather: {
         getForecast: {
             title: 'Weather forecast',
@@ -58,4 +116,4 @@ export const tools = k.tools({
             readOnlyHint: true,
         },
     },
-});
+}));
