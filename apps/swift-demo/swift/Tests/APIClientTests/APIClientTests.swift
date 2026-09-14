@@ -494,7 +494,7 @@ final class APIClientTests: XCTestCase {
     func testTrackToolCallsFoldsCallsAndResults() throws {
         let events: [APIClient.AssistantReply.Event] = [
             .tool_call(.countWords(id: "toolu_01", input: .init(text: "one two three"))),
-            .tool_result(.countWords(id: "toolu_01", output: .init(words: 3))),
+            .tool_result(.countWords(id: "toolu_01", output: .init(status: 200, body: .init(words: 3)))),
             .tool_call(.weather_getForecast(id: "toolu_02", input: .init(city: "Oslo", unit: .celsius))),
         ]
 
@@ -507,7 +507,8 @@ final class APIClientTests: XCTestCase {
         guard case .countWords(let counted)? = tracked[0].result else {
             return XCTFail("expected the countWords result, got \(String(describing: tracked[0].result))")
         }
-        XCTAssertEqual(counted.output.words, 3)
+        XCTAssertEqual(counted.output.status, 200)
+        XCTAssertEqual(counted.output.body?.words, 3)
     }
 
     func testAssistantReplyErrorStatusThrowsBeforeStreaming() async throws {

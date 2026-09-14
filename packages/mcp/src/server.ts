@@ -2,28 +2,29 @@ import { createMcpHandler } from '@modelcontextprotocol/server';
 import {
     buildProtectedResourceMetadata,
     declaredScopes,
+    type Contract,
     type ProtectedResourceMetadata,
     type RequiredPermissions,
+    type ResolvedTool,
     type SecurityScheme,
 } from '@ts-kizuna/core';
 import {
     adapterContextOf,
+    contractOf,
     implementPlugin,
     rawResponse,
-    resolveSecurityRequirements,
     GUARDS_META,
     SCHEMES_META,
     type ApiWithRouter,
     type GuardMap,
     type GuardRun,
 } from '@ts-kizuna/core/adapter';
-import { buildToolDefinitions, createMcpServer, type ToolDefinition } from './mcp-server.js';
+import { toolsOffered, createMcpServer, toolRequirements } from './mcp-server.js';
 import { mcpPlugin } from './plugin.js';
 import { assertCanonicalResource, protectedResourceMetadataUrl, type McpOAuthProps } from './oauth.js';
 import { denialResponse, enforceOAuth } from './oauth-enforcement.js';
 
-export { createMcpServer, buildToolDefinitions, buildInstructions, type McpServerOptions, type ToolDefinition } from './mcp-server.js';
-export type { ToolMap, ToolEntry, ToolSelection } from './tool-selection.js';
+export { createMcpServer, toolsOffered, buildInstructions, type McpServerOptions } from './mcp-server.js';
 
 type HandlerArgs = {
     body: unknown;
@@ -49,15 +50,10 @@ interface OAuthEnforcement {
     metadata: ProtectedResourceMetadata;
     metadataUrl: string;
     scopesSupported: readonly string[] | undefined;
-    tools: Map<string, ToolDefinition>;
+    tools: Map<string, ResolvedTool>;
 }
 
-const prepareOAuth = (
-    oauth: McpOAuthProps,
-    endpointPath: `/${string}`,
-    api: ApiWithRouter,
-    selection: Parameters<typeof buildToolDefinitions>[1]
-): OAuthEnforcement => {
+const prepareOAuth = (oauth: McpOAuthProps, endpointPath: `/${string}`, api: ApiWithRouter, onlyReadOnly?: boolean): OAuthEnforcement => {
     assertCanonicalResource(oauth, endpointPath);
     const guards = (api as unknown as Record<typeof GUARDS_META, GuardMap | undefined>)[GUARDS_META];
     const schemes = (api as unknown as Record<typeof SCHEMES_META, Record<string, SecurityScheme> | undefined>)[SCHEMES_META];
@@ -80,7 +76,9 @@ const prepareOAuth = (
         }),
         metadataUrl: protectedResourceMetadataUrl(oauth, endpointPath),
         scopesSupported: declaredScopes(schemeDefinition),
-        tools: new Map(buildToolDefinitions(api.routes, selection).map((definition) => [definition.name, definition])),
+        tools: new Map(
+            toolsOffered(contractOf<Contract | undefined>(api)?.tools, { onlyReadOnly }).map((definition) => [definition.name, definition])
+        ),
     };
 };
 
@@ -104,15 +102,16 @@ const toolCallTarget = (
         const callParams = (body as { params?: { name?: unknown; arguments?: { params?: unknown } } }).params;
         const definition = typeof callParams?.name === 'string' ? enforcement.tools.get(callParams.name) : undefined;
         if (definition !== undefined) {
-            const requirements = resolveSecurityRequirements(definition.route);
+            const { requirements, roles, requires } = toolRequirements(definition);
             const requirement = requirements.find((candidate) => candidate.scheme === enforcement.oauth.scheme);
             const roleBearing = requirements.filter((candidate) => enforcement.schemes?.[candidate.scheme]?.roles !== undefined);
             const oauthDecidesRequires = roleBearing.every((candidate) => candidate.scheme === enforcement.oauth.scheme);
             const routeParams = callParams?.arguments?.params;
+            const oauthDecides = requirement !== undefined && oauthDecidesRequires;
             return {
                 scopes: requirement?.scopes ?? [],
-                roles: requirement !== undefined && oauthDecidesRequires ? definition.route.roles : undefined,
-                requires: requirement !== undefined && oauthDecidesRequires ? definition.route.requires : undefined,
+                roles: oauthDecides ? roles : undefined,
+                requires: oauthDecides ? requires : undefined,
                 params: routeParams !== null && typeof routeParams === 'object' ? (routeParams as Record<string, string>) : {},
             };
         }
@@ -142,11 +141,7 @@ export const mcpPluginServer = () =>
     implementPlugin(mcpPlugin, ({ props, api }) => {
         const serverApi = api as ApiWithRouter;
         const enforcement =
-            props.oauth === undefined
-                ? undefined
-                : prepareOAuth(props.oauth, props.path ?? '/mcp', serverApi, {
-                      ...props,
-                  });
+            props.oauth === undefined ? undefined : prepareOAuth(props.oauth, props.path ?? '/mcp', serverApi, props.onlyReadOnly);
 
         return {
             router: {

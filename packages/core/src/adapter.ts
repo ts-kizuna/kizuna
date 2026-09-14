@@ -40,7 +40,16 @@ import { encodeStreamBody, EVENT_STREAM_MEDIA_TYPE, streamContentType, type Enco
 import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from './jobs.js';
 import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
 import type { Tools } from './tools.js';
-import { createToolRunner, type ToolRunner } from './tool-runner.js';
+import {
+    bindToolRunner,
+    createToolRunner,
+    ToolExecutionError,
+    ToolIdentityError,
+    ToolInputError,
+    type RouteToolExecutor,
+    type ToolRunner,
+} from './tool-runner.js';
+import { toToolEnvelope } from './tool-projection.js';
 import {
     DispatchFailedSchema,
     DispatchResultSchema,
@@ -73,7 +82,16 @@ export {
 export type { CompiledJob, Jobs, JobHandler, JobHandlers, FlattenedJob } from './jobs.js';
 export type { CompiledTool, Tools, ToolHandler, ToolHandlers, FlattenedTool } from './tools.js';
 export { flattenTools, isCompiledTool, toolAt } from './tools.js';
-export { createToolRunner, publishTools, type ToolRunner } from './tool-runner.js';
+export {
+    createToolRunner,
+    bindToolRunner,
+    modelFacingTools,
+    ToolRequestContextError,
+    type ToolRunner,
+    type RouteToolExecutor,
+    type BoundToolAuth,
+    type BoundToolContext,
+} from './tool-runner.js';
 export { flattenJobs, isCompiledJob, jobAt } from './jobs.js';
 export {
     createJobRunner,
@@ -527,15 +545,106 @@ export const jobRunnerFrom = (meta: JobsMeta | undefined): JobRunner<Jobs> | und
     meta ? createJobRunner(meta.jobs, meta.handlers as never, meta) : undefined;
 
 /**
- * What {@link TOOLS_META} carries: the contract's tools and the handler for each.
+ * What {@link TOOLS_META} carries: the contract's tools, the handler for each
+ * declared one, and what a route-derived one needs to run its route.
  */
 export interface ToolsMeta {
     tools: Tools;
     handlers: Record<string, unknown>;
+    /**
+     * The request-context providers the contract declares.
+     */
+    requestContextNames?: readonly string[];
+    /**
+     * The contract's router, so a `toolFromRoutes` tool can reach the
+     * handler its route already has.
+     */
+    router?: Record<string, unknown>;
+    /**
+     * Extra context every route handler receives.
+     */
+    handlerContext?: Record<string, unknown>;
 }
 
+const resolveRouteHandler = (router: Record<string, unknown> | undefined, routeKey: string): unknown => {
+    let current: unknown = router;
+    for (const segment of routeKey.split('.')) {
+        if (!current || typeof current !== 'object') return undefined;
+        current = (current as Record<string, unknown>)[segment];
+    }
+    return current;
+};
+
+/**
+ * Run the route behind a `toolFromRoutes` tool, answering its `{ status, body }`
+ * envelope. The caller's identity is checked against what the route requires;
+ * no guard runs, because there is no request to read a credential from.
+ */
+const routeToolExecutor =
+    (meta: ToolsMeta): RouteToolExecutor =>
+    async ({ toolKey, routeKey, route, input, auth }) => {
+        const handler = resolveRouteHandler(meta.router, routeKey);
+        if (typeof handler !== 'function') {
+            throw new Error(`No handler was bound for route "${routeKey}", which tool "${toolKey}" runs.`);
+        }
+
+        const securityContext: Record<string, unknown> = {};
+        const requiredSchemes: string[] = [];
+        for (const { scheme } of resolveSecurityRequirements(route)) {
+            const context = auth?.[scheme];
+            if (context === undefined) {
+                throw new ToolIdentityError(toolKey, scheme);
+            }
+            requiredSchemes.push(scheme);
+            securityContext[scheme] = context;
+        }
+        const forbidden = requiresDenial({
+            roles: route.roles,
+            requires: route.requires,
+            requiredSchemes,
+            schemes: undefined,
+            securityContext,
+        });
+        if (forbidden !== undefined) throw new ToolExecutionError(toolKey, forbidden);
+
+        const given = (input ?? {}) as {
+            params?: Record<string, string>;
+            query?: Record<string, unknown>;
+            body?: unknown;
+        };
+        const validation = validateRequest(route, {
+            params: given.params ?? {},
+            query: given.query ?? {},
+            body: given.body,
+            headers: {},
+        });
+        if (!validation.ok) {
+            throw new ToolInputError(toolKey, validation.error.issues);
+        }
+
+        try {
+            const result = await (handler as (args: unknown) => Promise<{ status: number; body: unknown }>)({
+                params: validation.parsed.params,
+                query: validation.parsed.query,
+                body: validation.parsed.body,
+                headers: validation.parsed.headers,
+                throwError: (response: { status: number; body: unknown; headers?: ResponseHeaders }): never => {
+                    throw new ResponseError(response);
+                },
+                ...(meta.handlerContext ?? {}),
+                ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
+            });
+            return toToolEnvelope(result.status, result.body);
+        } catch (error) {
+            if (error instanceof ResponseError) {
+                return toToolEnvelope(error.status, error.body);
+            }
+            throw error;
+        }
+    };
+
 export const toolRunnerFrom = (meta: ToolsMeta | undefined): ToolRunner<Tools> | undefined =>
-    meta ? createToolRunner(meta.tools, meta.handlers as never) : undefined;
+    meta ? createToolRunner(meta.tools, meta.handlers as never, undefined, routeToolExecutor(meta), meta.requestContextNames) : undefined;
 
 /**
  * The dotted keys of the jobs a handler was actually bound to. A job without one
@@ -1272,7 +1381,17 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             throwError,
             ...handlerContext,
             ...(jobRunner ? { jobs: jobRunner } : {}),
-            ...(toolRunner ? { tools: toolRunner } : {}),
+            ...(toolRunner
+                ? {
+                      tools:
+                          Object.keys(securityContext).length > 0 || hasRequestContext
+                              ? bindToolRunner(toolRunner, {
+                                    auth: securityContext,
+                                    requestContext,
+                                })
+                              : toolRunner,
+                  }
+                : {}),
             ...(hasRequestContext ? { requestContext } : {}),
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
             ...(pluginExports && Object.keys(pluginExports).length > 0 ? { plugins: pluginExports } : {}),

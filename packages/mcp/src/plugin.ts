@@ -2,26 +2,26 @@ import { z } from 'zod';
 import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
 import { ProtectedResourceMetadataSchema } from '@ts-kizuna/core/schemas';
 import type { Routes, Tools } from '@ts-kizuna/core';
-import type { ToolSelection } from './tool-selection.js';
 import { protectedResourceMetadataPath, type McpOAuthProps } from './oauth.js';
 
 export interface McpPluginProps<R extends Routes = Routes, T extends Tools = Tools> {
     /**
-     * The contract's routes. Name the ones to publish under `options.publishRoutes`.
+     * The contract's routes, so the endpoint can serve the ones a tool runs.
      */
     routes?: R;
 
     /**
-     * The contract's tools. Every one is published; drop any under
-     * `options.hideTools`.
+     * The contract's tools. Every one of them is published.
      */
     tools?: T;
 
     /**
-     * What the server offers: which routes to publish as tools, and which tools
-     * to hide.
+     * Keep only the tools that cannot change data, the ones whose annotations
+     * declare `readOnlyHint`. A route-derived tool gets that from its method.
+     *
+     * @default false
      */
-    options?: ToolSelection<R, T>;
+    onlyReadOnly?: boolean;
 
     /**
      * Path the endpoint is served from.
@@ -95,10 +95,8 @@ const declare = (props: McpPluginProps) => {
  * endpoint where every route is a tool an assistant can discover and call,
  * behind the same guards as the HTTP endpoints.
  *
- * Everything `k.tools` declares is published, because a tool is a tool.
- * A route is an HTTP endpoint rather than a tool, so name the ones worth
- * publishing under `options.publishRoutes`. `options.hideTools` drops a declared
- * tool you would rather keep to yourself.
+ * The tool tree is the selection. Everything `k.tools` declares is published,
+ * and a route becomes a tool by being named there with `toolFromRoutes`.
  *
  * The endpoint is an ordinary kizuna route, so `api.mount` serves it on any
  * adapter, and it stays out of `contract.routes` so the client and the
@@ -109,6 +107,12 @@ const declare = (props: McpPluginProps) => {
  *
  * @example
  * ```ts
+ * export const tools = k.tools(({ toolFromRoutes }) => ({
+ *     users: {
+ *         find: toolFromRoutes(routes.users.getUser),
+ *     },
+ * }));
+ *
  * export const contract = k.contract({
  *     routes,
  *     tools,
@@ -117,13 +121,6 @@ const declare = (props: McpPluginProps) => {
  *             name: 'My API',
  *             routes,
  *             tools,
- *             options: {
- *                 publishRoutes: {
- *                     users: {
- *                         '*': true,
- *                     },
- *                 },
- *             },
  *         }),
  *     }),
  * });

@@ -22,21 +22,12 @@ import {
     isGuardDenial,
 } from '@ts-kizuna/core/adapter';
 import { contractOf } from '@ts-kizuna/core/adapter';
-import type { Contract, Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
-import { isIdempotentMethod, isSafeMethod } from './method.js';
+import type { Contract, RequiredPermissions, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
 import { deriveToolNames } from '@ts-kizuna/core/generator';
-import { flattenTools, toolRunnerFrom, TOOLS_META, type ToolsMeta, type ToolRunner } from '@ts-kizuna/core/adapter';
-import { publishedTools, ToolExecutionError, ToolInputError, ToolOutputError, type PublishedTool, type Tools } from '@ts-kizuna/core';
-import { buildToolInputSchema, buildToolOutputSchema, type ToolInputSchema } from './schema.js';
-import { selectToolRoutes, selectTools, type ToolSelection } from './tool-selection.js';
+import { bindToolRunner, flattenTools, toolRunnerFrom, TOOLS_META, type ToolsMeta } from '@ts-kizuna/core/adapter';
+import { resolveTools, type ResolvedTool, type Tools, type ToolDispatchOutcome, type UntrustedToolCall } from '@ts-kizuna/core';
 
 export interface McpServerOptions {
-    /**
-     * What the server offers: the contract's routes and tools, which routes to
-     * publish, and which tools to hide.
-     */
-    options?: ToolSelection;
-
     /**
      * Human-readable name for the MCP server.
      *
@@ -61,7 +52,7 @@ export interface McpServerOptions {
 
     /**
      * Guidance for the model, appended to the overview built from the
-     * contract's tags. Use it for what belongs to no single route: the order
+     * contract's tags. For what belongs to no single route: the order
      * operations happen in, the conventions every route shares.
      */
     instructions?: string;
@@ -94,100 +85,25 @@ export interface McpServerOptions {
     };
 }
 
-interface Annotations {
-    readOnlyHint?: boolean;
-    destructiveHint?: boolean;
-    idempotentHint?: boolean;
-    openWorldHint?: boolean;
-}
+const describeRoles = (roles: readonly string[] | undefined): string | undefined =>
+    roles !== undefined && roles.length > 0 ? `Roles: ${roles.join(', ')}` : undefined;
 
-/**
- * Hints from the method's HTTP semantics, per RFC 9110. MCP already defaults
- * `destructiveHint` and `openWorldHint` to true, so only the hints that make a
- * tool safer than that are worth setting.
- */
-const buildToolAnnotations = (route: RouteDefinition): Annotations => ({
-    ...(isSafeMethod(route.method) ? { readOnlyHint: true } : {}),
-    ...(isIdempotentMethod(route.method) ? { idempotentHint: true } : {}),
-    ...(route.method === 'DELETE' ? { destructiveHint: true } : {}),
-});
-
-const describeRoles = (route: RouteDefinition): string | undefined =>
-    route.roles !== undefined && route.roles.length > 0 ? `Roles: ${route.roles.join(', ')}` : undefined;
-
-const describeRequires = (route: RouteDefinition): string | undefined => {
-    const requires = route.requires;
+const describeRequires = (requires: RequiredPermissions | undefined): string | undefined => {
     if (requires === undefined) return undefined;
     const names = Object.entries(requires).flatMap(([resource, verbs]) => verbs.map((verb) => `${resource}:${verb}`));
     return names.length > 0 ? `Permissions: ${names.join(', ')}` : undefined;
 };
 
-const buildToolDescription = (route: RouteDefinition): string => {
-    const parts: string[] = [];
-    if (route.summary) parts.push(route.summary);
-    if (route.description) parts.push(route.description);
-    if (parts.length === 0) parts.push(`${route.method} ${route.path}`);
-    parts.push(`\nHTTP: ${route.method} ${route.path}`);
-
-    const requirements = resolveSecurityRequirements(route);
-    if (requirements.length > 0) {
-        parts.push(`Requires: ${requirements.map(({ scheme }) => scheme).join(', ')}`);
-    }
-    const roles = describeRoles(route);
-    if (roles !== undefined) parts.push(roles);
-    const permissions = describeRequires(route);
-    if (permissions !== undefined) parts.push(permissions);
-
-    return parts.join('\n');
-};
-
-export interface ToolDefinition {
-    name: string;
-    title: string | undefined;
-    description: string;
-    inputSchema: ToolInputSchema;
-    outputSchema: z.ZodType;
-    route: RouteDefinition;
-    routeKey: string;
-    tags: string[];
-}
-
-export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions): ToolDefinition[] => {
-    const selected = selectToolRoutes(flattenRoutes(routes), options?.options);
-    const names = deriveToolNames(
-        selected.map(({ routeKey }) => ({
-            key: routeKey,
-            origin: 'route',
-        }))
-    );
-    const definitions: ToolDefinition[] = [];
-
-    for (const { routeKey, route, routeTags } of selected) {
-        const name = names.get(routeKey)!;
-        definitions.push({
-            name,
-            title: route.summary,
-            description: buildToolDescription(route),
-            inputSchema: buildToolInputSchema(route),
-            outputSchema: buildToolOutputSchema(route),
-            route,
-            routeKey,
-            tags: routeTags,
-        });
-    }
-
-    return definitions;
-};
-
 /**
- * The declared tools a selection publishes. Everything handed over, unless
- * `expose` says otherwise. `publishedTools` does the naming, so a tool is named
- * in one place whichever surface publishes it.
+ * What the server offers a model: every tool on the contract, less the ones
+ * that change data when `onlyReadOnly` is set.
  */
-export const buildDeclaredToolDefinitions = (tools: Tools | undefined, options?: McpServerOptions): PublishedTool[] => {
+export const toolsOffered = (tools: Tools | undefined, options?: McpServerOptions): ResolvedTool[] => {
     if (!tools) return [];
-    const selected = publishedTools(selectTools(flattenTools(tools), options?.options));
-    // Names are derived once more here so a bad key fails at startup, not at call time.
+    const selected = resolveTools(flattenTools(tools)).filter(
+        (tool) => options?.onlyReadOnly !== true || tool.annotations?.readOnlyHint === true
+    );
+    // Names are derived once here so a bad key fails at startup, not at call time.
     deriveToolNames(
         selected.map(({ toolKey }) => ({
             key: toolKey,
@@ -198,33 +114,41 @@ export const buildDeclaredToolDefinitions = (tools: Tools | undefined, options?:
 };
 
 /**
- * A declared tool's description, with the identity it needs appended the way a
- * route's requirements are.
+ * What a model reads before it picks the tool: its own description, then the
+ * identity, roles and permissions it requires.
  */
-const declaredDescription = (published: PublishedTool): string =>
-    published.identity === undefined ? published.description : `${published.description}\nRequires: ${published.identity}`;
+const describeTool = (published: ResolvedTool): string => {
+    const { requirements, roles, requires } = toolRequirements(published);
+    const parts = [published.description];
+    if (requirements.length > 0) parts.push(`Requires: ${requirements.map(({ scheme }) => scheme).join(', ')}`);
+    const accepted = describeRoles(roles);
+    if (accepted !== undefined) parts.push(accepted);
+    const permissions = describeRequires(requires);
+    if (permissions !== undefined) parts.push(permissions);
+    return parts.join('\n');
+};
 
 /**
  * What a client puts in front of the model before it picks a tool.
  */
 export const buildInstructions = (
     contract: Contract | undefined,
-    definitions: readonly ToolDefinition[],
-    declared: readonly PublishedTool[],
+    published: readonly ResolvedTool[],
     authored: string | undefined
 ): string => {
     const sections: string[] = [];
-    if (definitions.length > 0) {
+    const routeBacked = published.filter((tool) => tool.route !== undefined);
+    if (routeBacked.length > 0) {
         sections.push('Every tool named after an HTTP route returns `{ status, body }`. A status of 400 or more means the call failed.');
     }
-    if (declared.length > 0) {
+    if (routeBacked.length < published.length) {
         sections.push('The remaining tools return their own result directly.');
     }
 
     const tags = contract?.tags?.tags;
     if (tags !== undefined) {
         // A group whose every route was excluded is not a group the model has.
-        const exposed = new Set(definitions.flatMap((definition) => definition.tags));
+        const exposed = new Set(routeBacked.flatMap((tool) => tool.routeTags ?? []));
         const groups = Object.entries(tags)
             .filter(([key]) => exposed.has(key))
             .map(([, tag]) => (tag.description ? `- ${tag.title}: ${tag.description}` : `- ${tag.title}`));
@@ -249,8 +173,8 @@ const resolveHandler = (router: Record<string, unknown>, routeKey: string): unkn
 type ToolCallResult = { content: Array<{ type: 'text'; text: string }>; structuredContent?: Record<string, unknown>; isError?: boolean };
 
 /**
- * The `{ status, body }` envelope every tool returns. A success also rides
- * along as `structuredContent`, matching the advertised output schema.
+ * The envelope every tool returns. A success also rides along as
+ * `structuredContent`, matching the advertised output schema.
  */
 const toolEnvelope = (status: number, body: unknown): ToolCallResult => {
     const envelope = {
@@ -293,45 +217,21 @@ const toolError = (status: number, body: GuardDenialBody): ToolCallResult => ({
     isError: true,
 });
 
-/**
- * Resolve every request context declared on the contract, the way the HTTP
- * pipeline does, reading the headers of the transport request. Guards and
- * handlers both read the result.
- */
-const resolveRequestContext = async (
-    contextResolvers: RequestContextMap | undefined,
-    params: Record<string, string>,
-    credentialHeaders: Record<string, string | string[] | undefined> | undefined,
-    handlerContext: Record<string, unknown> | undefined
-): Promise<Record<string, unknown>> => {
-    const resolved: Record<string, unknown> = {};
-    if (!contextResolvers) return resolved;
-    for (const [name, resolver] of Object.entries(contextResolvers)) {
-        resolved[name] = await resolver({
-            ...(handlerContext ?? {}),
-            params,
-            headers: credentialHeaders ?? {},
-        } as Parameters<typeof resolver>[0]);
-    }
-    return resolved;
-};
-
 const gateBody = (guardSchema: z.ZodType | undefined, detail: string): GuardDenialBody => {
     const filled = guardSchema?.safeParse(problemDetails(403, detail));
     return filled?.success ? (filled.data as GuardDenialBody) : { detail };
 };
 
 /**
- * Run the guards a secured route requires, extracting each identity's
- * credential from the MCP transport request headers, the same pipeline the
- * HTTP adapters run. Returns the scheme-keyed security context for the handler
- * args, or a {@link ToolCallResult} error when a guard denies or the caller's
- * role is not one the route accepts or does not hold what it requires.
+ * Run the guards a secured tool requires, taking each identity's credential
+ * from the MCP transport request headers. Answers the scheme-keyed security
+ * context, or a {@link ToolCallResult} error when a guard denies, or when the
+ * caller's role is not one the tool accepts or does not hold what it requires.
  */
 const runGuards = async (
     requirements: ReturnType<typeof resolveSecurityRequirements>,
-    roles: RouteDefinition['roles'],
-    requires: RouteDefinition['requires'],
+    roles: readonly string[] | undefined,
+    requires: RequiredPermissions | undefined,
     label: string,
     params: Record<string, string>,
     guards: GuardMap | undefined,
@@ -403,151 +303,53 @@ const runGuards = async (
     };
 };
 
-const executeToolCall = async (
-    route: RouteDefinition,
-    routeKey: string,
-    args: Record<string, unknown>,
-    router: Record<string, unknown>,
-    handlerContext?: Record<string, unknown>,
-    guards?: GuardMap,
-    schemes?: Record<string, SecurityScheme>,
-    credentialHeaders?: Record<string, string | string[] | undefined>,
-    contextResolvers?: RequestContextMap,
-    transportAuth?: McpServerOptions['transportAuth'],
-    guardSchema?: z.ZodType
-): Promise<ToolCallResult> => {
-    const params = (args.params ?? {}) as Record<string, string>;
-    const query = (args.query ?? {}) as Record<string, unknown>;
-    const body = args.body;
+/**
+ * Dispatching a tool.
+ */
+type DeclaredToolDispatch = (call: UntrustedToolCall) => Promise<ToolDispatchOutcome<Tools>>;
 
-    const validation = validateRequest(route, {
-        params,
-        query,
-        body,
-        headers: {},
-    });
+/**
+ * The two methods a tool call needs: binding the identity this request
+ * verified, then dispatching against it.
+ */
+interface DeclaredToolRunner {
+    dispatch: DeclaredToolDispatch;
+}
 
-    if (!validation.ok) {
-        return {
-            content: [
-                {
-                    type: 'text' as const,
-                    text: JSON.stringify(
-                        {
-                            status: 400,
-                            body: {
-                                detail: `Validation failed: ${validation.error.stage}`,
-                                errors: validation.error.issues,
-                            },
-                        },
-                        null,
-                        2
-                    ),
-                },
-            ],
-            isError: true,
-        };
-    }
-
-    const handler = resolveHandler(router, routeKey);
-    if (typeof handler !== 'function') {
-        return {
-            content: [
-                {
-                    type: 'text' as const,
-                    text: JSON.stringify(
-                        {
-                            status: 500,
-                            body: {
-                                detail: `Handler not implemented: ${routeKey}`,
-                            },
-                        },
-                        null,
-                        2
-                    ),
-                },
-            ],
-            isError: true,
-        };
-    }
-
-    const requestContext = await resolveRequestContext(contextResolvers, params, credentialHeaders, handlerContext);
-
-    const guardOutcome = await runGuards(
-        resolveSecurityRequirements(route),
-        route.roles,
-        route.requires,
-        `route "${routeKey}"`,
-        params,
-        guards,
-        schemes,
-        handlerContext,
-        credentialHeaders,
-        requestContext,
-        transportAuth,
-        guardSchema
-    );
-    if (!guardOutcome.ok) {
-        return guardOutcome.result;
-    }
-
-    try {
-        const throwError = (response: { status: number; body: unknown; headers?: Record<string, string> }): never => {
-            throw new ResponseError(response);
-        };
-
-        const result = await (handler as (args: unknown) => Promise<{ status: number; body: unknown }>)({
-            params: validation.parsed.params,
-            query: validation.parsed.query,
-            body: validation.parsed.body,
-            headers: validation.parsed.headers,
-            throwError,
-            ...handlerContext,
-            ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
-            ...(Object.keys(guardOutcome.securityContext).length > 0 ? { auth: guardOutcome.securityContext } : {}),
-        });
-
-        return toolEnvelope(result.status, result.body);
-    } catch (error) {
-        if (error instanceof ResponseError) {
-            return toolEnvelope(error.status, error.body);
-        }
-
-        return {
-            content: [
-                {
-                    type: 'text' as const,
-                    text: JSON.stringify(
-                        {
-                            status: 500,
-                            body: {
-                                detail: error instanceof Error ? error.message : 'Internal Server Error',
-                            },
-                        },
-                        null,
-                        2
-                    ),
-                },
-            ],
-            isError: true,
-        };
-    }
+/**
+ * The identities a tool requires, with the roles it accepts and the permissions
+ * it requires. A tool running a route takes the route's own.
+ */
+export const toolRequirements = (
+    definition: ResolvedTool
+): {
+    requirements: ReturnType<typeof resolveSecurityRequirements>;
+    roles: readonly string[] | undefined;
+    requires: RequiredPermissions | undefined;
+} => {
+    const source =
+        definition.route ?? ({ security: definition.security, roles: definition.roles, requires: definition.requires } as RouteDefinition);
+    return {
+        requirements: resolveSecurityRequirements(source),
+        roles: source.roles,
+        requires: source.requires,
+    };
 };
 
 /**
- * Run one declared tool. There is no HTTP envelope here, so the result carries
- * the tool's own output and nothing more.
+ * Run one tool. The guards its identities require run first against the
+ * transport's credentials, and their verified context is bound to the runner.
  */
-const executeDeclaredToolCall = async (
-    definition: PublishedTool,
+const executeToolCall = async (
+    definition: ResolvedTool,
     args: Record<string, unknown>,
-    runner: ToolRunner<Tools> | undefined,
+    runner: DeclaredToolRunner | undefined,
     handlerContext?: Record<string, unknown>,
     guards?: GuardMap,
     schemes?: Record<string, SecurityScheme>,
     credentialHeaders?: Record<string, string | string[] | undefined>,
-    contextResolvers?: RequestContextMap,
     transportAuth?: McpServerOptions['transportAuth'],
+    contextResolvers?: RequestContextMap,
     guardSchema?: z.ZodType
 ): Promise<ToolCallResult> => {
     if (!runner) {
@@ -556,74 +358,86 @@ const executeDeclaredToolCall = async (
         });
     }
 
-    const { identity } = definition;
-    if (identity !== undefined) {
-        // A tool declares no path, so its guard runs over empty params.
+    const { requirements, roles, requires } = toolRequirements(definition);
+    const params = (args['params'] ?? {}) as Record<string, string>;
+
+    const requestContext: Record<string, unknown> = {};
+    if (contextResolvers) {
+        for (const [name, resolver] of Object.entries(contextResolvers)) {
+            requestContext[name] = await resolver({
+                ...(handlerContext ?? {}),
+                params,
+                headers: credentialHeaders ?? {},
+            } as Parameters<typeof resolver>[0]);
+        }
+    }
+
+    const securityContext: Record<string, unknown> = {};
+    if (requirements.length > 0) {
         const guardOutcome = await runGuards(
-            [
-                {
-                    scheme: identity,
-                    scopes: [],
-                },
-            ],
-            undefined,
-            undefined,
+            requirements,
+            roles,
+            requires,
             `tool "${definition.toolKey}"`,
-            {},
+            params,
             guards,
             schemes,
             handlerContext,
             credentialHeaders,
-            await resolveRequestContext(contextResolvers, {}, credentialHeaders, handlerContext),
+            requestContext,
             transportAuth,
             guardSchema
         );
         if (!guardOutcome.ok) return guardOutcome.result;
+        Object.assign(securityContext, guardOutcome.securityContext);
     }
 
-    try {
-        const output = await runner.call({
-            id: definition.name,
-            name: definition.toolKey,
-            input: args,
-        } as never);
-        const value = (output as { output?: unknown }).output;
+    const bound =
+        Object.keys(securityContext).length > 0 || Object.keys(requestContext).length > 0
+            ? (bindToolRunner(runner as never, {
+                  auth: securityContext,
+                  requestContext,
+              }) as unknown as DeclaredToolRunner)
+            : runner;
 
+    const outcome = await bound.dispatch({
+        id: definition.name,
+        name: definition.toolKey,
+        input: args,
+    });
+
+    if (!outcome.ok) {
         return {
             content: [
                 {
                     type: 'text' as const,
-                    text: definition.output ? JSON.stringify(value, null, 2) : `${definition.toolKey} ran.`,
+                    text: outcome.message,
                 },
             ],
-            ...(definition.output
-                ? {
-                      structuredContent: value as Record<string, unknown>,
-                  }
-                : {}),
-            isError: false,
+            isError: true,
         };
-    } catch (error) {
-        if (error instanceof ToolExecutionError) {
-            return {
-                content: [
-                    {
-                        type: 'text' as const,
-                        text: error.message,
-                    },
-                ],
-                isError: true,
-            };
-        }
-        if (error instanceof ToolInputError || error instanceof ToolOutputError) {
-            return toolError(400, {
-                detail: error.message,
-            });
-        }
-        return toolError(500, {
-            detail: error instanceof Error ? error.message : 'Internal Server Error',
-        });
     }
+
+    const value = (outcome as { output?: unknown }).output;
+    const failed =
+        definition.route !== undefined && typeof (value as { status?: unknown })?.status === 'number'
+            ? (value as { status: number }).status >= 400
+            : false;
+
+    return {
+        content: [
+            {
+                type: 'text' as const,
+                text: definition.output ? JSON.stringify(value, null, 2) : `${definition.toolKey} ran.`,
+            },
+        ],
+        ...(definition.output && !failed
+            ? {
+                  structuredContent: value as Record<string, unknown>,
+              }
+            : {}),
+        isError: failed,
+    };
 };
 
 /**
@@ -648,21 +462,19 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
 
     const contract = contractOf<Contract | undefined>(api);
     const toolsMeta = (api as unknown as Record<typeof TOOLS_META, ToolsMeta | undefined>)[TOOLS_META];
-    const toolRunner = toolRunnerFrom(toolsMeta);
+    const toolRunner = toolRunnerFrom(
+        toolsMeta === undefined
+            ? undefined
+            : {
+                  ...toolsMeta,
+                  handlerContext: {
+                      ...toolsMeta.handlerContext,
+                      ...options?.handlerContext,
+                  },
+              }
+    ) as DeclaredToolRunner | undefined;
 
-    const definitions = buildToolDefinitions(api.routes, options);
-    const declared = buildDeclaredToolDefinitions(contract?.tools, options);
-
-    // Routes and declared tools share one name space, so a clash has to surface at startup.
-    const claimed = new Map(definitions.map((definition) => [definition.name, definition.routeKey]));
-    for (const definition of declared) {
-        const claimant = claimed.get(definition.name);
-        if (claimant !== undefined) {
-            throw new Error(
-                `Route "${claimant}" and tool "${definition.toolKey}" both publish as "${definition.name}". Rename one of them.`
-            );
-        }
-    }
+    const published = toolsOffered(contract?.tools, options);
 
     const server = new McpServer(
         {
@@ -670,11 +482,11 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
             version: options?.version ?? '1.0.0',
         },
         {
-            instructions: buildInstructions(contract, definitions, declared, options?.instructions),
+            instructions: buildInstructions(contract, published, options?.instructions),
         }
     );
 
-    for (const definition of definitions) {
+    for (const definition of published) {
         server.registerTool(
             definition.name,
             {
@@ -683,44 +495,13 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     : {
                           title: definition.title,
                       }),
-                description: definition.description,
-                inputSchema: definition.inputSchema.shape === undefined ? undefined : z.object(definition.inputSchema.shape),
-                outputSchema: definition.outputSchema,
-                annotations: buildToolAnnotations(definition.route),
-            },
-            async (args: Record<string, unknown>) =>
-                executeToolCall(
-                    definition.route,
-                    definition.routeKey,
-                    args ?? {},
-                    router,
-                    options?.handlerContext,
-                    guards,
-                    schemes,
-                    options?.credentialHeaders,
-                    contextResolvers,
-                    options?.transportAuth,
-                    guardSchema
-                )
-        );
-    }
-
-    for (const definition of declared) {
-        server.registerTool(
-            definition.name,
-            {
-                ...(definition.title === undefined
-                    ? {}
-                    : {
-                          title: definition.title,
-                      }),
-                description: declaredDescription(definition),
+                description: describeTool(definition),
                 inputSchema: definition.input,
                 outputSchema: definition.output,
                 annotations: definition.annotations ?? {},
             },
             async (args: unknown) =>
-                executeDeclaredToolCall(
+                executeToolCall(
                     definition,
                     (args ?? {}) as Record<string, unknown>,
                     toolRunner,
@@ -728,8 +509,8 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     guards,
                     schemes,
                     options?.credentialHeaders,
-                    contextResolvers,
                     options?.transportAuth,
+                    contextResolvers,
                     guardSchema
                 )
         );

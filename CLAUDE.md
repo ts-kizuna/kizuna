@@ -53,15 +53,18 @@ Deliberate omissions: no first-party transports, no stored state, and no per-job
 Tools (`k.tools`) are what a model calls. Settled; don't relitigate.
 
 - A tool is a sibling of a route, never inside one. It declares no path and no method, and nothing that walks `contract.routes` sees one.
-- The fields are MCP's `Tool`, field for field: `title`, `description`, `input`, `output`, `annotations`. `description` is required, because it is the one thing a model reads before calling.
-- A handler receives only `input` and `throwError`. Anything more it imports, as a route handler would. `throwError` takes the message the model reads, not a `{ status, body }` envelope, because a tool has no HTTP status.
+- The fields are MCP's `Tool`, field for field: `title`, `description`, `input`, `output`, `annotations`, plus `failures`. `description` is required, because it is the one thing a model reads before calling.
+- `k.tools` takes a builder callback. `toolFromRoutes` names a route, a group, or a group with per-route overrides.
+- A tool answers `{ status, body }`. `200` carries `output`, `204` carries nothing, and `422`, `500` and `503` are synthesized as a job's are.
+- `failures` declares the statuses a tool may refuse with, as a list of 4xx and 5xx. There are no bodies to declare: every refusal carries Problem Details. `throwError` takes only a declared status, so an undeclared one is a compile error, and the published `status` is a closed `enum`.
+- A handler receives `input`, `throwError`, request context, and `auth` when the auth map gives the tool an identity. Anything more it imports, as a route handler would. A tool running a route needs no handler.
+- `k.accessControl.tools` says who may call each tool. A tool running a route is governed by that route's gate.
 - A tool is addressed by its dotted key, `weather.getForecast`, and publishes as `weather_get_forecast`.
-- A streamed response names them under `tools`, adding `tool_call`, `tool_result` and `tool_error` to the events it declares.
-- Every declared tool publishes over MCP, because a tool is a tool. `options.hideTools` drops one.
-- A route is an HTTP endpoint rather than a tool, so publishing one is the opt in, through `options.publishRoutes`.
+- A streamed response names them under `tools`, adding `tool_call`, `tool_result` and `tool_error` to the events it declares. `tools.emit(call)` yields all three, the call before the work starts.
+- The tool tree is the selection. Every tool in it publishes over MCP; a route not named in it is not a tool.
 - `readToolCalls` folds a message list into one row per call. Core exports it; the Swift and Kotlin generators emit it per route.
 
-Deliberate omissions: no LLM clients, no agent loop, no provider wire shapes, and no progressive tool input.
+Deliberate omissions: no LLM clients, no agent loop, no provider wire shapes, and no progressive tool input. A tool declares no `responses` either, so it has exactly one success body, from `output`. Several success bodies is what makes something a route.
 
 # Naming
 

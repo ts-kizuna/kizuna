@@ -383,7 +383,7 @@ export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: s
             }
             if (values.every((value) => typeof value === 'number')) {
                 return {
-                    expression: 'Double',
+                    expression: values.every((value) => Number.isInteger(value)) ? 'Int' : 'Double',
                     optional: false,
                 };
             }

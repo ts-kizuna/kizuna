@@ -9,6 +9,7 @@ import type {
     JobsOf,
     ToolsOf,
     GuardSchemaOf,
+    ToolAccessControlOf,
 } from './contract.js';
 import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
@@ -74,7 +75,9 @@ export type ContractJobsRouter<C> = C extends Contract ? JobHandlers<JobsOf<C>> 
  * `input` and `throwError`, so the same handler runs however the tool is
  * reached.
  */
-export type ContractToolsRouter<C> = C extends Contract ? ToolHandlers<ToolsOf<C>> : never;
+export type ContractToolsRouter<C> = C extends Contract
+    ? ToolHandlers<ToolsOf<C>, SchemesOf<C>, ToolAccessControlOf<C>, RequestContextOf<C>>
+    : never;
 
 /**
  * The handlers for a group named on the contract, or for a bare route group.
@@ -225,7 +228,11 @@ export type ServerApiOptions<C extends Contract, HandlerContext> = {
     router: ContractRouter<C, HandlerContext>;
 } & (string extends keyof SchemesOf<C> ? { guards?: undefined } : { guards: NoInfer<GuardsFor<SchemesOf<C>, HandlerContext>> }) &
     (string extends keyof JobsOf<C> ? { jobs?: undefined } : { jobs: NoInfer<ContractJobsRouter<C>> }) &
-    (string extends keyof ToolsOf<C> ? { tools?: undefined } : { tools: NoInfer<ContractToolsRouter<C>> }) &
+    (string extends keyof ToolsOf<C>
+        ? { tools?: undefined }
+        : [keyof ContractToolsRouter<C>] extends [never]
+          ? { tools?: undefined }
+          : { tools: NoInfer<ContractToolsRouter<C>> }) &
     (string extends keyof RequestContextOf<C>
         ? { requestContext?: undefined }
         : { requestContext: NoInfer<{ [Name in keyof RequestContextOf<C>]: RequestContextRun<HandlerContext> }> }) &
@@ -273,6 +280,8 @@ export const createServerSurface = <C extends Contract, HandlerContext, Api>(
                         ? {
                               tools: contract.tools,
                               handlers: (tools ?? {}) as Record<string, unknown>,
+                              router: router as Record<string, unknown>,
+                              requestContextNames: Object.keys(contract.requestContext ?? {}),
                           }
                         : undefined,
                 }),

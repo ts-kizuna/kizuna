@@ -1,15 +1,15 @@
 /**
- * Set by the MCP specification.
+ * Set by the MCP specification, and matched by the Anthropic and OpenAI tool
+ * APIs.
  *
  * @see https://modelcontextprotocol.io/specification/latest/server/tools
  */
 const MAX_TOOL_NAME_LENGTH = 128;
 
 /**
- * The specification allows a dot too, and kizuna's own route and tool keys are
- * dotted. Claude and GitHub Copilot validate against this narrower set and
- * reject the whole tool list over one name outside it, so the dot does not
- * survive here.
+ * Narrower than the specification, which allows a dot. Anthropic's Messages
+ * API, OpenAI's tool API and VS Code all reject one, so a dotted name is
+ * unusable wherever it matters.
  */
 const TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
@@ -64,8 +64,7 @@ export const deriveToolNames = (entries: ToolNameEntry[]): Map<string, string> =
         if (name.length > MAX_TOOL_NAME_LENGTH) {
             throw new Error(
                 `${sentenceLabel(origin)} "${key}" becomes the tool name "${name}", which is ${name.length} characters, ` +
-                    `exceeding the MCP maximum of ${MAX_TOOL_NAME_LENGTH}. ` +
-                    `Use a shorter key.`
+                    `over the MCP maximum of ${MAX_TOOL_NAME_LENGTH}. Use a shorter key.`
             );
         }
 

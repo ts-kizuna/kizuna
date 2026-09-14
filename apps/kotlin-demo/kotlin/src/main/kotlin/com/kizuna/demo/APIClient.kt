@@ -1013,6 +1013,78 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             val id: String
             val name: String
 
+            @SerialName("users.find")
+            @Serializable
+            data class Users_find(val value: ToolCallUsersFind) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.list")
+            @Serializable
+            data class Users_list(val value: ToolCallUsersList) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.create")
+            @Serializable
+            data class Users_create(val value: ToolCallUsersCreate) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.remove")
+            @Serializable
+            data class Users_remove(val value: ToolCallUsersRemove) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.archive")
+            @Serializable
+            data class Users_archive(val value: ToolCallUsersArchive) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.countActive")
+            @Serializable
+            data class Users_countActive(val value: ToolCallUsersCountActive) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.search.byName")
+            @Serializable
+            data class Users_search_byName(val value: ToolCallUsersSearchByName) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.search.suggest")
+            @Serializable
+            data class Users_search_suggest(val value: ToolCallUsersSearchSuggest) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.records.profile")
+            @Serializable
+            data class Users_records_profile(val value: ToolCallUsersRecordsProfile) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.records.activity.forYear")
+            @Serializable
+            data class Users_records_activity_forYear(val value: ToolCallUsersRecordsActivityForYear) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.records.activity.summarize")
+            @Serializable
+            data class Users_records_activity_summarize(val value: ToolCallUsersRecordsActivitySummarize) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("workspace.read")
+            @Serializable
+            data class Workspace_read(val value: ToolCallWorkspaceRead) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
             @SerialName("weather.getForecast")
             @Serializable
             data class Weather_getForecast(val value: ToolCallWeatherGetForecast) : ToolCall {
@@ -1032,6 +1104,152 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
                 override val name: String get() = value.name
             }
         }
+
+        @Serializable
+        data class ToolCallUsersFind(
+            val id: String,
+            val name: String,
+            val input: ToolCallUsersFindInput
+        )
+
+        @Serializable
+        data class ToolCallUsersFindInput(val params: ToolCallUsersFindInputParams)
+
+        @Serializable
+        data class ToolCallUsersFindInputParams(val id: String)
+
+        @Serializable
+        data class ToolCallUsersList(
+            val id: String,
+            val name: String,
+            val input: ToolCallUsersListInput
+        )
+
+        @Serializable
+        data class ToolCallUsersListInput(val query: ToolCallUsersListInputQuery? = null)
+
+        @Serializable
+        data class ToolCallUsersListInputQuery(
+            val page: Int? = null,
+            val limit: Int? = null
+        )
+
+        @Serializable
+        data class ToolCallUsersCreate(
+            val id: String,
+            val name: String,
+            val input: ToolCallUsersCreateInput
+        )
+
+        @Serializable
+        data class ToolCallUsersCreateInput(val body: API.CreateUserInput)
+
+        @Serializable
+        data class ToolCallUsersRemove(
+            val id: String,
+            val name: String,
+            val input: ToolCallUsersRemoveInput
+        )
+
+        @Serializable
+        data class ToolCallUsersRemoveInput(val params: ToolCallUsersRemoveInputParams)
+
+        @Serializable
+        data class ToolCallUsersRemoveInputParams(val id: String)
+
+        @Serializable
+        data class ToolCallUsersArchive(
+            val id: String,
+            val name: String,
+            val input: ToolCallUsersArchiveInput
+        )
+
+        @Serializable
+        data class ToolCallUsersArchiveInput(val params: ToolCallUsersArchiveInputParams)
+
+        @Serializable
+        data class ToolCallUsersArchiveInputParams(val id: String)
+
+        @Serializable
+        data class ToolCallUsersCountActive(
+            val id: String,
+            val name: String
+        )
+
+        @Serializable
+        data class ToolCallUsersSearchByName(
+            val id: String,
+            val name: String,
+            val input: ToolCallUsersSearchByNameInput
+        )
+
+        @Serializable
+        data class ToolCallUsersSearchByNameInput(val query: ToolCallUsersSearchByNameInputQuery)
+
+        @Serializable
+        data class ToolCallUsersSearchByNameInputQuery(
+            val q: String,
+            val limit: Int,
+            val cursor: Int
+        )
+
+        @Serializable
+        data class ToolCallUsersSearchSuggest(
+            val id: String,
+            val name: String,
+            val input: ToolCallUsersSearchSuggestInput
+        )
+
+        @Serializable
+        data class ToolCallUsersSearchSuggestInput(val prefix: String)
+
+        @Serializable
+        data class ToolCallUsersRecordsProfile(
+            val id: String,
+            val name: String,
+            val input: ToolCallUsersRecordsProfileInput
+        )
+
+        @Serializable
+        data class ToolCallUsersRecordsProfileInput(val params: ToolCallUsersRecordsProfileInputParams)
+
+        @Serializable
+        data class ToolCallUsersRecordsProfileInputParams(val id: String)
+
+        @Serializable
+        data class ToolCallUsersRecordsActivityForYear(
+            val id: String,
+            val name: String,
+            val input: ToolCallUsersRecordsActivityForYearInput
+        )
+
+        @Serializable
+        data class ToolCallUsersRecordsActivityForYearInput(val params: ToolCallUsersRecordsActivityForYearInputParams)
+
+        @Serializable
+        data class ToolCallUsersRecordsActivityForYearInputParams(
+            val id: String,
+            val year: Int
+        )
+
+        @Serializable
+        data class ToolCallUsersRecordsActivitySummarize(
+            val id: String,
+            val name: String,
+            val input: ToolCallUsersRecordsActivitySummarizeInput
+        )
+
+        @Serializable
+        data class ToolCallUsersRecordsActivitySummarizeInput(
+            val userId: String,
+            val year: Int
+        )
+
+        @Serializable
+        data class ToolCallWorkspaceRead(
+            val id: String,
+            val name: String
+        )
 
         @Serializable
         data class ToolCallWeatherGetForecast(
@@ -1079,6 +1297,78 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             val id: String
             val name: String
 
+            @SerialName("users.find")
+            @Serializable
+            data class Users_find(val value: ToolResultUsersFind) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.list")
+            @Serializable
+            data class Users_list(val value: ToolResultUsersList) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.create")
+            @Serializable
+            data class Users_create(val value: ToolResultUsersCreate) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.remove")
+            @Serializable
+            data class Users_remove(val value: ToolResultUsersRemove) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.archive")
+            @Serializable
+            data class Users_archive(val value: ToolResultUsersArchive) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.countActive")
+            @Serializable
+            data class Users_countActive(val value: ToolResultUsersCountActive) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.search.byName")
+            @Serializable
+            data class Users_search_byName(val value: ToolResultUsersSearchByName) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.search.suggest")
+            @Serializable
+            data class Users_search_suggest(val value: ToolResultUsersSearchSuggest) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.records.profile")
+            @Serializable
+            data class Users_records_profile(val value: ToolResultUsersRecordsProfile) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.records.activity.forYear")
+            @Serializable
+            data class Users_records_activity_forYear(val value: ToolResultUsersRecordsActivityForYear) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("users.records.activity.summarize")
+            @Serializable
+            data class Users_records_activity_summarize(val value: ToolResultUsersRecordsActivitySummarize) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("workspace.read")
+            @Serializable
+            data class Workspace_read(val value: ToolResultWorkspaceRead) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
             @SerialName("weather.getForecast")
             @Serializable
             data class Weather_getForecast(val value: ToolResultWeatherGetForecast) : ToolResult {
@@ -1100,6 +1390,213 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
 
         @Serializable
+        data class ToolResultUsersFind(
+            val id: String,
+            val name: String,
+            val output: ToolResultUsersFindOutput
+        )
+
+        @Serializable
+        data class ToolResultUsersFindOutput(
+            val status: Int,
+            val body: API.User? = null,
+            val detail: String? = null
+        )
+
+        @Serializable
+        data class ToolResultUsersList(
+            val id: String,
+            val name: String,
+            val output: ToolResultUsersListOutput
+        )
+
+        @Serializable
+        data class ToolResultUsersListOutput(
+            val status: Int,
+            val body: ToolResultUsersListOutputBody
+        )
+
+        @Serializable
+        data class ToolResultUsersListOutputBody(
+            val users: List<API.User>,
+            val total: Double
+        )
+
+        @Serializable
+        data class ToolResultUsersCreate(
+            val id: String,
+            val name: String,
+            val output: ToolResultUsersCreateOutput
+        )
+
+        @Serializable
+        data class ToolResultUsersCreateOutput(
+            val status: Int,
+            val body: API.User? = null,
+            val detail: String? = null
+        )
+
+        @Serializable
+        data class ToolResultUsersRemove(
+            val id: String,
+            val name: String,
+            val output: ToolResultUsersRemoveOutput
+        )
+
+        @Serializable
+        data class ToolResultUsersRemoveOutput(
+            val status: Int,
+            val body: ToolResultUsersRemoveOutputBody? = null,
+            val detail: String? = null
+        )
+
+        @Serializable
+        data class ToolResultUsersRemoveOutputBody(val success: Boolean)
+
+        @Serializable
+        data class ToolResultUsersArchive(
+            val id: String,
+            val name: String,
+            val output: ToolResultUsersArchiveOutput
+        )
+
+        @Serializable
+        data class ToolResultUsersArchiveOutput(
+            val status: Int,
+            val body: ToolResultUsersArchiveOutputBody
+        )
+
+        @Serializable
+        data class ToolResultUsersArchiveOutputBody(
+            val alreadyArchived: Boolean,
+            val userId: String
+        )
+
+        @Serializable
+        data class ToolResultUsersCountActive(
+            val id: String,
+            val name: String,
+            val output: ToolResultUsersCountActiveOutput
+        )
+
+        @Serializable
+        data class ToolResultUsersCountActiveOutput(
+            val status: Int,
+            val body: ToolResultUsersCountActiveOutputBody? = null,
+            val detail: String? = null
+        )
+
+        @Serializable
+        data class ToolResultUsersCountActiveOutputBody(val users: Int)
+
+        @Serializable
+        data class ToolResultUsersSearchByName(
+            val id: String,
+            val name: String,
+            val output: ToolResultUsersSearchByNameOutput
+        )
+
+        @Serializable
+        data class ToolResultUsersSearchByNameOutput(
+            val status: Int,
+            val body: ToolResultUsersSearchByNameOutputBody
+        )
+
+        @Serializable
+        data class ToolResultUsersSearchByNameOutputBody(
+            val users: List<API.User>,
+            val nextCursor: Double? = null
+        )
+
+        @Serializable
+        data class ToolResultUsersSearchSuggest(
+            val id: String,
+            val name: String,
+            val output: ToolResultUsersSearchSuggestOutput
+        )
+
+        @Serializable
+        data class ToolResultUsersSearchSuggestOutput(
+            val status: Int,
+            val body: ToolResultUsersSearchSuggestOutputBody? = null,
+            val detail: String? = null
+        )
+
+        @Serializable
+        data class ToolResultUsersSearchSuggestOutputBody(val names: List<String>)
+
+        @Serializable
+        data class ToolResultUsersRecordsProfile(
+            val id: String,
+            val name: String,
+            val output: ToolResultUsersRecordsProfileOutput
+        )
+
+        @Serializable
+        data class ToolResultUsersRecordsProfileOutput(
+            val status: Int,
+            val body: API.User? = null,
+            val detail: String? = null
+        )
+
+        @Serializable
+        data class ToolResultUsersRecordsActivityForYear(
+            val id: String,
+            val name: String,
+            val output: ToolResultUsersRecordsActivityForYearOutput
+        )
+
+        @Serializable
+        data class ToolResultUsersRecordsActivityForYearOutput(
+            val status: Int,
+            val body: ToolResultUsersRecordsActivityForYearOutputBody? = null,
+            val detail: String? = null
+        )
+
+        @Serializable
+        data class ToolResultUsersRecordsActivityForYearOutputBody(
+            val userId: String,
+            val year: Int,
+            val events: Int
+        )
+
+        @Serializable
+        data class ToolResultUsersRecordsActivitySummarize(
+            val id: String,
+            val name: String,
+            val output: ToolResultUsersRecordsActivitySummarizeOutput
+        )
+
+        @Serializable
+        data class ToolResultUsersRecordsActivitySummarizeOutput(
+            val status: Int,
+            val body: ToolResultUsersRecordsActivitySummarizeOutputBody? = null,
+            val detail: String? = null
+        )
+
+        @Serializable
+        data class ToolResultUsersRecordsActivitySummarizeOutputBody(val summary: String)
+
+        @Serializable
+        data class ToolResultWorkspaceRead(
+            val id: String,
+            val name: String,
+            val output: ToolResultWorkspaceReadOutput
+        )
+
+        @Serializable
+        data class ToolResultWorkspaceReadOutput(
+            val status: Int,
+            val body: ToolResultWorkspaceReadOutputBody
+        )
+
+        @Serializable
+        data class ToolResultWorkspaceReadOutputBody(
+            val id: String,
+            val name: String
+        )
+
+        @Serializable
         data class ToolResultWeatherGetForecast(
             val id: String,
             val name: String,
@@ -1108,13 +1605,20 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         @Serializable
         data class ToolResultWeatherGetForecastOutput(
+            val status: Int,
+            val body: ToolResultWeatherGetForecastOutputBody? = null,
+            val detail: String? = null
+        )
+
+        @Serializable
+        data class ToolResultWeatherGetForecastOutputBody(
             val temperature: Double,
-            val unit: ToolResultWeatherGetForecastOutputUnit,
+            val unit: ToolResultWeatherGetForecastOutputBodyUnit,
             val summary: String
         )
 
         @Serializable
-        enum class ToolResultWeatherGetForecastOutputUnit(override val wireValue: String) : KizunaQueryValue {
+        enum class ToolResultWeatherGetForecastOutputBodyUnit(override val wireValue: String) : KizunaQueryValue {
             @SerialName("celsius") CELSIUS("celsius"),
             @SerialName("fahrenheit") FAHRENHEIT("fahrenheit")
         }
@@ -1127,10 +1631,17 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         )
 
         @Serializable
-        data class ToolResultChartsPlotSignupsOutput(val points: List<ToolResultChartsPlotSignupsOutputPointsItem>)
+        data class ToolResultChartsPlotSignupsOutput(
+            val status: Int,
+            val body: ToolResultChartsPlotSignupsOutputBody? = null,
+            val detail: String? = null
+        )
 
         @Serializable
-        data class ToolResultChartsPlotSignupsOutputPointsItem(
+        data class ToolResultChartsPlotSignupsOutputBody(val points: List<ToolResultChartsPlotSignupsOutputBodyPointsItem>)
+
+        @Serializable
+        data class ToolResultChartsPlotSignupsOutputBodyPointsItem(
             val date: String,
             val signups: Int
         )
@@ -1143,7 +1654,14 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         )
 
         @Serializable
-        data class ToolResultCountWordsOutput(val words: Int)
+        data class ToolResultCountWordsOutput(
+            val status: Int,
+            val body: ToolResultCountWordsOutputBody? = null,
+            val detail: String? = null
+        )
+
+        @Serializable
+        data class ToolResultCountWordsOutputBody(val words: Int)
 
         @Serializable
         data class ToolError(
@@ -1154,6 +1672,18 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         @Serializable
         enum class ToolErrorName(override val wireValue: String) : KizunaQueryValue {
+            @SerialName("users.find") USERS_FIND("users.find"),
+            @SerialName("users.list") USERS_LIST("users.list"),
+            @SerialName("users.create") USERS_CREATE("users.create"),
+            @SerialName("users.remove") USERS_REMOVE("users.remove"),
+            @SerialName("users.archive") USERS_ARCHIVE("users.archive"),
+            @SerialName("users.countActive") USERS_COUNTACTIVE("users.countActive"),
+            @SerialName("users.search.byName") USERS_SEARCH_BYNAME("users.search.byName"),
+            @SerialName("users.search.suggest") USERS_SEARCH_SUGGEST("users.search.suggest"),
+            @SerialName("users.records.profile") USERS_RECORDS_PROFILE("users.records.profile"),
+            @SerialName("users.records.activity.forYear") USERS_RECORDS_ACTIVITY_FORYEAR("users.records.activity.forYear"),
+            @SerialName("users.records.activity.summarize") USERS_RECORDS_ACTIVITY_SUMMARIZE("users.records.activity.summarize"),
+            @SerialName("workspace.read") WORKSPACE_READ("workspace.read"),
             @SerialName("weather.getForecast") WEATHER_GETFORECAST("weather.getForecast"),
             @SerialName("charts.plotSignups") CHARTS_PLOTSIGNUPS("charts.plotSignups"),
             @SerialName("countWords") COUNTWORDS("countWords")

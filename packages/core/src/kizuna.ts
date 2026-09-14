@@ -3,13 +3,23 @@ import { tagRoutes } from './routes.js';
 import { assembleContract, type Contract } from './contract.js';
 import { pluginRouteTree, type ContractPlugins, type ContractPluginsArg, type PluginArgs } from './plugin.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
+import { flattenRoutes } from './handler-pipeline.js';
 import { assertValidDeprecationDates } from './deprecation.js';
 import { assertValidCache } from './cache.js';
 import { injectGuardResponses } from './guard-responses.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { jobClaims, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, type JobsArg, type JobsConfig } from './jobs.js';
-import { buildTools, type AuthoredTools, type CompiledTools, type Tools } from './tools.js';
+import {
+    attachRouteKeys,
+    isCompiledTool,
+    buildTools,
+    resolveAuthoredTools,
+    type AuthoredToolsArg,
+    type AuthoredTools,
+    type CompiledTools,
+    type Tools,
+} from './tools.js';
 import type { ToolsArg } from './tool-runner.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
 import { createIdentity, type RolesOf } from './identity.js';
@@ -31,6 +41,25 @@ export type AccessControlValue<Id extends string = string, Identities = Record<s
     | Id
     | false
     | AccessControlRule<Id, Identities>;
+
+/**
+ * The access control map for a contract's tools, nested the way the tool tree
+ * is. A tool naming a route with `toolFromRoutes` has no entry: that route's
+ * access control governs it.
+ */
+export type ToolAccessControlMap<Id extends string = string, T extends Tools = Tools, Identities = Record<string, unknown>> = {
+    [Name in keyof T & string]?: T[Name] extends {
+        route: unknown;
+    }
+        ? never
+        : T[Name] extends {
+                definition: unknown;
+            }
+          ? AccessControlValue<Id, Identities>
+          : T[Name] extends Tools
+            ? ToolAccessControlMap<Id, T[Name], Identities>
+            : never;
+};
 
 /**
  * The `requires` an identity accepts: a subset of the catalog behind its roles,
@@ -223,6 +252,39 @@ const resolveAccessControlValue = (
 };
 
 /**
+ * Write a tool access control map onto the tools it names. A tool running a
+ * route is refused an entry: that route already says who may call it.
+ */
+const applyToolAccessControl = (
+    tools: Tools,
+    map: Record<string, unknown>,
+    identities: Record<string, SecurityScheme> | undefined,
+    path = ''
+): void => {
+    for (const [name, value] of Object.entries(map)) {
+        const toolKey = path ? `${path}.${name}` : name;
+        const node = tools[name];
+        if (node === undefined) {
+            throw new Error(`Tool access control map names "${toolKey}", which this contract does not declare.`);
+        }
+        if (isCompiledTool(node)) {
+            if (node.route !== undefined) {
+                throw new Error(
+                    `Tool "${toolKey}" runs a route, so the route's own entry in the access control map says who may call it. Remove this one.`
+                );
+            }
+            const entry = node as unknown as RouteDefinition;
+            resolveAccessControlValue(entry, value as AccessControlValue, identities, toolKey);
+            const mutable = node as { identity: string | undefined };
+            const requirement = entry.security?.[0];
+            mutable.identity = typeof requirement === 'string' ? requirement : requirement && Object.keys(requirement)[0];
+            continue;
+        }
+        applyToolAccessControl(node as Tools, value as Record<string, unknown>, identities, toolKey);
+    }
+};
+
+/**
  * The security requirement for the identities an entry names. An OAuth token
  * carries its permissions as scopes, so an `oauth2` or `openIdConnect`
  * identity lists what the route requires from its catalog.
@@ -342,13 +404,34 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *     },
      * });
      */
-    accessControl<
-        const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
-        const A extends AccessControlMap<IdentityNamesOf<Spec>, R, Spec['identities']>,
-    >(
-        routes: R,
-        map: A & ValidAccessControlMap<A, R, IdentityNamesOf<Spec>, Spec['identities']>
-    ): A;
+    accessControl: {
+        <
+            const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
+            const A extends AccessControlMap<IdentityNamesOf<Spec>, R, Spec['identities']>,
+        >(
+            routes: R,
+            map: A & ValidAccessControlMap<A, R, IdentityNamesOf<Spec>, Spec['identities']>
+        ): A;
+        /**
+         * The access control map for the contract's tools, typed against them.
+         * Keep it beside `k.accessControl`, then pass it to `k.contract` under
+         * `toolAccessControl`.
+         *
+         * A tool naming a route with `toolFromRoutes` has no entry.
+         *
+         * @example
+         * export const toolAccessControl = k.accessControl.tools(tools, {
+         *     purgeCache: {
+         *         auth: 'member',
+         *         roles: 'owner',
+         *     },
+         * });
+         */
+        tools<const T extends Tools, const A extends ToolAccessControlMap<IdentityNamesOf<Spec>, T, Spec['identities']>>(
+            tools: T,
+            map: A
+        ): A;
+    };
     /**
      * Declare scheduled jobs. Pass the identity every job requires, the one
      * credential your scheduler sends, then the jobs themselves.
@@ -372,13 +455,13 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
     jobs<const J extends AuthoredJobs, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: J): CompiledJobs<J, Name>;
     jobs<const J extends AuthoredJobs>(definitions: J): CompiledJobs<J, undefined>;
     /**
-     * Declare tools a model may call. Pass the identity every tool requires,
-     * then the tools themselves.
+     * Declare tools a model may call. A tool declares no path and no method, and
+     * never appears in `contract.routes`, the OpenAPI document, or the generated
+     * Swift and Kotlin clients. A streamed response names them under `tools`,
+     * and the MCP plugin publishes them.
      *
-     * Tools are their own concept, not routes. A tool declares no path and no
-     * method, and never appears in `contract.routes`, the OpenAPI document, or
-     * the generated Swift and Kotlin clients. A streamed response names them
-     * under `tools`, and the MCP plugin publishes them.
+     * Pass a function instead of an object to reach `toolFromRoutes`, which
+     * names a route as a tool.
      *
      * @example
      * export const tools = k.tools({
@@ -392,15 +475,20 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *                 temperature: z.number(),
      *                 summary: z.string(),
      *             }),
-     *             annotations: {
-     *                 readOnlyHint: true,
-     *             },
      *         },
      *     },
      * });
+     *
+     * @example
+     * export const tools = k.tools(({ toolFromRoutes }) => ({
+     *     users: {
+     *         find: toolFromRoutes(routes.users.getUser),
+     *     },
+     * }));
      */
-    tools<const T extends AuthoredTools, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: T): CompiledTools<T, Name>;
-    tools<const T extends AuthoredTools>(definitions: T): CompiledTools<T, undefined>;
+    tools: {
+        <const T extends AuthoredTools>(definitions: AuthoredToolsArg<T>): CompiledTools<T>;
+    };
     /**
      * Assemble route groups into a contract. The access control map assigns each group
      * (and optionally each route, via a `'*'` cascade) the identity it requires,
@@ -416,11 +504,13 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         const A extends AccessControlMap<IdentityNamesOf<Spec>, R, Spec['identities']>,
         const J extends Jobs = Record<string, never>,
         const T extends Tools = Record<string, never>,
+        const TA extends Record<string, unknown> = Record<string, never>,
         const P extends ContractPlugins = Record<string, never>,
     >(definition: {
         routes: R;
         jobs?: J;
         tools?: T;
+        toolAccessControl?: TA & ToolAccessControlMap<IdentityNamesOf<Spec>, T, Spec['identities']>;
         plugins?: ContractPluginsArg<R, P, T>;
         accessControl: A & ValidAccessControlMap<A, R, IdentityNamesOf<Spec>, Spec['identities']>;
     }): Contract<
@@ -441,17 +531,20 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         P,
         J,
         T,
-        Spec['guardSchema']
+        Spec['guardSchema'],
+        TA
     >;
     contract<
         const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
         const J extends Jobs = Record<string, never>,
         const T extends Tools = Record<string, never>,
+        const TA extends Record<string, unknown> = Record<string, never>,
         const P extends ContractPlugins = Record<string, never>,
     >(definition: {
         routes: R;
         jobs?: J;
         tools?: T;
+        toolAccessControl?: TA & ToolAccessControlMap<IdentityNamesOf<Spec>, T, Spec['identities']>;
         plugins?: ContractPluginsArg<R, P, T>;
     }): Contract<
         RoutesWithHandlerContext<
@@ -471,7 +564,8 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         P,
         J,
         T,
-        Spec['guardSchema']
+        Spec['guardSchema'],
+        TA
     >;
     /**
      * Emit a validation issue with a machine-readable `code`, checked against the
@@ -568,19 +662,17 @@ const createSurface = <
             ? buildJobs(undefined, identityOrDefinitions as AuthoredJobs)
             : buildJobs(identityOrDefinitions as string, definitions)) as K<Spec>['jobs'];
 
-    const tools = ((identityOrDefinitions: string | AuthoredTools, definitions?: AuthoredTools) =>
-        definitions === undefined
-            ? buildTools(undefined, identityOrDefinitions as AuthoredTools)
-            : buildTools(identityOrDefinitions as string, definitions)) as K<Spec>['tools'];
+    const tools = ((definitions: AuthoredToolsArg<AuthoredTools>) => buildTools(resolveAuthoredTools(definitions))) as K<Spec>['tools'];
 
     const contract = (definition: {
         routes: Routes;
         jobs?: Jobs;
         tools?: Tools;
+        toolAccessControl?: Record<string, unknown>;
         plugins?: ContractPluginsArg<Routes, ContractPlugins>;
         accessControl?: Record<string, GroupAccessControl>;
     }) => {
-        const { routes: contractRoutes, jobs: contractJobs, tools: contractTools, accessControl } = definition;
+        const { routes: contractRoutes, jobs: contractJobs, tools: contractTools, toolAccessControl, accessControl } = definition;
         const plugins =
             typeof definition.plugins === 'function'
                 ? definition.plugins({
@@ -595,6 +687,13 @@ const createSurface = <
         ]);
         assertValidDeprecationDates(contractRoutes);
         assertValidDeprecationDates(pluginRouteTree(plugins));
+        if (contractTools) {
+            if (toolAccessControl) applyToolAccessControl(contractTools, toolAccessControl, config?.identities);
+            attachRouteKeys(
+                contractTools,
+                new Map(flattenRoutes(contractRoutes).map(({ route, routeKey, routeTags }) => [route, { routeKey, routeTags }]))
+            );
+        }
         if (accessControl) {
             for (const groupKey of Object.keys(accessControl)) {
                 if (!(groupKey in contractRoutes)) {
@@ -624,6 +723,7 @@ const createSurface = <
             routes: contractRoutes as Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
             jobs: contractJobs,
             tools: contractTools,
+            toolAccessControl,
             accessControl,
             tags: config?.tags,
             securitySchemes: config?.identities,
@@ -639,7 +739,9 @@ const createSurface = <
         routes,
         jobs,
         tools,
-        accessControl: (_routes, map) => map,
+        accessControl: Object.assign((_routes: unknown, map: unknown) => map, {
+            tools: (_tools: unknown, map: unknown) => map,
+        }) as K<Spec>['accessControl'],
         contract: contract as K<Spec>['contract'],
         issue: addCodedIssue,
     };
